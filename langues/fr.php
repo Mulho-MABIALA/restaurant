@@ -1,0 +1,23 @@
+<?php
+return [
+    'home' => 'Accueil',
+    'about' => 'À propos',
+    'menu' => 'Menu',
+    'events' => 'Événements',
+    'gallery' => 'Galerie',
+    'order' => 'Commander',
+    'book_table' => 'Réserver une table',
+    'contact' => 'Contact',
+    'languages' => 'Langues',
+    'choose_us' => 'Pourquoi nous choisir',
+    'learn_more' => 'En savoir plus',
+    'clients' => 'Clients',
+    'projects' => 'Projets',
+    'hours_support' => 'Heures de support',
+    'employees' => 'Employés',
+    'our_menu' => 'Notre Menu',
+    'add_to_cart' => 'Ajouter au panier',
+    'selected_category' => 'Catégorie sélectionnée',
+    'no_image' => 'Image à venir',
+    'table_booking' => 'Réserver une table',
+];
