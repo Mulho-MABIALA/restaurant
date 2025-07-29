@@ -348,23 +348,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <?php endif; ?>
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="flex space-x-2">
-                          <button onclick="openEditModal(<?= $res['id'] ?>)" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all duration-200 hover:scale-105 border border-blue-200">
-                            <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
-                            </svg>
-                            Modifier
-                          </button>
-                          <a href="?delete=<?= $res['id'] ?>" onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette réservation ?')" class="inline-flex items-center px-3 py-2 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-all duration-200 hover:scale-105 border border-red-200">
-                            <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path fill-rule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" clip-rule="evenodd"/>
-                              <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3l1.5 1.5a1 1 0 01-1.414 1.414L10 10.414V6a1 1 0 011-1z" clip-rule="evenodd"/>
-                              <path fill-rule="evenodd" d="M3 5a2 2 0 012-2h1a1 1 0 000 2H5v11a2 2 0 002 2h6a2 2 0 002-2V5h-1a1 1 0 100-2h1a2 2 0 012 2v11a4 4 0 01-4 4H7a4 4 0 01-4-4V5z" clip-rule="evenodd"/>
-                            </svg>
-                            Supprimer
-                          </a>
-                        </div>
-                      </td>
+  <div class="flex space-x-2">
+    <button onclick="openViewModal(<?= $res['id'] ?>)" class="inline-flex items-center px-3 py-2 text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-all duration-200 hover:scale-105 border border-green-200">
+      <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+        <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+        <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
+      </svg>
+      Voir
+    </button>
+    <button onclick="openEditModal(<?= $res['id'] ?>)" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all duration-200 hover:scale-105 border border-blue-200">
+      <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+      </svg>
+      Modifier
+    </button>
+    <a href="?delete=<?= $res['id'] ?>" onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette réservation ?')" class="inline-flex items-center px-3 py-2 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-all duration-200 hover:scale-105 border border-red-200">
+      <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" clip-rule="evenodd"/>
+        <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3l1.5 1.5a1 1 0 01-1.414 1.414L10 10.414V6a1 1 0 011-1z" clip-rule="evenodd"/>
+        <path fill-rule="evenodd" d="M3 5a2 2 0 012-2h1a1 1 0 000 2H5v11a2 2 0 002 2h6a2 2 0 002-2V5h-1a1 1 0 100-2h1a2 2 0 012 2v11a4 4 0 01-4 4H7a4 4 0 01-4-4V5z" clip-rule="evenodd"/>
+      </svg>
+      Supprimer
+    </a>
+  </div>
+</td>
                     </tr>
                   <?php endforeach; ?>
                 <?php else: ?>
@@ -683,6 +690,194 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
   </div>
 
+  <div id="viewReservationModal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto animate-slide-up">
+    <div class="p-8">
+      <div class="flex justify-between items-center mb-6">
+        <div>
+          <h3 class="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+            Détails de la réservation
+          </h3>
+          <p class="text-gray-600 mt-1">Informations complètes de la réservation</p>
+        </div>
+        <button onclick="closeViewModal()" class="p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 rounded-full transition-all duration-200">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Informations client -->
+        <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
+          <div class="flex items-center mb-4">
+            <div class="p-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg">
+              <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/>
+              </svg>
+            </div>
+            <h4 class="text-lg font-semibold text-gray-800 ml-3">Informations Client</h4>
+          </div>
+          
+          <div class="space-y-4">
+            <div class="flex items-center p-3 bg-white rounded-lg shadow-sm">
+              <div class="w-10 h-10 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center mr-3">
+                <span id="view_nom_initial" class="text-white font-bold text-sm"></span>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 uppercase tracking-wide">Nom complet</p>
+                <p id="view_nom" class="text-sm font-semibold text-gray-900"></p>
+              </div>
+            </div>
+            
+            <div class="flex items-center p-3 bg-white rounded-lg shadow-sm">
+              <div class="w-10 h-10 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full flex items-center justify-center mr-3">
+                <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/>
+                  <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/>
+                </svg>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 uppercase tracking-wide">Adresse email</p>
+                <p id="view_email" class="text-sm font-semibold text-gray-900"></p>
+              </div>
+            </div>
+            
+            <div class="flex items-center p-3 bg-white rounded-lg shadow-sm">
+              <div class="w-10 h-10 bg-gradient-to-r from-green-400 to-blue-500 rounded-full flex items-center justify-center mr-3">
+                <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/>
+                </svg>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 uppercase tracking-wide">Téléphone</p>
+                <p id="view_telephone" class="text-sm font-semibold text-gray-900"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Informations réservation -->
+        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-6 border border-emerald-100">
+          <div class="flex items-center mb-4">
+            <div class="p-2 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-lg">
+              <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/>
+              </svg>
+            </div>
+            <h4 class="text-lg font-semibold text-gray-800 ml-3">Détails Réservation</h4>
+          </div>
+          
+          <div class="space-y-4">
+            <div class="flex items-center p-3 bg-white rounded-lg shadow-sm">
+              <div class="w-10 h-10 bg-gradient-to-r from-purple-400 to-pink-500 rounded-full flex items-center justify-center mr-3">
+                <span id="view_id_display" class="text-white font-bold text-sm"></span>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 uppercase tracking-wide">ID Réservation</p>
+                <p id="view_id" class="text-sm font-semibold text-gray-900"></p>
+              </div>
+            </div>
+            
+            <div class="flex items-center p-3 bg-white rounded-lg shadow-sm">
+              <div class="w-10 h-10 bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full flex items-center justify-center mr-3">
+                <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/>
+                </svg>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 uppercase tracking-wide">Date de réservation</p>
+                <p id="view_date_reservation" class="text-sm font-semibold text-gray-900"></p>
+              </div>
+            </div>
+            
+            <div class="flex items-center p-3 bg-white rounded-lg shadow-sm">
+              <div class="w-10 h-10 bg-gradient-to-r from-orange-400 to-red-500 rounded-full flex items-center justify-center mr-3">
+                <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+                </svg>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 uppercase tracking-wide">Heure de réservation</p>
+                <p id="view_heure_reservation" class="text-sm font-semibold text-gray-900"></p>
+              </div>
+            </div>
+            
+            <div class="flex items-center p-3 bg-white rounded-lg shadow-sm">
+              <div class="w-10 h-10 bg-gradient-to-r from-teal-400 to-cyan-500 rounded-full flex items-center justify-center mr-3">
+                <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
+                </svg>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 uppercase tracking-wide">Nombre de personnes</p>
+                <p id="view_personnes" class="text-sm font-semibold text-gray-900"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Informations système -->
+      <div class="mt-8 bg-gradient-to-br from-gray-50 to-slate-50 rounded-xl p-6 border border-gray-100">
+        <div class="flex items-center mb-4">
+          <div class="p-2 bg-gradient-to-r from-gray-500 to-slate-600 rounded-lg">
+            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V4a2 2 0 00-2-2H6zm1 2a1 1 0 000 2h6a1 1 0 100-2H7zm6 7a1 1 0 01-1 1H8a1 1 0 110-2h4a1 1 0 011 1zm-1 4a1 1 0 100-2H8a1 1 0 100 2h4z" clip-rule="evenodd"/>
+            </svg>
+          </div>
+          <h4 class="text-lg font-semibold text-gray-800 ml-3">Informations Système</h4>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="flex items-center p-3 bg-white rounded-lg shadow-sm">
+            <div class="w-8 h-8 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mr-3">
+              <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/>
+              </svg>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 uppercase tracking-wide">Statut</p>
+              <p id="view_statut" class="text-sm font-semibold text-gray-900"></p>
+            </div>
+          </div>
+          
+          <div class="flex items-center p-3 bg-white rounded-lg shadow-sm">
+            <div class="w-8 h-8 bg-gradient-to-r from-indigo-400 to-purple-500 rounded-full flex items-center justify-center mr-3">
+              <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+              </svg>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 uppercase tracking-wide">Date d'envoi</p>
+              <p id="view_date_envoi" class="text-sm font-semibold text-gray-900"></p>
+            </div>
+          </div>
+          
+          <div class="flex items-center p-3 bg-white rounded-lg shadow-sm">
+            <div class="w-8 h-8 bg-gradient-to-r from-pink-400 to-red-500 rounded-full flex items-center justify-center mr-3">
+              <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 2L3 7v11a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h3a1 1 0 001-1V7l-7-5z" clip-rule="evenodd"/>
+              </svg>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 uppercase tracking-wide">Source</p>
+              <p class="text-sm font-semibold text-gray-900">Site Web</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="flex justify-end pt-6 border-t border-gray-100 mt-6">
+        <button onclick="closeViewModal()" 
+                class="px-6 py-3 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-medium rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl">
+          Fermer
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
   <script>
     // Gestion du modal d'ajout
     function openModal() {
@@ -763,6 +958,75 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }, 300);
       }, 5000);
     }
+
+
+// Gestion du modal de visualisation
+function openViewModal(reservationId) {
+  fetch('get_reservation.php?id=' + reservationId)
+    .then(response => response.json())
+    .then(data => {
+      // Remplir les informations client
+      document.getElementById('view_id').textContent = data.id;
+      document.getElementById('view_id_display').textContent = data.id;
+      document.getElementById('view_nom').textContent = data.nom;
+      document.getElementById('view_nom_initial').textContent = data.nom.charAt(0).toUpperCase();
+      document.getElementById('view_email').textContent = data.email;
+      document.getElementById('view_telephone').textContent = data.telephone;
+      document.getElementById('view_personnes').textContent = data.personnes;
+      document.getElementById('view_date_reservation').textContent = formatDate(data.date_reservation);
+      document.getElementById('view_heure_reservation').textContent = data.heure_reservation || 'Non spécifiée';
+      
+      // Statut avec formatage
+      const statutElement = document.getElementById('view_statut');
+      if (data.statut === 'non_lu') {
+        statutElement.innerHTML = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">🔔 Non lu</span>';
+      } else {
+        statutElement.innerHTML = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">✅ Lu</span>';
+      }
+      
+      // Date d'envoi formatée
+      document.getElementById('view_date_envoi').textContent = formatDateTime(data.date_envoi);
+      
+      document.getElementById('viewReservationModal').classList.remove('hidden');
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alert('Une erreur est survenue lors du chargement des données');
+    });
+}
+
+function closeViewModal() {
+  document.getElementById('viewReservationModal').classList.add('hidden');
+}
+
+document.getElementById('viewReservationModal').addEventListener('click', function(e) {
+  if (e.target === this) {
+    closeViewModal();
+  }
+});
+
+// Fonction utilitaire pour formater la date
+function formatDate(dateString) {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+}
+
+// Fonction utilitaire pour formater la date et l'heure
+function formatDateTime(dateString) {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('fr-FR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
 
     // Vérifier toutes les 2 minutes
     setInterval(checkNewReservations, 120000);

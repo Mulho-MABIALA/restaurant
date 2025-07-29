@@ -434,128 +434,183 @@ $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             </div>
                             
                             <!-- Cloche Notifications -->
-                            <div class="relative">
-                                <button 
-                                    @click="notificationsOpen = !notificationsOpen"
-                                    class="relative w-12 h-12 bg-warning-gradient rounded-2xl flex items-center justify-center shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-4 focus:ring-warning/30 group"
-                                    aria-label="Notifications"
-                                    type="button"
-                                >
-                                    <i class="fas fa-bell text-white text-lg group-hover:animate-wiggle"></i>
-                                    <?php if (!empty($nb_nouvelles_notifications) && $nb_nouvelles_notifications > 0): ?>
-                                        <div class="absolute -top-2 -right-2 w-6 h-6 bg-error rounded-full flex items-center justify-center notification-badge">
-                                            <span class="text-white text-xs font-bold">
-                                                <?= min($nb_nouvelles_notifications, 9) ?><?= $nb_nouvelles_notifications > 9 ? '+' : '' ?>
-                                            </span>
-                                        </div>
+                           <div class="relative">
+    <button 
+        @click="notificationsOpen = !notificationsOpen"
+        class="relative w-14 h-14 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-purple-300/50 group transform hover:rotate-3"
+        aria-label="Notifications"
+        type="button"
+    >
+        <i class="fas fa-bell text-white text-xl group-hover:animate-swing"></i>
+        <?php if (!empty($nb_nouvelles_notifications) && $nb_nouvelles_notifications > 0): ?>
+            <div class="absolute -top-3 -right-3 w-7 h-7 bg-gradient-to-r from-red-400 to-pink-500 rounded-full flex items-center justify-center shadow-lg animate-pulse border-2 border-white">
+                <span class="text-white text-xs font-bold">
+                    <?= min($nb_nouvelles_notifications, 9) ?><?= $nb_nouvelles_notifications > 9 ? '+' : '' ?>
+                </span>
+            </div>
+        <?php endif; ?>
+    </button>
+    
+    <!-- Dropdown Notifications -->
+    <div 
+        x-show="notificationsOpen"
+        @click.away="notificationsOpen = false"
+        x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="transform opacity-0 scale-95 translate-y-2"
+        x-transition:enter-end="transform opacity-100 scale-100 translate-y-0"
+        x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="transform opacity-100 scale-100 translate-y-0"
+        x-transition:leave-end="transform opacity-0 scale-95 translate-y-2"
+        class="absolute right-0 mt-6 w-[420px] bg-white rounded-3xl shadow-2xl py-0 z-50 border border-gray-100 max-h-[500px] overflow-hidden backdrop-blur-sm"
+        style="box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.1);"
+        x-cloak
+    >
+        <!-- Header Notifications avec gradient -->
+        <div class="px-8 py-6 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-t-3xl">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/30">
+                        <i class="fas fa-bell text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-white text-xl">Notifications</h3>
+                        <?php if (!empty($nb_nouvelles_notifications) && $nb_nouvelles_notifications > 0): ?>
+                            <span class="inline-flex items-center px-3 py-1 bg-white/20 text-white text-sm font-semibold rounded-full border border-white/30 backdrop-blur-sm mt-1">
+                                <?= $nb_nouvelles_notifications ?> nouvelle<?= $nb_nouvelles_notifications > 1 ? 's' : '' ?>
+                            </span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php if (!empty($nb_nouvelles_notifications) && $nb_nouvelles_notifications > 0): ?>
+                    <form method="post" class="inline">
+                        <button type="submit" name="mark_all_read" class="text-white/90 hover:text-white font-medium px-4 py-2 rounded-xl hover:bg-white/10 transition-all duration-200 text-sm border border-white/20 backdrop-blur-sm">
+                            <i class="fas fa-check-double mr-2"></i>
+                            Tout lire
+                        </button>
+                    </form>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <!-- Liste Notifications -->
+        <div class="max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+            <?php if (empty($notifications)): ?>
+                <div class="p-12 text-center">
+                    <div class="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                        <i class="fas fa-bell-slash text-gray-400 text-3xl"></i>
+                    </div>
+                    <h4 class="font-semibold text-gray-700 text-lg mb-2">Aucune notification</h4>
+                    <p class="text-gray-500 text-sm">Vous êtes à jour ! 🎉</p>
+                </div>
+            <?php else: ?>
+                <?php foreach ($notifications as $index => $notification): ?>
+                    <div class="group relative overflow-hidden <?= empty($notification['vue']) ? 'bg-gradient-to-r from-blue-50 to-indigo-50' : 'bg-white' ?> hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 transition-all duration-300 border-b border-gray-100 last:border-b-0">
+                        <?php if (empty($notification['vue'])): ?>
+                            <div class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-indigo-400 to-purple-500"></div>
+                        <?php endif; ?>
+                        
+                        <div class="p-6 flex items-start space-x-4">
+                            <div class="relative flex-shrink-0">
+                                <div class="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-transform duration-200
+                                    <?php 
+                                        switch ($notification['type'] ?? '') {
+                                            case 'success': echo 'bg-gradient-to-br from-green-400 to-emerald-500'; break;
+                                            case 'warning': echo 'bg-gradient-to-br from-amber-400 to-orange-500'; break;
+                                            case 'error': echo 'bg-gradient-to-br from-red-400 to-pink-500'; break;
+                                            default: echo 'bg-gradient-to-br from-blue-400 to-indigo-500';
+                                        }
+                                    ?>
+                                ">
+                                    <i class="fas 
+                                        <?php
+                                            switch ($notification['type'] ?? '') {
+                                                case 'success': echo 'fa-check'; break;
+                                                case 'warning': echo 'fa-exclamation-triangle'; break;
+                                                case 'error': echo 'fa-times'; break;
+                                                default: echo 'fa-info';
+                                            }
+                                        ?>" 
+                                        class="text-white text-lg"
+                                    ></i>
+                                </div>
+                                <?php if (empty($notification['vue'])): ?>
+                                    <div class="absolute -top-2 -right-2 w-4 h-4 bg-gradient-to-r from-red-400 to-pink-500 rounded-full border-2 border-white animate-pulse"></div>
+                                <?php endif; ?>
+                            </div>
+                            
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-start justify-between mb-2">
+                                    <h4 class="font-semibold text-gray-800 text-base leading-tight <?= empty($notification['vue']) ? 'text-indigo-700' : '' ?>">
+                                        <?= htmlspecialchars($notification['titre'] ?? 'Sans titre') ?>
+                                    </h4>
+                                    <?php if (empty($notification['vue'])): ?>
+                                        <span class="ml-3 inline-flex items-center px-2 py-1 bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 text-xs font-medium rounded-full border border-indigo-200">
+                                            Nouveau
+                                        </span>
                                     <?php endif; ?>
-                                </button>
+                                </div>
                                 
-                                <!-- Dropdown Notifications -->
-                                <div 
-                                    x-show="notificationsOpen"
-                                    @click.away="notificationsOpen = false"
-                                    x-transition:enter="transition ease-out duration-300"
-                                    x-transition:enter-start="transform opacity-0 scale-95 translate-y-2"
-                                    x-transition:enter-end="transform opacity-100 scale-100 translate-y-0"
-                                    x-transition:leave="transition ease-in duration-200"
-                                    x-transition:leave-start="transform opacity-100 scale-100 translate-y-0"
-                                    x-transition:leave-end="transform opacity-0 scale-95 translate-y-2"
-                                    class="absolute right-0 mt-4 w-96 glass-card rounded-3xl shadow-2xl py-4 z-50 border border-white/20 max-h-96 overflow-hidden"
-                                    x-cloak
-                                >
-                                    <!-- Header Notifications -->
-                                    <div class="px-6 py-4 border-b border-white/10 flex items-center justify-between">
-                                        <div class="flex items-center space-x-3">
-                                            <div class="w-8 h-8 bg-warning-gradient rounded-xl flex items-center justify-center">
-                                                <i class="fas fa-bell text-white text-sm"></i>
-                                            </div>
-                                            <h3 class="font-bold text-text-primary">Notifications</h3>
-                                            <?php if (!empty($nb_nouvelles_notifications) && $nb_nouvelles_notifications > 0): ?>
-                                                <span class="px-3 py-1 bg-error text-white text-xs font-bold rounded-full"><?= $nb_nouvelles_notifications ?></span>
-                                            <?php endif; ?>
-                                        </div>
-                                        <?php if (!empty($nb_nouvelles_notifications) && $nb_nouvelles_notifications > 0): ?>
-                                            <form method="post" class="inline">
-                                                <button type="submit" name="mark_all_read" class="text-xs text-corporate-amber hover:text-amber-300 font-medium">
-                                                    Tout marquer lu
-                                                </button>
-                                            </form>
-                                        <?php endif; ?>
+                                <p class="text-gray-600 text-sm leading-relaxed mb-3"><?= htmlspecialchars($notification['message'] ?? '') ?></p>
+                                
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-2 text-xs text-gray-500">
+                                        <i class="fas fa-clock text-gray-400"></i>
+                                        <span class="font-medium">
+                                            <?= !empty($notification['date_creation']) ? date('d/m/Y à H:i', strtotime($notification['date_creation'])) : 'Date inconnue' ?>
+                                        </span>
                                     </div>
                                     
-                                    <!-- Liste Notifications -->
-                                    <div class="max-h-64 overflow-y-auto scrollbar-hidden">
-                                        <?php if (empty($notifications)): ?>
-                                            <div class="p-8 text-center">
-                                                <div class="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                                                    <i class="fas fa-bell-slash text-white/50 text-2xl"></i>
-                                                </div>
-                                                <p class="text-text-secondary">Aucune notification</p>
-                                            </div>
-                                        <?php else: ?>
-                                            <?php foreach ($notifications as $notification): ?>
-                                                <div class="p-4 hover:bg-white/5 transition-colors border-b border-white/5 last:border-b-0">
-                                                    <div class="flex items-start space-x-3">
-                                                        <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
-                                                            <?php 
-                                                                switch ($notification['type'] ?? '') {
-                                                                    case 'success': echo 'bg-success'; break;
-                                                                    case 'warning': echo 'bg-warning'; break;
-                                                                    case 'error': echo 'bg-error'; break;
-                                                                    default: echo 'bg-info';
-                                                                }
-                                                            ?>
-                                                        ">
-                                                            <i class="fas 
-                                                                <?php
-                                                                    switch ($notification['type'] ?? '') {
-                                                                        case 'success': echo 'fa-check'; break;
-                                                                        case 'warning': echo 'fa-exclamation-triangle'; break;
-                                                                        case 'error': echo 'fa-times'; break;
-                                                                        default: echo 'fa-info';
-                                                                    }
-                                                                ?>" 
-                                                                class="text-white text-sm"
-                                                            ></i>
-                                                        </div>
-                                                        <div class="flex-1 min-w-0">
-                                                            <p class="font-semibold text-text-primary <?= empty($notification['vue']) ? 'text-corporate-amber' : '' ?>">
-                                                                <?= htmlspecialchars($notification['titre'] ?? 'Sans titre') ?>
-                                                                <?php if (empty($notification['vue'])): ?>
-                                                                    <span class="w-2 h-2 bg-corporate-amber rounded-full inline-block ml-2 animate-pulse"></span>
-                                                                <?php endif; ?>
-                                                            </p>
-                                                            <p class="text-sm text-text-secondary mt-1"><?= htmlspecialchars($notification['message'] ?? '') ?></p>
-                                                            <div class="flex items-center justify-between mt-2">
-                                                                <p class="text-xs text-white/50">
-                                                                    <?= !empty($notification['date_creation']) ? date('d/m/Y à H:i', strtotime($notification['date_creation'])) : 'Date inconnue' ?>
-                                                                </p>
-                                                                <?php if (empty($notification['vue'])): ?>
-                                                                    <form method="post" class="inline">
-                                                                        <input type="hidden" name="notification_id" value="<?= (int)($notification['id'] ?? 0) ?>">
-                                                                        <button type="submit" name="mark_read" class="text-xs text-info hover:text-blue-300">
-                                                                            Marquer lu
-                                                                        </button>
-                                                                    </form>
-                                                                <?php endif; ?>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            <?php endforeach; ?>
-                                        <?php endif; ?>
-                                    </div>
-                                    
-                                    <!-- Lien Voir Tout -->
-                                    <div class="px-6 py-4 border-t border-white/10">
-                                        <a href="notifications.php" class="block text-center text-info hover:text-blue-300 font-medium text-sm">
-                                            Voir toutes les notifications
-                                        </a>
-                                    </div>
+                                    <?php if (empty($notification['vue'])): ?>
+                                        <form method="post" class="inline">
+                                            <input type="hidden" name="notification_id" value="<?= (int)($notification['id'] ?? 0) ?>">
+                                            <button type="submit" name="mark_read" class="inline-flex items-center text-xs text-indigo-600 hover:text-indigo-700 font-medium px-3 py-1 rounded-lg hover:bg-indigo-50 transition-all duration-200 border border-indigo-200 hover:border-indigo-300">
+                                                <i class="fas fa-eye mr-1"></i>
+                                                Marquer lu
+                                            </button>
+                                        </form>
+                                    <?php endif; ?>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+        
+        <!-- Footer avec lien voir tout -->
+        <div class="px-8 py-6 bg-gradient-to-r from-gray-50 to-blue-50 rounded-b-3xl border-t border-gray-100">
+            <a href="notifications.php" class="group flex items-center justify-center space-x-3 text-indigo-600 hover:text-indigo-700 font-medium text-sm py-3 px-6 rounded-2xl hover:bg-white transition-all duration-300 shadow-sm hover:shadow-md border border-indigo-200 hover:border-indigo-300">
+                <span>Voir toutes les notifications</span>
+                <i class="fas fa-arrow-right group-hover:translate-x-1 transition-transform duration-200"></i>
+            </a>
+        </div>
+    </div>
 
+    <style>
+        @keyframes swing {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(15deg); }
+            75% { transform: rotate(-15deg); }
+        }
+        
+        .group-hover\:animate-swing:hover {
+            animation: swing 0.6s ease-in-out;
+        }
+        
+        .scrollbar-thin::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .scrollbar-thumb-gray-300::-webkit-scrollbar-thumb {
+            background-color: #d1d5db;
+            border-radius: 3px;
+        }
+        
+        .scrollbar-track-gray-100::-webkit-scrollbar-track {
+            background-color: #f3f4f6;
+        }
+    </style>
+</div>
                             <!-- Menu Profil -->
                             <div class="relative">
                                 <button 
@@ -638,23 +693,6 @@ $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                 </div>
             </header>
-<div id="notifications" class="space-y-2 p-2"></div>
-
-            <!-- Section Notifications -->
-            <div class="bg-white/5 shadow-md rounded-lg p-4 mx-4 mt-4">
-                <h2 class="text-xl font-bold mb-4 text-text-primary">🔔 Notifications</h2>
-                <ul>
-                    <?php foreach ($notifications as $notif): ?>
-                        <li class="mb-2 p-3 rounded bg-corporate-blue/10 border-l-4 border-corporate-blue">
-                            <span class="text-text-primary"><?= htmlspecialchars($notif['message']) ?></span><br>
-                            <small class="text-text-secondary"><?= date('d/m/Y H:i', strtotime($notif['date'])) ?></small>
-                        </li>
-                    <?php endforeach; ?>
-                    <?php if (empty($notifications)): ?>
-                        <li class="text-text-secondary">Aucune nouvelle notification</li>
-                    <?php endif; ?>
-                </ul>
-            </div>
 
             <!-- Contenu Principal -->
             <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-8 scrollbar-hidden">

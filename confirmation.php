@@ -9,8 +9,8 @@ error_reporting(E_ALL);
 $message = $_GET['message'] ?? 'Merci pour votre commande !';
 
 // ID de commande
-$commande_id = $_GET['commande_id'] ?? $_SESSION['commande_id'] ?? null;
-$mode_paiement = $_GET['mode'] ?? 'livraison'; // 'livraison' ou 'en ligne'
+$commande_id = $_GET['commande'] ?? $_SESSION['commande_id'] ?? null;
+
 
 if (!$commande_id) {
     die("ID de commande manquant.");
@@ -86,12 +86,6 @@ try {
                             <span class="font-semibold"><?= nl2br(htmlspecialchars($commande['adresse'])); ?></span>
                         </div>
                         <div class="flex justify-between">
-                            <span class="text-gray-600">Mode de paiement</span>
-                            <span class="font-semibold text-blue-700">
-                                <?= $mode_paiement === 'enligne' ? 'En ligne (PayDunya)' : 'À la livraison' ?>
-                            </span>
-                        </div>
-                        <div class="flex justify-between">
                             <span class="text-gray-600">Total</span>
                             <span class="font-bold text-danger text-lg"><?= number_format($commande['total'], 2); ?> fcfa</span>
                         </div>
@@ -145,11 +139,7 @@ try {
                         <li>• Un e-mail de confirmation vous a été envoyé</li>
                         <li>• Préparation de votre commande</li>
                         <li>• Livraison dans les délais annoncés</li>
-                        <?php if ($mode_paiement === 'livraison'): ?>
-                            <li>• Paiement à la livraison</li>
-                        <?php else: ?>
-                            <li>• Paiement en ligne validé avec succès</li>
-                        <?php endif; ?>
+                        <li>• Paiement à la livraison</li>
                     </ul>
                 </div>
 

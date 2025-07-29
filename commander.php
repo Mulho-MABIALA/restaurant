@@ -1,10 +1,29 @@
 <?php
 require_once 'config.php';
-session_start(); // Toujours avant tout
+require 'vendor/autoload.php'; // PHPMailer et Dompdf
+session_start();
+$total = 0;
+$produits = [];
+
+if (!empty($_SESSION['panier'])) {
+    $ids = array_keys($_SESSION['panier']);
+    $stmt = $conn->prepare("SELECT * FROM plats WHERE id = ?");
+    foreach ($ids as $id) {
+        $stmt->execute([$id]);
+        $produit = $stmt->fetch();
+        if ($produit) {
+            $produit['quantite'] = $_SESSION['panier'][$produit['id']];
+            $total += $produit['prix'] * $produit['quantite'];
+            $produits[] = $produit;
+        }
+    }
+}
+
 
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
 
 // Vérifier que le panier n'est pas vide
 if (!isset($_SESSION['panier']) || empty($_SESSION['panier'])) {
@@ -18,7 +37,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $telephone = trim($_POST['telephone']);
     $adresse = trim($_POST['adresse']);
     $mode_retrait = $_POST['mode_retrait'] ?? '';
-    $mode_paiement = $_POST['paiement'] ?? '';
 
     if (empty($nom) || empty($email) || empty($adresse)) {
         $erreur = "Veuillez remplir tous les champs obligatoires.";
@@ -43,14 +61,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $conn->beginTransaction();
             $transactionActive = true;
 
-            // Insérer la commande avec mode_retrait et mode_paiement
+            // Insertion de la commande
             $stmt = $conn->prepare("INSERT INTO commandes 
-                (nom_client, email, telephone, adresse, mode_retrait, total, date_commande, statut, vu_admin, created_at, mode_paiement)
-                VALUES (?, ?, ?, ?, ?, ?, NOW(), 'En cours', 0, NOW(), ?)");
-            $stmt->execute([$nom, $email, $telephone, $adresse, $mode_retrait, $total, $mode_paiement]);
+                (nom_client, email, telephone, adresse, mode_retrait, total, date_commande, statut, vu_admin, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, NOW(), 'En cours', 0, NOW())");
+            $stmt->execute([$nom, $email, $telephone, $adresse, $mode_retrait, $total]);
             $commande_id = $conn->lastInsertId();
 
-            // Insérer détails commande et mettre à jour stock
+            // Insertion des détails
             foreach ($produits as $plat) {
                 $stmt = $conn->prepare("INSERT INTO commande_details (commande_id, nom_plat, quantite, prix) VALUES (?, ?, ?, ?)");
                 $stmt->execute([$commande_id, $plat['nom'], $plat['quantite'], $plat['prix']]);
@@ -66,14 +84,291 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $conn->commit();
             $transactionActive = false;
 
-            // Redirection selon mode paiement
-            if ($mode_paiement === 'en ligne') {
-                header("Location: payer.php?commande=$commande_id");
-                exit;
-            } else {
-                header("Location: confirmation.php?commande=$commande_id");
-                exit;
+            // Template HTML pour l'email de reçu (identique à la page de confirmation)
+            $emailTemplate = "
+            <!DOCTYPE html>
+            <html lang='fr'>
+            <head>
+                <meta charset='UTF-8'>
+                <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+                <title>Reçu de commande</title>
+                <style>
+                    * { box-sizing: border-box; margin: 0; padding: 0; }
+                    body {
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                        line-height: 1.5;
+                        background-color: #f9f9f9;
+                        padding: 20px;
+                        color: #333;
+                    }
+                    .receipt-container {
+                        max-width: 400px;
+                        margin: 0 auto;
+                        background: white;
+                        border-radius: 8px;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                        overflow: hidden;
+                    }
+                    .header {
+                        text-align: center;
+                        padding: 30px 20px 20px;
+                        border-bottom: 1px solid #f0f0f0;
+                    }
+                    .success-circle {
+                        width: 60px;
+                        height: 60px;
+                        background-color: #c8f7c5;
+                        border-radius: 50%;
+                        margin: 0 auto 20px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 24px;
+                        color: #22c55e;
+                    }
+                    .header h1 {
+                        font-size: 20px;
+                        font-weight: 600;
+                        color: #333;
+                        margin-bottom: 8px;
+                    }
+                    .header p {
+                        color: #666;
+                        font-size: 14px;
+                    }
+                    .details-section {
+                        padding: 20px;
+                        border-bottom: 1px solid #f0f0f0;
+                    }
+                    .section-title {
+                        font-size: 16px;
+                        font-weight: 600;
+                        color: #333;
+                        margin-bottom: 15px;
+                    }
+                    .detail-row {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: flex-start;
+                        padding: 8px 0;
+                        border-bottom: 1px solid #f5f5f5;
+                    }
+                    .detail-row:last-child {
+                        border-bottom: none;
+                    }
+                    .detail-label {
+                        color: #666;
+                        font-size: 14px;
+                        flex: 1;
+                    }
+                    .detail-value {
+                        color: #333;
+                        font-size: 14px;
+                        font-weight: 500;
+                        text-align: right;
+                        flex: 1;
+                    }
+                    .order-number {
+                        color: #3b82f6 !important;
+                        font-weight: 600;
+                    }
+                    .total-value {
+                        color: #dc2626 !important;
+                        font-weight: 600;
+                        font-size: 16px;
+                    }
+                    .products-section {
+                        padding: 20px;
+                    }
+                    .products-table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        background: #f8f9fa;
+                        border-radius: 6px;
+                        overflow: hidden;
+                        font-size: 13px;
+                    }
+                    .products-table th {
+                        background-color: #e9ecef;
+                        color: #495057;
+                        font-weight: 600;
+                        padding: 12px 8px;
+                        text-align: left;
+                        font-size: 12px;
+                        border-bottom: 1px solid #dee2e6;
+                    }
+                    .products-table th:nth-child(2),
+                    .products-table th:nth-child(3),
+                    .products-table th:nth-child(4) {
+                        text-align: center;
+                    }
+                    .products-table td {
+                        padding: 12px 8px;
+                        border-bottom: 1px solid #f1f3f4;
+                        background: white;
+                    }
+                    .products-table td:nth-child(2),
+                    .products-table td:nth-child(3),
+                    .products-table td:nth-child(4) {
+                        text-align: center;
+                    }
+                    .product-name {
+                        color: #333;
+                        font-weight: 500;
+                    }
+                    .price-text {
+                        color: #333;
+                        font-size: 12px;
+                    }
+                    .total-row {
+                        background-color: #f8f9fa !important;
+                        font-weight: 600;
+                    }
+                    .total-row td {
+                        border-bottom: none !important;
+                        padding: 15px 8px !important;
+                    }
+                    .total-amount {
+                        color: #dc2626 !important;
+                        font-weight: 600;
+                        font-size: 14px;
+                    }
+                    @media (max-width: 500px) {
+                        .receipt-container {
+                            margin: 0;
+                            border-radius: 0;
+                        }
+                        body {
+                            padding: 0;
+                        }
+                        .products-table {
+                            font-size: 11px;
+                        }
+                        .products-table th,
+                        .products-table td {
+                            padding: 8px 4px;
+                        }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class='receipt-container'>
+                    <!-- Header avec cercle vert et titre -->
+                    <div class='header'>
+                        <div class='success-circle'></div>
+                        <h1>Commande confirmée !</h1>
+                        <p>Merci pour votre commande !</p>
+                    </div>
+                    
+                    <!-- Section détails de la commande -->
+                    <div class='details-section'>
+                        <div class='section-title'>Détails de la commande</div>
+                        
+                        <div class='detail-row'>
+                            <span class='detail-label'>N° de commande:  </span>
+                            <span class='detail-value order-number'>#" . str_pad($commande_id, 6, '0', STR_PAD_LEFT) . "</span>
+                        </div>
+                        
+                        <div class='detail-row'>
+                            <span class='detail-label'>Date:  </span>
+                            <span class='detail-value'>" . date('d/m/Y') . "</span>
+                        </div>
+                        
+                        <div class='detail-row'>
+                            <span class='detail-label'>Client:  </span>
+                            <span class='detail-value'>" . htmlspecialchars($nom) . "</span>
+                        </div>";
+                        
+            if (!empty($telephone)) {
+                $emailTemplate .= "
+                        <div class='detail-row'>
+                            <span class='detail-label'>Téléphone:  </span>
+                            <span class='detail-value'>" . htmlspecialchars($telephone) . "</span>
+                        </div>";
             }
+            
+            $emailTemplate .= "
+                        <div class='detail-row'>
+                            <span class='detail-label'>Email:  </span>
+                            <span class='detail-value'>" . htmlspecialchars($email) . "</span>
+                        </div>
+                        
+                        <div class='detail-row'>
+                            <span class='detail-label'>Adresse:  </span>
+                            <span class='detail-value'>" . htmlspecialchars($adresse) . "</span>
+                        </div>
+                        
+                        <div class='detail-row'>
+                            <span class='detail-label'>Total:  </span>
+                            <span class='detail-value total-value'>" . number_format($total, 2) . " fcfa</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Section produits commandés -->
+                    <div class='products-section'>
+                        <div class='section-title'>Produits commandés:  </div>
+                        
+                        <table class='products-table'>
+                            <thead>
+                                <tr>
+                                    <th>Produit:  </th>
+                                    <th>Quantité:  </th>
+                                    <th>Prix<br>unitaire:  </th>
+                                    <th>Sous-total:  </th>
+                                </tr>
+                            </thead>
+                            <tbody>";
+                            
+            foreach ($produits as $plat) {
+                $sousTotal = $plat['prix'] * $plat['quantite'];
+                $emailTemplate .= "
+                                <tr>
+                                    <td class='product-name'>" . htmlspecialchars($plat['nom']) . "</td>
+                                    <td>" . $plat['quantite'] . "</td>
+                                    <td class='price-text'>" . number_format($plat['prix'], 2) . "<br>fcfa</td>
+                                    <td class='price-text'>" . number_format($sousTotal, 2) . "<br>fcfa</td>
+                                </tr>";
+            }
+            
+            $emailTemplate .= "
+                                <tr class='total-row'>
+                                    <td colspan='3'><strong>Total</strong></td>
+                                    <td class='total-amount'><strong>" . number_format($total, 2) . "<br>fcfa</strong></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </body>
+            </html>";
+
+            // Envoi de l'e-mail
+            $mail = new PHPMailer(true);
+
+            try {
+                $mail->isSMTP();
+                $mail->Host = 'smtp.gmail.com';
+                $mail->SMTPAuth = true;
+                $mail->Username = 'mulhomabiala29@gmail.com'; // Ton adresse
+                $mail->Password = 'khli pyzj ihte qdgu'; // Mot de passe application Gmail
+                $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+                $mail->Port = 587;
+
+                $mail->setFrom('mulhomabiala29@gmail.com', 'Nom du Restaurant');
+                $mail->addAddress($email, $nom);
+
+                $mail->isHTML(true);
+                $mail->Subject = 'Confirmation de votre commande #' . str_pad($commande_id, 6, '0', STR_PAD_LEFT);
+                $mail->Body = $emailTemplate;
+
+                $mail->send();
+            } catch (Exception $e) {
+                error_log("Erreur lors de l'envoi du mail : {$mail->ErrorInfo}");
+            }
+
+            // Redirection vers la page de confirmation
+            header("Location: confirmation.php?commande=$commande_id");
+            exit;
 
         } catch (PDOException $e) {
             if ($transactionActive) {
@@ -81,150 +376,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
             die("Erreur lors de l'enregistrement de la commande : " . $e->getMessage());
         }
-
-
-        // ----------- Hors transaction -------------
-
-        // Génération du reçu PDF
-        require 'vendor/autoload.php'; // S'assurer que l'autoload est chargé
-
-        $options = new Options();
-        $options->set('defaultFont', 'DejaVu Sans');
-        $dompdf = new Dompdf($options);
-
-        ob_start();
-        ?>
-        <h1>Reçu de commande</h1>
-        <p>Commande n° <?= str_pad($commande_id, 6, '0', STR_PAD_LEFT) ?></p>
-        <p>Date : <?= date('d/m/Y') ?></p>
-        <p>Client : <?= htmlspecialchars($nom) ?></p>
-        <p>Téléphone : <?= htmlspecialchars($telephone) ?></p>
-        <p>Adresse : <?= nl2br(htmlspecialchars($adresse)) ?></p>
-        <p>Total : <strong><?= number_format($total, 2) ?> FCFA</strong></p>
-        <h3>Détails :</h3>
-        <ul>
-        <?php foreach ($produits as $produit): ?>
-            <li><?= $produit['quantite'] ?> x <?= htmlspecialchars($produit['nom']) ?> (<?= number_format($produit['prix'], 2) ?> FCFA)</li>
-        <?php endforeach; ?>
-        </ul>
-        <?php
-        $html = ob_get_clean();
-
-        $dompdf->loadHtml($html);
-        $dompdf->setPaper('A4', 'portrait');
-        $dompdf->render();
-
-        $repertoire = __DIR__ . '/recu';
-        if (!is_dir($repertoire)) mkdir($repertoire, 0777, true);
-        $pdfPath = "$repertoire/recu_commande_{$commande_id}.pdf";
-        file_put_contents($pdfPath, $dompdf->output());
-
-        // Envoi mail avec PHPMailer
-        try {
-            $mail = new PHPMailer(true);
-            $mail->isSMTP();
-            $mail->Host = 'smtp.gmail.com';
-            $mail->SMTPAuth = true;
-            $mail->Username = 'mulhomabiala29@gmail.com'; // à adapter
-            $mail->Password = 'khli pyzj ihte qdgu';       // mot de passe application Gmail
-            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-            $mail->Port = 587;
-
-            $mail->setFrom('ton-email@gmail.com', 'Ton Nom');
-            $mail->addAddress($email, $nom);
-            $mail->isHTML(true);
-            $mail->Subject = "Confirmation de votre commande #" . str_pad($commande_id, 6, '0', STR_PAD_LEFT);
-
-            $montantTotal = number_format($total, 2, ',', ' ');
-
-            // Construire la liste des produits
-            $produitsHTML = '';
-            foreach ($produits as $produit) {
-                $nomPlat = htmlspecialchars($produit['nom']);
-                $quantite = $produit['quantite'];
-                $prixUnitaire = number_format($produit['prix'], 2, ',', ' ');
-                $sousTotal = number_format($produit['prix'] * $quantite, 2, ',', ' ');
-
-                $produitsHTML .= "
-                    <tr style='border-bottom:1px solid #ddd;'>
-                        <td style='padding:8px;'>{$nomPlat}</td>
-                        <td style='text-align:center;'>{$quantite}</td>
-                        <td style='text-align:right;'>{$prixUnitaire} FCFA</td>
-                        <td style='text-align:right;'>{$sousTotal} FCFA</td>
-                    </tr>
-                ";
-            }
-
-            $mail->Body = '
-            <div style="max-width:600px;margin:0 auto;padding:20px;font-family:sans-serif;border-radius:10px;background:#fff;text-align:center;">
-                <div style="width:80px;height:80px;border-radius:50%;background:#d4f8d4;margin:0 auto;"></div>
-                <h2 style="color:#2ecc71;margin-top:20px;">Commande confirmée !</h2>
-                <p style="color:#555;">Merci pour votre confiance. Votre commande a été enregistrée avec succès.</p>
-
-                <div style="background:#f9f9f9;border-radius:8px;padding:20px;text-align:left;margin-top:20px;">
-                    <h3 style="margin-bottom:15px;color:#333;">Détails de votre commande</h3>
-                    <p><strong>N° de commande :</strong> <a href="#" style="color:#3498db;">#' . str_pad($commande_id, 6, '0', STR_PAD_LEFT) . '</a></p>
-                    <p><strong>Date :</strong> ' . date('d/m/Y') . '</p>
-                    <p><strong>Nom :</strong> ' . htmlspecialchars($nom) . '</p>
-                    <p><strong>Téléphone :</strong> ' . htmlspecialchars($telephone) . '</p>
-                    <p><strong>Adresse :</strong> ' . htmlspecialchars($adresse) . '</p>
-                    <p><strong>Email :</strong> ' . htmlspecialchars($email) . '</p>
-
-                    <h4 style="margin-top:20px;margin-bottom:10px;">Articles commandés :</h4>
-                    <table style="width:100%;border-collapse:collapse;font-size:14px;">
-                        <thead>
-                            <tr style="background:#e8e8e8;">
-                                <th style="text-align:left;padding:8px;">Produit</th>
-                                <th style="text-align:center;padding:8px;">Qté</th>
-                                <th style="text-align:right;padding:8px;">Prix Unitaire</th>
-                                <th style="text-align:right;padding:8px;">Sous-total</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ' . $produitsHTML . '
-                        </tbody>
-                    </table>
-
-                    <p style="font-size:1.2em;margin-top:20px;text-align:right;">
-                        <strong>Total :</strong>
-                        <span style="color:#e74c3c;font-weight:bold;">' . $montantTotal . ' FCFA</span>
-                    </p>
-                </div>
-            </div>';
-
-            $mail->send();
-
-            // Vider le panier
-            unset($_SESSION['panier']);
-
-            // Stocker l'ID de la commande
-            $_SESSION['commande_id'] = $commande_id;
-
-            // Redirection vers la page de confirmation
-            header('Location: confirmation.php');
-            exit;
-
-        } catch (Exception $e) {
-            die("Erreur lors de l'envoi de l'email : " . $e->getMessage());
-        }
-    }
-}
-
-// Calculer le total et récupérer les produits pour l'affichage si besoin (par ex. affichage panier)
-$total = 0;
-$ids = array_keys($_SESSION['panier']);
-$stmt = $conn->prepare("SELECT * FROM plats WHERE id = ?");
-$produits = [];
-foreach ($ids as $id) {
-    $stmt->execute([$id]);
-    $produit = $stmt->fetch();
-    if ($produit) {
-        $produit['quantite'] = $_SESSION['panier'][$produit['id']];
-        $total += $produit['prix'] * $produit['quantite'];
-        $produits[] = $produit;
     }
 }
 ?>
+
 
 <!DOCTYPE html>
 <html lang="fr">
@@ -359,20 +514,6 @@ foreach ($ids as $id) {
                                 </svg>
                             </div>
                         </div>
-<select id="paiement" name="paiement" required
-    class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-primary focus:border-transparent transition-colors">
-    
-    <option value="">-- Sélectionnez un mode de paiement --</option>
-    
-    <option value="livraison" <?= (isset($_POST['paiement']) && $_POST['paiement'] === 'livraison') ? 'selected' : '' ?>>
-        Paiement à la livraison
-    </option>
-    
-    <option value="en ligne" <?= (isset($_POST['paiement']) && $_POST['paiement'] === 'en ligne') ? 'selected' : '' ?>>
-        Paiement en ligne (Orange / Wave)
-    </option>
-</select>
-
 
                         <button type="submit" 
                                 class="w-full bg-gradient-to-r from-primary to-primary-dark text-white font-bold py-4 px-6 rounded-lg hover:from-primary-dark hover:to-primary transform hover:scale-[1.02] transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center space-x-2">
@@ -466,15 +607,5 @@ foreach ($ids as $id) {
             </div>
         </div>
     </footer>
-    <script>
-document.querySelector('form').addEventListener('submit', function(e) {
-    const paiement = document.getElementById('paiement').value;
-    if (!paiement) {
-        e.preventDefault();
-        alert('Veuillez sélectionner un mode de paiement.');
-    }
-});
-</script>
-
 </body>
 </html>
