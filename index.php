@@ -1,31 +1,10 @@
 <?php
-session_start(); // Démarrage de la session
-
-// Choix de la langue : GET > session > défaut (français)
-$lang = $_GET['lang'] ?? ($_SESSION['lang'] ?? 'fr');
-$_SESSION['lang'] = $lang;
-
-// Chargement du fichier de langue
-$lang_file = __DIR__ . "/langues/$lang.php";
-if (file_exists($lang_file)) {
-    include $lang_file; // Ce fichier doit définir $traduction
-} else {
-    include __DIR__ . "/langues/fr.php";
-}
-
-// Vérification de la variable $traduction
-if (!isset($traduction) || !is_array($traduction)) {
-    $traduction = [];
-}
-
-
-
-// Connexion à la base de données
+session_start();
+include('lang.php');
 require_once 'config.php';
 
 try {
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
     // Requête pour récupérer les horaires d'ouverture/fermeture par jour
     $query = "
         SELECT jour, heure_ouverture, heure_fermeture, ferme
@@ -52,799 +31,874 @@ try {
 // Compter les articles dans le panier
 $nb_articles_panier = 0;
 if (!empty($_SESSION['panier']) && is_array($_SESSION['panier'])) {
-    foreach ($_SESSION['panier'] as $quantite) {
-        if (is_numeric($quantite)) {
-            $nb_articles_panier += (int)$quantite;
+    foreach ($_SESSION['panier'] as $id => $details) {
+        if (isset($details['quantite']) && is_numeric($details['quantite'])) {
+            $nb_articles_panier += (int)$details['quantite'];
         }
     }
 }
 ?>
-
-
-  <!DOCTYPE html>
-  <html lang="en">
-
-  <head>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
     <meta charset="utf-8">
     <meta content="width=device-width, initial-scale=1.0" name="viewport">
-    <title>Restaurant</title>
-    <meta name="description" content="">
-    <meta name="keywords" content="">
-
+    <title>Restaurant Mulho</title>
+    <meta name="description" content="Restaurant Mulho - Découvrez nos plats de qualité">
+    <meta name="keywords" content="restaurant, mulho, dakar, senegal">
+    
     <!-- Favicons -->
     <link href="assets/img/favicon.png" rel="icon">
     <link href="assets/img/apple-touch-icon.png" rel="apple-touch-icon">
-
+    
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com" rel="preconnect">
     <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&family=Inter:wght@100;200;300;400;500;600;700;800;900&family=Amatic+SC:wght@400;700&display=swap" rel="stylesheet">
-  
-    <!-- Vendor CSS Files -->
+
+    <!-- CSS Files -->
     <link href="assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link href="assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
     <link href="assets/vendor/aos/aos.css" rel="stylesheet">
     <link href="assets/vendor/glightbox/css/glightbox.min.css" rel="stylesheet">
     <link href="assets/vendor/swiper/swiper-bundle.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-
-    
-
-
-    <!-- Main CSS File -->
     <link href="assets/css/main.css" rel="stylesheet">
-    <script src="cart.js"></script>
-<script>
-  function updateCartCount() {
-    let cart = JSON.parse(localStorage.getItem('cart')) || [];
-    let count = cart.reduce((sum, item) => sum + item.quantity, 0);
-    let cartCount = document.getElementById('cart-count');
-    if (cartCount) cartCount.textContent = count;
-  }
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-  document.addEventListener('DOMContentLoaded', updateCartCount);
-</script>
-<script>
-  function toggleDropdown() {
-    const dropdown = document.getElementById('languageDropdown');
-    dropdown.classList.toggle('show');
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    // Optionnel : ferme si clic en dehors
-    document.addEventListener('click', function (event) {
-      const dropdownWrapper = document.querySelector('.language-dropdown');
-      if (!dropdownWrapper.contains(event.target)) {
-        dropdown.classList.remove('show');
-      }
-    }, { once: true });
-  }
-</script>
+        body {
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
 
+        .header-glass {
+            backdrop-filter: blur(20px);
+            background: rgba(255, 255, 255, 0.95) !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            position: fixed !important;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+        }
 
-
-     <style>
-        
-        .language-dropdown {
+        .nav-link-hover {
             position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .nav-link-hover::after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 2px;
+            bottom: -4px;
+            left: 50%;
+            background: linear-gradient(90deg, #ec4899, #f97316);
+            transition: all 0.3s ease;
+            transform: translateX(-50%);
+        }
+
+        .nav-link-hover:hover::after,
+        .nav-link-hover.active::after {
+            width: 100%;
+        }
+
+        .logo-gradient {
+            background: linear-gradient(135deg, #ec4899, #f97316, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .mobile-menu {
+            transform: translateX(100%);
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .mobile-menu.open {
+            transform: translateX(0);
+        }
+
+        .dropdown-menu {
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+        }
+
+        .dropdown:hover .dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .cart-badge {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        /* CORRECTION PRINCIPALE : Ajouter du margin-top pour éviter que le contenu soit masqué par le header fixe */
+        main.main {
+            margin-top: 80px; /* Hauteur du header */
+        }
+
+        /* Section Hero */
+        .hero {
+            min-height: 80vh;
+            display: flex;
+            align-items: center;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        }
+
+        .hero h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            color: #1a202c;
+            margin-bottom: 2rem;
+        }
+
+        .btn-get-started {
+            background: linear-gradient(135deg, #ec4899, #f97316);
+            color: white;
+            padding: 12px 30px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
             display: inline-block;
         }
 
-        .language-btn {
-            background-color: #007bff;
+        .btn-get-started:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(236, 72, 153, 0.3);
             color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
+        }
+
+        /* Sections */
+        .section {
+            padding: 80px 0;
+        }
+
+        .section-title {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .section-title h2 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #1a202c;
+            margin-bottom: 1rem;
+        }
+
+        .light-background {
+            background-color: #f8fafc;
+        }
+
+        .dark-background {
+            background-color: #1a202c;
+            color: white;
+        }
+
+        /* Corrections pour que le contenu soit visible */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .row {
             display: flex;
-            align-items: center;
-            gap: 8px;
-            text-decoration: none;
-            transition: background-color 0.3s;
+            flex-wrap: wrap;
+            margin: 0 -15px;
         }
 
-        .language-btn:hover {
-            background-color: #0056b3;
+        .col-lg-5, .col-lg-7, .col-lg-4, .col-lg-8, .col-lg-3, .col-md-6 {
+            padding: 0 15px;
+            flex: 1;
         }
 
-        .dropdown-arrow {
-            font-size: 12px;
-            transition: transform 0.3s;
+        .col-lg-5 { flex: 0 0 41.666667%; }
+        .col-lg-7 { flex: 0 0 58.333333%; }
+        .col-lg-4 { flex: 0 0 33.333333%; }
+        .col-lg-8 { flex: 0 0 66.666667%; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2rem;
+            }
+            
+            .col-lg-5, .col-lg-7, .col-lg-4, .col-lg-8 {
+                flex: 0 0 100%;
+                margin-bottom: 2rem;
+            }
+            
+            main.main {
+                margin-top: 70px;
+            }
         }
 
-        .dropdown-content {
-            display: none;
-            position: absolute;
-            background-color: white;
-            min-width: 200px;
-            box-shadow: 0px 8px 16px rgba(0,0,0,0.2);
-            border-radius: 5px;
-            z-index: 1;
-            top: 100%;
-            left: 0;
-            margin-top: 5px;
-            overflow: hidden;
+        /* Footer */
+        .footer {
+            background-color: #1a202c;
+            color: white;
+            padding: 60px 0 20px;
         }
 
-        .dropdown-content.show {
-            display: block;
+        .footer h4 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
         }
 
-        .dropdown-content a {
-            color: #333;
-            padding: 12px 16px;
-            text-decoration: none;
+        .social-links {
             display: flex;
-            align-items: center;
             gap: 10px;
-            transition: background-color 0.3s;
         }
 
-        .dropdown-content a:hover {
-            background-color: #f1f1f1;
-        }
-
-        .flag {
-            font-size: 20px;
-        }
-
-        .language-name {
-            font-weight: 500;
-        }
-
-        /* Animation pour la flèche */
-        .language-dropdown.active .dropdown-arrow {
-            transform: rotate(180deg);
-        }
-
-     
-        .current-language {
-            background-color: #28a745;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 14px;
-            display: inline-flex;
+        .social-links a {
+            display: flex;
             align-items: center;
-            gap: 8px;
-            margin-top: 20px;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #ec4899, #f97316);
+            color: white;
+            border-radius: 50%;
+            text-decoration: none;
+            transition: all 0.3s ease;
         }
 
-        
+        .social-links a:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(236, 72, 153, 0.3);
+        }
 
-
+        #preloader {
+            display: none !important;
+        }
     </style>
-
-  </head>
-  <?php include('lang.php'); ?>
-
-
-  <body class="index-page">
-    <header id="header" class="header d-flex align-items-center sticky-top">
-      <div class="container position-relative d-flex align-items-center justify-content-between">
-        <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
-          <h1 class="sitename">Mulho</h1>
-          
-        </a>
-        <nav id="navmenu" class="navmenu">
-          <ul>
-         <li><a href="#hero" class="active"><?= $traduction['home'] ?? 'Accueil' ?></a></li>
-<li><a href="#about"><?= $traduction['about'] ?? 'À propos' ?></a></li>
-<li><a href="#menu"><?= $traduction['menu'] ?? 'Menu' ?></a></li>
-<li><a href="#events"><?= $traduction['events'] ?? 'Événements' ?></a></li>
-<!-- <li><a href="#chefs">Chefs</a></li> -->
-<li><a href="#gallery"><?= $traduction['gallery'] ?? 'Galerie' ?></a></li>
-<li><a href="#menu"><?= $traduction['order'] ?? 'Commander' ?></a></li>
-
-
-             <li>
-                <div class="language-dropdown">
-                    <button class="language-btn" onclick="toggleDropdown()">
-                        <span class="flag">🌐</span>
-                        <span>Langues</span>
-                        <span class="dropdown-arrow">▼</span>
-                    </button>
-                    <div class="dropdown-content" id="languageDropdown">
-                        <a href="?lang=fr" onclick="changeLanguage('fr')">
-                            <span class="flag">🇫🇷</span>
-                            <span class="language-name">Français</span>
-                        </a>
-                        <a href="?lang=en" onclick="changeLanguage('en')">
-                            <span class="flag">🇬🇧</span>
-                            <span class="language-name">English</span>
-                        </a>
-                        <a href="?lang=wo" onclick="changeLanguage('wo')">
-                            <span class="flag">🇸🇳</span>
-                            <span class="language-name">Wolof</span>
-                        </a>
-                    </div>
+</head>
+<body class="index-page">
+    <header id="header" class="header-glass">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-20">
+                <!-- Logo -->
+                <div class="flex-shrink-0">
+                    <a href="index.php" class="flex items-center space-x-2 group">
+                        <div class="w-10 h-10 bg-gradient-to-br from-pink-500 to-orange-500 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-105">
+                            <span class="text-white font-bold text-lg">M</span>
+                        </div>
+                        <h1 class="text-2xl font-bold logo-gradient">Mulho</h1>
+                    </a>
                 </div>
-            </li>
-            <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
-       <a class="btn-getstarted" href="#book-a-table">Réserver une table</a> 
-        </nav>
-       <a href="panier.php" class="text-gray-700 hover:text-pink-600 transition duration-300 font-medium relative">
-                        <i class="fas fa-shopping-cart mr-2"></i>Panier
+                
+                <!-- Navigation Desktop -->
+                <nav class="hidden lg:flex items-center space-x-8">
+                    <a href="#hero" class="nav-link-hover active text-gray-700 hover:text-pink-600 font-medium py-2 transition-colors duration-300">
+                        <?= $traduction['home'] ?? 'Accueil' ?>
+                    </a>
+                    <a href="#about" class="nav-link-hover text-gray-700 hover:text-pink-600 font-medium py-2 transition-colors duration-300">
+                        <?= $traduction['about'] ?? 'À propos' ?>
+                    </a>
+                    <a href="#menu" class="nav-link-hover text-gray-700 hover:text-pink-600 font-medium py-2 transition-colors duration-300">
+                        <?= $traduction['menu'] ?? 'Menu' ?>
+                    </a>
+                    <a href="#events" class="nav-link-hover text-gray-700 hover:text-pink-600 font-medium py-2 transition-colors duration-300">
+                        <?= $traduction['events'] ?? 'Événements' ?>
+                    </a>
+                    <a href="#gallery" class="nav-link-hover text-gray-700 hover:text-pink-600 font-medium py-2 transition-colors duration-300">
+                        <?= $traduction['gallery'] ?? 'Galerie' ?>
+                    </a>
+                    <a href="#contact" class="nav-link-hover text-gray-700 hover:text-pink-600 font-medium py-2 transition-colors duration-300">
+                        Contact
+                    </a>
+
+                    <!-- Language Dropdown -->
+                    <div class="relative dropdown">
+                        <button class="flex items-center space-x-2 text-gray-700 hover:text-pink-600 font-medium py-2 px-3 rounded-lg hover:bg-gray-100 transition-all duration-300">
+                            <span class="text-lg">🌐</span>
+                            <span>Langues</span>
+                            <i class="fas fa-chevron-down text-xs"></i>
+                        </button>
+                        <div class="dropdown-menu absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-100 py-2">
+                            <a href="?lang=fr" onclick="changeLanguage('fr')"
+                               class="flex items-center space-x-3 px-4 py-3 hover:bg-gray-50 transition-colors duration-200">
+                                <span class="text-lg">🇫🇷</span>
+                                <span class="text-gray-700 font-medium">Français</span>
+                            </a>
+                            <a href="?lang=en" onclick="changeLanguage('en')"
+                               class="flex items-center space-x-3 px-4 py-3 hover:bg-gray-50 transition-colors duration-200">
+                                <span class="text-lg">🇬🇧</span>
+                                <span class="text-gray-700 font-medium">English</span>
+                            </a>
+                            <a href="?lang=wo" onclick="changeLanguage('wo')"
+                               class="flex items-center space-x-3 px-4 py-3 hover:bg-gray-50 transition-colors duration-200">
+                                <span class="text-lg">🇸🇳</span>
+                                <span class="text-gray-700 font-medium">Wolof</span>
+                            </a>
+                        </div>
+                    </div>
+                </nav>
+                
+                <!-- Actions Desktop -->
+                <div class="hidden lg:flex items-center space-x-4">
+                    <!-- Panier -->
+                    <a href="panier.php" class="relative flex items-center space-x-2 text-gray-700 hover:text-pink-600 transition-colors duration-300">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span>Panier</span>
+                        <span id="cart-count" class="cart-badge absolute -top-1 -right-1 bg-gradient-to-r from-pink-500 to-orange-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold shadow-lg">
+                            <?php echo $nb_articles_panier ?? 0; ?>
+                        </span>
+                    </a>
+                    
+                    <!-- Bouton Réserver -->
+                    <a href="#book-a-table" class="bg-gradient-to-r from-pink-500 to-orange-500 text-white px-6 py-2.5 rounded-full font-semibold hover:from-pink-600 hover:to-orange-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105">
+                        Réserver une table
+                    </a>
+                </div>
+                
+                <!-- Mobile Menu Button -->
+                <div class="lg:hidden flex items-center space-x-4">
+                    <!-- Panier Mobile -->
+                    <a href="panier.php" class="text-gray-700 hover:text-pink-600 transition-colors duration-300 relative">
+                        <i class="fas fa-shopping-cart text-xl"></i>
                         <?php if($nb_articles_panier > 0): ?>
-                        <span class="absolute -top-2 -right-2 bg-pink-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center animate-pulse">
+                        <span class="cart-badge absolute -top-2 -right-2 bg-gradient-to-r from-pink-500 to-orange-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
                             <?php echo $nb_articles_panier; ?>
                         </span>
                         <?php endif; ?>
                     </a>
 
-      </div>
+                    <button id="mobile-menu-toggle" class="text-gray-700 hover:text-pink-600 focus:outline-none transition-colors duration-300">
+                        <i class="fas fa-bars text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="mobile-menu lg:hidden fixed inset-y-0 right-0 w-80 bg-white shadow-2xl z-50">
+            <div class="flex flex-col h-full">
+                <!-- Mobile Header -->
+                <div class="flex items-center justify-between p-6 border-b border-gray-200">
+                    <h2 class="text-xl font-bold logo-gradient">Navigation</h2>
+                    <button id="mobile-menu-close" class="text-gray-500 hover:text-gray-700 transition-colors duration-300">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
 
+                <!-- Mobile Navigation -->
+                <nav class="flex-1 px-6 py-8 space-y-4">
+                    <a href="#hero" class="block text-gray-700 hover:text-pink-600 font-medium py-3 border-b border-gray-100 transition-colors duration-300">
+                        <?= $traduction['home'] ?? 'Accueil' ?>
+                    </a>
+                    <a href="#about" class="block text-gray-700 hover:text-pink-600 font-medium py-3 border-b border-gray-100 transition-colors duration-300">
+                        <?= $traduction['about'] ?? 'À propos' ?>
+                    </a>
+                    <a href="#menu" class="block text-gray-700 hover:text-pink-600 font-medium py-3 border-b border-gray-100 transition-colors duration-300">
+                        <?= $traduction['menu'] ?? 'Menu' ?>
+                    </a>
+                    <a href="#events" class="block text-gray-700 hover:text-pink-600 font-medium py-3 border-b border-gray-100 transition-colors duration-300">
+                        <?= $traduction['events'] ?? 'Événements' ?>
+                    </a>
+                    <a href="#gallery" class="block text-gray-700 hover:text-pink-600 font-medium py-3 border-b border-gray-100 transition-colors duration-300">
+                        <?= $traduction['gallery'] ?? 'Galerie' ?>
+                    </a>
+                    <a href="#contact" class="block text-gray-700 hover:text-pink-600 font-medium py-3 border-b border-gray-100 transition-colors duration-300">
+                        Contact
+                    </a>
+                </nav>
 
+                <!-- Mobile CTA -->
+                <div class="p-6 border-t border-gray-200">
+                    <a href="#book-a-table" class="block w-full bg-gradient-to-r from-pink-500 to-orange-500 text-white text-center px-6 py-3 rounded-full font-semibold hover:from-pink-600 hover:to-orange-600 transition-all duration-300 shadow-lg">
+                        Réserver une table
+                    </a>
+                </div>
+            </div>
+        </div>
     </header>
-    
+
     <main class="main">
-      <!-- Section Hero -->
-      <section id="hero" class="hero section light-background">
-        <div class="container">
-          <div class="row gy-4 justify-content-center justify-content-lg-between">
-            <div class="col-lg-5 order-2 order-lg-1 d-flex flex-column justify-content-center">
-              <h1 data-aos="fade-up">Profitez de vos meilleurs plats de qualité<br></h1> 
-              <!-- Délicieuse -->
-              <!-- <p data-aos="fade-up" data-aos-delay="100">Nous sommes une équipe de designers talentueux créant des sites web avec Bootstrap</p> -->
-              <div class="d-flex" data-aos="fade-up" data-aos-delay="200">
-                <a href="#book-a-table" class="btn-get-started">Réserver une table</a>
-              
-              </div>
-            </div>
-            <div class="col-lg-5 order-1 order-lg-2 hero-img" data-aos="zoom-out">
-              <img src="assets/img/hero-img.png" class="img-fluid animated" alt="">
-            </div>
-          </div>
-        </div>
-      </section><!-- /Section Hero -->
-      <!-- Section À propos -->
-      <section id="about" class="about section">
-        <!-- Titre de la section -->
-        <div class="container section-title" data-aos="fade-up">
-          <h2>À propos de nous</h2>
-          <p><span>En savoir plus</span> <span class="description-title">À propos de nous</span></p>
-        </div><!-- Fin du titre de la section -->
-        <div class="container">
-          <div class="row gy-4">
-            <div class="col-lg-7" data-aos="fade-up" data-aos-delay="100">
-              <img src="assets/img/about.jpg" class="img-fluid mb-4" alt="">
-              <div class="book-a-table">
-                <h3>Réserver une table</h3>
-                <a href="tel:787308706">78 730 87 06</a>
-              </div>
-            </div>
-            <div class="col-lg-5" data-aos="fade-up" data-aos-delay="250">
-              <div class="content ps-0 ps-lg-5">
-                <p class="fst-italic">
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-            </p>
-            <ul>
-              <li><i class="bi bi-check-circle-fill"></i> <span>Travail effectué sans prendre de repos, sauf pour ce qui est nécessaire au confort.</span></li>
-              <li><i class="bi bi-check-circle-fill"></i> <span>Ils éprouvent une douleur terrible en cherchant le plaisir dans la volupté.</span></li>
-              <li><i class="bi bi-check-circle-fill"></i> <span>Travail effectué sans prendre de repos, sauf pour ce qui est nécessaire au confort. Ils éprouvent une douleur terrible en cherchant le plaisir dans la volupté trideta storacalaperda mastiro, douleur qu’ils fuient sans aucune conséquence.</span></li>
-            </ul>
-            <p>
-              Travail effectué sans prendre de repos, sauf pour ce qui est nécessaire au confort. Ils éprouvent une douleur terrible en cherchant le plaisir dans la volupté,
-              cette volupté même qui engendre la douleur qu’ils fuient sans aucune conséquence. Sauf exception, ceux qui ne sont pas prudents n’en profitent pas.
-            </p>
-                <div class="position-relative mt-4">
-                  <img src="assets/img/about-2.jpg" class="img-fluid" alt="">
-                  <a href="https://www.youtube.com/watch?v=Y7f98aduVJ8" class="glightbox pulsating-play-btn"></a>
+        <!-- Section Hero -->
+        <section id="hero" class="hero section light-background">
+            <div class="container">
+                <div class="row gy-4 justify-content-center justify-content-lg-between">
+                    <div class="col-lg-5 order-2 order-lg-1 d-flex flex-column justify-content-center">
+                        <h1 data-aos="fade-up">Profitez de vos meilleurs plats de qualité<br></h1>
+                        <p data-aos="fade-up" data-aos-delay="100" class="mb-4">
+                            Découvrez une expérience culinaire exceptionnelle dans notre restaurant Mulho. 
+                            Des saveurs authentiques du Sénégal aux créations modernes.
+                        </p>
+                        <div class="d-flex" data-aos="fade-up" data-aos-delay="200">
+                            <a href="#book-a-table" class="btn-get-started">Réserver une table</a>
+                        </div>
+                    </div>
+                    <div class="col-lg-5 order-1 order-lg-2 hero-img" data-aos="zoom-out">
+                        <img src="assets/img/hero-img.png" class="img-fluid animated" alt="Restaurant Mulho" style="max-width: 100%; height: auto;">
+                    </div>
                 </div>
-              </div>
             </div>
-          </div>
-        </div>
-      </section><!-- /Section À propos -->
-      <!-- Section Pourquoi nous -->
-      <section id="why-us" class="why-us section light-background">
-        <div class="container">
-          <div class="row gy-4">
-            <div class="col-lg-4" data-aos="fade-up" data-aos-delay="100">
-              <div class="why-box">
-                <h3>Pourquoi choisir Yummy</h3>
-                <p>
-                  Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Duis aute irure dolor in reprehenderit
-                  Asperiores dolores sed et. Tenetur quia eos. Autem tempore quibusdam vel necessitatibus optio ad corporis.
-                </p>
-                <div class="text-center">
-                  <a href="#" class="more-btn"><span>En savoir plus</span> <i class="bi bi-chevron-right"></i></a>
-                </div>
-              </div>
-            </div><!-- Fin de la boîte Pourquoi -->
-            <div class="col-lg-8 d-flex align-items-stretch">
-              <div class="row gy-4" data-aos="fade-up" data-aos-delay="200">
-                <div class="col-xl-4">
-                  <div class="icon-box d-flex flex-column justify-content-center align-items-center">
-                    <i class="bi bi-clipboard-data"></i>
-                    <h4>Corporis voluptates officia eiusmod</h4>
-                    <p>Consequuntur sunt aut quasi enim aliquam quae harum pariatur laboris nisi ut aliquip</p>
-                  </div>
-                </div><!-- Fin de la boîte d'icônes -->
-                <div class="col-xl-4" data-aos="fade-up" data-aos-delay="300">
-                  <div class="icon-box d-flex flex-column justify-content-center align-items-center">
-                    <i class="bi bi-gem"></i>
-                    <h4>Ullamco laboris ladore lore pan</h4>
-                    <p>Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt</p>
-                  </div>
-                </div><!-- Fin de la boîte d'icônes -->
-                <div class="col-xl-4" data-aos="fade-up" data-aos-delay="400">
-                  <div class="icon-box d-flex flex-column justify-content-center align-items-center">
-                    <i class="bi bi-inboxes"></i>
-                    <h4>Labore consequatur incidid dolore</h4>
-                    <p>Aut suscipit aut cum nemo deleniti aut omnis. Doloribus ut maiores omnis facere</p>
-                  </div>
-                </div><!-- Fin de la boîte d'icônes -->
-              </div>
+        </section>
+
+        <!-- Section À propos -->
+        <section id="about" class="about section">
+            <div class="container section-title" data-aos="fade-up">
+                <h2>À propos de nous</h2>
+                <p><span>En savoir plus</span> <span class="description-title">À propos de nous</span></p>
             </div>
-          </div>
-        </div>
-      </section><!-- /Section Pourquoi nous -->
-      <!-- Section Statistiques -->
-      <section id="stats" class="stats section dark-background">
-        <img src="assets/img/stats-bg.jpg" alt="" data-aos="fade-in">
-        <div class="container position-relative" data-aos="fade-up" data-aos-delay="100">
-          <div class="row gy-4">
-            <div class="col-lg-3 col-md-6">
-              <div class="stats-item text-center w-100 h-100">
-                <span data-purecounter-start="0" data-purecounter-end="232" data-purecounter-duration="1" class="purecounter"></span>
-                <p>Clients</p>
-              </div>
-            </div><!-- Fin de l'élément Statistiques -->
-            <div class="col-lg-3 col-md-6">
-              <div class="stats-item text-center w-100 h-100">
-                <span data-purecounter-start="0" data-purecounter-end="521" data-purecounter-duration="1" class="purecounter"></span>
-                <p>Projets</p>
-              </div>
-            </div><!-- Fin de l'élément Statistiques -->
-            <div class="col-lg-3 col-md-6">
-              <div class="stats-item text-center w-100 h-100">
-                <span data-purecounter-start="0" data-purecounter-end="1453" data-purecounter-duration="1" class="purecounter"></span>
-                <p>Heures de support</p>
-              </div>
-            </div><!-- Fin de l'élément Statistiques -->
-            <div class="col-lg-3 col-md-6">
-              <div class="stats-item text-center w-100 h-100">
-                <span data-purecounter-start="0" data-purecounter-end="32" data-purecounter-duration="1" class="purecounter"></span>
-                <p>Employés</p>
-              </div>
-            </div><!-- Fin de l'élément Statistiques -->
-          </div>
-        </div>
-      </section><!-- /Section Statistiques -->
-      <!-- Section Menu -->
-      <?php include('menu.php');?>
-    
-      <!-- Section Événements -->
-      <section id="events" class="events section">
-        <div class="container-fluid" data-aos="fade-up" data-aos-delay="100">
-          <div class="swiper init-swiper">
-            <script type="application/json" class="swiper-config">
-              {
-                "loop": true,
-                "speed": 600,
-                "autoplay": {
-                  "delay": 5000
-                },
-                "slidesPerView": "auto",
-                "pagination": {
-                  "el": ".swiper-pagination",
-                  "type": "bullets",
-                  "clickable": true
-                },
-                "breakpoints": {
-                  "320": {
-                    "slidesPerView": 1,
-                    "spaceBetween": 40
-                  },
-                  "1200": {
-                    "slidesPerView": 3,
-                    "spaceBetween": 1
-                  }
-                }
-              }
-            </script>
-            <div class="swiper-wrapper">
-              <div class="swiper-slide event-item d-flex flex-column justify-content-end" style="background-image: url(assets/img/events-1.jpg)">
-                <h3>Fêtes sur mesure</h3>
-                <div class="price align-self-start">$99</div>
-                <p class="description">
-                  Quo corporis voluptas ea ad. Consectetur inventore sapiente ipsum voluptas eos omnis facere. Enim facilis veritatis id est rem repudiandae nulla expedita quas.
-                </p>
-              </div><!-- Fin de l'élément événement -->
-              <div class="swiper-slide event-item d-flex flex-column justify-content-end" style="background-image: url(assets/img/events-2.jpg)">
-                <h3>Fêtes privées</h3>
-                <div class="price align-self-start">$289</div>
-                <p class="description">
-                  In delectus sint qui et enim. Et ab repudiandae inventore quaerat doloribus. Facere nemo vero est ut dolores ea assumenda et. Delectus saepe accusamus aspernatur.
-                </p>
-              </div><!-- Fin de l'élément événement -->
-              <div class="swiper-slide event-item d-flex flex-column justify-content-end" style="background-image: url(assets/img/events-3.jpg)">
-                <h3>Fêtes d'anniversaire</h3>
-                <div class="price align-self-start">$499</div>
-                <p class="description">
-                  Laborum aperiam atque omnis minus omnis est qui assumenda quos. Quis id sit quibusdam. Esse quisquam ducimus officia ipsum ut quibusdam maxime. Non enim perspiciatis.
-                </p>
-              </div><!-- Fin de l'élément événement -->
-              <div class="swiper-slide event-item d-flex flex-column justify-content-end" style="background-image: url(assets/img/events-4.jpg)">
-                <h3>Fêtes de mariage</h3>
-                <div class="price align-self-start">$899</div>
-                <p class="description">
-                  Laborum aperiam atque omnis minus omnis est qui assumenda quos. Quis id sit quibusdam. Esse quisquam ducimus officia ipsum ut quibusdam maxime. Non enim perspiciatis.
-                </p>
-              </div><!-- Fin de l'élément événement -->
-            </div>
-            <div class="swiper-pagination"></div>
-          </div>
-        </div>
-      </section><!-- /Section Événements -->
-      <!-- Section Réserver une table -->
-      <section id="book-a-table" class="book-a-table section">
-        <!-- Titre de la section -->
-        <div class="container section-title" data-aos="fade-up">
-          <h2>Réserver une table</h2>
-          <!-- <span class="description-title">Séjour avec nous</span> -->
-          <p><span>Réservez votre</span> </p>
-        </div><!-- Fin du titre de la section -->
-        <div class="container">
-          <div class="row g-0" data-aos="fade-up" data-aos-delay="100">
-            <div class="col-lg-4 reservation-img" style="background-image: url(assets/img/reservation.jpg);"></div>
-            <div class="col-lg-8 d-flex align-items-center reservation-form-bg" data-aos="fade-up" data-aos-delay="200">
-              <form action="forms/book-a-table.php" method="post" role="form" class="php-email-form">
+            <div class="container">
                 <div class="row gy-4">
-                  <div class="col-lg-4 col-md-6">
-                    <input type="text" name="name" class="form-control" id="name" placeholder="Votre nom" required="">
-                  </div>
-                  <div class="col-lg-4 col-md-6">
-                    <input type="email" class="form-control" name="email" id="email" placeholder="Votre email" required="">
-                  </div>
-                  <div class="col-lg-4 col-md-6">
-                    <input type="text" class="form-control" name="phone" id="phone" placeholder="Votre téléphone" required="">
-                  </div>
-                  <div class="col-lg-4 col-md-6">
-                    <input type="date" name="date" class="form-control" id="date" placeholder="Date" required="">
-                  </div>
-                  <div class="col-lg-4 col-md-6">
-                    <input type="time" class="form-control" name="time" id="time" placeholder="Heure" required="">
-                  </div>
-                  <div class="col-lg-4 col-md-6">
-                    <input type="number" class="form-control" name="people" id="people" placeholder="Nombre de personnes" required="">
-                  </div>
+                    <div class="col-lg-7" data-aos="fade-up" data-aos-delay="100">
+                        <img src="assets/img/about.jpg" class="img-fluid mb-4" alt="À propos du restaurant" style="width: 100%; height: 400px; object-fit: cover; border-radius: 10px;">
+                        <div class="book-a-table" style="background: linear-gradient(135deg, #ec4899, #f97316); color: white; padding: 20px; border-radius: 10px; text-align: center;">
+                            <h3>Réserver une table</h3>
+                            <a href="tel:787308706" style="color: white; font-size: 1.5rem; font-weight: bold;">78 730 87 06</a>
+                        </div>
+                    </div>
+                    <div class="col-lg-5" data-aos="fade-up" data-aos-delay="250">
+                        <div class="content ps-0 ps-lg-5">
+                            <p class="fst-italic">
+                                Bienvenue au Restaurant Mulho, où la tradition culinaire sénégalaise rencontre l'innovation moderne. 
+                                Situé au cœur de Dakar, nous vous proposons une expérience gastronomique unique.
+                            </p>
+                            <ul style="list-style: none; padding: 0;">
+                                <li style="margin: 15px 0; display: flex; align-items: flex-start;">
+                                    <i class="bi bi-check-circle-fill" style="color: #ec4899; margin-right: 10px; margin-top: 5px;"></i>
+                                    <span>Ingrédients frais et locaux sélectionnés avec soin pour chaque plat</span>
+                                </li>
+                                <li style="margin: 15px 0; display: flex; align-items: flex-start;">
+                                    <i class="bi bi-check-circle-fill" style="color: #ec4899; margin-right: 10px; margin-top: 5px;"></i>
+                                    <span>Cuisine authentique préparée par nos chefs expérimentés</span>
+                                </li>
+                                <li style="margin: 15px 0; display: flex; align-items: flex-start;">
+                                    <i class="bi bi-check-circle-fill" style="color: #ec4899; margin-right: 10px; margin-top: 5px;"></i>
+                                    <span>Ambiance chaleureuse et service attentionné pour tous nos clients</span>
+                                </li>
+                            </ul>
+                            <p>
+                                Notre passion pour la gastronomie nous pousse à créer des plats qui racontent une histoire, 
+                                mélangeant les saveurs traditionnelles du Sénégal avec des techniques culinaires modernes.
+                            </p>
+                        </div>
+                    </div>
                 </div>
-                <div class="form-group mt-3">
-                  <textarea class="form-control" name="message" rows="5" placeholder="Message"></textarea>
-                </div>
-                <div class="text-center mt-3">
-                  <div class="loading">Chargement</div>
-                  <div class="error-message"></div>
-                  <div class="sent-message">Votre demande de réservation a été envoyée. Nous vous rappellerons ou enverrons un email pour confirmer votre réservation. Merci !</div>
-                  <button type="submit">Réserver une table</button>
-                </div>
-              </form>
-            </div><!-- Fin du formulaire de réservation -->
-          </div>
-        </div>
-      </section><!-- /Section Réserver une table -->
-      <!-- Section Galerie -->
-      <section id="gallery" class="gallery section light-background">
-        <!-- Titre de la section -->
-        <div class="container section-title" data-aos="fade-up">
-          <h2>Galerie</h2>
-          <p><span>Consultez</span> <span class="description-title">Notre galerie</span></p>
-        </div><!-- Fin du titre de la section -->
-        <div class="container" data-aos="fade-up" data-aos-delay="100">
-          <div class="swiper init-swiper">
-            <script type="application/json" class="swiper-config">
-              {
-                "loop": true,
-                "speed": 600,
-                "autoplay": {
-                  "delay": 5000
-                },
-                "slidesPerView": "auto",
-                "centeredSlides": true,
-                "pagination": {
-                  "el": ".swiper-pagination",
-                  "type": "bullets",
-                  "clickable": true
-                },
-                "breakpoints": {
-                  "320": {
-                    "slidesPerView": 1,
-                    "spaceBetween": 0
-                  },
-                  "768": {
-                    "slidesPerView": 3,
-                    "spaceBetween": 20
-                  },
-                  "1200": {
-                    "slidesPerView": 5,
-                    "spaceBetween": 20
-                  }
-                }
-              }
-            </script> 
-            <div class="swiper-wrapper align-items-center">
-              <div class="swiper-slide"><a class="glightbox" data-gallery="images-gallery" href="assets/img/gallery/gallery-1.jpg"><img src="assets/img/gallery/gallery-1.jpg" class="img-fluid" alt=""></a></div>
-              <div class="swiper-slide"><a class="glightbox" data-gallery="images-gallery" href="assets/img/gallery/gallery-2.jpg"><img src="assets/img/gallery/gallery-2.jpg" class="img-fluid" alt=""></a></div>
-              <div class="swiper-slide"><a class="glightbox" data-gallery="images-gallery" href="assets/img/gallery/gallery-3.jpg"><img src="assets/img/gallery/gallery-3.jpg" class="img-fluid" alt=""></a></div>
-              <div class="swiper-slide"><a class="glightbox" data-gallery="images-gallery" href="assets/img/gallery/gallery-4.jpg"><img src="assets/img/gallery/gallery-4.jpg" class="img-fluid" alt=""></a></div>
-              <div class="swiper-slide"><a class="glightbox" data-gallery="images-gallery" href="assets/img/gallery/gallery-5.jpg"><img src="assets/img/gallery/gallery-5.jpg" class="img-fluid" alt=""></a></div>
-              <div class="swiper-slide"><a class="glightbox" data-gallery="images-gallery" href="assets/img/gallery/gallery-6.jpg"><img src="assets/img/gallery/gallery-6.jpg" class="img-fluid" alt=""></a></div>
-              <div class="swiper-slide"><a class="glightbox" data-gallery="images-gallery" href="assets/img/gallery/gallery-7.jpg"><img src="assets/img/gallery/gallery-7.jpg" class="img-fluid" alt=""></a></div>
-              <div class="swiper-slide"><a class="glightbox" data-gallery="images-gallery" href="assets/img/gallery/gallery-8.jpg"><img src="assets/img/gallery/gallery-8.jpg" class="img-fluid" alt=""></a></div>
             </div>
-            <div class="swiper-pagination"></div>
-          </div>
-        </div>
-      </section><!-- /Section Galerie -->
-      <!-- Section Contact -->
-      <section id="contact" class="contact section">
-        <!-- Titre de la section -->
-        <div class="container section-title" data-aos="fade-up">
-          <h2>Contact</h2>
-          <p><span>Besoin d'aide ?</span> <span class="description-title">Contactez-nous</span></p>
-        </div><!-- Fin du titre de la section -->
-        <div class="container" data-aos="fade-up" data-aos-delay="100">
-          <div class="mb-5">
-            <iframe style="width: 100%; height: 400px;" src="https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d12097.433213460943!2d-74.0062269!3d40.7101282!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0xb89d1fe6bc499443!2sDowntown+Conference+Center!5e0!3m2!1smk!2sbg!4v1539943755621" frameborder="0" allowfullscreen=""></iframe>
-          </div><!-- Fin Google Maps -->
-          <div class="row gy-4">
-            <div class="col-md-6">
-              <div class="info-item d-flex align-items-center" data-aos="fade-up" data-aos-delay="200">
-                <i class="icon bi bi-geo-alt flex-shrink-0"></i>
-                <div>
-                  <h3>Adresse</h3>
-                  <p>Dakar, Medina rue 27x24</p>
-                </div>
-              </div>
-            </div><!-- Fin de l'élément d'information -->
-            <div class="col-md-6">
-              <div class="info-item d-flex align-items-center" data-aos="fade-up" data-aos-delay="300">
-                <i class="icon bi bi-telephone flex-shrink-0"></i>
-                          <div>
-              <h3>Appelez-nous</h3>
-              <p><a href="tel:787308706">78 730 87 06</a></p>
+        </section>
+
+        <!-- Section Menu -->
+        <section id="menu" class="section light-background">
+            <div class="container section-title" data-aos="fade-up">
+                <h2>Notre Menu</h2>
+                <p><span>Découvrez</span> <span class="description-title">Nos Spécialités</span></p>
             </div>
-              </div>
-            </div><!-- Fin de l'élément d'information -->
-            <div class="col-md-6">
-              <div class="info-item d-flex align-items-center" data-aos="fade-up" data-aos-delay="400">
-                <i class="icon bi bi-envelope flex-shrink-0"></i>
-                <div>
-                  <h3>Envoyez-nous un email</h3>
-                  <p>mulhomabiala29@gmail.com</p>
-                </div>
-              </div>
-            </div><!-- Fin de l'élément d'information -->
-          <div class="col-md-6">
-    <div class="info-item d-flex align-items-center" data-aos="fade-up" data-aos-delay="500">
-        <i class="icon bi bi-clock flex-shrink-0"></i>
-        <div>
-            <h3>Heures d'ouverture</h3>
-            <ul>
-                <?php if (!empty($results)): ?>
-                    <?php foreach ($results as $row): ?>
-                        <li>
-                            <strong><?= htmlspecialchars($row['jour']) ?> :</strong>
-                            <?php if ($row['ferme'] == 1): ?>
-                                Fermé
-                            <?php else: ?>
-                                <?= htmlspecialchars(substr($row['heure_ouverture'], 0, 5)) ?> - 
-                                <?= htmlspecialchars(substr($row['heure_fermeture'], 0, 5)) ?>
-                            <?php endif; ?>
-                        </li>
+            <div class="container">
+                <?php if (!empty($produits)): ?>
+                <div class="row">
+                    <?php foreach (array_slice($produits, 0, 6) as $produit): ?>
+                    <div class="col-lg-4 col-md-6 mb-4" data-aos="fade-up">
+                        <div class="menu-item" style="background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 5px 15px rgba(0,0,0,0.1); transition: transform 0.3s ease;">
+                            <img src="<?= htmlspecialchars($produit['image'] ?? 'assets/img/default-dish.jpg') ?>" 
+                                 alt="<?= htmlspecialchars($produit['nom']) ?>" 
+                                 style="width: 100%; height: 200px; object-fit: cover;">
+                            <div style="padding: 20px;">
+                                <h4 style="color: #1a202c; font-weight: 600; margin-bottom: 10px;">
+                                    <?= htmlspecialchars($produit['nom']) ?>
+                                </h4>
+                                <p style="color: #666; font-size: 0.9rem; margin-bottom: 15px;">
+                                    <?= htmlspecialchars(substr($produit['description'] ?? '', 0, 100)) ?>...
+                                </p>
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="font-size: 1.2rem; font-weight: bold; color: #ec4899;">
+                                        <?= number_format($produit['prix'], 0, ',', ' ') ?> FCFA
+                                    </span>
+                                    <button onclick="ajouterAuPanier(<?= $produit['id'] ?>)" 
+                                            style="background: linear-gradient(135deg, #ec4899, #f97316); color: white; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer; transition: all 0.3s ease;">
+                                        Ajouter
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <?php endforeach; ?>
+                </div>
                 <?php else: ?>
-                    <li>Aucun horaire trouvé.</li>
+                <div class="text-center">
+                    <p>Aucun plat disponible pour le moment.</p>
+                </div>
                 <?php endif; ?>
-            </ul>
-        </div>
-    </div>
-</div>
-          <form action="forms/contact.php" method="post" class="php-email-form" data-aos="fade-up" data-aos-delay="600">
-            <div class="row gy-4">
-              <div class="col-md-6">
-                <input type="text" name="name" class="form-control" placeholder="Votre nom" required="">
-              </div>
-              <div class="col-md-6 ">
-                <input type="email" class="form-control" name="email" placeholder="Votre email" required="">
-              </div>
-              <div class="col-md-12">
-                <input type="text" class="form-control" name="subject" placeholder="Sujet" required="">
-              </div>
-              <div class="col-md-12">
-                <textarea class="form-control" name="message" rows="6" placeholder="Message" required=""></textarea>
-              </div>
-              <div class="col-md-12 text-center">
-                <div class="loading">Chargement</div>
-                <div class="error-message"></div>
-                <div class="sent-message">Votre message a été envoyé. Merci !</div>
-                <button type="submit">Envoyer le message</button>
-              </div>
             </div>
-          </form><!-- Fin du formulaire de contact -->
-        </div>
-      </section><!-- /Section Contact -->
+        </section>
+
+        <!-- Section Réserver une table -->
+        <section id="book-a-table" class="book-a-table section">
+            <div class="container section-title" data-aos="fade-up">
+                <h2>Réserver une table</h2>
+                <p><span>Réservez votre</span> <span class="description-title">Table</span></p>
+            </div>
+            <div class="container">
+                <div class="row g-0" data-aos="fade-up" data-aos-delay="100">
+                    <div class="col-lg-4 reservation-img" style="background-image: url(assets/img/reservation.jpg); background-size: cover; background-position: center; min-height: 400px;"></div>
+                    <div class="col-lg-8 d-flex align-items-center" style="background: #f8fafc; padding: 60px 40px;" data-aos="fade-up" data-aos-delay="200">
+                        <form action="forms/book-a-table.php" method="post" role="form" class="php-email-form" style="width: 100%;">
+                            <div class="row gy-4">
+                                <div class="col-lg-4 col-md-6">
+                                    <input type="text" name="name" class="form-control" id="name" placeholder="Votre nom" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;">
+                                </div>
+                                <div class="col-lg-4 col-md-6">
+                                    <input type="email" class="form-control" name="email" id="email" placeholder="Votre email" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;">
+                                </div>
+                                <div class="col-lg-4 col-md-6">
+                                    <input type="text" class="form-control" name="phone" id="phone" placeholder="Votre téléphone" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;">
+                                </div>
+                                <div class="col-lg-4 col-md-6">
+                                    <input type="date" name="date" class="form-control" id="date" placeholder="Date" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;">
+                                </div>
+                                <div class="col-lg-4 col-md-6">
+                                    <input type="time" class="form-control" name="time" id="time" placeholder="Heure" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;">
+                                </div>
+                                <div class="col-lg-4 col-md-6">
+                                    <input type="number" class="form-control" name="people" id="people" placeholder="Nombre de personnes" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;">
+                                </div>
+                            </div>
+                            <div class="form-group mt-3">
+                                <textarea class="form-control" name="message" rows="5" placeholder="Message" style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px; width: 100%;"></textarea>
+                            </div>
+                            <div class="text-center mt-3">
+                                <div class="loading" style="display: none;">Chargement</div>
+                                <div class="error-message" style="display: none; color: #e53e3e;"></div>
+                                <div class="sent-message" style="display: none; color: #38a169;">Votre demande de réservation a été envoyée. Nous vous rappellerons ou enverrons un email pour confirmer votre réservation. Merci !</div>
+                                <button type="submit" style="background: linear-gradient(135deg, #ec4899, #f97316); color: white; border: none; padding: 15px 40px; border-radius: 50px; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">Réserver une table</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section Galerie -->
+        <section id="gallery" class="gallery section light-background">
+            <div class="container section-title" data-aos="fade-up">
+                <h2>Galerie</h2>
+                <p><span>Consultez</span> <span class="description-title">Notre galerie</span></p>
+            </div>
+            <div class="container" data-aos="fade-up" data-aos-delay="100">
+                <div class="row">
+                    <?php 
+                    $gallery_images = [
+                        'assets/img/gallery/gallery-1.jpg',
+                        'assets/img/gallery/gallery-2.jpg',
+                        'assets/img/gallery/gallery-3.jpg',
+                        'assets/img/gallery/gallery-4.jpg',
+                        'assets/img/gallery/gallery-5.jpg',
+                        'assets/img/gallery/gallery-6.jpg'
+                    ];
+                    foreach($gallery_images as $index => $image): ?>
+                    <div class="col-lg-4 col-md-6 mb-4">
+                        <div style="overflow: hidden; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); transition: transform 0.3s ease;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                            <a href="<?= $image ?>" data-lightbox="gallery" data-title="Image <?= $index + 1 ?>">
+                                <img src="<?= $image ?>" alt="Galerie <?= $index + 1 ?>" style="width: 100%; height: 250px; object-fit: cover; cursor: pointer;">
+                            </a>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section Contact -->
+        <section id="contact" class="contact section">
+            <div class="container section-title" data-aos="fade-up">
+                <h2>Contact</h2>
+                <p><span>Besoin d'aide ?</span> <span class="description-title">Contactez-nous</span></p>
+            </div>
+            <div class="container" data-aos="fade-up" data-aos-delay="100">
+                <div class="mb-5">
+                    <iframe style="width: 100%; height: 400px; border-radius: 15px;" 
+                            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3858.9689555935147!2d-17.44270312595434!3d14.693425085886857!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0xec10d6c8b7e6c13%3A0x20e6e5b6b7e6c13!2sMedina%2C%20Dakar%2C%20Senegal!5e0!3m2!1sen!2sus!4v1641234567890!5m2!1sen!2sus" 
+                            frameborder="0" allowfullscreen=""></iframe>
+                </div>
+                
+                <div class="row gy-4">
+                    <div class="col-md-6">
+                        <div class="info-item d-flex align-items-center" data-aos="fade-up" data-aos-delay="200" style="background: white; padding: 30px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); margin-bottom: 20px;">
+                            <i class="icon bi bi-geo-alt" style="color: #ec4899; font-size: 2rem; margin-right: 20px;"></i>
+                            <div>
+                                <h3 style="color: #1a202c; font-weight: 600; margin-bottom: 5px;">Adresse</h3>
+                                <p style="color: #666; margin: 0;">Dakar, Medina rue 27x24</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="info-item d-flex align-items-center" data-aos="fade-up" data-aos-delay="300" style="background: white; padding: 30px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); margin-bottom: 20px;">
+                            <i class="icon bi bi-telephone" style="color: #ec4899; font-size: 2rem; margin-right: 20px;"></i>
+                            <div>
+                                <h3 style="color: #1a202c; font-weight: 600; margin-bottom: 5px;">Appelez-nous</h3>
+                                <p style="margin: 0;"><a href="tel:787308706" style="color: #666; text-decoration: none;">78 730 87 06</a></p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="info-item d-flex align-items-center" data-aos="fade-up" data-aos-delay="400" style="background: white; padding: 30px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); margin-bottom: 20px;">
+                            <i class="icon bi bi-envelope" style="color: #ec4899; font-size: 2rem; margin-right: 20px;"></i>
+                            <div>
+                                <h3 style="color: #1a202c; font-weight: 600; margin-bottom: 5px;">Envoyez-nous un email</h3>
+                                <p style="margin: 0;"><a href="mailto:mulhomabiala29@gmail.com" style="color: #666; text-decoration: none;">mulhomabiala29@gmail.com</a></p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="info-item d-flex align-items-center" data-aos="fade-up" data-aos-delay="500" style="background: white; padding: 30px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); margin-bottom: 20px;">
+                            <i class="icon bi bi-clock" style="color: #ec4899; font-size: 2rem; margin-right: 20px;"></i>
+                            <div>
+                                <h3 style="color: #1a202c; font-weight: 600; margin-bottom: 10px;">Heures d'ouverture</h3>
+                                <ul style="list-style: none; padding: 0; margin: 0;">
+                                    <?php if (!empty($results)): ?>
+                                        <?php foreach ($results as $row): ?>
+                                            <li style="margin: 5px 0; color: #666;">
+                                                <strong><?= htmlspecialchars($row['jour']) ?> :</strong>
+                                                <?php if ($row['ferme'] == 1): ?>
+                                                    <span style="color: #e53e3e;">Fermé</span>
+                                                <?php else: ?>
+                                                    <?= htmlspecialchars(substr($row['heure_ouverture'], 0, 5)) ?> -
+                                                    <?= htmlspecialchars(substr($row['heure_fermeture'], 0, 5)) ?>
+                                                <?php endif; ?>
+                                            </li>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <li style="color: #666;">Aucun horaire trouvé.</li>
+                                    <?php endif; ?>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Formulaire de contact -->
+                <form action="forms/contact.php" method="post" class="php-email-form" data-aos="fade-up" data-aos-delay="600" style="background: white; padding: 40px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); margin-top: 40px;">
+                    <div class="row gy-4">
+                        <div class="col-md-6">
+                            <input type="text" name="name" class="form-control" placeholder="Votre nom" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;">
+                        </div>
+                        <div class="col-md-6">
+                            <input type="email" class="form-control" name="email" placeholder="Votre email" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;">
+                        </div>
+                        <div class="col-md-12">
+                            <input type="text" class="form-control" name="subject" placeholder="Sujet" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;">
+                        </div>
+                        <div class="col-md-12">
+                            <textarea class="form-control" name="message" rows="6" placeholder="Message" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px; resize: vertical;"></textarea>
+                        </div>
+                        <div class="col-md-12 text-center">
+                            <div class="loading" style="display: none;">Chargement</div>
+                            <div class="error-message" style="display: none; color: #e53e3e;"></div>
+                            <div class="sent-message" style="display: none; color: #38a169;">Votre message a été envoyé. Merci !</div>
+                            <button type="submit" style="background: linear-gradient(135deg, #ec4899, #f97316); color: white; border: none; padding: 15px 40px; border-radius: 50px; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">Envoyer le message</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </section>
     </main>
+
+    <!-- Footer -->
     <footer id="footer" class="footer dark-background">
-      <div class="container">
-        <div class="row gy-3">
-          <div class="col-lg-3 col-md-6 d-flex">
-            <i class="bi bi-geo-alt icon"></i>
-            <div class="address">
-              <h4>Adresse</h4>
-              <p>A108 Adam Street</p>
-              <p>New York, NY 535022</p>
-              <a class="btn-getstarted" href="admin/login.php">admin</a>
-            </div>
-          </div>
-          <div class="col-lg-3 col-md-6 d-flex">
-            <i class="bi bi-telephone icon"></i>
-            <div>
-              <h4>Contact</h4>
-              <p>
-                <strong>Téléphone :</strong> <span> <a href="tel:787308706">78 730 87 06</a></span><br>
-                <strong>Email :</strong>
-<a href="mailto:mulhomabiala29@gmail.com?subject=Contact depuis le site">mulhomabiala29@gmail.com</a>
-
-
-              </p>
-            </div>
-          </div>
-          <div class="col-lg-3 col-md-6 d-flex">
-            <i class="bi bi-clock icon"></i>
-            <div>
-              <h4>Heures d'ouverture</h4>
-              <p>
-                <ul>
-                <?php if (!empty($results)): ?>
-                    <?php foreach ($results as $row): ?>
-                        <li>
-                            <strong><?= htmlspecialchars($row['jour']) ?> :</strong>
-                            <?php if ($row['ferme'] == 1): ?>
-                                Fermé
+        <div class="container" style="padding: 60px 20px 20px;">
+            <div class="row gy-3">
+                <div class="col-lg-3 col-md-6 d-flex">
+                    <i class="bi bi-geo-alt icon" style="color: #ec4899; font-size: 2rem; margin-right: 15px;"></i>
+                    <div class="address">
+                        <h4 style="color: white; font-weight: 600; margin-bottom: 10px;">Adresse</h4>
+                        <p style="color: #cbd5e0; margin: 5px 0;">Dakar, Medina</p>
+                        <p style="color: #cbd5e0; margin: 5px 0;">Rue 27x24</p>
+                        <a class="btn-getstarted" href="admin/login.php" style="display: inline-block; margin-top: 15px; background: linear-gradient(135deg, #ec4899, #f97316); color: white; padding: 8px 20px; border-radius: 20px; text-decoration: none; font-size: 0.9rem;">Administration</a>
+                    </div>
+                </div>
+                
+                <div class="col-lg-3 col-md-6 d-flex">
+                    <i class="bi bi-telephone icon" style="color: #ec4899; font-size: 2rem; margin-right: 15px;"></i>
+                    <div>
+                        <h4 style="color: white; font-weight: 600; margin-bottom: 10px;">Contact</h4>
+                        <p style="color: #cbd5e0; margin: 5px 0;">
+                            <strong>Téléphone :</strong> 
+                            <a href="tel:787308706" style="color: #cbd5e0; text-decoration: none;">78 730 87 06</a>
+                        </p>
+                        <p style="color: #cbd5e0; margin: 5px 0;">
+                            <strong>Email :</strong><br>
+                            <a href="mailto:mulhomabiala29@gmail.com?subject=Contact depuis le site" style="color: #cbd5e0; text-decoration: none; font-size: 0.9rem;">mulhomabiala29@gmail.com</a>
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="col-lg-3 col-md-6 d-flex">
+                    <i class="bi bi-clock icon" style="color: #ec4899; font-size: 2rem; margin-right: 15px;"></i>
+                    <div>
+                        <h4 style="color: white; font-weight: 600; margin-bottom: 10px;">Heures d'ouverture</h4>
+                        <ul style="list-style: none; padding: 0; margin: 0;">
+                            <?php if (!empty($results)): ?>
+                                <?php foreach ($results as $row): ?>
+                                    <li style="color: #cbd5e0; margin: 3px 0; font-size: 0.9rem;">
+                                        <strong><?= htmlspecialchars($row['jour']) ?> :</strong>
+                                        <?php if ($row['ferme'] == 1): ?>
+                                            <span style="color: #fc8181;">Fermé</span>
+                                        <?php else: ?>
+                                            <?= htmlspecialchars(substr($row['heure_ouverture'], 0, 5)) ?> -
+                                            <?= htmlspecialchars(substr($row['heure_fermeture'], 0, 5)) ?>
+                                        <?php endif; ?>
+                                    </li>
+                                <?php endforeach; ?>
                             <?php else: ?>
-                                <?= htmlspecialchars(substr($row['heure_ouverture'], 0, 5)) ?> - 
-                                <?= htmlspecialchars(substr($row['heure_fermeture'], 0, 5)) ?>
+                                <li style="color: #cbd5e0;">Aucun horaire trouvé.</li>
                             <?php endif; ?>
-                        </li>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <li>Aucun horaire trouvé.</li>
-                <?php endif; ?>
-            </ul>
-              </p>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="col-lg-3 col-md-6">
+                    <h4 style="color: white; font-weight: 600; margin-bottom: 15px;">Suivez-nous</h4>
+                    <div class="social-links d-flex">
+                        <a href="https://www.snapchat.com/add/yourusername" class="snapchat"><i class="bi bi-snapchat"></i></a>
+                        <a href="https://www.tiktok.com/@Ombrelumineuse" class="tiktok" style="background: linear-gradient(135deg, #ec4899, #f97316);"><i class="bi bi-tiktok"></i></a>
+                        <a href="https://wa.me/+24205530852" class="whatsapp"><i class="bi bi-whatsapp"></i></a>
+                        <a href="https://www.facebook.com/votreprofil" class="facebook" target="_blank"><i class="bi bi-facebook"></i></a>
+                        <a href="https://www.instagram.com/votreprofil" class="instagram" target="_blank"><i class="bi bi-instagram"></i></a>
+                    </div>
+                </div>
             </div>
-          </div>
-          <div class="col-lg-3 col-md-6">
-            <h4>Suivez-nous</h4>
-            <div class="social-links d-flex">
-              <a href="https://www.snapchat.com/add/yourusername" class="snapchat"><i class="bi bi-snapchat"></i></a>
-              <a href="https://www.tiktok.com/@Ombrelumineuse" class="tiktok"><i class="bi bi-tiktok"></i></a>
-              <a href="https://wa.me/+24205530852" class="whatsapp"><i class="bi bi-whatsapp"></i></a>
-              <a href="https://www.facebook.com/votreprofil" class="facebook" target="_blank"><i class="bi bi-facebook"></i></a>
-              <a href="https://www.instagram.com/votreprofil" class="instagram" target="_blank"><i class="bi bi-instagram"></i></a>
-              
+        </div>
+        
+        <div class="container copyright text-center mt-4" style="border-top: 1px solid #2d3748; padding-top: 30px;">
+            <p style="color: #cbd5e0; margin: 10px 0;">© <span>Copyright</span> <strong class="px-1 sitename" style="color: #ec4899;">Mulho</strong> <span>Tous droits réservés</span></p>
+            <div class="credits" style="color: #a0aec0; font-size: 0.9rem;">
+                Conçu par <a href="#" style="color: #ec4899; text-decoration: none;">Mulho - MABIALA</a>
             </div>
-          </div>
         </div>
-      </div>
-      <div class="container copyright text-center mt-4">
-        <p>© <span>Copyright</span> <strong class="px-1 sitename">Mulho</strong> <span>Tous droits réservés</span></p>
-        <div class="credits">
-          Conçu par <a href="#">Mulho - MABIALA</a>
-        </div>
-      </div>
     </footer>
-  </body>
-
 
     <!-- Scroll Top -->
-    <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
+    <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center" style="position: fixed; bottom: 30px; right: 30px; background: linear-gradient(135deg, #ec4899, #f97316); color: white; width: 50px; height: 50px; border-radius: 50%; text-decoration: none; box-shadow: 0 5px 15px rgba(236, 72, 153, 0.3); transition: all 0.3s ease; z-index: 999; display: none;">
+        <i class="bi bi-arrow-up-short" style="font-size: 1.5rem;"></i>
+    </a>
 
-    <!-- Preloader -->
-    <div id="preloader"></div>
-    <!-- Ajoutez ce script après votre formulaire -->
-
-
- 
-<script>
-   let currentLanguage = 'fr';
-
-        function toggleDropdown() {
-            const dropdown = document.getElementById('languageDropdown');
-            const container = document.querySelector('.language-dropdown');
-            
-            dropdown.classList.toggle('show');
-            container.classList.toggle('active');
-        }
-
-        function changeLanguage(lang) {
-            currentLanguage = lang;
-            
-            const langInfo = {
-                'fr': { flag: '🇫🇷', name: 'Français' },
-                'en': { flag: '🇬🇧', name: 'English' },
-                'wo': { flag: '🇸🇳', name: 'Wolof' }
-            };
-
-            // Mettre à jour l'affichage de la langue actuelle
-            const currentLangElement = document.getElementById('currentLang');
-            currentLangElement.innerHTML = `
-                <span class="flag">${langInfo[lang].flag}</span>
-                <span>Langue actuelle: ${langInfo[lang].name}</span>
-            `;
-
-            // Fermer le menu déroulant
-            toggleDropdown();
-
-            // Ici vous pouvez ajouter la logique pour changer réellement la langue du site
-            console.log('Langue sélectionnée:', lang);
-        }
-
-        // Fermer le menu si on clique ailleurs
-        window.onclick = function(event) {
-            if (!event.target.matches('.language-btn') && !event.target.closest('.language-btn')) {
-                const dropdown = document.getElementById('languageDropdown');
-                const container = document.querySelector('.language-dropdown');
-                
-                if (dropdown.classList.contains('show')) {
-                    dropdown.classList.remove('show');
-                    container.classList.remove('active');
-                }
+    <!-- Scripts -->
+    <script src="cart.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // === 🔁 Mise à jour du panier ===
+        function updateCartCount() {
+            const cartCount = document.getElementById('cart-count');
+            if (!cartCount) return;
+            try {
+                const cart = JSON.parse(localStorage.getItem('cart')) || [];
+                const count = cart.reduce((sum, item) => sum + (item.quantity || 0), 0);
+                cartCount.textContent = count;
+            } catch (e) {
+                console.error("Erreur panier :", e);
+                cartCount.textContent = "0";
             }
         }
+        updateCartCount();
 
-        // Initialiser avec la langue par défaut
-        window.onload = function() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const lang = urlParams.get('lang') || 'fr';
-            changeLanguage(lang);
+        // === 🌐 Changement de langue ===
+        function changeLanguage(lang) {
+            console.log('Langue sélectionnée:', lang);
+            window.location.search = `?lang=${lang}`;
         }
-</script>
+        window.changeLanguage = changeLanguage;
 
-<script>
-document.getElementById('date_reservation').addEventListener('change', function() {
-    const date = this.value;
-    if (!date) return;
+        // === 📱 Mobile menu ===
+        const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+        const mobileMenuClose = document.getElementById('mobile-menu-close');
+        const mobileMenu = document.getElementById('mobile-menu');
 
-    const jour = new Date(date).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+        function openMobileMenu() {
+            mobileMenu?.classList.add('open');
+            document.body.style.overflow = 'hidden';
+        }
 
-    fetch(`get_horaires_jour.php?jour=${jour}`)
-        .then(res => res.json())
-        .then(data => {
-            const heureInput = document.getElementById('heure_reservation');
-            const infoText = document.getElementById('plage_horaire_info');
+        function closeMobileMenu() {
+            mobileMenu?.classList.remove('open');
+            document.body.style.overflow = 'auto';
+        }
 
-            if (data.success) {
-                heureInput.min = data.heure_debut;
-                heureInput.max = data.heure_fin;
-                infoText.textContent = `Heures disponibles : ${data.heure_debut} - ${data.heure_fin}`;
-                heureInput.disabled = false;
+        mobileMenuToggle?.addEventListener('click', openMobileMenu);
+        mobileMenuClose?.addEventListener('click', closeMobileMenu);
+
+        // === 🔗 Scroll fluide vers les ancres ===
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+                closeMobileMenu();
+            });
+        });
+
+        // === 🔼 Bouton scroll to top ===
+        const scrollTop = document.getElementById('scroll-top');
+        window.addEventListener('scroll', () => {
+            if (window.pageYOffset > 300) {
+                scrollTop.style.display = 'flex';
             } else {
-                heureInput.disabled = true;
-                infoText.textContent = data.message;
+                scrollTop.style.display = 'none';
             }
         });
-});
-</script>
+
+        scrollTop?.addEventListener('click', (e) => {
+            e.preventDefault();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        // === 🍽️ Fonction d'ajout au panier ===
+        window.ajouterAuPanier = function(productId) {
+            // Cette fonction devrait être définie dans cart.js
+            console.log('Ajout au panier:', productId);
+            // Simuler l'ajout
+            updateCartCount();
+        };
+
+        // === 📅 Animation AOS (si disponible) ===
+        if (typeof AOS !== 'undefined') {
+            AOS.init({
+                duration: 1000,
+                easing: 'ease-in-out',
+                once: true,
+                mirror: false
+            });
+        }
+    });
+    </script>
 
     <!-- Vendor JS Files -->
-    <script src="assets/vendor/purecounter/purecounter.js"></script>
+    <script src="assets/vendor/purecounter/purecounter_vanilla.js"></script>
     <script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="assets/vendor/php-email-form/validate.js"></script>
     <script src="assets/vendor/aos/aos.js"></script>
     <script src="assets/vendor/glightbox/js/glightbox.min.js"></script>
-    <script src="assets/vendor/purecounter/purecounter_vanilla.js"></script>
     <script src="assets/vendor/swiper/swiper-bundle.min.js"></script>
-
     <!-- Main JS File -->
     <script src="assets/js/main.js"></script>
-
-  </body>
-
-  </html>
+</body>
+</html>
