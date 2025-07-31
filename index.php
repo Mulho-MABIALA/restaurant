@@ -253,43 +253,6 @@ if (!empty($_SESSION['panier']) && is_array($_SESSION['panier'])) {
                 margin-top: 70px;
             }
         }
-
-        /* Footer */
-        .footer {
-            background-color: #1a202c;
-            color: white;
-            padding: 60px 0 20px;
-        }
-
-        .footer h4 {
-            font-size: 1.2rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-        }
-
-        .social-links {
-            display: flex;
-            gap: 10px;
-        }
-
-        .social-links a {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, #ec4899, #f97316);
-            color: white;
-            border-radius: 50%;
-            text-decoration: none;
-            transition: all 0.3s ease;
-        }
-
-        .social-links a:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(236, 72, 153, 0.3);
-        }
-
         #preloader {
             display: none !important;
         }
@@ -323,7 +286,7 @@ if (!empty($_SESSION['panier']) && is_array($_SESSION['panier'])) {
                     <a href="#events" class="nav-link-hover text-gray-700 hover:text-pink-600 font-medium py-2 transition-colors duration-300">
                         <?= $traduction['events'] ?? 'Événements' ?>
                     </a>
-                    <a href="#gallery" class="nav-link-hover text-gray-700 hover:text-pink-600 font-medium py-2 transition-colors duration-300">
+                    <a href="galerie.php" class="nav-link-hover text-gray-700 hover:text-pink-600 font-medium py-2 transition-colors duration-300">
                         <?= $traduction['gallery'] ?? 'Galerie' ?>
                     </a>
                     <a href="#contact" class="nav-link-hover text-gray-700 hover:text-pink-600 font-medium py-2 transition-colors duration-300">
@@ -373,7 +336,7 @@ if (!empty($_SESSION['panier']) && is_array($_SESSION['panier'])) {
                         Réserver une table
                     </a>
                 </div>
-                
+ 
                 <!-- Mobile Menu Button -->
                 <div class="lg:hidden flex items-center space-x-4">
                     <!-- Panier Mobile -->
@@ -385,14 +348,12 @@ if (!empty($_SESSION['panier']) && is_array($_SESSION['panier'])) {
                         </span>
                         <?php endif; ?>
                     </a>
-
                     <button id="mobile-menu-toggle" class="text-gray-700 hover:text-pink-600 focus:outline-none transition-colors duration-300">
                         <i class="fas fa-bars text-xl"></i>
                     </button>
                 </div>
             </div>
         </div>
-        
         <!-- Mobile Menu -->
         <div id="mobile-menu" class="mobile-menu lg:hidden fixed inset-y-0 right-0 w-80 bg-white shadow-2xl z-50">
             <div class="flex flex-col h-full">
@@ -403,7 +364,6 @@ if (!empty($_SESSION['panier']) && is_array($_SESSION['panier'])) {
                         <i class="fas fa-times text-xl"></i>
                     </button>
                 </div>
-
                 <!-- Mobile Navigation -->
                 <nav class="flex-1 px-6 py-8 space-y-4">
                     <a href="#hero" class="block text-gray-700 hover:text-pink-600 font-medium py-3 border-b border-gray-100 transition-colors duration-300">
@@ -425,7 +385,6 @@ if (!empty($_SESSION['panier']) && is_array($_SESSION['panier'])) {
                         Contact
                     </a>
                 </nav>
-
                 <!-- Mobile CTA -->
                 <div class="p-6 border-t border-gray-200">
                     <a href="#book-a-table" class="block w-full bg-gradient-to-r from-pink-500 to-orange-500 text-white text-center px-6 py-3 rounded-full font-semibold hover:from-pink-600 hover:to-orange-600 transition-all duration-300 shadow-lg">
@@ -435,7 +394,6 @@ if (!empty($_SESSION['panier']) && is_array($_SESSION['panier'])) {
             </div>
         </div>
     </header>
-
     <main class="main">
         <!-- Section Hero -->
         <section id="hero" class="hero section light-background">
@@ -457,7 +415,6 @@ if (!empty($_SESSION['panier']) && is_array($_SESSION['panier'])) {
                 </div>
             </div>
         </section>
-
         <!-- Section À propos -->
         <section id="about" class="about section">
             <div class="container section-title" data-aos="fade-up">
@@ -502,51 +459,8 @@ if (!empty($_SESSION['panier']) && is_array($_SESSION['panier'])) {
                 </div>
             </div>
         </section>
-
         <!-- Section Menu -->
-        <section id="menu" class="section light-background">
-            <div class="container section-title" data-aos="fade-up">
-                <h2>Notre Menu</h2>
-                <p><span>Découvrez</span> <span class="description-title">Nos Spécialités</span></p>
-            </div>
-            <div class="container">
-                <?php if (!empty($produits)): ?>
-                <div class="row">
-                    <?php foreach (array_slice($produits, 0, 6) as $produit): ?>
-                    <div class="col-lg-4 col-md-6 mb-4" data-aos="fade-up">
-                        <div class="menu-item" style="background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 5px 15px rgba(0,0,0,0.1); transition: transform 0.3s ease;">
-                            <img src="<?= htmlspecialchars($produit['image'] ?? 'assets/img/default-dish.jpg') ?>" 
-                                 alt="<?= htmlspecialchars($produit['nom']) ?>" 
-                                 style="width: 100%; height: 200px; object-fit: cover;">
-                            <div style="padding: 20px;">
-                                <h4 style="color: #1a202c; font-weight: 600; margin-bottom: 10px;">
-                                    <?= htmlspecialchars($produit['nom']) ?>
-                                </h4>
-                                <p style="color: #666; font-size: 0.9rem; margin-bottom: 15px;">
-                                    <?= htmlspecialchars(substr($produit['description'] ?? '', 0, 100)) ?>...
-                                </p>
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <span style="font-size: 1.2rem; font-weight: bold; color: #ec4899;">
-                                        <?= number_format($produit['prix'], 0, ',', ' ') ?> FCFA
-                                    </span>
-                                    <button onclick="ajouterAuPanier(<?= $produit['id'] ?>)" 
-                                            style="background: linear-gradient(135deg, #ec4899, #f97316); color: white; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer; transition: all 0.3s ease;">
-                                        Ajouter
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
-                <?php else: ?>
-                <div class="text-center">
-                    <p>Aucun plat disponible pour le moment.</p>
-                </div>
-                <?php endif; ?>
-            </div>
-        </section>
-
+        <?php include('menu.php'); ?>
         <!-- Section Réserver une table -->
         <section id="book-a-table" class="book-a-table section">
             <div class="container section-title" data-aos="fade-up">
@@ -592,37 +506,6 @@ if (!empty($_SESSION['panier']) && is_array($_SESSION['panier'])) {
                 </div>
             </div>
         </section>
-
-        <!-- Section Galerie -->
-        <section id="gallery" class="gallery section light-background">
-            <div class="container section-title" data-aos="fade-up">
-                <h2>Galerie</h2>
-                <p><span>Consultez</span> <span class="description-title">Notre galerie</span></p>
-            </div>
-            <div class="container" data-aos="fade-up" data-aos-delay="100">
-                <div class="row">
-                    <?php 
-                    $gallery_images = [
-                        'assets/img/gallery/gallery-1.jpg',
-                        'assets/img/gallery/gallery-2.jpg',
-                        'assets/img/gallery/gallery-3.jpg',
-                        'assets/img/gallery/gallery-4.jpg',
-                        'assets/img/gallery/gallery-5.jpg',
-                        'assets/img/gallery/gallery-6.jpg'
-                    ];
-                    foreach($gallery_images as $index => $image): ?>
-                    <div class="col-lg-4 col-md-6 mb-4">
-                        <div style="overflow: hidden; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); transition: transform 0.3s ease;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-                            <a href="<?= $image ?>" data-lightbox="gallery" data-title="Image <?= $index + 1 ?>">
-                                <img src="<?= $image ?>" alt="Galerie <?= $index + 1 ?>" style="width: 100%; height: 250px; object-fit: cover; cursor: pointer;">
-                            </a>
-                        </div>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-        </section>
-
         <!-- Section Contact -->
         <section id="contact" class="contact section">
             <div class="container section-title" data-aos="fade-up">
@@ -721,80 +604,8 @@ if (!empty($_SESSION['panier']) && is_array($_SESSION['panier'])) {
         </section>
     </main>
 
-    <!-- Footer -->
-    <footer id="footer" class="footer dark-background">
-        <div class="container" style="padding: 60px 20px 20px;">
-            <div class="row gy-3">
-                <div class="col-lg-3 col-md-6 d-flex">
-                    <i class="bi bi-geo-alt icon" style="color: #ec4899; font-size: 2rem; margin-right: 15px;"></i>
-                    <div class="address">
-                        <h4 style="color: white; font-weight: 600; margin-bottom: 10px;">Adresse</h4>
-                        <p style="color: #cbd5e0; margin: 5px 0;">Dakar, Medina</p>
-                        <p style="color: #cbd5e0; margin: 5px 0;">Rue 27x24</p>
-                        <a class="btn-getstarted" href="admin/login.php" style="display: inline-block; margin-top: 15px; background: linear-gradient(135deg, #ec4899, #f97316); color: white; padding: 8px 20px; border-radius: 20px; text-decoration: none; font-size: 0.9rem;">Administration</a>
-                    </div>
-                </div>
-                
-                <div class="col-lg-3 col-md-6 d-flex">
-                    <i class="bi bi-telephone icon" style="color: #ec4899; font-size: 2rem; margin-right: 15px;"></i>
-                    <div>
-                        <h4 style="color: white; font-weight: 600; margin-bottom: 10px;">Contact</h4>
-                        <p style="color: #cbd5e0; margin: 5px 0;">
-                            <strong>Téléphone :</strong> 
-                            <a href="tel:787308706" style="color: #cbd5e0; text-decoration: none;">78 730 87 06</a>
-                        </p>
-                        <p style="color: #cbd5e0; margin: 5px 0;">
-                            <strong>Email :</strong><br>
-                            <a href="mailto:mulhomabiala29@gmail.com?subject=Contact depuis le site" style="color: #cbd5e0; text-decoration: none; font-size: 0.9rem;">mulhomabiala29@gmail.com</a>
-                        </p>
-                    </div>
-                </div>
-                
-                <div class="col-lg-3 col-md-6 d-flex">
-                    <i class="bi bi-clock icon" style="color: #ec4899; font-size: 2rem; margin-right: 15px;"></i>
-                    <div>
-                        <h4 style="color: white; font-weight: 600; margin-bottom: 10px;">Heures d'ouverture</h4>
-                        <ul style="list-style: none; padding: 0; margin: 0;">
-                            <?php if (!empty($results)): ?>
-                                <?php foreach ($results as $row): ?>
-                                    <li style="color: #cbd5e0; margin: 3px 0; font-size: 0.9rem;">
-                                        <strong><?= htmlspecialchars($row['jour']) ?> :</strong>
-                                        <?php if ($row['ferme'] == 1): ?>
-                                            <span style="color: #fc8181;">Fermé</span>
-                                        <?php else: ?>
-                                            <?= htmlspecialchars(substr($row['heure_ouverture'], 0, 5)) ?> -
-                                            <?= htmlspecialchars(substr($row['heure_fermeture'], 0, 5)) ?>
-                                        <?php endif; ?>
-                                    </li>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <li style="color: #cbd5e0;">Aucun horaire trouvé.</li>
-                            <?php endif; ?>
-                        </ul>
-                    </div>
-                </div>
-                
-                <div class="col-lg-3 col-md-6">
-                    <h4 style="color: white; font-weight: 600; margin-bottom: 15px;">Suivez-nous</h4>
-                    <div class="social-links d-flex">
-                        <a href="https://www.snapchat.com/add/yourusername" class="snapchat"><i class="bi bi-snapchat"></i></a>
-                        <a href="https://www.tiktok.com/@Ombrelumineuse" class="tiktok" style="background: linear-gradient(135deg, #ec4899, #f97316);"><i class="bi bi-tiktok"></i></a>
-                        <a href="https://wa.me/+24205530852" class="whatsapp"><i class="bi bi-whatsapp"></i></a>
-                        <a href="https://www.facebook.com/votreprofil" class="facebook" target="_blank"><i class="bi bi-facebook"></i></a>
-                        <a href="https://www.instagram.com/votreprofil" class="instagram" target="_blank"><i class="bi bi-instagram"></i></a>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="container copyright text-center mt-4" style="border-top: 1px solid #2d3748; padding-top: 30px;">
-            <p style="color: #cbd5e0; margin: 10px 0;">© <span>Copyright</span> <strong class="px-1 sitename" style="color: #ec4899;">Mulho</strong> <span>Tous droits réservés</span></p>
-            <div class="credits" style="color: #a0aec0; font-size: 0.9rem;">
-                Conçu par <a href="#" style="color: #ec4899; text-decoration: none;">Mulho - MABIALA</a>
-            </div>
-        </div>
-    </footer>
-
+   
+ <?php include('footer.php'); ?>
     <!-- Scroll Top -->
     <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center" style="position: fixed; bottom: 30px; right: 30px; background: linear-gradient(135deg, #ec4899, #f97316); color: white; width: 50px; height: 50px; border-radius: 50%; text-decoration: none; box-shadow: 0 5px 15px rgba(236, 72, 153, 0.3); transition: all 0.3s ease; z-index: 999; display: none;">
         <i class="bi bi-arrow-up-short" style="font-size: 1.5rem;"></i>

@@ -37,8 +37,15 @@ if (isset($_GET['delete'])) {
     exit;
 }
 
+// Récupération du total global (sans filtre)
+$stmt_total_global = $conn->query("SELECT COUNT(*) AS total_global FROM reservations");
+$total_global = $stmt_total_global->fetch()['total_global'] ?? 0;
+
 // Construction de la requête
-$query = "SELECT * FROM reservations WHERE 1=1";
+// Dans la requête principale, ajouter le message :
+$query = "SELECT id, nom, email, telephone, personnes, date_reservation, 
+          heure_reservation, message, date_envoi, statut 
+          FROM reservations WHERE 1=1";
 $params = [];
 
 // Recherche
@@ -90,17 +97,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email'] ?? '');
     $telephone = trim($_POST['telephone'] ?? '');
     $date_reservation = trim($_POST['date_reservation'] ?? '');
+    $heure_reservation = trim($_POST['heure_reservation'] ?? '');
+    $personnes = (int)($_POST['personnes'] ?? 1);
+    $message = trim($_POST['message'] ?? ''); // Ajouté
 
-    if (!empty($nom) && !empty($email) && !empty($telephone) && !empty($date_reservation)) {
-        $stmt = $conn->prepare("INSERT INTO reservations (nom, email, telephone, date_reservation, statut, date_envoi)
-                                VALUES (?, ?, ?, ?, 'non_lu', NOW())");
+    if (!empty($nom) && !empty($email) && !empty($telephone) && 
+        !empty($date_reservation) && !empty($heure_reservation)) {
+        
+        // Requête complète avec tous les champs
+        $stmt = $conn->prepare("INSERT INTO reservations 
+            (nom, email, telephone, date_reservation, heure_reservation, personnes, message, statut, date_envoi)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'non_lu', NOW())");
 
-        if ($stmt->execute([$nom, $email, $telephone, $date_reservation])) {
+        if ($stmt->execute([$nom, $email, $telephone, $date_reservation, $heure_reservation, $personnes, $message])) {
             header("Location: reservations.php?success=1");
             exit;
         }
     }
 }
+// Réservations aujourd'hui
+$aujourdhui = date('Y-m-d');
+$stmt_auj = $conn->prepare("SELECT COUNT(*) AS total FROM reservations WHERE date_reservation = ?");
+$stmt_auj->execute([$aujourdhui]);
+$reservations_aujourdhui = $stmt_auj->fetch()['total'] ?? 0;
+
+// Moyenne des personnes
+$stmt_moy = $conn->query("SELECT AVG(personnes) AS moyenne FROM reservations");
+$moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
 ?>
 
 <!DOCTYPE html>
@@ -163,8 +186,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
             <div class="flex items-center space-x-4">
               <div class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg">
-                <?= $totalReservations ?> réservations au total
-              </div>
+    <?= $total_global ?> réservations au total
+</div>
             </div>
           </div>
         </div>
@@ -187,6 +210,112 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
           </div>
         <?php endif; ?>
+
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+    <!-- Carte 1: Total réservations -->
+    <div class="bg-gradient-to-br from-blue-50 to-white rounded-2xl shadow-[0_10px_30px_-15px_rgba(0,0,0,0.1)] overflow-hidden border border-blue-100/70 transition-all duration-300 hover:shadow-[0_15px_40px_-10px_rgba(59,130,246,0.3)] hover:-translate-y-1 group">
+        <div class="p-6 relative z-10">
+            <div class="flex justify-between items-start mb-4">
+                <div class="bg-blue-500/10 p-2.5 rounded-xl backdrop-blur-sm border border-blue-200">
+                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                    </svg>
+                </div>
+                <div class="text-xs font-semibold bg-blue-600/10 text-blue-700 px-2 py-1 rounded-full">
+                    TOTAL
+                </div>
+            </div>
+            
+            <div class="text-3xl font-bold text-blue-800 mb-1"><?= $total_global ?></div>
+            <div class="text-sm text-blue-600/80">Toutes les réservations</div>
+            
+            <div class="absolute bottom-4 right-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                <svg class="w-16 h-16 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                </svg>
+            </div>
+        </div>
+        <div class="w-full h-1.5 bg-gradient-to-r from-blue-400 to-blue-600"></div>
+    </div>
+
+    <!-- Carte 2: Nouvelles réservations -->
+    <div class="bg-gradient-to-br from-emerald-50 to-white rounded-2xl shadow-[0_10px_30px_-15px_rgba(0,0,0,0.1)] overflow-hidden border border-emerald-100/70 transition-all duration-300 hover:shadow-[0_15px_40px_-10px_rgba(16,185,129,0.3)] hover:-translate-y-1 group">
+        <div class="p-6 relative z-10">
+            <div class="flex justify-between items-start mb-4">
+                <div class="bg-emerald-500/10 p-2.5 rounded-xl backdrop-blur-sm border border-emerald-200">
+                    <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                    </svg>
+                </div>
+                <div class="text-xs font-semibold bg-emerald-600/10 text-emerald-700 px-2 py-1 rounded-full">
+                    NOUVELLES
+                </div>
+            </div>
+            
+            <div class="text-3xl font-bold text-emerald-800 mb-1"><?= $nombre_nouvelles ?></div>
+            <div class="text-sm text-emerald-600/80">À traiter</div>
+            
+            <div class="absolute bottom-4 right-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                <svg class="w-16 h-16 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                </svg>
+            </div>
+        </div>
+        <div class="w-full h-1.5 bg-gradient-to-r from-emerald-400 to-emerald-600"></div>
+    </div>
+
+    <!-- Carte 3: Aujourd'hui -->
+    <div class="bg-gradient-to-br from-amber-50 to-white rounded-2xl shadow-[0_10px_30px_-15px_rgba(0,0,0,0.1)] overflow-hidden border border-amber-100/70 transition-all duration-300 hover:shadow-[0_15px_40px_-10px_rgba(245,158,11,0.3)] hover:-translate-y-1 group">
+        <div class="p-6 relative z-10">
+            <div class="flex justify-between items-start mb-4">
+                <div class="bg-amber-500/10 p-2.5 rounded-xl backdrop-blur-sm border border-amber-200">
+                    <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                </div>
+                <div class="text-xs font-semibold bg-amber-600/10 text-amber-700 px-2 py-1 rounded-full">
+                    AUJOURD'HUI
+                </div>
+            </div>
+            
+            <div class="text-3xl font-bold text-amber-800 mb-1"><?= $reservations_aujourdhui ?></div>
+            <div class="text-sm text-amber-600/80"><?= date('d M Y') ?></div>
+            
+            <div class="absolute bottom-4 right-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                <svg class="w-16 h-16 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+            </div>
+        </div>
+        <div class="w-full h-1.5 bg-gradient-to-r from-amber-400 to-amber-600"></div>
+    </div>
+
+    <!-- Carte 4: Moyenne personnes -->
+    <div class="bg-gradient-to-br from-violet-50 to-white rounded-2xl shadow-[0_10px_30px_-15px_rgba(0,0,0,0.1)] overflow-hidden border border-violet-100/70 transition-all duration-300 hover:shadow-[0_15px_40px_-10px_rgba(139,92,246,0.3)] hover:-translate-y-1 group">
+        <div class="p-6 relative z-10">
+            <div class="flex justify-between items-start mb-4">
+                <div class="bg-violet-500/10 p-2.5 rounded-xl backdrop-blur-sm border border-violet-200">
+                    <svg class="w-6 h-6 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                </div>
+                <div class="text-xs font-semibold bg-violet-600/10 text-violet-700 px-2 py-1 rounded-full">
+                    MOYENNE
+                </div>
+            </div>
+            
+            <div class="text-3xl font-bold text-violet-800 mb-1"><?= $moyenne_personnes ?></div>
+            <div class="text-sm text-violet-600/80">Personnes par réservation</div>
+            
+            <div class="absolute bottom-4 right-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                <svg class="w-16 h-16 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                </svg>
+            </div>
+        </div>
+        <div class="w-full h-1.5 bg-gradient-to-r from-violet-400 to-violet-600"></div>
+    </div>
+</div>
 
         <!-- Filtres Section -->
         <div class="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 mb-8 animate-slide-up">
@@ -674,6 +803,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                      class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200 hover:border-gray-400">
             </div>
           </div>
+          <!-- Dans le modal d'ajout -->
+<div class="col-md-12">
+  <label for="message" class="block text-sm font-semibold text-gray-700 mb-2">
+    Message
+  </label>
+  <textarea id="message" name="message" class="px-4 py-3 border border-gray-300 rounded-xl w-full focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200 hover:border-gray-400"></textarea>
+</div>
           
           <div class="flex justify-end space-x-4 pt-6 border-t border-gray-100">
             <button type="button" onclick="closeModal()" 
@@ -813,7 +949,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <p class="text-xs text-gray-500 uppercase tracking-wide">Nombre de personnes</p>
                 <p id="view_personnes" class="text-sm font-semibold text-gray-900"></p>
               </div>
+              
             </div>
+            <!-- Dans le modal d'ajout -->
+<div class="col-md-12">
+  <label for="message" class="block text-sm font-semibold text-gray-700 mb-2">
+    Message
+  </label>
+  <textarea id="message" name="message" class="px-4 py-3 border border-gray-300 rounded-xl w-full focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200 hover:border-gray-400"></textarea>
+</div>
           </div>
         </div>
       </div>

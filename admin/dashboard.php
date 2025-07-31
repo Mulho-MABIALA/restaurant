@@ -611,84 +611,139 @@ $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
     </style>
 </div>
-                            <!-- Menu Profil -->
-                            <div class="relative">
-                                <button 
-                                    @click="profileOpen = !profileOpen"
-                                    class="w-14 h-14 bg-gradient-to-r from-corporate-violet to-corporate-blue rounded-2xl flex items-center justify-center shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-corporate-violet/30 group animate-glow"
-                                    type="button"
-                                >
-                                    <span class="text-white font-bold text-lg group-hover:scale-110 transition-transform">
-                                        <?= strtoupper(substr($admin_name ?? 'A', 0, 1)) ?>
-                                    </span>
-                                </button>
-                                
-                                <!-- Dropdown Profil -->
-                                <div 
-                                    x-show="profileOpen"
-                                    @click.away="profileOpen = false"
-                                    x-transition:enter="transition ease-out duration-300"
-                                    x-transition:enter-start="transform opacity-0 scale-95 translate-y-2"
-                                    x-transition:enter-end="transform opacity-100 scale-100 translate-y-0"
-                                    x-transition:leave="transition ease-in duration-200"
-                                    x-transition:leave-start="transform opacity-100 scale-100 translate-y-0"
-                                    x-transition:leave-end="transform opacity-0 scale-95 translate-y-2"
-                                    class="absolute right-0 mt-4 w-72 glass-card rounded-3xl shadow-2xl py-4 z-50 border border-white/20"
-                                    x-cloak
-                                >
-                                    <!-- Header Profil -->
-                                    <div class="px-8 py-6 border-b border-white/10 flex items-center space-x-4">
-                                        <div class="w-12 h-12 bg-gradient-to-r from-corporate-violet to-corporate-blue rounded-2xl flex items-center justify-center shadow-lg">
-                                            <span class="text-white font-bold text-lg"><?= strtoupper(substr($admin_name ?? 'A', 0, 1)) ?></span>
-                                        </div>
-                                        <div>
-                                            <p class="font-bold text-text-primary text-lg"><?= htmlspecialchars($admin_name ?? 'Admin') ?></p>
-                                            <?php if (!empty($admin_email)): ?>
-                                                <p class="text-sm text-text-secondary"><?= htmlspecialchars($admin_email) ?></p>
-                                            <?php endif; ?>
-                                            <div class="flex items-center mt-1">
-                                                <div class="w-2 h-2 bg-success rounded-full animate-pulse"></div>
-                                                <span class="text-xs text-success ml-2 font-medium">En ligne</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Menu Items -->
-                                    <div class="py-2">
-                                        <a href="profile.php" class="flex items-center px-8 py-4 text-text-secondary hover:bg-white/10 hover:text-text-primary transition-all duration-200 group">
-                                            <div class="w-10 h-10 bg-corporate-blue/20 rounded-xl flex items-center justify-center mr-4 group-hover:bg-corporate-blue/30 transition-colors">
-                                                <i class="fas fa-user text-corporate-blue"></i>
-                                            </div>
-                                            <span class="font-medium">Mon profil</span>
-                                            <i class="fas fa-chevron-right ml-auto text-xs opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all"></i>
-                                        </a>
-                                        <a href="settings.php" class="flex items-center px-8 py-4 text-text-secondary hover:bg-white/10 hover:text-text-primary transition-all duration-200 group">
-                                            <div class="w-10 h-10 bg-corporate-teal/20 rounded-xl flex items-center justify-center mr-4 group-hover:bg-corporate-teal/30 transition-colors">
-                                                <i class="fas fa-cog text-corporate-teal"></i>
-                                            </div>
-                                            <span class="font-medium">Paramètres</span>
-                                            <i class="fas fa-chevron-right ml-auto text-xs opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all"></i>
-                                        </a>
-                                        <a href="changer_email.php" class="flex items-center px-8 py-4 text-text-secondary hover:bg-white/10 hover:text-text-primary transition-all duration-200 group">
-                                            <div class="w-10 h-10 bg-corporate-violet/20 rounded-xl flex items-center justify-center mr-4 group-hover:bg-corporate-violet/30 transition-colors">
-                                                <i class="fas fa-envelope text-corporate-violet"></i>
-                                            </div>
-                                            <span class="font-medium">Changer email</span>
-                                            <i class="fas fa-chevron-right ml-auto text-xs opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all"></i>
-                                        </a>
-                                    </div>
-                                    
-                                    <!-- Déconnexion -->
-                                    <div class="border-t border-white/10 pt-2">
-                                        <a href="logout.php" class="flex items-center px-8 py-4 text-error hover:bg-error/10 hover:text-red-300 transition-all duration-200 group">
-                                            <div class="w-10 h-10 bg-error/20 rounded-xl flex items-center justify-center mr-4 group-hover:bg-error/30 transition-colors">
-                                                <i class="fas fa-sign-out-alt text-error"></i>
-                                            </div>
-                                            <span class="font-medium">Déconnexion</span>
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
+                           <!-- Menu Profil -->
+<div class="relative" style="z-index: 1000;">
+    <!-- Bouton Profil Principal -->
+    <button 
+        @click="profileOpen = !profileOpen"
+        class="w-14 h-14 bg-gradient-to-r from-corporate-violet to-corporate-blue rounded-2xl flex items-center justify-center shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-corporate-violet/30 group animate-glow relative"
+        style="z-index: 1001;"
+        type="button"
+    >
+        <span class="text-white font-bold text-lg group-hover:scale-110 transition-transform">
+            <?= strtoupper(substr($admin_name ?? 'A', 0, 1)) ?>
+        </span>
+    </button>
+    
+    <!-- Dropdown Profil -->
+    <div 
+        x-show="profileOpen"
+        @click.away="profileOpen = false"
+        x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="transform opacity-0 scale-95 translate-y-2"
+        x-transition:enter-end="transform opacity-100 scale-100 translate-y-0"
+        x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="transform opacity-100 scale-100 translate-y-0"
+        x-transition:leave-end="transform opacity-0 scale-95 translate-y-2"
+        class="fixed top-20 right-4 w-80 rounded-3xl shadow-2xl overflow-hidden border border-white/30"
+        style="background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(20px); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);"
+        style="z-index: 9999; position: fixed !important;"
+        x-cloak
+    >
+        <!-- En-tête du Profil -->
+        <div class="px-6 py-6" style="background: rgba(88, 28, 135, 0.1); border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+            <div class="flex items-center space-x-4">
+                <!-- Avatar -->
+                <div class="w-16 h-16 bg-gradient-to-r from-corporate-violet to-corporate-blue rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0">
+                    <span class="text-white font-bold text-xl">
+                        <?= strtoupper(substr($admin_name ?? 'A', 0, 1)) ?>
+                    </span>
+                </div>
+                
+                <!-- Informations Utilisateur -->
+                <div class="flex-1 min-w-0">
+                    <h3 class="font-bold text-white text-lg truncate">
+                        <?= htmlspecialchars($admin_name ?? 'Admin') ?>
+                    </h3>
+                    
+                    <?php if (!empty($admin_email)): ?>
+                        <p class="text-sm text-gray-300 truncate mt-1">
+                            <?= htmlspecialchars($admin_email) ?>
+                        </p>
+                    <?php endif; ?>
+                    
+                    <!-- Statut En Ligne -->
+                    <div class="flex items-center mt-2">
+                        <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                        <span class="text-xs text-green-400 ml-2 font-medium">En ligne</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Séparateur -->
+        <div class="h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
+        
+        <!-- Menu de Navigation -->
+        <div class="py-3" style="background: rgba(15, 23, 42, 0.7);">
+            <!-- Mon Profil -->
+            <a href="profile.php" 
+               class="flex items-center px-6 py-4 text-gray-200 hover:text-white transition-all duration-200 group"
+               style="background: transparent; border-radius: 0;"
+               onmouseover="this.style.background='rgba(255, 255, 255, 0.1)'"
+               onmouseout="this.style.background='transparent'">
+                <div class="w-11 h-11 bg-corporate-blue/15 rounded-xl flex items-center justify-center mr-4 group-hover:bg-corporate-blue/25 group-hover:scale-105 transition-all duration-200">
+                    <i class="fas fa-user text-corporate-blue text-lg"></i>
+                </div>
+                <div class="flex-1">
+                    <span class="font-medium text-base block text-white">Mon profil</span>
+                    <span class="text-xs text-gray-400">Gérer mes informations</span>
+                </div>
+                <i class="fas fa-chevron-right text-xs opacity-40 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200"></i>
+            </a>
+            
+            <!-- Paramètres -->
+            <a href="settings.php" 
+               class="flex items-center px-6 py-4 text-gray-200 hover:text-white transition-all duration-200 group"
+               onmouseover="this.style.background='rgba(255, 255, 255, 0.1)'"
+               onmouseout="this.style.background='transparent'">
+                <div class="w-11 h-11 bg-corporate-teal/15 rounded-xl flex items-center justify-center mr-4 group-hover:bg-corporate-teal/25 group-hover:scale-105 transition-all duration-200">
+                    <i class="fas fa-cog text-corporate-teal text-lg"></i>
+                </div>
+                <div class="flex-1">
+                    <span class="font-medium text-base block">Paramètres</span>
+                    <span class="text-xs text-text-secondary/70">Configuration système</span>
+                </div>
+                <i class="fas fa-chevron-right text-xs opacity-40 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200"></i>
+            </a>
+            
+            <!-- Changer Email -->
+            <a href="changer_email.php" 
+               class="flex items-center px-6 py-4 text-gray-200 hover:text-white transition-all duration-200 group"
+               onmouseover="this.style.background='rgba(255, 255, 255, 0.1)'"
+               onmouseout="this.style.background='transparent'">
+                <div class="w-11 h-11 bg-corporate-violet/15 rounded-xl flex items-center justify-center mr-4 group-hover:bg-corporate-violet/25 group-hover:scale-105 transition-all duration-200">
+                    <i class="fas fa-envelope text-corporate-violet text-lg"></i>
+                </div>
+                <div class="flex-1">
+                    <span class="font-medium text-base block">Changer email</span>
+                    <span class="text-xs text-text-secondary/70">Modifier mon adresse</span>
+                </div>
+                <i class="fas fa-chevron-right text-xs opacity-40 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200"></i>
+            </a>
+        </div>
+        
+        <!-- Séparateur avant Déconnexion -->
+        <div class="h-px bg-gradient-to-r from-transparent via-white/20 to-transparent mx-6"></div>
+        
+        <!-- Section Déconnexion -->
+        <div class="py-3" style="background: rgba(15, 23, 42, 0.8); border-top: 1px solid rgba(255, 255, 255, 0.1);">
+            <a href="logout.php" 
+               class="flex items-center px-6 py-4 text-red-400 hover:text-red-300 transition-all duration-200 group"
+               onmouseover="this.style.background='rgba(239, 68, 68, 0.1)'"
+               onmouseout="this.style.background='transparent'">
+                <div class="w-11 h-11 bg-error/15 rounded-xl flex items-center justify-center mr-4 group-hover:bg-error/25 group-hover:scale-105 transition-all duration-200">
+                    <i class="fas fa-sign-out-alt text-error text-lg"></i>
+                </div>
+                <div class="flex-1">
+                    <span class="font-medium text-base block">Déconnexion</span>
+                    <span class="text-xs text-error/70">Fermer la session</span>
+                </div>
+                <i class="fas fa-arrow-right text-xs opacity-40 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200"></i>
+            </a>
+        </div>
+    </div>
+</div>
                         </div>
                     </div>
                 </div>

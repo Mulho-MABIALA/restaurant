@@ -161,6 +161,42 @@ try {
                 width: auto;
             }
         }
+
+        /* Styles pour le modal */
+        .modal-backdrop {
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+        
+        .modal-content {
+            animation: modalSlideIn 0.3s ease-out;
+        }
+        
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+        
+        .modal-exit {
+            animation: modalSlideOut 0.2s ease-in forwards;
+        }
+        
+        @keyframes modalSlideOut {
+            from {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+            to {
+                opacity: 0;
+                transform: scale(0.9) translateY(-20px);
+            }
+        }
     </style>
 </head>
 
@@ -405,11 +441,11 @@ try {
 
                                         <td class="px-6 py-4 whitespace-nowrap text-center">
                                             <div class="flex items-center justify-center gap-2">
-                                                <a href="modifier_plat.php?id=<?= $plat['id'] ?>" 
+                                                <button onclick="openEditModal(<?= htmlspecialchars(json_encode($plat), ENT_QUOTES, 'UTF-8') ?>)"
                                                    class="bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white px-4 py-2 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg">
                                                     <i class="fas fa-edit mr-1"></i>
                                                     <span class="hidden sm:inline">Modifier</span>
-                                                </a>
+                                                </button>
                                                 <button onclick="confirmDelete(<?= $plat['id'] ?>, '<?= addslashes($plat['nom']) ?>')" 
                                                         class="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white px-4 py-2 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg">
                                                     <i class="fas fa-trash mr-1"></i>
@@ -453,6 +489,107 @@ try {
         </div>
     </div>
 
+    <!-- Modal de modification -->
+    <div id="editModal" class="fixed inset-0 modal-backdrop hidden items-center justify-center z-50 p-4">
+        <div class="modal-content bg-white rounded-3xl max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-6 rounded-t-3xl">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-white bg-opacity-20 p-2 rounded-xl">
+                            <i class="fas fa-edit text-xl"></i>
+                        </div>
+                        <h2 class="text-2xl font-bold">Modifier le plat</h2>
+                    </div>
+                    <button onclick="closeEditModal()" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-xl transition-all duration-300">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+
+            <form id="editForm" method="post" enctype="multipart/form-data" class="p-6">
+                <input type="hidden" id="edit_id" name="id">
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Nom du plat -->
+                    <div class="md:col-span-2">
+                        <label for="edit_nom" class="block text-sm font-bold text-gray-700 mb-2">
+                            <i class="fas fa-utensils mr-2 text-blue-600"></i>Nom du plat
+                        </label>
+                        <input type="text" id="edit_nom" name="nom" required
+                               class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-300">
+                    </div>
+
+                    <!-- Prix -->
+                    <div>
+                        <label for="edit_prix" class="block text-sm font-bold text-gray-700 mb-2">
+                            <i class="fas fa-euro-sign mr-2 text-green-600"></i>Prix (FCFA)
+                        </label>
+                        <input type="number" id="edit_prix" name="prix" step="0.01" required
+                               class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:ring-4 focus:ring-green-100 focus:border-green-500 transition-all duration-300">
+                    </div>
+
+                    <!-- Catégorie -->
+                    <div>
+                        <label for="edit_categorie" class="block text-sm font-bold text-gray-700 mb-2">
+                            <i class="fas fa-tags mr-2 text-purple-600"></i>Catégorie
+                        </label>
+                        <select id="edit_categorie" name="categorie_id"
+                                class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:ring-4 focus:ring-purple-100 focus:border-purple-500 transition-all duration-300">
+                            <option value="">Sélectionner une catégorie</option>
+                            <?php foreach ($categories as $cat): ?>
+                                <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['nom']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <!-- Description -->
+                    <div class="md:col-span-2">
+                        <label for="edit_description" class="block text-sm font-bold text-gray-700 mb-2">
+                            <i class="fas fa-align-left mr-2 text-indigo-600"></i>Description
+                        </label>
+                        <textarea id="edit_description" name="description" rows="4"
+                                  class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 transition-all duration-300 resize-none"></textarea>
+                    </div>
+
+                    <!-- Image actuelle -->
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-bold text-gray-700 mb-2">
+                            <i class="fas fa-image mr-2 text-pink-600"></i>Image actuelle
+                        </label>
+                        <div id="current_image_container" class="mb-4">
+                            <!-- L'image actuelle sera affichée ici -->
+                        </div>
+                    </div>
+
+                    <!-- Nouvelle image -->
+                    <div class="md:col-span-2">
+                        <label for="edit_image" class="block text-sm font-bold text-gray-700 mb-2">
+                            <i class="fas fa-upload mr-2 text-orange-600"></i>Nouvelle image (optionnel)
+                        </label>
+                        <input type="file" id="edit_image" name="image" accept="image/*"
+                               class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:ring-4 focus:ring-orange-100 focus:border-orange-500 transition-all duration-300">
+                        <p class="text-sm text-gray-500 mt-2">Laissez vide pour conserver l'image actuelle</p>
+                    </div>
+                </div>
+
+                <!-- Messages d'erreur/succès -->
+                <div id="modal_messages" class="mt-6"></div>
+
+                <!-- Boutons d'action -->
+                <div class="flex flex-col sm:flex-row gap-4 mt-8">
+                    <button type="button" onclick="closeEditModal()" 
+                            class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 px-6 rounded-xl font-semibold transition-all duration-300">
+                        <i class="fas fa-times mr-2"></i>Annuler
+                    </button>
+                    <button type="submit" 
+                            class="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white py-3 px-6 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105">
+                        <i class="fas fa-save mr-2"></i>Enregistrer les modifications
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         // Animation au chargement
         document.addEventListener('DOMContentLoaded', function() {
@@ -466,6 +603,140 @@ try {
                     card.style.opacity = '1';
                     card.style.transform = 'translateY(0)';
                 }, index * 150);
+            });
+        });
+
+        // Fonction pour ouvrir le modal de modification
+        function openEditModal(plat) {
+            // Remplir les champs du formulaire
+            document.getElementById('edit_id').value = plat.id;
+            document.getElementById('edit_nom').value = plat.nom;
+            document.getElementById('edit_prix').value = plat.prix;
+            document.getElementById('edit_description').value = plat.description || '';
+            
+            // Sélectionner la catégorie
+            const categorieSelect = document.getElementById('edit_categorie');
+            for (let option of categorieSelect.options) {
+                if (option.text === plat.categorie_nom) {
+                    option.selected = true;
+                    break;
+                }
+            }
+
+            // Afficher l'image actuelle
+            const imageContainer = document.getElementById('current_image_container');
+            if (plat.image) {
+                imageContainer.innerHTML = `
+                    <div class="relative inline-block">
+                        <img src="../uploads/${plat.image}" 
+                             class="h-32 w-32 rounded-2xl object-cover shadow-lg ring-4 ring-white" 
+                             alt="${plat.nom}">
+                        <div class="absolute -top-2 -right-2 bg-green-500 text-white p-1 rounded-full">
+                            <i class="fas fa-check text-xs"></i>
+                        </div>
+                    </div>
+                `;
+            } else {
+                imageContainer.innerHTML = `
+                    <div class="h-32 w-32 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center">
+                        <i class="fas fa-image text-gray-400 text-2xl"></i>
+                    </div>
+                `;
+            }
+
+            // Définir l'action du formulaire
+            document.getElementById('editForm').action = 'modifier_plat_ajax.php';
+
+            // Afficher le modal
+            const modal = document.getElementById('editModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            
+            // Empêcher le scroll du body
+            document.body.style.overflow = 'hidden';
+        }
+
+        // Fonction pour fermer le modal de modification
+        function closeEditModal() {
+            const modal = document.getElementById('editModal');
+            const modalContent = modal.querySelector('.modal-content');
+            
+            // Animation de sortie
+            modalContent.classList.add('modal-exit');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                modalContent.classList.remove('modal-exit');
+                
+                // Réactiver le scroll du body
+                document.body.style.overflow = 'auto';
+                
+                // Nettoyer les messages
+                document.getElementById('modal_messages').innerHTML = '';
+            }, 200);
+        }
+
+        // Gestion de la soumission du formulaire de modification
+        document.getElementById('editForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            
+            // Désactiver le bouton et afficher le loading
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Enregistrement...';
+            
+            fetch('modifier_plat_ajax.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                const messagesDiv = document.getElementById('modal_messages');
+                
+                if (data.success) {
+                    messagesDiv.innerHTML = `
+                        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-xl">
+                            <div class="flex items-center">
+                                <i class="fas fa-check-circle mr-2"></i>
+                                <span>${data.message}</span>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Fermer le modal après 1.5 secondes et recharger la page
+                    setTimeout(() => {
+                        closeEditModal();
+                        location.reload();
+                    }, 1500);
+                } else {
+                    messagesDiv.innerHTML = `
+                        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl">
+                            <div class="flex items-center">
+                                <i class="fas fa-exclamation-circle mr-2"></i>
+                                <span>${data.message}</span>
+                            </div>
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                document.getElementById('modal_messages').innerHTML = `
+                    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl">
+                        <div class="flex items-center">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>
+                            <span>Une erreur est survenue lors de la modification.</span>
+                        </div>
+                    </div>
+                `;
+            })
+            .finally(() => {
+                // Réactiver le bouton
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
             });
         });
 
@@ -507,6 +778,20 @@ try {
                 modal.querySelector('.bg-white').style.transform = 'scale(1)';
             }, 10);
         }
+
+        // Fermer le modal en cliquant sur le backdrop
+        document.getElementById('editModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeEditModal();
+            }
+        });
+
+        // Fermer le modal avec la touche Escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && !document.getElementById('editModal').classList.contains('hidden')) {
+                closeEditModal();
+            }
+        });
 
         // Effet de parallaxe léger pour les éléments flottants
         document.addEventListener('mousemove', function(e) {

@@ -273,17 +273,6 @@ try {
                     <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300"></i>
                 </a>
                 
-                <a href="recu.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-light hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-lg">
-                    <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
-                        <i class="fas fa-file-invoice nav-icon text-lg"></i>
-                    </div>
-                    <div class="flex-1">
-                        <span class="font-medium text-base">Reçus</span>
-                        <p class="text-sm text-gray-400 opacity-80">Imprimer les reçus</p>
-                    </div>
-                    <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300"></i>
-                </a>
-                
                 <a href="horaires.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-light hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-lg">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-clock nav-icon text-lg"></i>
