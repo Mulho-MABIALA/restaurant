@@ -272,7 +272,16 @@ try {
                     </div>
                     <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300"></i>
                 </a>
-                
+        <a href="cuisine.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-light hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-lg">
+            <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
+                <i class="fas fa-fire nav-icon text-lg"></i>
+            </div>
+            <div class="flex-1">
+                <span class="font-medium text-base">Cuisine</span>
+                <p class="text-sm text-gray-400 opacity-80">Gestion de la cuisine</p>
+            </div>
+            <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300"></i>
+        </a>
                 <a href="horaires.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-light hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-lg">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-clock nav-icon text-lg"></i>
@@ -283,6 +292,75 @@ try {
                     </div>
                     <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300"></i>
                 </a>
+                <a href="badgeuse.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-light hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-lg">
+                    <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
+                        <i class="fas fa-id-card nav-icon text-lg"></i>
+                    </div>
+                    <div class="flex-1">
+                        <span class="font-medium text-base">Badgeuse</span>
+                        <p class="text-sm text-gray-400 opacity-80">Pointage employé</p>
+                    </div>
+                    <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300"></i>
+                </a>
+                <a href="presence.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-light hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-lg">
+                    <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
+                        <i class="fas fa-user-check nav-icon text-lg"></i>
+                    </div>
+                    <div class="flex-1">
+                        <span class="font-medium text-base">Présence</span>
+                        <p class="text-sm text-gray-400 opacity-80">Gestion présence</p>
+                    </div>
+                    <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300"></i>
+                </a>
+
+                <!-- Communication Dropdown -->
+                <div x-data="{ open: false }" class="relative">
+                    <button type="button"
+                        class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-light hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-lg w-full focus:outline-none"
+                        @click="open = !open"
+                        aria-haspopup="true"
+                        :aria-expanded="open"
+                    >
+                        <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
+                            <i class="fas fa-comments nav-icon text-lg"></i>
+                        </div>
+                        <div class="flex-1 text-left">
+                            <span class="font-medium text-base">Communication</span>
+                            <p class="text-sm text-gray-400 opacity-80">Outils internes</p>
+                        </div>
+                        <i class="fas fa-chevron-down text-xs ml-2 transition-transform duration-200"
+                           :class="open ? 'rotate-180' : ''"></i>
+                    </button>
+                    <div x-show="open" @click.away="open = false"
+                         x-transition:enter="transition ease-out duration-200"
+                         x-transition:enter-start="opacity-0 -translate-y-2"
+                         x-transition:enter-end="opacity-100 translate-y-0"
+                         x-transition:leave="transition ease-in duration-150"
+                         x-transition:leave-start="opacity-100 translate-y-0"
+                         x-transition:leave-end="opacity-0 -translate-y-2"
+                         class="mt-2 ml-8 space-y-1 bg-surface-light rounded-xl shadow-lg py-2 w-[85%] z-10 absolute left-0"
+                         style="display: none;"
+                    >
+                        <a href="communication/annonces.php" class="flex items-center px-4 py-2 text-gray-300 hover:bg-primary hover:text-white rounded-lg transition-all duration-200">
+                            <i class="fas fa-bullhorn mr-3 w-5 text-sm"></i>
+                            <span>Annonces internes</span>
+                        </a>
+                        <a href="communication/messagerie.php" class="flex items-center px-4 py-2 text-gray-300 hover:bg-primary hover:text-white rounded-lg transition-all duration-200">
+                            <i class="fas fa-envelope mr-3 w-5 text-sm"></i>
+                            <span>Messagerie interne</span>
+                        </a>
+                        <a href="communication/procedures.php" class="flex items-center px-4 py-2 text-gray-300 hover:bg-primary hover:text-white rounded-lg transition-all duration-200">
+                            <i class="fas fa-book mr-3 w-5 text-sm"></i>
+                            <span>Procédures internes</span>
+                        </a>
+                        <a href="communication/signalements.php" class="flex items-center px-4 py-2 text-gray-300 hover:bg-primary hover:text-white rounded-lg transition-all duration-200">
+                            <i class="fas fa-exclamation-triangle mr-3 w-5 text-sm"></i>
+                            <span>Signalements</span>
+                        </a>
+                    </div>
+                </div>
+                <!-- Alpine.js for dropdown -->
+                <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
             </div>
         </div>
         
@@ -303,7 +381,16 @@ try {
                     </div>
                     <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300"></i>
                 </a>
-                
+                <a href="gestion_employe.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-light hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-lg">
+                    <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
+                        <i class="fas fa-user-tie nav-icon text-lg"></i>
+                    </div>
+                    <div class="flex-1">
+                        <span class="font-medium text-base">Employés</span>
+                        <p class="text-sm text-gray-400 opacity-80">Gestion des employés</p>
+                    </div>
+                    <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300"></i>
+                </a>
                 <a href="admin_gestion.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-light hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-lg">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-users-cog nav-icon text-lg"></i>

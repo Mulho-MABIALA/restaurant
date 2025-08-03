@@ -171,10 +171,42 @@ if (isIpBlocked($conn, $clientIP)) {
                     $error = "Code incorrect. Il vous reste $remainingAttempts tentative(s).";
                 } else {
                     // Code correct - connexion réussie
-                    $_SESSION['admin_logged_in'] = true;
-                    $_SESSION['admin_username'] = $_SESSION['2fa_username'];
-                    $_SESSION['login_time'] = time();
-                    
+                 // Code correct - connexion réussie
+             
+                $_SESSION['admin_logged_in'] = true;
+                $_SESSION['admin_username'] = $_SESSION['2fa_username'];
+                $_SESSION['login_time'] = time();
+
+               if (isset($_SESSION['admin_data'])) {
+    $admin = $_SESSION['admin_data'];
+    $_SESSION['admin_id'] = (int)$admin['id'];
+    $_SESSION['admin_username'] = $admin['username'];
+    $_SESSION['admin_email'] = $admin['email'];
+    unset($_SESSION['admin_data']); // Nettoyer les données temporaires
+} else {
+    // Récupérer les données depuis la base si admin_data n'existe pas
+    try {
+        $stmt = $conn->prepare("SELECT id, username, email FROM admin WHERE username = ?");
+        $stmt->execute([$_SESSION['2fa_username']]);
+        $admin = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($admin) {
+            $_SESSION['admin_id'] = (int)$admin['id'];
+            $_SESSION['admin_username'] = $admin['username']; // ou un champ 'name' si il existe
+            $_SESSION['admin_email'] = $admin['email'];
+        } else {
+            error_log("Impossible de récupérer les données admin pour: " . $_SESSION['2fa_username']);
+            header('Location: logout.php');
+            exit;
+        }
+    } catch (PDOException $e) {
+        error_log("Erreur DB lors de la récupération admin après 2FA : " . $e->getMessage());
+        header('Location: logout.php');
+        exit;
+    }
+}
+
+
                     // Supprimer les données 2FA et tentatives
                     unset($_SESSION['2fa_code'], $_SESSION['2fa_expiry'], $_SESSION['2fa_username'], $_SESSION['2fa_attempts']);
                     clearFailedAttempts($conn, $clientIP);
@@ -222,7 +254,7 @@ if (isIpBlocked($conn, $clientIP)) {
                 recordFailedAttempt($conn, $clientIP, $username);
             } else {
                 // Requête sécurisée avec préparation
-                $stmt = $conn->prepare("SELECT id, username, password, email, failed_attempts, locked_until FROM admin WHERE username = ? AND active = 1");
+               $stmt = $conn->prepare("SELECT id, username, password, email, failed_attempts, locked_until FROM admin WHERE username = ? AND active = 1");
                 $stmt->execute([$username]);
                 $admin = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -248,7 +280,9 @@ if (isIpBlocked($conn, $clientIP)) {
                         // Mot de passe correct - réinitialiser les tentatives échouées
                         $stmt = $conn->prepare("UPDATE admin SET failed_attempts = 0, locked_until = NULL WHERE id = ?");
                         $stmt->execute([$admin['id']]);
-                        
+                        // Sauvegarder les infos admin pour l'étape 2FA
+                        $_SESSION['admin_data'] = $admin;
+
                         // Générer et envoyer le code 2FA
                         $code = generate2FACode();
                         $_SESSION['2fa_code'] = $code;

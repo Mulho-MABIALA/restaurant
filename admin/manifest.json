@@ -1,0 +1,1062 @@
+<?php
+/**
+ * Système d'Alertes Intelligentes pour TimeTracker Pro
+ * Fonctionnalités: Détection automatique, notifications push, escalade
+ */
+
+require_once '../config.php';
+
+class AlertSystem {
+    private $conn;
+    private $notificationService;
+    private $rules;
+    
+    public function __construct($database) {
+        $this->conn = $database;
+        $this->notificationService = new NotificationService();
+        $this->loadAlertRules();
+    }
+    
+    // Configuration des règles d'alerte
+    private function loadAlertRules() {
+        $this->rules = [
+            'retard' => [
+                'condition' => 'first_entry > 09:00',
+                'severity' => 'warning',
+                'frequency' => 'immediate',
+                'escalation' => ['supervisor', 'hr'],
+                'threshold' => 3 // 3 retards dans la semaine
+            ],
+            'absence_non_justifiee' => [
+                'condition' => 'no_entry_for_hours > 2',
+                'severity' => 'error',
+                'frequency' => 'immediate',
+                'escalation' => ['supervisor', 'hr', 'direction'],
+                'threshold' => 1
+            ],
+            'depassement_heures' => [
+                'condition' => 'daily_hours > 10',
+                'severity' => 'warning',
+                'frequency' => 'end_of_day',
+                'escalation' => ['supervisor'],
+                'threshold' => 1
+            ],
+            'heures_supplementaires' => [
+                'condition' => 'weekly_hours > 35',
+                'severity' => 'info',
+                'frequency' => 'weekly',
+                'escalation' => ['payroll'],
+                'threshold' => 8 // 8h sup par semaine
+            ],
+            'pointage_weekend' => [
+                'condition' => 'entry_on_weekend',
+                'severity' => 'warning',
+                'frequency' => 'immediate',
+                'escalation' => ['supervisor'],
+                'threshold' => 1
+            ],
+            'geolocalisation_suspecte' => [
+                'condition' => 'geoloc_outside_authorized_zone',
+                'severity' => 'error',
+                'frequency' => 'immediate',
+                'escalation' => ['security', 'supervisor'],
+                'threshold' => 1
+            ],
+            'pointages_incoherents' => [
+                'condition' => 'inconsistent_entries_exits',
+                'severity' => 'warning',
+                'frequency' => 'daily',
+                'escalation' => ['hr'],
+                'threshold' => 2
+            ],
+            'repos_hebdo_non_respecte' => [
+                'condition' => 'worked_7_consecutive_days',
+                'severity' => 'error',
+                'frequency' => 'weekly',
+                'escalation' => ['hr', 'legal'],
+                'threshold' => 1
+            ]
+        ];
+    }
+    
+    // Analyse en temps réel d'un nouveau pointage
+    public function analyzePointage($pointage_id) {
+        $stmt = $this->conn->prepare("
+            SELECT p.*, e.nom, e.email, e.supervisor_id, e.departement_id
+            FROM pointages p
+            JOIN employes e ON p.employe_id = e.id
+            WHERE p.id = ?
+        ");
+        $stmt->execute([$pointage_id]);
+        $pointage = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$pointage) {
+            throw new Exception('Pointage introuvable');
+        }
+        
+        $alerts = [];
+        
+        // Vérification de chaque règle
+        foreach ($this->rules as $rule_name => $rule) {
+            if ($rule['frequency'] === 'immediate') {
+                $violation = $this->checkRule($rule_name, $pointage);
+                if ($violation) {
+                    $alerts[] = $this->createAlert($rule_name, $pointage, $violation);
+                }
+            }
+        }
+        
+        // Traitement des alertes générées
+        foreach ($alerts as $alert) {
+            $this->processAlert($alert);
+        }
+        
+        return $alerts;
+    }
+    
+    // Vérification d'une règle spécifique
+    private function checkRule($rule_name, $pointage) {
+        switch ($rule_name) {
+            case 'retard':
+                return $this->checkRetard($pointage);
+            case 'absence_non_justifiee':
+                return $this->checkAbsence($pointage);
+            case 'depassement_heures':
+                return $this->checkDepassement($pointage);
+            case 'pointage_weekend':
+                return $this->checkWeekend($pointage);
+            case 'geolocalisation_suspecte':
+                return $this->checkGeolocation($pointage);
+            case 'pointages_incoherents':
+                return $this->checkCoherence($pointage);
+            default:
+                return false;
+        }
+    }
+    
+    private function checkRetard($pointage) {
+        if ($pointage['type'] !== 'entree') {
+            return false;
+        }
+        
+        $heure_entree = date('H:i', strtotime($pointage['created_at']));
+        $heure_limite = '09:00';
+        
+        if ($heure_entree > $heure_limite) {
+            $retard_minutes = (strtotime($heure_entree) - strtotime($heure_limite)) / 60;
+            
+            // Vérifier la fréquence des retards cette semaine
+            $debut_semaine = date('Y-m-d', strtotime('monday this week', strtotime($pointage['created_at'])));
+            $fin_semaine = date('Y-m-d', strtotime('sunday this week', strtotime($pointage['created_at'])));
+            
+            $stmt = $this->conn->prepare("
+                SELECT COUNT(*) as nb_retards
+                FROM pointages p
+                WHERE p.employe_id = ? 
+                AND DATE(p.created_at) BETWEEN ? AND ?
+                AND p.type = 'entree'
+                AND TIME(p.created_at) > '09:00:00'
+            ");
+            $stmt->execute([$pointage['employe_id'], $debut_semaine, $fin_semaine]);
+            $nb_retards = $stmt->fetch(PDO::FETCH_ASSOC)['nb_retards'];
+            
+            return [
+                'retard_minutes' => $retard_minutes,
+                'nb_retards_semaine' => $nb_retards,
+                'escalate' => $nb_retards >= $this->rules['retard']['threshold']
+            ];
+        }
+        
+        return false;
+    }
+    
+    private function checkAbsence($pointage) {
+        // Vérifier s'il n'y a pas eu d'entrée depuis plus de X heures un jour ouvré
+        $now = time();
+        $today = date('Y-m-d');
+        $is_working_day = date('N') < 6; // Lundi = 1, Dimanche = 7
+        
+        if (!$is_working_day) {
+            return false;
+        }
+        
+        $stmt = $this->conn->prepare("
+            SELECT MAX(created_at) as derniere_entree
+            FROM pointages 
+            WHERE employe_id = ? AND DATE(created_at) = ? AND type = 'entree'
+        ");
+        $stmt->execute([$pointage['employe_id'], $today]);
+        $derniere_entree = $stmt->fetch(PDO::FETCH_ASSOC)['derniere_entree'];
+        
+        // Si pas d'entrée aujourd'hui et qu'il est après 11h
+        if (!$derniere_entree && date('H') >= 11) {
+            return [
+                'heures_absence' => date('H') - 9,
+                'date' => $today,
+                'escalate' => true
+            ];
+        }
+        
+        return false;
+    }
+    
+    private function checkDepassement($pointage) {
+        if ($pointage['type'] !== 'sortie') {
+            return false;
+        }
+        
+        $date = date('Y-m-d', strtotime($pointage['created_at']));
+        $heures_jour = $this->calculateDailyHours($pointage['employe_id'], $date);
+        
+        if ($heures_jour > 10) {
+            return [
+                'heures_travaillees' => $heures_jour,
+                'depassement' => $heures_jour - 8,
+                'escalate' => $heures_jour > 12
+            ];
+        }
+        
+        return false;
+    }
+    
+    private function checkWeekend($pointage) {
+        $jour_semaine = date('N', strtotime($pointage['created_at']));
+        
+        if ($jour_semaine >= 6) { // Samedi ou Dimanche
+            return [
+                'jour' => $jour_semaine == 6 ? 'Samedi' : 'Dimanche',
+                'date' => date('Y-m-d', strtotime($pointage['created_at'])),
+                'escalate' => true
+            ];
+        }
+        
+        return false;
+    }
+    
+    private function checkGeolocation($pointage) {
+        if (empty($pointage['geoloc'])) {
+            return false;
+        }
+        
+        $zones_autorisees = $this->getAuthorizedZones($pointage['employe_id']);
+        [$lat, $lon] = explode(',', $pointage['geoloc']);
+        
+        foreach ($zones_autorisees as $zone) {
+            $distance = $this->calculateDistance(
+                (float)$lat, (float)$lon, 
+                $zone['lat'], $zone['lon']
+            );
+            
+            if ($distance <= $zone['radius']) {
+                return false; // Dans une zone autorisée
+            }
+        }
+        
+        return [
+            'latitude' => $lat,
+            'longitude' => $lon,
+            'distance_min' => $this->getMinDistanceToZones($lat, $lon, $zones_autorisees),
+            'escalate' => true
+        ];
+    }
+    
+    private function checkCoherence($pointage) {
+        $date = date('Y-m-d', strtotime($pointage['created_at']));
+        
+        $stmt = $this->conn->prepare("
+            SELECT type, COUNT(*) as count
+            FROM pointages 
+            WHERE employe_id = ? AND DATE(created_at) = ?
+            GROUP BY type
+        ");
+        $stmt->execute([$pointage['employe_id'], $date]);
+        $counts = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+        
+        $entrees = $counts['entree'] ?? 0;
+        $sorties = $counts['sortie'] ?? 0;
+        
+        // Vérifications de cohérence
+        $incoherences = [];
+        
+        if ($sorties > $entrees) {
+            $incoherences[] = 'Plus de sorties que d\'entrées';
+        }
+        
+        if ($entrees - $sorties > 1) {
+            $incoherences[] = 'Trop d\'entrées sans sortie';
+        }
+        
+        if (!empty($incoherences)) {
+            return [
+                'entrees' => $entrees,
+                'sorties' => $sorties,
+                'problemes' => $incoherences,
+                'escalate' => count($incoherences) > 1
+            ];
+        }
+        
+        return false;
+    }
+    
+    // Création d'une alerte
+    private function createAlert($rule_name, $pointage, $violation) {
+        $rule = $this->rules[$rule_name];
+        
+        return [
+            'id' => uniqid('alert_'),
+            'rule_name' => $rule_name,
+            'employe_id' => $pointage['employe_id'],
+            'employe_nom' => $pointage['nom'],
+            'pointage_id' => $pointage['id'],
+            'severity' => $rule['severity'],
+            'created_at' => date('Y-m-d H:i:s'),
+            'violation_data' => $violation,
+            'escalate' => $violation['escalate'] ?? false,
+            'escalation_levels' => $rule['escalation'],
+            'status' => 'active'
+        ];
+    }
+    
+    // Traitement d'une alerte
+    private function processAlert($alert) {
+        // Sauvegarde en base
+        $this->saveAlert($alert);
+        
+        // Notifications immédiates
+        $this->sendNotifications($alert);
+        
+        // Escalade si nécessaire
+        if ($alert['escalate']) {
+            $this->escalateAlert($alert);
+        }
+        
+        // Log de sécurité pour certaines alertes critiques
+        if (in_array($alert['rule_name'], ['geolocalisation_suspecte', 'absence_non_justifiee'])) {
+            $this->logSecurityEvent($alert);
+        }
+    }
+    
+    private function saveAlert($alert) {
+        $stmt = $this->conn->prepare("
+            INSERT INTO alerts (id, rule_name, employe_id, pointage_id, severity, violation_data, created_at, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        
+        $stmt->execute([
+            $alert['id'],
+            $alert['rule_name'],
+            $alert['employe_id'],
+            $alert['pointage_id'],
+            $alert['severity'],
+            json_encode($alert['violation_data']),
+            $alert['created_at'],
+            $alert['status']
+        ]);
+    }
+    
+    private function sendNotifications($alert) {
+        $message = $this->generateAlertMessage($alert);
+        
+        // Notification à l'employé (si pas trop critique)
+        if (!in_array($alert['rule_name'], ['geolocalisation_suspecte', 'pointages_incoherents'])) {
+            $this->notificationService->sendToEmployee($alert['employe_id'], $message);
+        }
+        
+        // Notification au superviseur
+        $supervisor_id = $this->getSupervisorId($alert['employe_id']);
+        if ($supervisor_id) {
+            $this->notificationService->sendToSupervisor($supervisor_id, $message, $alert);
+        }
+        
+        // Notifications push pour l'interface web
+        $this->notificationService->sendWebPush([
+            'title' => 'Alerte TimeTracker',
+            'body' => $message['short'],
+            'data' => [
+                'alert_id' => $alert['id'],
+                'employe_id' => $alert['employe_id'],
+                'severity' => $alert['severity']
+            ],
+            'urgent' => $alert['severity'] === 'error'
+        ]);
+    }
+    
+    private function generateAlertMessage($alert) {
+        $employe = $alert['employe_nom'];
+        $violation = $alert['violation_data'];
+        
+        switch ($alert['rule_name']) {
+            case 'retard':
+                return [
+                    'short' => "Retard détecté: {$employe} ({$violation['retard_minutes']} min)",
+                    'detailed' => "L'employé {$employe} est arrivé avec {$violation['retard_minutes']} minutes de retard. C'est le {$violation['nb_retards_semaine']}e retard cette semaine."
+                ];
+                
+            case 'absence_non_justifiee':
+                return [
+                    'short' => "Absence non justifiée: {$employe}",
+                    'detailed' => "L'employé {$employe} n'a pas pointé depuis {$violation['heures_absence']} heures un jour ouvré."
+                ];
+                
+            case 'depassement_heures':
+                return [
+                    'short' => "Dépassement horaire: {$employe} ({$violation['heures_travaillees']}h)",
+                    'detailed' => "L'employé {$employe} a travaillé {$violation['heures_travaillees']} heures aujourd'hui, soit {$violation['depassement']}h de dépassement."
+                ];
+                
+            case 'geolocalisation_suspecte':
+                return [
+                    'short' => "Géolocalisation suspecte: {$employe}",
+                    'detailed' => "L'employé {$employe} a pointé depuis un lieu non autorisé (distance: {$violation['distance_min']}m)."
+                ];
+                
+            default:
+                return [
+                    'short' => "Alerte {$alert['rule_name']}: {$employe}",
+                    'detailed' => "Une anomalie a été détectée pour l'employé {$employe}."
+                ];
+        }
+    }
+    
+    private function escalateAlert($alert) {
+        foreach ($alert['escalation_levels'] as $level) {
+            switch ($level) {
+                case 'supervisor':
+                    $this->notifyRole('supervisor', $alert);
+                    break;
+                case 'hr':
+                    $this->notifyRole('hr', $alert);
+                    break;
+                case 'direction':
+                    $this->notifyRole('direction', $alert);
+                    break;
+                case 'security':
+                    $this->notifyRole('security', $alert);
+                    break;
+                case 'legal':
+                    $this->notifyRole('legal', $alert);
+                    break;
+            }
+        }
+        
+        // Marquer l'escalade
+        $this->conn->prepare("UPDATE alerts SET escalated_at = ?, escalated_to = ? WHERE id = ?")
+                   ->execute([date('Y-m-d H:i:s'), implode(',', $alert['escalation_levels']), $alert['id']]);
+    }
+    
+    private function notifyRole($role, $alert) {
+        $stmt = $this->conn->prepare("
+            SELECT email FROM admins WHERE role = ? AND notifications_enabled = 1
+        ");
+        $stmt->execute([$role]);
+        $recipients = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        
+        $message = $this->generateAlertMessage($alert);
+        
+        foreach ($recipients as $email) {
+            $this->notificationService->sendEmail($email, "Escalade d'alerte", $message['detailed'], $alert);
+        }
+    }
+    
+    // Analyse périodique (cron job)
+    public function runPeriodicAnalysis() {
+        $this->analyzeWeeklyPatterns();
+        $this->analyzeMonthlyTrends();
+        $this->checkComplianceViolations();
+        $this->generateInsights();
+    }
+    
+    private function analyzeWeeklyPatterns() {
+        // Analyse des patterns hebdomadaires suspects
+        $stmt = $this->conn->prepare("
+            SELECT employe_id, 
+                   AVG(CASE WHEN DAYOFWEEK(created_at) = 2 THEN 1 ELSE 0 END) as monday_rate,
+                   AVG(CASE WHEN DAYOFWEEK(created_at) = 6 THEN 1 ELSE 0 END) as friday_rate,
+                   COUNT(DISTINCT DATE(created_at)) as days_worked
+            FROM pointages 
+            WHERE created_at >= DATE_SUB(NOW(), INTERVAL 4 WEEK)
+            AND type = 'entree'
+            GROUP BY employe_id
+            HAVING days_worked >= 15
+        ");
+        $stmt->execute();
+        $patterns = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        foreach ($patterns as $pattern) {
+            // Détection d'absentéisme le lundi/vendredi
+            if ($pattern['monday_rate'] < 0.6 || $pattern['friday_rate'] < 0.6) {
+                $this->createPatternAlert('weekly_absenteeism', $pattern);
+            }
+        }
+    }
+    
+    private function checkComplianceViolations() {
+        // Vérification des violations de conformité légale
+        $violations = [];
+        
+        // Repos hebdomadaire
+        $stmt = $this->conn->prepare("
+            SELECT employe_id, COUNT(DISTINCT DATE(created_at)) as days_worked
+            FROM pointages 
+            WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+            AND type = 'entree'
+            GROUP BY employe_id
+            HAVING days_worked = 7
+        ");
+        $stmt->execute();
+        $continuous_workers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        foreach ($continuous_workers as $worker) {
+            $this->createComplianceAlert('no_weekly_rest', $worker);
+        }
+    }
+    
+    // Utilitaires
+    private function calculateDailyHours($employe_id, $date) {
+        $stmt = $this->conn->prepare("
+            SELECT type, created_at FROM pointages 
+            WHERE employe_id = ? AND DATE(created_at) = ? 
+            ORDER BY created_at
+        ");
+        $stmt->execute([$employe_id, $date]);
+        $points = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        $heures = 0;
+        $entree = null;
+        
+        foreach ($points as $p) {
+            if ($p['type'] === 'entree') {
+                $entree = strtotime($p['created_at']);
+            } elseif ($p['type'] === 'sortie' && $entree) {
+                $heures += (strtotime($p['created_at']) - $entree) / 3600;
+                $entree = null;
+            }
+        }
+        
+        return round($heures, 2);
+    }
+    
+    private function calculateDistance($lat1, $lon1, $lat2, $lon2) {
+        $earthRadius = 6371000; // mètres
+        
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLon = deg2rad($lon2 - $lon1);
+        
+        $a = sin($dLat/2) * sin($dLat/2) + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon/2) * sin($dLon/2);
+        $c = 2 * atan2(sqrt($a), sqrt(1-$a));
+        
+        return $earthRadius * $c;
+    }
+    
+    private function getAuthorizedZones($employe_id) {
+        $stmt = $this->conn->prepare("
+            SELECT z.* FROM authorized_zones z
+            JOIN employee_zones ez ON z.id = ez.zone_id
+            WHERE ez.employe_id = ?
+        ");
+        $stmt->execute([$employe_id]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    
+    private function getSupervisorId($employe_id) {
+        $stmt = $this->conn->prepare("SELECT supervisor_id FROM employes WHERE id = ?");
+        $stmt->execute([$employe_id]);
+        return $stmt->fetchColumn();
+    }
+}
+
+// Service de notifications
+class NotificationService {
+    private $conn;
+    private $emailService;
+    private $pushService;
+    
+    public function __construct() {
+        global $conn;
+        $this->conn = $conn;
+        $this->emailService = new EmailService();
+        $this->pushService = new PushNotificationService();
+    }
+    
+    public function sendToEmployee($employe_id, $message) {
+        // Notification in-app
+        $this->saveInAppNotification($employe_id, $message['short'], 'info');
+        
+        // Email si activé
+        $employee = $this->getEmployeeNotificationPrefs($employe_id);
+        if ($employee['email_notifications']) {
+            $this->emailService->send($employee['email'], 'TimeTracker - Notification', $message['detailed']);
+        }
+    }
+    
+    public function sendToSupervisor($supervisor_id, $message, $alert) {
+        $this->saveInAppNotification($supervisor_id, $message['short'], $alert['severity']);
+        
+        $supervisor = $this->getEmployeeNotificationPrefs($supervisor_id);
+        if ($supervisor['email_notifications']) {
+            $this->emailService->send($supervisor['email'], 'TimeTracker - Alerte équipe', $message['detailed']);
+        }
+    }
+    
+    public function sendWebPush($data) {
+        $this->pushService->sendToAllAdmins($data);
+    }
+    
+    public function sendEmail($email, $subject, $body, $alert = null) {
+        $this->emailService->send($email, $subject, $body, $alert);
+    }
+    
+    private function saveInAppNotification($user_id, $message, $type) {
+        $stmt = $this->conn->prepare("
+            INSERT INTO notifications (user_id, message, type, created_at, read_at)
+            VALUES (?, ?, ?, NOW(), NULL)
+        ");
+        $stmt->execute([$user_id, $message, $type]);
+    }
+    
+    private function getEmployeeNotificationPrefs($employe_id) {
+        $stmt = $this->conn->prepare("
+            SELECT email, email_notifications, push_notifications 
+            FROM employes 
+            WHERE id = ?
+        ");
+        $stmt->execute([$employe_id]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+}
+
+// Service d'email
+class EmailService {
+    private $config;
+    
+    public function __construct() {
+        $this->config = [
+            'smtp_host' => $_ENV['SMTP_HOST'] ?? 'localhost',
+            'smtp_port' => $_ENV['SMTP_PORT'] ?? 587,
+            'smtp_user' => $_ENV['SMTP_USER'] ?? '',
+            'smtp_pass' => $_ENV['SMTP_PASS'] ?? '',
+            'from_email' => $_ENV['FROM_EMAIL'] ?? 'noreply@timetracker.com',
+            'from_name' => 'TimeTracker Pro'
+        ];
+    }
+    
+    public function send($to, $subject, $body, $alert = null) {
+        // Configuration PHPMailer ou service email
+        $headers = [
+            'From: ' . $this->config['from_name'] . ' <' . $this->config['from_email'] . '>',
+            'Reply-To: ' . $this->config['from_email'],
+            'X-Mailer: TimeTracker Pro',
+            'Content-Type: text/html; charset=UTF-8'
+        ];
+        
+        $html_body = $this->generateEmailTemplate($subject, $body, $alert);
+        
+        // Envoi via mail() ou service SMTP
+        return mail($to, $subject, $html_body, implode("\r\n", $headers));
+    }
+    
+    private function generateEmailTemplate($subject, $body, $alert = null) {
+        $severity_colors = [
+            'info' => '#2196F3',
+            'warning' => '#FF9800', 
+            'error' => '#F44336'
+        ];
+        
+        $color = $severity_colors[$alert['severity'] ?? 'info'];
+        
+        return "
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset='utf-8'>
+            <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .header { background: {$color}; color: white; padding: 20px; text-align: center; }
+                .content { background: #f9f9f9; padding: 20px; }
+                .footer { background: #333; color: white; padding: 15px; text-align: center; font-size: 12px; }
+                .alert-box { background: " . ($alert ? 'rgba(' . $this->hexToRgb($color) . ', 0.1)' : '#fff') . "; 
+                            border-left: 4px solid {$color}; padding: 15px; margin: 20px 0; }
+            </style>
+        </head>
+        <body>
+            <div class='container'>
+                <div class='header'>
+                    <h1>🕒 TimeTracker Pro</h1>
+                    <h2>{$subject}</h2>
+                </div>
+                <div class='content'>
+                    <div class='alert-box'>
+                        {$body}
+                    </div>
+                    " . ($alert ? $this->generateAlertDetails($alert) : '') . "
+                </div>
+                <div class='footer'>
+                    <p>Ce message a été généré automatiquement par TimeTracker Pro</p>
+                    <p>Pour modifier vos préférences de notification, connectez-vous à votre tableau de bord</p>
+                </div>
+            </div>
+        </body>
+        </html>";
+    }
+    
+    private function generateAlertDetails($alert) {
+        return "
+        <div style='margin-top: 20px; padding: 15px; background: white; border-radius: 5px;'>
+            <h3>Détails de l'alerte</h3>
+            <p><strong>Type:</strong> " . ucfirst(str_replace('_', ' ', $alert['rule_name'])) . "</p>
+            <p><strong>Employé:</strong> {$alert['employe_nom']}</p>
+            <p><strong>Gravité:</strong> " . strtoupper($alert['severity']) . "</p>
+            <p><strong>Date:</strong> " . date('d/m/Y H:i', strtotime($alert['created_at'])) . "</p>
+            " . ($alert['escalate'] ? '<p style=\"color: #f44336;\"><strong>⚠️ Cette alerte nécessite une attention immédiate</strong></p>' : '') . "
+        </div>";
+    }
+    
+    private function hexToRgb($hex) {
+        $hex = ltrim($hex, '#');
+        return implode(', ', [
+            hexdec(substr($hex, 0, 2)),
+            hexdec(substr($hex, 2, 2)),
+            hexdec(substr($hex, 4, 2))
+        ]);
+    }
+}
+
+// Service de notifications push
+class PushNotificationService {
+    private $conn;
+    private $vapidKeys;
+    
+    public function __construct() {
+        global $conn;
+        $this->conn = $conn;
+        $this->vapidKeys = [
+            'public' => $_ENV['VAPID_PUBLIC_KEY'] ?? '',
+            'private' => $_ENV['VAPID_PRIVATE_KEY'] ?? ''
+        ];
+    }
+    
+    public function sendToAllAdmins($data) {
+        $stmt = $this->conn->prepare("
+            SELECT push_subscription FROM admins 
+            WHERE push_notifications = 1 AND push_subscription IS NOT NULL
+        ");
+        $stmt->execute();
+        $subscriptions = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        
+        foreach ($subscriptions as $subscription) {
+            $this->sendPush($subscription, $data);
+        }
+    }
+    
+    private function sendPush($subscription, $data) {
+        // Implémentation Web Push Protocol
+        // Utilisation d'une librairie comme web-push-libs/web-push-php
+        
+        $payload = json_encode([
+            'title' => $data['title'],
+            'body' => $data['body'],
+            'icon' => '/assets/images/icons/icon-192x192.png',
+            'badge' => '/assets/images/icons/badge-72x72.png',
+            'data' => $data['data'],
+            'requireInteraction' => $data['urgent'] ?? false,
+            'actions' => [
+                ['action' => 'view', 'title' => 'Voir'],
+                ['action' => 'dismiss', 'title' => 'Ignorer']
+            ]
+        ]);
+        
+        // Envoi via service push (simplifié)
+        $this->webPush($subscription, $payload);
+    }
+    
+    private function webPush($subscription, $payload) {
+        // Implémentation simplifiée - en production, utiliser une vraie librairie
+        $subscription_data = json_decode($subscription, true);
+        
+        // Headers et authentification VAPID
+        $headers = [
+            'Content-Type: application/json',
+            'TTL: 86400',
+            'Urgency: high'
+        ];
+        
+        // Envoi via cURL vers le service push
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $subscription_data['endpoint'],
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 30
+        ]);
+        
+        $result = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        return $httpCode >= 200 && $httpCode < 300;
+    }
+}
+
+// Analyseur de tendances et insights
+class TrendAnalyzer {
+    private $conn;
+    
+    public function __construct($database) {
+        $this->conn = $database;
+    }
+    
+    public function generateMonthlyInsights($employe_id = null) {
+        $insights = [];
+        
+        // Analyse des patterns de retard
+        $insights['retard_patterns'] = $this->analyzeRetardPatterns($employe_id);
+        
+        // Productivité par jour de la semaine
+        $insights['productivity_by_day'] = $this->analyzeProductivityByDay($employe_id);
+        
+        // Détection d'anomalies statistiques
+        $insights['anomalies'] = $this->detectAnomalies($employe_id);
+        
+        // Prédictions basées sur les tendances
+        $insights['predictions'] = $this->generatePredictions($employe_id);
+        
+        return $insights;
+    }
+    
+    private function analyzeRetardPatterns($employe_id) {
+        $where = $employe_id ? "AND p.employe_id = ?" : "";
+        $params = $employe_id ? [$employe_id] : [];
+        
+        $stmt = $this->conn->prepare("
+            SELECT 
+                DAYOFWEEK(created_at) as day_of_week,
+                HOUR(created_at) as hour,
+                COUNT(*) as retard_count,
+                AVG(TIMESTAMPDIFF(MINUTE, CONCAT(DATE(created_at), ' 09:00:00'), created_at)) as avg_delay_minutes
+            FROM pointages p
+            WHERE type = 'entree' 
+            AND TIME(created_at) > '09:00:00'
+            AND created_at >= DATE_SUB(NOW(), INTERVAL 3 MONTH)
+            {$where}
+            GROUP BY DAYOFWEEK(created_at), HOUR(created_at)
+            ORDER BY retard_count DESC
+        ");
+        $stmt->execute($params);
+        
+        return [
+            'patterns' => $stmt->fetchAll(PDO::FETCH_ASSOC),
+            'insight' => $this->generateRetardInsight($stmt->fetchAll(PDO::FETCH_ASSOC))
+        ];
+    }
+    
+    private function generateRetardInsight($patterns) {
+        if (empty($patterns)) {
+            return "Aucun pattern de retard détecté.";
+        }
+        
+        $top_pattern = $patterns[0];
+        $days = ['', 'Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+        
+        return "Pattern principal: retards le {$days[$top_pattern['day_of_week']]} vers {$top_pattern['hour']}h ({$top_pattern['retard_count']} occurrences, moyenne {$top_pattern['avg_delay_minutes']} min)";
+    }
+    
+    private function detectAnomalies($employe_id) {
+        // Détection d'anomalies statistiques dans les horaires
+        $anomalies = [];
+        
+        // Heures de travail inhabituelles
+        $stmt = $this->conn->prepare("
+            SELECT DATE(created_at) as date,
+                   MIN(CASE WHEN type = 'entree' THEN TIME(created_at) END) as first_entry,
+                   MAX(CASE WHEN type = 'sortie' THEN TIME(created_at) END) as last_exit
+            FROM pointages 
+            WHERE employe_id = ? 
+            AND created_at >= DATE_SUB(NOW(), INTERVAL 1 MONTH)
+            GROUP BY DATE(created_at)
+            HAVING first_entry < '06:00:00' OR last_exit > '22:00:00'
+        ");
+        $stmt->execute([$employe_id]);
+        $unusual_hours = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        if (!empty($unusual_hours)) {
+            $anomalies[] = [
+                'type' => 'unusual_hours',
+                'count' => count($unusual_hours),
+                'description' => 'Horaires de travail inhabituels détectés',
+                'details' => $unusual_hours
+            ];
+        }
+        
+        return $anomalies;
+    }
+    
+    private function generatePredictions($employe_id) {
+        // Prédictions simples basées sur les tendances historiques
+        $predictions = [];
+        
+        // Prédiction du nombre de retards du mois prochain
+        $stmt = $this->conn->prepare("
+            SELECT COUNT(*) as retards_month
+            FROM pointages 
+            WHERE employe_id = ? 
+            AND type = 'entree'
+            AND TIME(created_at) > '09:00:00'
+            AND created_at >= DATE_SUB(NOW(), INTERVAL 1 MONTH)
+        ");
+        $stmt->execute([$employe_id]);
+        $retards_current = $stmt->fetch(PDO::FETCH_ASSOC)['retards_month'];
+        
+        $predictions['retards_next_month'] = [
+            'predicted_value' => round($retards_current * 1.1), // Tendance légèrement à la hausse
+            'confidence' => 'medium',
+            'basis' => 'Basé sur les 30 derniers jours avec tendance saisonnière'
+        ];
+        
+        return $predictions;
+    }
+}
+
+// Script principal d'analyse périodique
+class PeriodicAnalysisRunner {
+    private $alertSystem;
+    private $trendAnalyzer;
+    
+    public function __construct() {
+        global $conn;
+        $this->alertSystem = new AlertSystem($conn);
+        $this->trendAnalyzer = new TrendAnalyzer($conn);
+    }
+    
+    public function runDailyAnalysis() {
+        echo "[" . date('Y-m-d H:i:s') . "] Début de l'analyse quotidienne\n";
+        
+        try {
+            // Vérification des règles quotidiennes
+            $this->alertSystem->runPeriodicAnalysis();
+            
+            // Génération des insights hebdomadaires (le lundi)
+            if (date('N') == 1) {
+                $this->generateWeeklyReports();
+            }
+            
+            // Nettoyage des anciennes alertes
+            $this->cleanupOldAlerts();
+            
+            echo "[" . date('Y-m-d H:i:s') . "] Analyse quotidienne terminée\n";
+            
+        } catch (Exception $e) {
+            echo "[" . date('Y-m-d H:i:s') . "] Erreur: " . $e->getMessage() . "\n";
+            error_log("Periodic Analysis Error: " . $e->getMessage());
+        }
+    }
+    
+    private function generateWeeklyReports() {
+        echo "Génération des rapports hebdomadaires...\n";
+        
+        // Rapport global pour la direction
+        $insights = $this->trendAnalyzer->generateMonthlyInsights();
+        
+        // Envoi du rapport par email aux administrateurs
+        $emailService = new EmailService();
+        $adminEmails = $this->getAdminEmails();
+        
+        $reportContent = $this->formatWeeklyReport($insights);
+        
+        foreach ($adminEmails as $email) {
+            $emailService->send(
+                $email, 
+                'TimeTracker Pro - Rapport hebdomadaire',
+                $reportContent
+            );
+        }
+    }
+    
+    private function cleanupOldAlerts() {
+        global $conn;
+        
+        // Supprimer les alertes résolues de plus de 3 mois
+        $stmt = $conn->prepare("
+            DELETE FROM alerts 
+            WHERE status = 'resolved' 
+            AND created_at < DATE_SUB(NOW(), INTERVAL 3 MONTH)
+        ");
+        $stmt->execute();
+        
+        $deleted = $stmt->rowCount();
+        if ($deleted > 0) {
+            echo "Nettoyage: {$deleted} alertes anciennes supprimées\n";
+        }
+    }
+    
+    private function getAdminEmails() {
+        global $conn;
+        
+        $stmt = $conn->prepare("
+            SELECT email FROM admins 
+            WHERE role IN ('admin', 'super_admin') 
+            AND email_notifications = 1
+        ");
+        $stmt->execute();
+        
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
+    }
+    
+    private function formatWeeklyReport($insights) {
+        $html = "<h2>📊 Rapport Hebdomadaire TimeTracker Pro</h2>";
+        $html .= "<p><strong>Période:</strong> " . date('d/m/Y', strtotime('-7 days')) . " - " . date('d/m/Y') . "</p>";
+        
+        // Résumé des alertes
+        if (!empty($insights['retard_patterns']['patterns'])) {
+            $html .= "<h3>🚨 Alertes de la semaine</h3>";
+            $html .= "<p>" . $insights['retard_patterns']['insight'] . "</p>";
+        }
+        
+        // Anomalies détectées
+        if (!empty($insights['anomalies'])) {
+            $html .= "<h3>⚠️ Anomalies détectées</h3>";
+            foreach ($insights['anomalies'] as $anomaly) {
+                $html .= "<p>• {$anomaly['description']} ({$anomaly['count']} occurrences)</p>";
+            }
+        }
+        
+        // Prédictions
+        if (!empty($insights['predictions'])) {
+            $html .= "<h3>🔮 Prédictions</h3>";
+            foreach ($insights['predictions'] as $key => $prediction) {
+                $html .= "<p>• " . ucfirst(str_replace('_', ' ', $key)) . ": {$prediction['predicted_value']} ({$prediction['confidence']} confiance)</p>";
+            }
+        }
+        
+        $html .= "<hr><p><small>Rapport généré automatiquement le " . date('d/m/Y H:i') . "</small></p>";
+        
+        return $html;
+    }
+}
+
+// Point d'entrée pour les tâches CRON
+if (php_sapi_name() === 'cli') {
+    $runner = new PeriodicAnalysisRunner();
+    
+    $action = $argv[1] ?? 'daily';
+    
+    switch ($action) {
+        case 'daily':
+            $runner->runDailyAnalysis();
+            break;
+        case 'test-alert':
+            $employeId = $argv[2] ?? null;
+            if ($employeId) {
+                $alertSystem = new AlertSystem($GLOBALS['conn']);
+                // Simuler un pointage pour test
+                echo "Test d'alerte pour l'employé {$employeId}\n";
+            }
+            break;
+        default:
+            echo "Usage: php alert_system.php [daily|test-alert] [employe_id]\n";
+    }
+}
+
+?>
