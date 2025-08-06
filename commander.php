@@ -1,35 +1,48 @@
 <?php
 require_once 'config.php';
-require 'vendor/autoload.php'; // PHPMailer et Dompdf
+require 'vendor/autoload.php';
 session_start();
+
+// Initialisation sécurisée des variables
 $total = 0;
 $produits = [];
 
-if (!empty($_SESSION['panier'])) {
+// Vérification et initialisation du panier
+if (!isset($_SESSION['panier']) || !is_array($_SESSION['panier'])) {
+    $_SESSION['panier'] = [];
+}
+
+// Chargement des produits du panier depuis la session
+if (!empty($_SESSION['panier']) && is_array($_SESSION['panier'])) {
     $ids = array_keys($_SESSION['panier']);
-    $stmt = $conn->prepare("SELECT * FROM plats WHERE id = ?");
-    foreach ($ids as $id) {
-        $stmt->execute([$id]);
-        $produit = $stmt->fetch();
-        if ($produit) {
-            $produit['quantite'] = $_SESSION['panier'][$produit['id']];
-            $total += $produit['prix'] * $produit['quantite'];
-            $produits[] = $produit;
+    if (!empty($ids)) {
+        $stmt = $conn->prepare("SELECT * FROM plats WHERE id = ?");
+        foreach ($ids as $id) {
+            if (is_numeric($id)) {
+                $stmt->execute([$id]);
+                $produit = $stmt->fetch();
+                if ($produit) {
+                    $produit['quantite'] = $_SESSION['panier'][$produit['id']];
+                    $total += $produit['prix'] * $produit['quantite'];
+                    $produits[] = $produit;
+                }
+            }
         }
     }
 }
 
+// Si le panier de session est vide, essayer de récupérer depuis localStorage via JavaScript
+if (empty($produits)) {
+    // On laissera JavaScript récupérer le panier du localStorage
+    $useLocalStorage = true;
+} else {
+    $useLocalStorage = false;
+}
 
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
-
-// Vérifier que le panier n'est pas vide
-if (!isset($_SESSION['panier']) || empty($_SESSION['panier'])) {
-    header('Location: panier.php');
-    exit;
-}
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $nom = trim($_POST['nom']);
@@ -380,7 +393,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 }
 ?>
 
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -536,30 +548,39 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <h2 class="text-xl font-bold text-gray-800">Résumé de la commande</h2>
                     </div>
                     
-                    <div class="space-y-4 mb-6">
-                        <?php foreach ($produits as $produit): ?>
-                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <div class="flex-1">
-                                    <h3 class="font-medium text-gray-800 text-sm">
-                                        <?= htmlspecialchars($produit['nom']) ?>
-                                    </h3>
-                                    <p class="text-xs text-gray-500 mt-1">
-                                        <?= number_format($produit['prix'], 0) ?> FCFA × <?= $produit['quantite'] ?>
-                                    </p>
+                    <!-- Container pour les produits -->
+                    <div id="orderSummary" class="space-y-4 mb-6">
+                        <?php if (!empty($produits)): ?>
+                            <!-- Affichage depuis PHP (session) -->
+                            <?php foreach ($produits as $produit): ?>
+                                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                    <div class="flex-1">
+                                        <h3 class="font-medium text-gray-800 text-sm">
+                                            <?= htmlspecialchars($produit['nom']) ?>
+                                        </h3>
+                                        <p class="text-xs text-gray-500 mt-1">
+                                            <?= number_format($produit['prix'], 0) ?> FCFA × <?= $produit['quantite'] ?>
+                                        </p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="font-semibold text-gray-800">
+                                            <?= number_format($produit['prix'] * $produit['quantite'], 0) ?> FCFA
+                                        </p>
+                                    </div>
                                 </div>
-                                <div class="text-right">
-                                    <p class="font-semibold text-gray-800">
-                                        <?= number_format($produit['prix'] * $produit['quantite'], 0) ?> FCFA
-                                    </p>
-                                </div>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <!-- Le panier sera chargé via JavaScript si vide en PHP -->
+                            <div class="text-center py-4" id="emptyCartMessage">
+                                <p class="text-gray-500">Chargement du panier...</p>
                             </div>
-                        <?php endforeach; ?>
+                        <?php endif; ?>
                     </div>
                     
                     <div class="border-t pt-4">
                         <div class="flex justify-between items-center mb-2">
                             <span class="text-gray-600">Sous-total</span>
-                            <span class="font-medium"><?= number_format($total, 0) ?> FCFA</span>
+                            <span class="font-medium" id="subtotalAmount"><?= number_format($total, 0) ?> FCFA</span>
                         </div>
                         <div class="flex justify-between items-center mb-2">
                             <span class="text-gray-600">Livraison</span>
@@ -568,7 +589,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <div class="border-t pt-2 mt-4">
                             <div class="flex justify-between items-center">
                                 <span class="text-lg font-bold text-gray-800">Total</span>
-                                <span class="text-2xl font-bold text-primary"><?= number_format($total, 0) ?> FCFA</span>
+                                <span class="text-2xl font-bold text-primary" id="totalAmount"><?= number_format($total, 0) ?> FCFA</span>
                             </div>
                         </div>
                     </div>
@@ -590,6 +611,90 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             </div>
         </div>
     </div>
+
+    <script>
+        // Variables globales pour gérer le panier
+        let cartFromLocalStorage = [];
+        
+        // Fonction pour charger le panier depuis localStorage si nécessaire
+        function loadCartFromLocalStorage() {
+            <?php if ($useLocalStorage): ?>
+                // Récupérer le panier du localStorage seulement si le panier PHP est vide
+                const cartItems = JSON.parse(localStorage.getItem('cartItems') || '[]');
+                
+                if (cartItems.length > 0) {
+                    cartFromLocalStorage = cartItems;
+                    displayCartItems(cartItems);
+                    
+                    // Envoyer les données du panier au serveur pour mise à jour de la session
+                    updateServerCart(cartItems);
+                } else {
+                    // Aucun item dans le panier
+                    document.getElementById('emptyCartMessage').innerHTML = 
+                        '<p class="text-gray-500">Votre panier est vide</p><a href="menu.php" class="text-primary hover:underline">← Retour au menu</a>';
+                }
+            <?php endif; ?>
+        }
+        
+        // Fonction pour afficher les items du panier
+        function displayCartItems(cartItems) {
+            const orderSummary = document.getElementById('orderSummary');
+            let total = 0;
+            let itemsHTML = '';
+            
+            cartItems.forEach(item => {
+                const itemTotal = item.price * item.quantity;
+                total += itemTotal;
+                
+                itemsHTML += `
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div class="flex-1">
+                            <h3 class="font-medium text-gray-800 text-sm">
+                                ${item.item}
+                            </h3>
+                            <p class="text-xs text-gray-500 mt-1">
+                                ${item.price.toLocaleString()} FCFA × ${item.quantity}
+                            </p>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-semibold text-gray-800">
+                                ${itemTotal.toLocaleString()} FCFA
+                            </p>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            orderSummary.innerHTML = itemsHTML;
+            
+            // Mettre à jour les totaux
+            document.getElementById('subtotalAmount').textContent = total.toLocaleString() + ' FCFA';
+            document.getElementById('totalAmount').textContent = total.toLocaleString() + ' FCFA';
+        }
+        
+        // Fonction pour mettre à jour le panier côté serveur
+        function updateServerCart(cartItems) {
+            fetch('menu.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'action=update_cart&cart_data=' + encodeURIComponent(JSON.stringify(cartItems))
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Panier synchronisé avec le serveur:', data);
+            })
+            .catch(error => {
+                console.error('Erreur lors de la synchronisation:', error);
+            });
+        }
+        
+        // Charger le panier au démarrage de la page
+        document.addEventListener('DOMContentLoaded', function() {
+            loadCartFromLocalStorage();
+        });
+    </script>
     
     <!-- Footer -->
     <footer class="bg-gray-800 text-white py-8 mt-16">
