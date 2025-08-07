@@ -121,26 +121,29 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
 
         :root {
             --primary: #1a1a1a;
-            --secondary: #f8f8f8;
+            --secondary: #f8f9fa;
             --accent: #d4a574;
-            --text-primary: #1a1a1a;
+            --text-primary: #2c3e50;
             --text-secondary: #666666;
             --text-light: #999999;
             --white: #ffffff;
-            --border: #f0f0f0;
-            --shadow: 0 1px 3px rgba(0,0,0,0.05);
-            --shadow-hover: 0 4px 20px rgba(0,0,0,0.1);
+            --paper: #fefefe;
+            --paper-shadow: rgba(0, 0, 0, 0.08);
+            --paper-shadow-hover: rgba(0, 0, 0, 0.15);
+            --border: #e9ecef;
             --success: #22c55e;
             --warning: #f59e0b;
             --danger: #ef4444;
+            --paper-edge: #f1f3f4;
         }
 
         body {
             font-family: 'Inter', sans-serif;
-            background: var(--white);
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
             color: var(--text-primary);
-            line-height: 1.5;
+            line-height: 1.6;
             font-weight: 400;
+            min-height: 100vh;
         }
 
         /* Header Ultra Clean */
@@ -152,6 +155,7 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
             top: 0;
             z-index: 1000;
             backdrop-filter: blur(20px);
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.03);
         }
 
         .header-content {
@@ -181,11 +185,11 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
             color: var(--text-secondary);
             border: 1px solid var(--border);
             padding: 10px 16px;
-            border-radius: 6px;
+            border-radius: 10px;
             cursor: pointer;
             font-size: 14px;
             font-weight: 500;
-            transition: all 0.2s ease;
+            transition: all 0.3s ease;
             display: flex;
             align-items: center;
             gap: 6px;
@@ -196,6 +200,8 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
             background: var(--primary);
             color: var(--white);
             border-color: var(--primary);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
 
         /* Badge pour le nombre d'items dans le panier */
@@ -221,67 +227,118 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
             transform: scale(1);
         }
 
-        /* Container Ultra Clean */
+        /* Container avec effet papier */
         .container {
             max-width: 1000px;
             margin: 0 auto;
             padding: 48px 24px;
         }
 
-        /* Category Navigation Minimal */
+        /* Category Navigation avec effet papier */
         .category-nav {
             display: flex;
-            gap: 4px;
+            gap: 8px;
             margin-bottom: 64px;
             justify-content: center;
             flex-wrap: wrap;
+            background: var(--paper);
+            padding: 24px;
+            border-radius: 20px;
+            box-shadow: 
+                0 4px 20px var(--paper-shadow),
+                inset 0 1px 0 rgba(255, 255, 255, 0.8);
+            position: relative;
+        }
+
+        .category-nav::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--paper-edge), transparent);
         }
 
         .category-btn {
             padding: 12px 20px;
-            background: transparent;
+            background: var(--white);
             color: var(--text-secondary);
             text-decoration: none;
             border: none;
             font-weight: 500;
             font-size: 14px;
-            transition: all 0.2s ease;
+            transition: all 0.3s ease;
             position: relative;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         }
 
         .category-btn::after {
             content: '';
             position: absolute;
-            bottom: 0;
+            bottom: -4px;
             left: 50%;
             width: 0;
             height: 2px;
             background: var(--accent);
-            transition: all 0.2s ease;
+            transition: all 0.3s ease;
             transform: translateX(-50%);
+            border-radius: 1px;
         }
 
         .category-btn.active,
         .category-btn:hover {
             color: var(--primary);
+            background: var(--white);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
         }
 
         .category-btn.active::after,
         .category-btn:hover::after {
-            width: 80%;
+            width: 60%;
         }
 
-        /* Category Title Minimal */
+        /* Category Section avec effet papier */
         .category-section {
-            margin-bottom: 64px;
+            margin-bottom: 80px;
+            background: var(--paper);
+            border-radius: 24px;
+            padding: 48px;
+            box-shadow: 
+                0 8px 40px var(--paper-shadow),
+                inset 0 1px 0 rgba(255, 255, 255, 0.9);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .category-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 24px;
+            right: 24px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--paper-edge), transparent);
+        }
+
+        .category-section::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 24px;
+            right: 24px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--paper-edge), transparent);
         }
 
         .category-title {
             font-family: 'Playfair Display', serif;
-            font-size: 24px;
+            font-size: 28px;
             font-weight: 500;
             color: var(--primary);
-            margin-bottom: 32px;
+            margin-bottom: 40px;
             text-align: center;
             position: relative;
         }
@@ -289,129 +346,193 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
         .category-title::after {
             content: '';
             position: absolute;
-            bottom: -8px;
+            bottom: -12px;
             left: 50%;
-            width: 40px;
-            height: 1px;
-            background: var(--accent);
+            width: 60px;
+            height: 2px;
+            background: linear-gradient(90deg, var(--accent), #c19654);
             transform: translateX(-50%);
+            border-radius: 1px;
         }
 
-        /* Menu Items Ultra Clean */
+        /* Menu Items avec effet feuille de papier */
         .menu-grid {
             display: grid;
-            gap: 24px;
+            gap: 32px;
         }
 
         .menu-item {
             display: flex;
             align-items: flex-start;
-            padding: 24px;
+            padding: 32px;
             background: var(--white);
-            border: 1px solid var(--border);
-            border-radius: 8px;
+            border-radius: 20px;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
+            box-shadow: 
+                0 4px 20px rgba(0, 0, 0, 0.06),
+                0 1px 4px rgba(0, 0, 0, 0.04),
+                inset 0 1px 0 rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            overflow: hidden;
+        }
+
+        /* Effet de texture papier subtil */
+        .menu-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.3) 1px, transparent 1px),
+                radial-gradient(circle at 80% 70%, rgba(0, 0, 0, 0.02) 1px, transparent 1px);
+            background-size: 40px 40px, 60px 60px;
+            pointer-events: none;
+        }
+
+        /* Effet de pliage en coin */
+        .menu-item::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 24px;
+            height: 24px;
+            background: linear-gradient(-45deg, var(--paper-edge) 50%, transparent 50%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
         }
 
         .menu-item:hover {
-            border-color: var(--accent);
-            box-shadow: var(--shadow-hover);
-            transform: translateY(-1px);
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 
+                0 20px 60px rgba(0, 0, 0, 0.12),
+                0 8px 24px rgba(0, 0, 0, 0.08),
+                inset 0 1px 0 rgba(255, 255, 255, 1);
+        }
+
+        .menu-item:hover::after {
+            opacity: 1;
+        }
+
+        /* Ombre portée réaliste au hover */
+        .menu-item:hover {
+            box-shadow: 
+                0 25px 80px rgba(0, 0, 0, 0.15),
+                0 10px 30px rgba(0, 0, 0, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 1);
         }
 
         .menu-item-image {
-            width: 80px;
-            height: 80px;
-            border-radius: 6px;
+            width: 90px;
+            height: 90px;
+            border-radius: 16px;
             object-fit: cover;
-            margin-right: 20px;
+            margin-right: 24px;
             flex-shrink: 0;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+            position: relative;
+            z-index: 2;
         }
 
         .menu-item-placeholder {
-            width: 80px;
-            height: 80px;
-            border-radius: 6px;
-            background: var(--secondary);
+            width: 90px;
+            height: 90px;
+            border-radius: 16px;
+            background: linear-gradient(135deg, var(--secondary), #e9ecef);
             display: flex;
             align-items: center;
             justify-content: center;
             color: var(--text-light);
-            font-size: 20px;
-            margin-right: 20px;
+            font-size: 24px;
+            margin-right: 24px;
             flex-shrink: 0;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+            position: relative;
+            z-index: 2;
         }
 
         .menu-item-content {
             flex: 1;
             min-width: 0;
+            position: relative;
+            z-index: 2;
         }
 
         .menu-item-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 8px;
+            margin-bottom: 12px;
         }
 
         .menu-item-name {
-            font-size: 16px;
+            font-size: 18px;
             font-weight: 600;
             color: var(--primary);
             margin-right: 16px;
+            letter-spacing: -0.5px;
         }
 
         .menu-item-price {
-            font-size: 16px;
-            font-weight: 600;
+            font-size: 18px;
+            font-weight: 700;
             color: var(--accent);
             flex-shrink: 0;
+            background: linear-gradient(135deg, var(--accent), #c19654);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
         .menu-item-description {
             color: var(--text-secondary);
             font-size: 14px;
-            line-height: 1.4;
-            margin-bottom: 12px;
+            line-height: 1.5;
+            margin-bottom: 16px;
         }
 
-        /* Bouton rapide d'ajout */
+        /* Bouton rapide d'ajout avec effet papier */
         .quick-add-btn {
             position: absolute;
-            top: 16px;
-            right: 16px;
-            background: var(--accent);
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, var(--accent), #c19654);
             color: var(--white);
             border: none;
-            width: 32px;
-            height: 32px;
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             opacity: 0;
-            transform: scale(0.8);
+            transform: scale(0.8) translateY(10px);
+            box-shadow: 0 4px 16px rgba(212, 165, 116, 0.3);
+            z-index: 10;
         }
 
         .menu-item:hover .quick-add-btn {
             opacity: 1;
-            transform: scale(1);
+            transform: scale(1) translateY(0);
         }
 
         .quick-add-btn:hover {
-            background: #c19654;
-            transform: scale(1.1);
+            background: linear-gradient(135deg, #c19654, #b8884d);
+            transform: scale(1.1) translateY(-2px);
+            box-shadow: 0 8px 24px rgba(212, 165, 116, 0.4);
         }
 
         .quick-add-btn:active {
-            transform: scale(0.95);
+            transform: scale(0.95) translateY(0);
         }
 
-        /* Modal Panier Styles */
+        /* Modal Panier avec effet papier */
         .cart-modal {
             position: fixed;
             top: 0;
@@ -419,7 +540,7 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
             width: 100%;
             height: 100%;
             background: rgba(26, 26, 26, 0.8);
-            backdrop-filter: blur(10px);
+            backdrop-filter: blur(15px);
             display: none;
             align-items: center;
             justify-content: center;
@@ -428,22 +549,24 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
         }
 
         .cart-content {
-            background: var(--white);
-            border-radius: 16px;
+            background: var(--paper);
+            border-radius: 24px;
             max-width: 500px;
             width: 90%;
             max-height: 90vh;
             position: relative;
-            box-shadow: 0 25px 80px rgba(0,0,0,0.2);
+            box-shadow: 
+                0 40px 120px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.9);
             overflow: hidden;
             display: flex;
             flex-direction: column;
         }
 
         .cart-header {
-            background: var(--accent);
+            background: linear-gradient(135deg, var(--accent), #c19654);
             color: var(--white);
-            padding: 24px;
+            padding: 32px;
             display: flex;
             justify-content: between;
             align-items: center;
@@ -458,22 +581,22 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
         }
 
         .close-cart {
-            background: rgba(255,255,255,0.2);
+            background: rgba(255, 255, 255, 0.2);
             color: var(--white);
             border: none;
             font-size: 20px;
             cursor: pointer;
-            width: 36px;
-            height: 36px;
+            width: 40px;
+            height: 40px;
             display: flex;
             align-items: center;
             justify-content: center;
             border-radius: 50%;
-            transition: all 0.2s ease;
+            transition: all 0.3s ease;
         }
 
         .close-cart:hover {
-            background: rgba(255,255,255,0.3);
+            background: rgba(255, 255, 255, 0.3);
             transform: scale(1.05);
         }
 
@@ -485,7 +608,7 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
 
         .cart-empty {
             text-align: center;
-            padding: 60px 24px;
+            padding: 80px 32px;
             color: var(--text-secondary);
         }
 
@@ -502,9 +625,15 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
         .cart-item {
             display: flex;
             align-items: center;
-            padding: 20px 24px;
+            padding: 24px 32px;
             border-bottom: 1px solid var(--border);
-            gap: 16px;
+            gap: 20px;
+            background: var(--white);
+            transition: background 0.2s ease;
+        }
+
+        .cart-item:hover {
+            background: var(--secondary);
         }
 
         .cart-item:last-child {
@@ -512,24 +641,26 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
         }
 
         .cart-item-image {
-            width: 60px;
-            height: 60px;
-            border-radius: 8px;
+            width: 70px;
+            height: 70px;
+            border-radius: 12px;
             object-fit: cover;
             flex-shrink: 0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
 
         .cart-item-placeholder {
-            width: 60px;
-            height: 60px;
-            border-radius: 8px;
+            width: 70px;
+            height: 70px;
+            border-radius: 12px;
             background: var(--secondary);
             display: flex;
             align-items: center;
             justify-content: center;
             color: var(--text-light);
-            font-size: 18px;
+            font-size: 20px;
             flex-shrink: 0;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .cart-item-details {
@@ -568,11 +699,11 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
         }
 
         .quantity-btn-small {
-            width: 28px;
-            height: 28px;
+            width: 32px;
+            height: 32px;
             border: 1px solid var(--border);
             background: var(--white);
-            border-radius: 6px;
+            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -580,12 +711,14 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
             transition: all 0.2s ease;
             font-size: 12px;
             color: var(--text-secondary);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
         }
 
         .quantity-btn-small:hover {
             border-color: var(--accent);
             background: var(--accent);
             color: var(--white);
+            transform: scale(1.05);
         }
 
         .quantity-display-small {
@@ -598,8 +731,8 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
         .remove-item {
             color: var(--danger);
             cursor: pointer;
-            padding: 4px;
-            border-radius: 4px;
+            padding: 8px;
+            border-radius: 6px;
             transition: all 0.2s ease;
         }
 
@@ -609,7 +742,7 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
 
         .cart-footer {
             border-top: 1px solid var(--border);
-            padding: 24px;
+            padding: 32px;
             background: var(--secondary);
         }
 
@@ -617,8 +750,8 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
-            font-size: 18px;
+            margin-bottom: 24px;
+            font-size: 20px;
             font-weight: 700;
         }
 
@@ -635,18 +768,19 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
             background: linear-gradient(135deg, var(--accent), #c19654);
             color: var(--white);
             border: none;
-            padding: 16px;
-            border-radius: 12px;
+            padding: 18px;
+            border-radius: 16px;
             font-size: 16px;
             font-weight: 700;
             cursor: pointer;
             transition: all 0.3s ease;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 20px rgba(212, 165, 116, 0.3);
         }
 
         .checkout-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(212, 165, 116, 0.4);
+            box-shadow: 0 12px 40px rgba(212, 165, 116, 0.4);
         }
 
         .continue-shopping {
@@ -654,8 +788,8 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
             background: transparent;
             color: var(--text-secondary);
             border: 1px solid var(--border);
-            padding: 12px;
-            border-radius: 8px;
+            padding: 14px;
+            border-radius: 12px;
             font-size: 14px;
             cursor: pointer;
             transition: all 0.2s ease;
@@ -667,99 +801,7 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
             border-color: var(--primary);
         }
 
-        /* Promo Modal Clean */
-        .promo-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(26, 26, 26, 0.8);
-            backdrop-filter: blur(10px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
-            animation: fadeIn 0.3s ease;
-        }
-
-        .promo-content {
-            background: var(--white);
-            padding: 48px;
-            border-radius: 12px;
-            text-align: center;
-            max-width: 420px;
-            width: 90%;
-            position: relative;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
-        }
-
-        .close-promo {
-            position: absolute;
-            top: 16px;
-            right: 20px;
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            color: var(--text-light);
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-            transition: all 0.2s ease;
-        }
-
-        .close-promo:hover {
-            background: var(--secondary);
-            color: var(--primary);
-        }
-
-        .promo-logo {
-            width: 64px;
-            height: 64px;
-            background: var(--accent);
-            border-radius: 50%;
-            margin: 0 auto 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            color: var(--white);
-        }
-
-        .promo-title {
-            font-size: 18px;
-            font-weight: 600;
-            color: var(--primary);
-            margin-bottom: 8px;
-        }
-
-        .promo-discount {
-            font-size: 32px;
-            font-weight: 700;
-            color: var(--accent);
-            margin-bottom: 16px;
-        }
-
-        .promo-description {
-            color: var(--text-secondary);
-            margin-bottom: 24px;
-            line-height: 1.6;
-        }
-
-        .promo-conditions {
-            background: var(--secondary);
-            padding: 16px;
-            border-radius: 6px;
-            font-size: 12px;
-            color: var(--text-light);
-            text-align: left;
-        }
-
-        /* Order Modal Compact et Professionnel */
+        /* Order Modal avec effet papier */
         .order-modal {
             position: fixed;
             top: 0;
@@ -767,7 +809,7 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
             width: 100%;
             height: 100%;
             background: rgba(26, 26, 26, 0.85);
-            backdrop-filter: blur(12px);
+            backdrop-filter: blur(15px);
             display: none;
             align-items: center;
             justify-content: center;
@@ -776,12 +818,14 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
         }
 
         .order-content {
-            background: var(--white);
-            border-radius: 16px;
+            background: var(--paper);
+            border-radius: 24px;
             max-width: 400px;
             width: 90%;
             position: relative;
-            box-shadow: 0 25px 80px rgba(0,0,0,0.2);
+            box-shadow: 
+                0 40px 120px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.9);
             overflow: hidden;
             animation: slideUp 0.3s ease;
             max-height: 85vh;
@@ -796,7 +840,7 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
 
         .order-modal-header {
             position: relative;
-            height: 120px;
+            height: 140px;
             background: linear-gradient(135deg, var(--accent), #c19654);
             display: flex;
             align-items: center;
@@ -812,45 +856,47 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0,0,0,0.1);
+            background: rgba(0, 0, 0, 0.1);
         }
 
         .order-item-image {
-            width: 80px;
-            height: 80px;
-            border-radius: 12px;
+            width: 90px;
+            height: 90px;
+            border-radius: 16px;
             object-fit: cover;
-            border: 3px solid rgba(255,255,255,0.3);
+            border: 4px solid rgba(255, 255, 255, 0.3);
             position: relative;
             z-index: 2;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
         }
 
         .order-item-placeholder {
-            width: 80px;
-            height: 80px;
-            border-radius: 12px;
-            background: rgba(255,255,255,0.2);
+            width: 90px;
+            height: 90px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.2);
             display: flex;
             align-items: center;
             justify-content: center;
             color: var(--white);
-            font-size: 30px;
-            border: 3px solid rgba(255,255,255,0.3);
+            font-size: 32px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
             position: relative;
             z-index: 2;
+            box-shadow: inset 0 4px 8px rgba(0, 0, 0, 0.1);
         }
 
         .close-modal {
             position: absolute;
-            top: 12px;
-            right: 12px;
-            background: rgba(255,255,255,0.2);
+            top: 16px;
+            right: 16px;
+            background: rgba(255, 255, 255, 0.2);
             color: var(--white);
             border: none;
             font-size: 18px;
             cursor: pointer;
-            width: 32px;
-            height: 32px;
+            width: 36px;
+            height: 36px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -860,73 +906,77 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
         }
 
         .close-modal:hover {
-            background: rgba(255,255,255,0.3);
+            background: rgba(255, 255, 255, 0.3);
             transform: scale(1.05);
         }
 
         .order-body {
-            padding: 24px;
+            padding: 32px;
             flex: 1;
             overflow-y: auto;
         }
 
         .order-header {
             text-align: center;
-            margin-bottom: 24px;
+            margin-bottom: 32px;
         }
 
         .order-title {
             font-family: 'Playfair Display', serif;
-            font-size: 20px;
+            font-size: 22px;
             font-weight: 600;
             color: var(--primary);
-            margin-bottom: 6px;
+            margin-bottom: 8px;
         }
 
         .order-item-name {
-            font-size: 16px;
+            font-size: 18px;
             font-weight: 600;
             color: var(--text-primary);
-            margin-bottom: 2px;
+            margin-bottom: 4px;
         }
 
         .order-item-price {
-            font-size: 18px;
+            font-size: 20px;
             font-weight: 700;
             color: var(--accent);
         }
 
-        /* Special Instructions Compact */
+        /* Special Instructions avec effet papier */
         .special-instructions {
-            margin-bottom: 20px;
+            margin-bottom: 24px;
         }
 
         .special-instructions-label {
             display: block;
-            margin-bottom: 8px;
-            font-size: 13px;
+            margin-bottom: 12px;
+            font-size: 14px;
             font-weight: 600;
             color: var(--primary);
         }
 
         .special-instructions-input {
             width: 100%;
-            padding: 12px;
+            padding: 16px;
             border: 2px solid var(--border);
-            border-radius: 10px;
-            font-size: 13px;
+            border-radius: 12px;
+            font-size: 14px;
             font-family: inherit;
-            transition: all 0.2s ease;
-            background: var(--secondary);
+            transition: all 0.3s ease;
+            background: var(--white);
             resize: vertical;
-            min-height: 60px;
+            min-height: 80px;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
         }
 
         .special-instructions-input:focus {
             outline: none;
             border-color: var(--accent);
             background: var(--white);
-            box-shadow: 0 0 0 4px rgba(212, 165, 116, 0.1);
+            box-shadow: 
+                0 0 0 4px rgba(212, 165, 116, 0.1),
+                inset 0 2px 4px rgba(0, 0, 0, 0.05);
+            transform: scale(1.02);
         }
 
         .special-instructions-input::placeholder {
@@ -934,15 +984,15 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
             font-style: italic;
         }
 
-        /* Quantity Section Compact */
+        /* Quantity Section avec effet papier */
         .quantity-section {
-            margin-bottom: 24px;
+            margin-bottom: 32px;
         }
 
         .quantity-label {
             display: block;
-            margin-bottom: 12px;
-            font-size: 14px;
+            margin-bottom: 16px;
+            font-size: 16px;
             font-weight: 600;
             color: var(--primary);
         }
@@ -951,24 +1001,25 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 16px;
-            margin-bottom: 12px;
+            gap: 20px;
+            margin-bottom: 16px;
         }
 
         .quantity-btn {
-            width: 40px;
-            height: 40px;
+            width: 48px;
+            height: 48px;
             border: 2px solid var(--border);
             background: var(--white);
-            border-radius: 10px;
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: all 0.2s ease;
-            font-size: 16px;
+            transition: all 0.3s ease;
+            font-size: 18px;
             font-weight: bold;
             color: var(--text-secondary);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
         }
 
         .quantity-btn:hover {
@@ -976,6 +1027,7 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
             background: var(--accent);
             color: var(--white);
             transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(212, 165, 116, 0.3);
         }
 
         .quantity-btn:active {
@@ -983,72 +1035,75 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
         }
 
         .quantity-display {
-            font-size: 20px;
+            font-size: 24px;
             font-weight: 700;
             color: var(--primary);
-            min-width: 50px;
+            min-width: 60px;
             text-align: center;
             background: var(--secondary);
-            padding: 10px 14px;
-            border-radius: 10px;
+            padding: 12px 20px;
+            border-radius: 12px;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
-        /* Order Summary Compact */
+        /* Order Summary avec effet papier */
         .order-summary {
             background: var(--secondary);
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 20px;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
         }
 
         .order-summary-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 8px;
+            margin-bottom: 12px;
         }
 
         .order-summary-row:last-child {
             margin-bottom: 0;
-            padding-top: 8px;
+            padding-top: 12px;
             border-top: 2px solid var(--border);
             font-weight: 700;
         }
 
         .order-summary-label {
             color: var(--text-secondary);
-            font-size: 13px;
+            font-size: 14px;
         }
 
         .order-summary-value {
             color: var(--primary);
             font-weight: 600;
-            font-size: 13px;
+            font-size: 14px;
         }
 
         .order-summary-total {
-            font-size: 16px;
+            font-size: 18px;
             color: var(--accent);
         }
 
-        /* Action Button Compact */
+        /* Action Button avec effet papier */
         .add-to-cart-btn {
             width: 100%;
             background: linear-gradient(135deg, var(--accent), #c19654);
             color: var(--white);
             border: none;
-            padding: 14px;
-            border-radius: 12px;
-            font-size: 15px;
+            padding: 18px;
+            border-radius: 16px;
+            font-size: 16px;
             font-weight: 700;
             cursor: pointer;
             transition: all 0.3s ease;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 10px;
+            gap: 12px;
             position: relative;
             overflow: hidden;
+            box-shadow: 0 6px 24px rgba(212, 165, 116, 0.3);
         }
 
         .add-to-cart-btn::before {
@@ -1058,7 +1113,7 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
             left: -100%;
             width: 100%;
             height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
             transition: left 0.5s ease;
         }
 
@@ -1068,74 +1123,91 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
 
         .add-to-cart-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(212, 165, 116, 0.4);
+            box-shadow: 0 12px 40px rgba(212, 165, 116, 0.4);
         }
 
         .add-to-cart-btn:active {
             transform: translateY(0);
         }
 
-        /* Empty State */
+        /* Empty State avec effet papier */
         .empty-state {
             text-align: center;
-            padding: 80px 20px;
+            padding: 120px 32px;
+            background: var(--white);
+            border-radius: 20px;
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.08),
+                inset 0 1px 0 rgba(255, 255, 255, 0.9);
         }
 
         .empty-state i {
-            font-size: 48px;
+            font-size: 64px;
             color: var(--text-light);
-            margin-bottom: 24px;
+            margin-bottom: 32px;
+            opacity: 0.6;
         }
 
         .empty-state h3 {
-            font-size: 20px;
+            font-size: 24px;
             color: var(--primary);
-            margin-bottom: 8px;
+            margin-bottom: 12px;
             font-weight: 500;
         }
 
         .empty-state p {
             color: var(--text-secondary);
-            font-size: 14px;
+            font-size: 16px;
         }
 
-        /* Hero Clean */
+        /* Hero avec effet papier */
         .hero {
             text-align: center;
-            padding: 120px 24px;
-            background: var(--white);
+            padding: 160px 32px;
+            background: var(--paper);
             display: none;
+            margin: 48px auto;
+            max-width: 800px;
+            border-radius: 24px;
+            box-shadow: 
+                0 20px 80px rgba(0, 0, 0, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.9);
         }
 
         .hero h1 {
             font-family: 'Playfair Display', serif;
-            font-size: 48px;
+            font-size: 54px;
             font-weight: 500;
             color: var(--primary);
-            margin-bottom: 16px;
+            margin-bottom: 24px;
+            letter-spacing: -1px;
         }
 
         .hero p {
-            font-size: 18px;
+            font-size: 20px;
             color: var(--text-secondary);
             max-width: 500px;
             margin: 0 auto;
         }
 
-        /* Footer */
+        /* Footer avec effet papier */
         .footer-info {
             text-align: center;
-            padding: 24px;
-            margin-top: 64px;
-            border-top: 1px solid var(--border);
-            font-size: 13px;
+            padding: 32px;
+            margin-top: 80px;
+            background: var(--paper);
+            border-radius: 20px;
+            font-size: 14px;
             color: var(--text-light);
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.06),
+                inset 0 1px 0 rgba(255, 255, 255, 0.9);
         }
 
         /* Animation pour l'ajout rapide */
         @keyframes quickAddSuccess {
             0% { transform: scale(1); }
-            50% { transform: scale(1.2); background: var(--success); }
+            50% { transform: scale(1.2); background: linear-gradient(135deg, var(--success), #16a34a); }
             100% { transform: scale(1); }
         }
 
@@ -1143,7 +1215,38 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
             animation: quickAddSuccess 0.6s ease;
         }
 
-        /* Responsive */
+        /* Toast avec effet papier */
+        .toast {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            background: var(--paper);
+            color: var(--text-primary);
+            padding: 20px 24px;
+            border-radius: 16px;
+            z-index: 3000;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 600;
+            box-shadow: 
+                0 20px 60px rgba(0, 0, 0, 0.15),
+                inset 0 1px 0 rgba(255, 255, 255, 0.9);
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+            border: 1px solid var(--success);
+        }
+
+        .toast .fa-check-circle {
+            color: var(--success);
+            font-size: 18px;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        /* Responsive avec effets papier préservés */
         @media (max-width: 768px) {
             .container {
                 padding: 32px 16px;
@@ -1157,27 +1260,45 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
                 font-size: 24px;
             }
             
-            .menu-item {
-                padding: 20px;
-            }
-            
-            .menu-item-image,
-            .menu-item-placeholder {
-                width: 64px;
-                height: 64px;
-                margin-right: 16px;
-            }
-            
             .category-nav {
+                padding: 20px;
                 margin-bottom: 48px;
             }
             
             .category-section {
-                margin-bottom: 48px;
+                padding: 32px 24px;
+                margin-bottom: 60px;
             }
             
-            .promo-content {
-                padding: 32px 24px;
+            .category-title {
+                font-size: 24px;
+                margin-bottom: 32px;
+            }
+            
+            .menu-item {
+                padding: 24px 20px;
+            }
+            
+            .menu-item-image,
+            .menu-item-placeholder {
+                width: 70px;
+                height: 70px;
+                margin-right: 16px;
+            }
+            
+            .menu-item-name {
+                font-size: 16px;
+            }
+            
+            .menu-item-price {
+                font-size: 16px;
+            }
+            
+            .quick-add-btn {
+                width: 36px;
+                height: 36px;
+                top: 16px;
+                right: 16px;
             }
 
             .order-content {
@@ -1187,11 +1308,11 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
             }
 
             .order-body {
-                padding: 20px;
+                padding: 24px;
             }
 
             .order-modal-header {
-                height: 100px;
+                height: 120px;
             }
 
             .order-item-image,
@@ -1201,16 +1322,38 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
             }
             
             .hero {
-                padding: 80px 16px;
+                padding: 100px 24px;
+                margin: 32px 16px;
             }
             
             .hero h1 {
-                font-size: 36px;
+                font-size: 40px;
+            }
+
+            .hero p {
+                font-size: 18px;
             }
 
             .cart-content {
                 width: 95%;
                 max-width: none;
+            }
+
+            .cart-header,
+            .cart-footer {
+                padding: 24px;
+            }
+
+            .empty-state {
+                padding: 80px 24px;
+            }
+
+            .empty-state i {
+                font-size: 48px;
+            }
+
+            .empty-state h3 {
+                font-size: 20px;
             }
         }
 
@@ -1221,29 +1364,6 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
 
         .hidden {
             display: none !important;
-        }
-
-        /* Notification toast */
-        .toast {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: var(--success);
-            color: var(--white);
-            padding: 16px 20px;
-            border-radius: 8px;
-            z-index: 3000;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-weight: 600;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-            transform: translateX(400px);
-            transition: transform 0.3s ease;
-        }
-
-        .toast.show {
-            transform: translateX(0);
         }
         
     </style>
@@ -1297,24 +1417,6 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
                 <button class="continue-shopping" onclick="closeCartModal()">
                     Continuer mes achats
                 </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Promo Modal -->
-    <div class="promo-modal" id="promoModal">
-        <div class="promo-content">
-            <button class="close-promo" onclick="closePromo()">&times;</button>
-            <div class="promo-logo">
-                <i class="fas fa-percent"></i>
-            </div>
-            <div class="promo-title">www.teralgrill.com</div>
-            <div class="promo-discount">5% de remise</div>
-            <div class="promo-description">
-                Offre valable sur commande supérieure à 20 000 FCFA
-            </div>
-            <div class="promo-conditions">
-                <i class="fas fa-info-circle"></i> Promo appliquée automatiquement
             </div>
         </div>
     </div>
@@ -1441,7 +1543,7 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
         </div>
     </div>
 
-    <!-- Enhanced Order Modal Compact -->
+    <!-- Enhanced Order Modal -->
     <div class="order-modal" id="orderModal">
         <div class="order-content">
             <div class="order-modal-header">
@@ -1465,7 +1567,7 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
                         id="specialInstructions" 
                         class="special-instructions-input" 
                         placeholder="Pas de poivre, moins de sel..."
-                        rows="2"></textarea>
+                        rows="3"></textarea>
                 </div>
 
                 <!-- Quantity Section -->
@@ -1512,351 +1614,11 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
         <h1>Bienvenue chez TERAL</h1>
         <p>Découvrez nos spécialités culinaires authentiques</p>
     </div>
+    
     <form id="checkoutForm" action="commander.php" method="POST" style="display: none;">
         <input type="hidden" name="cart_data" id="cartDataInput">
     </form>
 
-    <script>
-        // Variables globales
-        let selectedItem = {};
-        let currentQuantity = 1;
-        let cartItems = [];
-
-        // Afficher le menu directement au chargement
-        document.addEventListener('DOMContentLoaded', function() {
-            showMenu();
-            updateCartDisplay();
-        });
-
-        // Gestion du panier
-        function openCartModal() {
-            document.getElementById('cartModal').style.display = 'flex';
-            renderCartItems();
-        }
-
-        function closeCartModal() {
-            document.getElementById('cartModal').style.display = 'none';
-        }
-
-        function renderCartItems() {
-            const cartItemsContainer = document.getElementById('cartItems');
-            const cartEmpty = document.getElementById('cartEmpty');
-            const cartFooter = document.getElementById('cartFooter');
-
-            if (cartItems.length === 0) {
-                cartEmpty.style.display = 'block';
-                cartItemsContainer.style.display = 'none';
-                cartFooter.style.display = 'none';
-                return;
-            }
-
-            cartEmpty.style.display = 'none';
-            cartItemsContainer.style.display = 'block';
-            cartFooter.style.display = 'block';
-
-            let cartHTML = '';
-            let totalAmount = 0;
-
-            cartItems.forEach((item, index) => {
-                totalAmount += item.total;
-                
-                cartHTML += `
-                    <div class="cart-item">
-                        ${item.image && item.image.trim() !== '' ? 
-                            `<img src="uploads/${item.image}" alt="${item.item}" class="cart-item-image">` :
-                            `<div class="cart-item-placeholder"><i class="fas fa-utensils"></i></div>`
-                        }
-                        <div class="cart-item-details">
-                            <div class="cart-item-name">${item.item}</div>
-                            ${item.specialInstructions ? 
-                                `<div class="cart-item-instructions">${item.specialInstructions}</div>` : 
-                                ''
-                            }
-                            <div class="cart-item-price">${item.total.toLocaleString()} F</div>
-                        </div>
-                        <div class="cart-item-actions">
-                            <div class="quantity-controls">
-                                <button class="quantity-btn-small" onclick="updateCartItemQuantity(${index}, -1)">
-                                    <i class="fas fa-minus"></i>
-                                </button>
-                                <span class="quantity-display-small">${item.quantity}</span>
-                                <button class="quantity-btn-small" onclick="updateCartItemQuantity(${index}, 1)">
-                                    <i class="fas fa-plus"></i>
-                                </button>
-                            </div>
-                            <i class="fas fa-trash remove-item" onclick="removeCartItem(${index})"></i>
-                        </div>
-                    </div>
-                `;
-            });
-
-            cartItemsContainer.innerHTML = cartHTML;
-            document.getElementById('cartTotalAmount').textContent = totalAmount.toLocaleString() + ' F';
-        }
-
-        function updateCartItemQuantity(index, change) {
-            if (cartItems[index]) {
-                const newQuantity = cartItems[index].quantity + change;
-                if (newQuantity > 0) {
-                    cartItems[index].quantity = newQuantity;
-                    cartItems[index].total = cartItems[index].price * newQuantity;
-                    renderCartItems();
-                    updateCartDisplay();
-                } else {
-                    removeCartItem(index);
-                }
-            }
-        }
-
-        function removeCartItem(index) {
-            cartItems.splice(index, 1);
-            renderCartItems();
-            updateCartDisplay();
-            showToast('Article supprimé du panier');
-        }
-
-        function updateCartDisplay() {
-            const cartBadge = document.getElementById('cartBadge');
-            const totalItems = cartItems.reduce((total, item) => total + item.quantity, 0);
-            
-            cartBadge.textContent = totalItems;
-            if (totalItems > 0) {
-                cartBadge.classList.add('show');
-            } else {
-                cartBadge.classList.remove('show');
-            }
-        }
-function proceedToCheckout() {
-    if (cartItems.length === 0) {
-        showToast('Votre panier est vide');
-        return;
-    }
-    
-    // Envoyer les données au serveur via AJAX
-    fetch('menu.php', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: 'action=update_cart&cart_data=' + encodeURIComponent(JSON.stringify(cartItems))
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            window.location.href = 'commander.php';
-        }
-    })
-    .catch(error => {
-        console.error('Erreur:', error);
-        // Fallback : utiliser localStorage quand même
-        localStorage.setItem('cartItems', JSON.stringify(cartItems));
-        window.location.href = 'commander.php';
-    });
-}
-
-// Alternative : fonction de redirection directe (à tester si la première ne marche pas)
-function redirectToCommander() {
-    console.log('Redirection directe vers commander.php');
-    window.location.replace('commander.php');
-}
-        // Fermer la modal promo
-        function closePromo() {
-            document.getElementById('promoModal').style.display = 'none';
-        }
-
-        // Afficher le menu
-        function showMenu() {
-            document.getElementById('heroSection').style.display = 'none';
-            document.getElementById('menuContainer').style.display = 'block';
-        }
-
-        // Afficher la modal de commande (renommé pour éviter les conflits)
-        function showOrderModal() {
-            document.getElementById('orderModal').style.display = 'flex';
-        }
-
-        // Ouvrir la modal avec les détails de l'item
-        function openOrderModal(name, price, image, description) {
-            selectedItem = { 
-                name: name, 
-                price: price, 
-                image: image, 
-                description: description 
-            };
-            
-            // Update modal content
-            document.getElementById('orderItemName').textContent = name;
-            document.getElementById('orderItemPrice').textContent = price.toLocaleString() + ' FCFA';
-            document.getElementById('unitPrice').textContent = price.toLocaleString() + ' F';
-            
-            // Update image
-            const imageContainer = document.getElementById('orderItemImageContainer');
-            if (image && image.trim() !== '') {
-                imageContainer.innerHTML = `<img src="uploads/${image}" alt="${name}" class="order-item-image">`;
-            } else {
-                imageContainer.innerHTML = `<div class="order-item-placeholder"><i class="fas fa-utensils"></i></div>`;
-            }
-            
-            // Reset and update totals
-            currentQuantity = 1;
-            document.getElementById('quantityDisplay').textContent = '1';
-            document.getElementById('specialInstructions').value = '';
-            updateOrderSummary();
-            showOrderModal();
-        }
-
-        // Fermer la modal de commande
-        function closeOrderModal() {
-            document.getElementById('orderModal').style.display = 'none';
-        }
-
-        // Ajout rapide au panier (nouveau)
-        function quickAddToCart(name, price, image, description) {
-            const orderData = {
-                item: name,
-                price: price,
-                quantity: 1,
-                total: price,
-                specialInstructions: '',
-                image: image,
-                id: Date.now() // ID unique pour chaque item
-            };
-
-            // Ajouter au panier
-            cartItems.push(orderData);
-            updateCartDisplay();
-            
-            // Trouver le bouton qui a été cliqué
-            const clickedButton = event.target.closest('.quick-add-btn');
-            
-            // Animation du bouton
-            clickedButton.classList.add('quick-add-success');
-            clickedButton.innerHTML = '<i class="fas fa-check"></i>';
-            
-            // Afficher une notification
-            showToast(`${name} ajouté au panier !`);
-            
-            // Reset du bouton après 1 seconde
-            setTimeout(() => {
-                clickedButton.classList.remove('quick-add-success');
-                clickedButton.innerHTML = '<i class="fas fa-plus"></i>';
-            }, 1000);
-
-            console.log('Panier mis à jour:', cartItems);
-        }
-
-        // Changer la quantité
-        function changeQuantity(change) {
-            const newQuantity = currentQuantity + change;
-            if (newQuantity >= 1) {
-                currentQuantity = newQuantity;
-                document.getElementById('quantityDisplay').textContent = currentQuantity;
-                updateOrderSummary();
-            }
-        }
-
-        // Mettre à jour le résumé de commande
-        function updateOrderSummary() {
-            const total = selectedItem.price * currentQuantity;
-            document.getElementById('summaryQuantity').textContent = currentQuantity;
-            document.getElementById('totalPrice').textContent = total.toLocaleString() + ' F';
-            document.getElementById('addToCartText').textContent = 
-                `${total.toLocaleString()} F • Ajouter`;
-        }
-
-        // Ajouter au panier depuis la modal
-        function addToCart() {
-            const specialInstructions = document.getElementById('specialInstructions').value;
-            
-            const orderData = {
-                item: selectedItem.name,
-                price: selectedItem.price,
-                quantity: currentQuantity,
-                total: selectedItem.price * currentQuantity,
-                specialInstructions: specialInstructions,
-                image: selectedItem.image,
-                id: Date.now()
-            };
-
-            // Ajouter au panier
-            cartItems.push(orderData);
-            updateCartDisplay();
-
-            // Animation du bouton
-            const btn = document.querySelector('.add-to-cart-btn');
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-check"></i> Ajouté !';
-            btn.style.background = 'linear-gradient(135deg, var(--success), #16a34a)';
-            
-            // Afficher une notification
-            showToast(`${selectedItem.name} ajouté au panier !`);
-            
-            setTimeout(() => {
-                btn.innerHTML = originalText;
-                btn.style.background = 'linear-gradient(135deg, var(--accent), #c19654)';
-                closeOrderModal();
-            }, 1500);
-
-            console.log('Panier mis à jour:', cartItems);
-        }
-
-        // Afficher une notification toast
-        function showToast(message) {
-            // Supprimer les anciens toasts
-            const existingToasts = document.querySelectorAll('.toast');
-            existingToasts.forEach(toast => toast.remove());
-            
-            // Créer le nouveau toast
-            const toast = document.createElement('div');
-            toast.className = 'toast';
-            toast.innerHTML = `
-                <i class="fas fa-check-circle"></i>
-                <span>${message}</span>
-            `;
-            
-            document.body.appendChild(toast);
-            
-            // Animer l'entrée
-            setTimeout(() => {
-                toast.classList.add('show');
-            }, 100);
-            
-            // Supprimer après 3 secondes
-            setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => {
-                    toast.remove();
-                }, 300);
-            }, 3000);
-        }
-
-        // Fermer les modals en cliquant à l'extérieur
-        document.addEventListener('click', function(event) {
-            const promoModal = document.getElementById('promoModal');
-            const orderModal = document.getElementById('orderModal');
-            const cartModal = document.getElementById('cartModal');
-            
-            if (event.target === promoModal) {
-                closePromo();
-            }
-            
-            if (event.target === orderModal) {
-                closeOrderModal();
-            }
-
-            if (event.target === cartModal) {
-                closeCartModal();
-            }
-        });
-
-        // Gestion des touches du clavier
-        document.addEventListener('keydown', function(event) {
-            if (event.key === 'Escape') {
-                closePromo();
-                closeOrderModal();
-                closeCartModal();
-            }
-        });
-    </script>
+    <script src="menu.js"></script>
 </body>
 </html>

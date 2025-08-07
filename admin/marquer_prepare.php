@@ -5,7 +5,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id_detail'])) {
     $id_detail = $_POST['id_detail'];
 
     // Récupérer le nom du plat
-    $stmt = $conn->prepare("SELECT nom_plat FROM details_commandes WHERE id = ?");
+    $stmt = $conn->prepare("SELECT nom_plat FROM commande_details WHERE id = ?");
     $stmt->execute([$id_detail]);
     $plat = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id_detail'])) {
     }
 
     // Marquer le plat comme préparé
-    $stmt = $conn->prepare("UPDATE details_commandes SET prepare = 1 WHERE id = ?");
+    $stmt = $conn->prepare("UPDATE commande_details SET prepare = 1 WHERE id = ?");
     $stmt->execute([$id_detail]);
 }
 

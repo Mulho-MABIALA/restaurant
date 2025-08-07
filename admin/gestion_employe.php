@@ -1,127 +1,227 @@
 <?php
+// Afficher les erreurs PHP
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+// Pour voir les données POST reçues
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    error_log("POST data: " . print_r($_POST, true));
+}
+
 session_start();
 require_once '../config.php';
-
-// Vérifier si l'utilisateur est connecté et a les droits admin
-// if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
-   //  header('Location: login.php');
-    // exit();
-// }
 
 // Traitement des actions AJAX
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     header('Content-Type: application/json');
-    
+
     switch ($_POST['action']) {
         case 'add_employee':
             try {
-              $stmt = $conn->prepare("INSERT INTO employes (nom, prenom, poste, telephone, email, date_embauche, salaire_horaire, statut, photo) VALUES (?, ?, ?, ?, ?, ?, ?, 'actif', ?)");
+                $required_fields = ['nom', 'prenom', 'poste', 'telephone', 'email', 'date_embauche', 'salaire'];
+                foreach ($required_fields as $field) {
+                    if (!isset($_POST[$field]) || empty(trim($_POST[$field]))) {
+                        throw new Exception("Le champ '$field' est requis");
+                    }
+                }
+
+                $stmt = $conn->prepare("SELECT COUNT(*) FROM employes WHERE email = ?");
+                $stmt->execute([$_POST['email']]);
+                if ($stmt->fetchColumn() > 0) {
+                    throw new Exception("Un employé avec cet email existe déjà");
+                }
+
                 $photo_url = "https://i.pravatar.cc/150?u=" . urlencode($_POST['nom'] . $_POST['prenom']);
-                $stmt->execute([
-                    $_POST['nom'],
-                    $_POST['prenom'],
+
+                $stmt = $conn->prepare("INSERT INTO employes (nom, prenom, poste, telephone, email, date_embauche, salaire_horaire, statut, photo) VALUES (?, ?, ?, ?, ?, ?, ?, 'actif', ?)");
+                $result = $stmt->execute([
+                    trim($_POST['nom']),
+                    trim($_POST['prenom']),
                     $_POST['poste'],
                     $_POST['telephone'],
                     $_POST['email'],
                     $_POST['date_embauche'],
-                    $_POST['salaire'],
+                    floatval($_POST['salaire']),
                     $photo_url
                 ]);
-                echo json_encode(['success' => true, 'message' => 'Employé ajouté avec succès']);
-            } catch(PDOException $e) {
-                echo json_encode(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()]);
+
+                echo json_encode([
+                    'success' => $result,
+                    'message' => $result ? 'Employé ajouté avec succès' : 'Erreur lors de l\'insertion'
+                ]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
             }
             exit();
-            
+
         case 'update_employee':
             try {
+                if (!isset($_POST['id']) || empty($_POST['id'])) {
+                    throw new Exception("ID employé manquant");
+                }
+
+                $required_fields = ['nom', 'prenom', 'poste', 'telephone', 'email', 'salaire', 'statut'];
+                foreach ($required_fields as $field) {
+                    if (!isset($_POST[$field]) || empty(trim($_POST[$field]))) {
+                        throw new Exception("Le champ '$field' est requis");
+                    }
+                }
+
+                $stmt = $conn->prepare("SELECT COUNT(*) FROM employes WHERE email = ? AND id != ?");
+                $stmt->execute([$_POST['email'], $_POST['id']]);
+                if ($stmt->fetchColumn() > 0) {
+                    throw new Exception("Un autre employé avec cet email existe déjà");
+                }
+
                 $stmt = $conn->prepare("UPDATE employes SET nom=?, prenom=?, poste=?, telephone=?, email=?, salaire_horaire=?, statut=? WHERE id=?");
-                $stmt->execute([
-                    $_POST['nom'],
-                    $_POST['prenom'],
+                $result = $stmt->execute([
+                    trim($_POST['nom']),
+                    trim($_POST['prenom']),
                     $_POST['poste'],
                     $_POST['telephone'],
                     $_POST['email'],
-                    $_POST['salaire'],
+                    floatval($_POST['salaire']),
                     $_POST['statut'],
                     $_POST['id']
                 ]);
-                echo json_encode(['success' => true, 'message' => 'Employé modifié avec succès']);
-            } catch(PDOException $e) {
-                echo json_encode(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()]);
+
+                echo json_encode([
+                    'success' => $result,
+                    'message' => $result ? 'Employé modifié avec succès' : 'Erreur lors de la mise à jour'
+                ]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
             }
             exit();
-            
+
         case 'delete_employee':
             try {
+                if (!isset($_POST['id']) || empty($_POST['id'])) {
+                    throw new Exception("ID employé manquant");
+                }
+
                 $stmt = $conn->prepare("UPDATE employes SET statut='inactif' WHERE id=?");
-                $stmt->execute([$_POST['id']]);
-                echo json_encode(['success' => true, 'message' => 'Employé désactivé avec succès']);
-            } catch(PDOException $e) {
-                echo json_encode(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()]);
+                $result = $stmt->execute([$_POST['id']]);
+
+                echo json_encode([
+                    'success' => $result,
+                    'message' => $result ? 'Employé désactivé avec succès' : 'Erreur lors de la désactivation'
+                ]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
             }
             exit();
-            
+
         case 'get_employee':
             try {
+                if (!isset($_POST['id']) || empty($_POST['id'])) {
+                    throw new Exception("ID employé manquant");
+                }
+
                 $stmt = $conn->prepare("SELECT * FROM employes WHERE id=?");
                 $stmt->execute([$_POST['id']]);
                 $employee = $stmt->fetch(PDO::FETCH_ASSOC);
-                echo json_encode(['success' => true, 'employee' => $employee]);
-            } catch(PDOException $e) {
-                echo json_encode(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()]);
+
+                if ($employee) {
+                    echo json_encode(['success' => true, 'employee' => $employee]);
+                } else {
+                    echo json_encode(['success' => false, 'message' => 'Employé non trouvé']);
+                }
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
             }
             exit();
-            
+
         case 'save_schedule':
             try {
-                // Supprimer les anciens horaires pour cet employé et cette semaine
+                if (!isset($_POST['employee_id'], $_POST['semaine']) || empty($_POST['employee_id']) || empty($_POST['semaine'])) {
+                    throw new Exception("Données manquantes pour la planification");
+                }
+
                 $stmt = $conn->prepare("DELETE FROM horaires WHERE employee_id=? AND semaine=?");
                 $stmt->execute([$_POST['employee_id'], $_POST['semaine']]);
-                
-                // Insérer les nouveaux horaires
+
                 $stmt = $conn->prepare("INSERT INTO horaires (employee_id, semaine, jour, heure_debut, heure_fin) VALUES (?, ?, ?, ?, ?)");
-                foreach ($_POST['horaires'] as $jour => $horaire) {
-                    if (!empty($horaire['debut']) && !empty($horaire['fin'])) {
-                        $stmt->execute([$_POST['employee_id'], $_POST['semaine'], $jour, $horaire['debut'], $horaire['fin']]);
+
+                if (isset($_POST['horaires']) && is_array($_POST['horaires'])) {
+                    foreach ($_POST['horaires'] as $jour => $horaire) {
+                        if (!empty($horaire['debut']) && !empty($horaire['fin'])) {
+                            $stmt->execute([$_POST['employee_id'], $_POST['semaine'], $jour, $horaire['debut'], $horaire['fin']]);
+                        }
                     }
                 }
+
                 echo json_encode(['success' => true, 'message' => 'Horaires sauvegardés avec succès']);
-            } catch(PDOException $e) {
-                echo json_encode(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
             }
+            exit();
+
+        default:
+            echo json_encode(['success' => false, 'message' => 'Action non reconnue']);
             exit();
     }
 }
 
-// Récupération des statistiques
+// ➕ AJOUT DU TRAITEMENT get_stats EN DEHORS DU SWITCH
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'get_stats') {
+    try {
+        $stmt = $conn->query("SELECT COUNT(*) FROM employes WHERE statut != 'inactif'");
+        $total_employees = $stmt->fetchColumn();
+
+        $today = date('N');
+        $current_week = date('Y-W');
+
+        $stmt = $conn->prepare("SELECT COUNT(DISTINCT h.employee_id) FROM horaires h 
+                              JOIN employes e ON h.employee_id = e.id 
+                              WHERE h.semaine = ? AND h.jour = ? AND e.statut = 'actif'");
+        $stmt->execute([$current_week, $today]);
+        $present_today = $stmt->fetchColumn();
+
+        $stmt = $conn->prepare("SELECT COUNT(*) FROM employes WHERE MONTH(date_embauche) = MONTH(CURRENT_DATE) AND YEAR(date_embauche) = YEAR(CURRENT_DATE) AND statut != 'inactif'");
+        $stmt->execute();
+        $new_this_month = $stmt->fetchColumn();
+
+        $attendance_rate = $total_employees > 0 ? round(($present_today / $total_employees) * 100) : 0;
+
+        echo json_encode([
+            'success' => true,
+            'stats' => [
+                'total_employees' => (int)$total_employees,
+                'present_today' => (int)$present_today,
+                'new_this_month' => (int)$new_this_month,
+                'attendance_rate' => (int)$attendance_rate
+            ]
+        ]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => 'Erreur base de données: ' . $e->getMessage()]);
+    }
+    exit();
+}
+
+// Récupération des statistiques générales (GET)
 try {
-    // Total employés
     $stmt = $conn->query("SELECT COUNT(*) FROM employes WHERE statut != 'inactif'");
     $total_employees = $stmt->fetchColumn();
-    
-    // Employés présents aujourd'hui (basé sur les horaires)
-    $today = date('N'); // 1=Lundi, 7=Dimanche
+
+    $today = date('N');
     $current_week = date('Y-W');
     $stmt = $conn->prepare("SELECT COUNT(DISTINCT h.employee_id) FROM horaires h 
-                          JOIN employees e ON h.employee_id = e.id 
+                          JOIN employes e ON h.employee_id = e.id 
                           WHERE h.semaine = ? AND h.jour = ? AND e.statut = 'actif'");
     $stmt->execute([$current_week, $today]);
     $present_today = $stmt->fetchColumn();
-    
-    // Nouveaux employés ce mois
-    $stmt = $conn->prepare("SELECT COUNT(*) FROM employees WHERE MONTH(date_embauche) = MONTH(CURRENT_DATE) AND YEAR(date_embauche) = YEAR(CURRENT_DATE)");
+
+    $stmt = $conn->prepare("SELECT COUNT(*) FROM employes WHERE MONTH(date_embauche) = MONTH(CURRENT_DATE) AND YEAR(date_embauche) = YEAR(CURRENT_DATE)");
     $stmt->execute();
     $new_this_month = $stmt->fetchColumn();
-    
-    // Taux de présence (simulation basée sur les horaires planifiés vs réels)
+
     $attendance_rate = $total_employees > 0 ? round(($present_today / $total_employees) * 100) : 0;
-    
-} catch(PDOException $e) {
+} catch (Exception $e) {
     $total_employees = $present_today = $new_this_month = $attendance_rate = 0;
 }
 
-// Récupération des employés avec filtres
+// Récupération des employés avec filtres (GET)
 $where_clauses = ["e.statut != 'inactif'"];
 $params = [];
 
@@ -137,10 +237,10 @@ if (isset($_GET['statut']) && !empty($_GET['statut'])) {
 
 if (isset($_GET['search']) && !empty($_GET['search'])) {
     $where_clauses[] = "(e.nom LIKE ? OR e.prenom LIKE ? OR e.email LIKE ?)";
-    $search_param = '%' . $_GET['search'] . '%';
-    $params[] = $search_param;
-    $params[] = $search_param;
-    $params[] = $search_param;
+    $search = '%' . $_GET['search'] . '%';
+    $params[] = $search;
+    $params[] = $search;
+    $params[] = $search;
 }
 
 $where_sql = implode(' AND ', $where_clauses);
@@ -158,11 +258,11 @@ try {
                           ORDER BY e.nom, e.prenom");
     $stmt->execute($params);
     $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch(PDOException $e) {
+} catch (Exception $e) {
     $employees = [];
-    $error_message = "Erreur lors de la récupération des employés: " . $e->getMessage();
 }
 ?>
+
 
 <!DOCTYPE html>
 <html lang="fr">
@@ -530,6 +630,35 @@ try {
             pointer-events: none;
         }
 
+        .grid-schedule {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .grid-schedule > div {
+            text-align: center;
+        }
+
+        .grid-schedule .day-header {
+            font-weight: bold;
+            padding: 10px 5px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+
+        .time-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .time-input-group input {
+            font-size: 0.8rem;
+            padding: 5px;
+        }
+
         @media (max-width: 768px) {
             .container {
                 margin: 10px;
@@ -561,6 +690,11 @@ try {
             table {
                 min-width: 800px;
             }
+
+            .grid-schedule {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
         }
     </style>
 </head>
@@ -576,28 +710,29 @@ try {
         <div id="alertContainer"></div>
 
         <!-- Statistiques -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-icon"><i class="fas fa-users"></i></div>
-                <div class="stat-value"><?php echo $total_employees; ?></div>
-                <div class="stat-label">Total Employés</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon"><i class="fas fa-user-check"></i></div>
-                <div class="stat-value"><?php echo $present_today; ?></div>
-                <div class="stat-label">Présents Aujourd'hui</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon"><i class="fas fa-user-plus"></i></div>
-                <div class="stat-value"><?php echo $new_this_month; ?></div>
-                <div class="stat-label">Nouveaux ce Mois</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon"><i class="fas fa-percentage"></i></div>
-                <div class="stat-value"><?php echo $attendance_rate; ?>%</div>
-                <div class="stat-label">Taux de Présence</div>
-            </div>
-        </div>
+       <!-- Statistiques -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon"><i class="fas fa-users"></i></div>
+        <div class="stat-value" id="total-employees"><?php echo $total_employees; ?></div>
+        <div class="stat-label">Total Employés</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon"><i class="fas fa-user-check"></i></div>
+        <div class="stat-value" id="present-today"><?php echo $present_today; ?></div>
+        <div class="stat-label">Présents Aujourd'hui</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon"><i class="fas fa-user-plus"></i></div>
+        <div class="stat-value" id="new-this-month"><?php echo $new_this_month; ?></div>
+        <div class="stat-label">Nouveaux ce Mois</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon"><i class="fas fa-percentage"></i></div>
+        <div class="stat-value" id="attendance-rate"><?php echo $attendance_rate; ?>%</div>
+        <div class="stat-label">Taux de Présence</div>
+    </div>
+</div>
 
         <!-- Barre d'actions -->
         <div class="actions-bar">
@@ -664,7 +799,8 @@ try {
                                         <div class="employee-info">
                                             <img src="<?php echo htmlspecialchars($employee['photo'] ?? 'https://i.pravatar.cc/150?u=' . urlencode($employee['nom'])); ?>" 
                                                  alt="<?php echo htmlspecialchars($employee['nom'] . ' ' . $employee['prenom']); ?>" 
-                                                 class="employee-photo">
+                                                 class="employee-photo"
+                                                 onerror="this.src='https://i.pravatar.cc/150?u=<?php echo urlencode($employee['nom']); ?>'">
                                             <div>
                                                 <div class="employee-name"><?php echo htmlspecialchars($employee['nom'] . ' ' . $employee['prenom']); ?></div>
                                                 <div class="employee-id">ID: <?php echo str_pad($employee['id'], 3, '0', STR_PAD_LEFT); ?></div>
@@ -744,7 +880,7 @@ try {
                     </div>
                     <div class="form-group">
                         <label class="form-label">Salaire (€/heure)</label>
-                        <input type="number" class="form-control" name="salaire" id="employeeSalaire" step="0.50" required>
+                        <input type="number" class="form-control" name="salaire" id="employeeSalaire" step="0.50" min="0" required>
                     </div>
                     <div class="form-group" id="statutGroup" style="display: none;">
                         <label class="form-label">Statut</label>
@@ -785,48 +921,50 @@ try {
                         <select class="form-control" id="employeeSelector" name="employee_id" required>
                             <option value="">Sélectionner un employé</option>
                             <?php foreach ($employees as $emp): ?>
-                                <option value="<?php echo $emp['id']; ?>"><?php echo htmlspecialchars($emp['nom'] . ' ' . $emp['prenom']); ?></option>
+                                <?php if ($emp['statut'] === 'actif'): ?>
+                                    <option value="<?php echo $emp['id']; ?>"><?php echo htmlspecialchars($emp['nom'] . ' ' . $emp['prenom']); ?></option>
+                                <?php endif; ?>
                             <?php endforeach; ?>
                         </select>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Horaires de la semaine</label>
-                        <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; margin-top: 15px;">
-                            <div style="font-weight: bold; text-align: center;">Lun</div>
-                            <div style="font-weight: bold; text-align: center;">Mar</div>
-                            <div style="font-weight: bold; text-align: center;">Mer</div>
-                            <div style="font-weight: bold; text-align: center;">Jeu</div>
-                            <div style="font-weight: bold; text-align: center;">Ven</div>
-                            <div style="font-weight: bold; text-align: center;">Sam</div>
-                            <div style="font-weight: bold; text-align: center;">Dim</div>
+                        <div class="grid-schedule">
+                            <div class="day-header">Lun</div>
+                            <div class="day-header">Mar</div>
+                            <div class="day-header">Mer</div>
+                            <div class="day-header">Jeu</div>
+                            <div class="day-header">Ven</div>
+                            <div class="day-header">Sam</div>
+                            <div class="day-header">Dim</div>
                             
-                            <div>
+                            <div class="time-input-group">
                                 <input type="time" class="form-control" name="horaires[1][debut]" placeholder="Début">
-                                <input type="time" class="form-control" name="horaires[1][fin]" placeholder="Fin" style="margin-top: 5px;">
+                                <input type="time" class="form-control" name="horaires[1][fin]" placeholder="Fin">
                             </div>
-                            <div>
+                            <div class="time-input-group">
                                 <input type="time" class="form-control" name="horaires[2][debut]" placeholder="Début">
-                                <input type="time" class="form-control" name="horaires[2][fin]" placeholder="Fin" style="margin-top: 5px;">
+                                <input type="time" class="form-control" name="horaires[2][fin]" placeholder="Fin">
                             </div>
-                            <div>
+                            <div class="time-input-group">
                                 <input type="time" class="form-control" name="horaires[3][debut]" placeholder="Début">
-                                <input type="time" class="form-control" name="horaires[3][fin]" placeholder="Fin" style="margin-top: 5px;">
+                                <input type="time" class="form-control" name="horaires[3][fin]" placeholder="Fin">
                             </div>
-                            <div>
+                            <div class="time-input-group">
                                 <input type="time" class="form-control" name="horaires[4][debut]" placeholder="Début">
-                                <input type="time" class="form-control" name="horaires[4][fin]" placeholder="Fin" style="margin-top: 5px;">
+                                <input type="time" class="form-control" name="horaires[4][fin]" placeholder="Fin">
                             </div>
-                            <div>
+                            <div class="time-input-group">
                                 <input type="time" class="form-control" name="horaires[5][debut]" placeholder="Début">
-                                <input type="time" class="form-control" name="horaires[5][fin]" placeholder="Fin" style="margin-top: 5px;">
+                                <input type="time" class="form-control" name="horaires[5][fin]" placeholder="Fin">
                             </div>
-                            <div>
+                            <div class="time-input-group">
                                 <input type="time" class="form-control" name="horaires[6][debut]" placeholder="Début">
-                                <input type="time" class="form-control" name="horaires[6][fin]" placeholder="Fin" style="margin-top: 5px;">
+                                <input type="time" class="form-control" name="horaires[6][fin]" placeholder="Fin">
                             </div>
-                            <div>
+                            <div class="time-input-group">
                                 <input type="time" class="form-control" name="horaires[7][debut]" placeholder="Début">
-                                <input type="time" class="form-control" name="horaires[7][fin]" placeholder="Fin" style="margin-top: 5px;">
+                                <input type="time" class="form-control" name="horaires[7][fin]" placeholder="Fin">
                             </div>
                         </div>
                     </div>
@@ -859,6 +997,168 @@ try {
     </div>
 
     <script>
+// Fonction pour actualiser les statistiques
+function updateStats() {
+    const submitData = new FormData();
+    submitData.append('action', 'get_stats');
+
+    fetch(window.location.href, {
+        method: 'POST',
+        body: submitData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Mettre à jour les valeurs des statistiques
+            const stats = data.stats;
+            
+            // Animation des chiffres
+            animateNumber('total-employees', stats.total_employees);
+            animateNumber('present-today', stats.present_today);
+            animateNumber('new-this-month', stats.new_this_month);
+            animateNumber('attendance-rate', stats.attendance_rate, '%');
+        }
+    })
+    .catch(error => {
+        console.error('Erreur lors de la mise à jour des stats:', error);
+    });
+}
+
+// Fonction pour animer les chiffres
+function animateNumber(elementId, targetValue, suffix = '') {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    
+    const currentValue = parseInt(element.textContent) || 0;
+    const increment = targetValue > currentValue ? 1 : -1;
+    const duration = 1000; // 1 seconde
+    const steps = Math.abs(targetValue - currentValue);
+    const stepDuration = steps > 0 ? duration / steps : 0;
+    
+    let current = currentValue;
+    
+    const timer = setInterval(() => {
+        if ((increment > 0 && current >= targetValue) || 
+            (increment < 0 && current <= targetValue)) {
+            element.textContent = targetValue + suffix;
+            clearInterval(timer);
+        } else {
+            current += increment;
+            element.textContent = current + suffix;
+        }
+    }, stepDuration);
+}
+
+// Modifier la fonction de soumission du formulaire employé
+document.getElementById('employeeForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    const action = isEditing ? 'update_employee' : 'add_employee';
+    formData.append('action', action);
+    
+    // Validation côté client
+    const requiredFields = [
+        { name: 'nom', id: 'employeeNom', label: 'Nom' },
+        { name: 'prenom', id: 'employeePrenom', label: 'Prénom' },
+        { name: 'poste', id: 'employeePoste', label: 'Poste' },
+        { name: 'telephone', id: 'employeeTelephone', label: 'Téléphone' },
+        { name: 'email', id: 'employeeEmail', label: 'Email' },
+        { name: 'date_embauche', id: 'employeeDateEmbauche', label: 'Date d\'embauche' },
+        { name: 'salaire', id: 'employeeSalaire', label: 'Salaire' }
+    ];
+    
+    let isValid = true;
+    let errors = [];
+    
+    requiredFields.forEach(field => {
+        const input = document.getElementById(field.id);
+        const value = input.value.trim();
+        
+        if (!value) {
+            isValid = false;
+            input.style.borderColor = '#dc3545';
+            errors.push(field.label + ' est requis');
+        } else {
+            input.style.borderColor = '#e9ecef';
+        }
+    });
+    
+    if (!isValid) {
+        showAlert('Erreurs de validation: ' + errors.join(', '), 'error');
+        return;
+    }
+    
+    // Désactiver le bouton pendant la requête
+    const submitBtn = document.getElementById('submitBtn');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Traitement...';
+    submitBtn.disabled = true;
+    
+    fetch(window.location.href, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert(data.message);
+            closeModal('addEmployeeModal');
+            
+            // Actualiser les statistiques
+            updateStats();
+            
+            // Actualiser le tableau après un délai
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+        } else {
+            showAlert('Erreur: ' + (data.message || 'Erreur inconnue'), 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Erreur:', error);
+        showAlert('Erreur de connexion: ' + error.message, 'error');
+    })
+    .finally(() => {
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    });
+});
+
+// Modifier la fonction de suppression
+function deleteEmployee(id, name) {
+    if (confirm(`Êtes-vous sûr de vouloir désactiver ${name} ?`)) {
+        const submitData = new FormData();
+        submitData.append('action', 'delete_employee');
+        submitData.append('id', id);
+
+        fetch(window.location.href, {
+            method: 'POST',
+            body: submitData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert(data.message);
+                
+                // Actualiser les statistiques immédiatement
+                updateStats();
+                
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
+            } else {
+                showAlert('Erreur: ' + (data.message || 'Erreur inconnue'), 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            showAlert('Erreur de connexion: ' + error.message, 'error');
+        });
+    }
+}
+
         let searchTimeout;
         let isEditing = false;
 
@@ -897,6 +1197,14 @@ try {
         function openModal(modalId) {
             document.getElementById(modalId).style.display = 'block';
             document.body.style.overflow = 'hidden';
+            
+            // Initialiser la semaine courante pour le modal de planification
+            if (modalId === 'scheduleModal') {
+                const now = new Date();
+                const year = now.getFullYear();
+                let week = getWeekNumber(now);
+                document.getElementById('weekSelector').value = `${year}-W${week.toString().padStart(2, '0')}`;
+            }
         }
 
         function closeModal(modalId) {
@@ -912,35 +1220,48 @@ try {
                 document.getElementById('statutGroup').style.display = 'none';
                 isEditing = false;
             }
+            
+            if (modalId === 'scheduleModal') {
+                document.getElementById('scheduleForm').reset();
+            }
+        }
+
+        // Fonction pour calculer le numéro de semaine
+        function getWeekNumber(date) {
+            const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+            const pastDaysOfYear = (date - firstDayOfYear) / 86400000;
+            return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
         }
 
         // Fermer le modal en cliquant à l'extérieur
         window.onclick = function(event) {
             if (event.target.classList.contains('modal')) {
-                event.target.style.display = 'none';
-                document.body.style.overflow = 'auto';
+                const modalId = event.target.id;
+                closeModal(modalId);
             }
         }
 
         // Fonction pour voir les détails d'un employé
         function viewEmployee(id) {
+            const submitData = new FormData();
+            submitData.append('action', 'get_employee');
+            submitData.append('id', id);
+
             fetch('', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: `action=get_employee&id=${id}`
+                body: submitData
             })
             .then(response => response.json())
             .then(data => {
-                if (data.success) {
+                if (data.success && data.employee) {
                     const employee = data.employee;
                     const detailsHtml = `
                         <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 20px; align-items: start;">
                             <div style="text-align: center;">
                                 <img src="${employee.photo || 'https://i.pravatar.cc/150?u=' + encodeURIComponent(employee.nom)}" 
                                      alt="${employee.nom} ${employee.prenom}" 
-                                     style="width: 120px; height: 120px; border-radius: 50%; border: 4px solid #667eea;">
+                                     style="width: 120px; height: 120px; border-radius: 50%; border: 4px solid #667eea;"
+                                     onerror="this.src='https://i.pravatar.cc/150?u=${encodeURIComponent(employee.nom)}'">
                                 <h3 style="margin: 15px 0 5px; color: #2c3e50;">${employee.nom} ${employee.prenom}</h3>
                                 <p style="color: #7f8c8d; font-size: 0.9rem;">ID: ${employee.id.toString().padStart(3, '0')}</p>
                             </div>
@@ -972,81 +1293,131 @@ try {
                     document.getElementById('employeeDetails').innerHTML = detailsHtml;
                     openModal('viewEmployeeModal');
                 } else {
-                    showAlert('Erreur lors de la récupération des détails: ' + data.message, 'error');
+                    showAlert('Erreur lors de la récupération des détails: ' + (data.message || 'Employé non trouvé'), 'error');
                 }
             })
             .catch(error => {
+                console.error('Erreur:', error);
                 showAlert('Erreur de connexion: ' + error.message, 'error');
             });
         }
-
-        // Fonction pour modifier un employé
-        function editEmployee(id) {
-            fetch('', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: `action=get_employee&id=${id}`
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const employee = data.employee;
-                    
-                    // Remplir le formulaire
-                    document.getElementById('employeeId').value = employee.id;
-                    document.getElementById('employeeNom').value = employee.nom;
-                    document.getElementById('employeePrenom').value = employee.prenom;
-                    document.getElementById('employeePoste').value = employee.poste;
-                    document.getElementById('employeeTelephone').value = employee.telephone;
-                    document.getElementById('employeeEmail').value = employee.email;
-                    document.getElementById('employeeDateEmbauche').value = employee.date_embauche;
-                    document.getElementById('employeeSalaire').value = employee.salaire_horaire;
-                    document.getElementById('employeeStatut').value = employee.statut;
-                    
-                    // Modifier l'apparence du modal
-                    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit"></i> Modifier l\'Employé';
-                    document.getElementById('submitBtn').innerHTML = '<i class="fas fa-save"></i> Mettre à jour';
-                    document.getElementById('statutGroup').style.display = 'block';
-                    
-                    isEditing = true;
-                    openModal('addEmployeeModal');
-                } else {
-                    showAlert('Erreur lors de la récupération des données: ' + data.message, 'error');
-                }
-            })
-            .catch(error => {
-                showAlert('Erreur de connexion: ' + error.message, 'error');
-            });
-        }
-
-        // Fonction pour supprimer un employé
-        function deleteEmployee(id, name) {
-            if (confirm(`Êtes-vous sûr de vouloir désactiver ${name} ?`)) {
-                fetch('', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: `action=delete_employee&id=${id}`
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        showAlert(data.message);
-                        setTimeout(() => {
-                            location.reload();
-                        }, 1500);
-                    } else {
-                        showAlert('Erreur: ' + data.message, 'error');
-                    }
-                })
-                .catch(error => {
-                    showAlert('Erreur de connexion: ' + error.message, 'error');
-                });
+// Gestion du formulaire d'employé (ajout/modification) - VERSION CORRIGÉE
+document.getElementById('employeeForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    console.log('Formulaire soumis'); // Debug
+    
+    const formData = new FormData(e.target);
+    const action = isEditing ? 'update_employee' : 'add_employee';
+    formData.append('action', action);
+    
+    // Debug - afficher les données du formulaire
+    for (let [key, value] of formData.entries()) {
+        console.log(key + ': ' + value);
+    }
+    
+    // Validation côté client améliorée
+    const requiredFields = [
+        { name: 'nom', id: 'employeeNom', label: 'Nom' },
+        { name: 'prenom', id: 'employeePrenom', label: 'Prénom' },
+        { name: 'poste', id: 'employeePoste', label: 'Poste' },
+        { name: 'telephone', id: 'employeeTelephone', label: 'Téléphone' },
+        { name: 'email', id: 'employeeEmail', label: 'Email' },
+        { name: 'date_embauche', id: 'employeeDateEmbauche', label: 'Date d\'embauche' },
+        { name: 'salaire', id: 'employeeSalaire', label: 'Salaire' }
+    ];
+    
+    let isValid = true;
+    let errors = [];
+    
+    requiredFields.forEach(field => {
+        const input = document.getElementById(field.id);
+        const value = input.value.trim();
+        
+        if (!value) {
+            isValid = false;
+            input.style.borderColor = '#dc3545';
+            errors.push(field.label + ' est requis');
+        } else {
+            input.style.borderColor = '#e9ecef';
+            
+            // Validations spécifiques
+            if (field.name === 'email' && !validateEmail(value)) {
+                isValid = false;
+                input.style.borderColor = '#dc3545';
+                errors.push('Format email invalide');
+            }
+            
+            if (field.name === 'salaire' && (isNaN(value) || parseFloat(value) <= 0)) {
+                isValid = false;
+                input.style.borderColor = '#dc3545';
+                errors.push('Le salaire doit être un nombre positif');
+            }
+            
+            if (field.name === 'telephone' && !validatePhone(value)) {
+                isValid = false;
+                input.style.borderColor = '#dc3545';
+                errors.push('Format téléphone invalide');
             }
         }
+    });
+    
+    if (!isValid) {
+        showAlert('Erreurs de validation: ' + errors.join(', '), 'error');
+        return;
+    }
+    
+    // Désactiver le bouton pendant la requête
+    const submitBtn = document.getElementById('submitBtn');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Traitement...';
+    submitBtn.disabled = true;
+    
+    fetch(window.location.href, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        console.log('Response status:', response.status); // Debug
+        if (!response.ok) {
+            throw new Error('HTTP ' + response.status);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Response data:', data); // Debug
+        
+        if (data.success) {
+            showAlert(data.message);
+            closeModal('addEmployeeModal');
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+        } else {
+            showAlert('Erreur: ' + (data.message || 'Erreur inconnue'), 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Erreur complète:', error);
+        showAlert('Erreur de connexion: ' + error.message, 'error');
+    })
+    .finally(() => {
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    });
+});
+
+// Fonctions de validation
+function validateEmail(email) {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
+}
+
+function validatePhone(phone) {
+    // Format français basique (à adapter selon vos besoins)
+    const re = /^(?:(?:\+|00)33|0)\s*[1-9](?:[\s.-]*\d{2}){4}$/;
+    return re.test(phone) || phone.length >= 8;
+}
 
         // Fonction pour générer un rapport
         function generateReport() {
@@ -1062,7 +1433,8 @@ try {
                 };
                 
                 let reportContent = `RAPPORT DE GESTION DES EMPLOYÉS\n`;
-                reportContent += `Date: ${new Date().toLocaleDateString('fr-FR')}\n\n`;
+                reportContent += `Date: ${new Date().toLocaleDateString('fr-FR')}\n`;
+                reportContent += `Restaurant Le Gourmand\n\n`;
                 reportContent += `STATISTIQUES GÉNÉRALES:\n`;
                 reportContent += `- Total employés: ${reportData.totalEmployees}\n`;
                 reportContent += `- Présents aujourd'hui: ${reportData.presentToday}\n`;
@@ -1070,17 +1442,21 @@ try {
                 reportContent += `- Taux de présence: ${reportData.attendanceRate}%\n\n`;
                 reportContent += `LISTE DES EMPLOYÉS:\n`;
                 
+                <?php if (!empty($employees)): ?>
                 <?php foreach ($employees as $emp): ?>
                 reportContent += `- <?php echo htmlspecialchars($emp['nom'] . ' ' . $emp['prenom']); ?> (<?php echo ucfirst($emp['poste']); ?>) - <?php echo ucfirst($emp['statut']); ?>\n`;
                 <?php endforeach; ?>
+                <?php endif; ?>
                 
                 // Créer et télécharger le fichier
-                const blob = new Blob([reportContent], { type: 'text/plain' });
+                const blob = new Blob([reportContent], { type: 'text/plain; charset=utf-8' });
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
                 a.download = `rapport_employes_${new Date().toISOString().split('T')[0]}.txt`;
+                document.body.appendChild(a);
                 a.click();
+                document.body.removeChild(a);
                 window.URL.revokeObjectURL(url);
                 
                 showAlert('Rapport généré et téléchargé avec succès!');
@@ -1094,6 +1470,25 @@ try {
             const formData = new FormData(e.target);
             const action = isEditing ? 'update_employee' : 'add_employee';
             formData.append('action', action);
+            
+            // Validation côté client
+            const requiredFields = ['nom', 'prenom', 'poste', 'telephone', 'email', 'date_embauche', 'salaire'];
+            let isValid = true;
+            
+            requiredFields.forEach(field => {
+                const input = document.getElementById('employee' + field.charAt(0).toUpperCase() + field.slice(1));
+                if (!input.value.trim()) {
+                    isValid = false;
+                    input.style.borderColor = '#dc3545';
+                } else {
+                    input.style.borderColor = '#e9ecef';
+                }
+            });
+            
+            if (!isValid) {
+                showAlert('Veuillez remplir tous les champs obligatoires', 'error');
+                return;
+            }
             
             // Désactiver le bouton pendant la requête
             const submitBtn = document.getElementById('submitBtn');
@@ -1114,10 +1509,11 @@ try {
                         location.reload();
                     }, 1500);
                 } else {
-                    showAlert('Erreur: ' + data.message, 'error');
+                    showAlert('Erreur: ' + (data.message || 'Erreur inconnue'), 'error');
                 }
             })
             .catch(error => {
+                console.error('Erreur:', error);
                 showAlert('Erreur de connexion: ' + error.message, 'error');
             })
             .finally(() => {
@@ -1133,6 +1529,15 @@ try {
             const formData = new FormData(e.target);
             formData.append('action', 'save_schedule');
             
+            // Vérifier qu'un employé est sélectionné
+            const employeeId = document.getElementById('employeeSelector').value;
+            const semaine = document.getElementById('weekSelector').value;
+            
+            if (!employeeId || !semaine) {
+                showAlert('Veuillez sélectionner un employé et une semaine', 'error');
+                return;
+            }
+            
             fetch('', {
                 method: 'POST',
                 body: formData
@@ -1142,28 +1547,59 @@ try {
                 if (data.success) {
                     showAlert(data.message);
                     closeModal('scheduleModal');
-                    document.getElementById('scheduleForm').reset();
                 } else {
-                    showAlert('Erreur: ' + data.message, 'error');
+                    showAlert('Erreur: ' + (data.message || 'Erreur inconnue'), 'error');
                 }
             })
             .catch(error => {
+                console.error('Erreur:', error);
                 showAlert('Erreur de connexion: ' + error.message, 'error');
             });
         });
 
-        // Initialiser la semaine courante dans le sélecteur
-        document.addEventListener('DOMContentLoaded', function() {
-            const now = new Date();
-            const year = now.getFullYear();
-            const week = Math.floor((now - new Date(year, 0, 1)) / (7 * 24 * 60 * 60 * 1000)) + 1;
-            document.getElementById('weekSelector').value = `${year}-W${week.toString().padStart(2, '0')}`;
+        // Validation en temps réel des heures
+        document.addEventListener('change', function(e) {
+            if (e.target.type === 'time' && e.target.name && e.target.name.includes('horaires')) {
+                const nameMatch = e.target.name.match(/horaires\[(\d+)\]\[(debut|fin)\]/);
+                if (nameMatch) {
+                    const jour = nameMatch[1];
+                    const type = nameMatch[2];
+                    
+                    if (type === 'fin') {
+                        const debutInput = document.querySelector(`input[name="horaires[${jour}][debut]"]`);
+                        const finInput = e.target;
+                        
+                        if (debutInput.value && finInput.value && debutInput.value >= finInput.value) {
+                            showAlert('L\'heure de fin doit être postérieure à l\'heure de début', 'error');
+                            finInput.value = '';
+                        }
+                    }
+                }
+            }
         });
 
         // Gestion des erreurs globales
         window.addEventListener('error', function(e) {
             console.error('Erreur JavaScript:', e.error);
             showAlert('Une erreur inattendue s\'est produite. Veuillez actualiser la page.', 'error');
+        });
+
+        // Initialisation au chargement de la page
+        document.addEventListener('DOMContentLoaded', function() {
+            // Vérifier s'il y a des employés pour activer/désactiver certaines fonctionnalités
+            const hasEmployees = <?php echo !empty($employees) ? 'true' : 'false'; ?>;
+            
+            if (!hasEmployees) {
+                console.log('Aucun employé trouvé dans la base de données');
+            }
+            
+            // Initialiser les tooltips si nécessaire
+            const buttons = document.querySelectorAll('[title]');
+            buttons.forEach(button => {
+                button.addEventListener('mouseenter', function() {
+                    // Logique de tooltip personnalisée si nécessaire
+                });
+            });
         });
     </script>
 </body>
