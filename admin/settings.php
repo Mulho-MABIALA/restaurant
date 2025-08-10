@@ -13,10 +13,11 @@ $success = '';
 $error = '';
 $settings = [];
 
-// Charger les paramètres existants
-try {
-    $stmt = $conn->query("SELECT * FROM settings");
-    $settings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+    // Charger les paramètres existants
+    try {
+  $stmt = $conn->query("SELECT setting_key, setting_value FROM settings");
+$settings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+
 } catch (PDOException $e) {
     $error = "Erreur lors du chargement des paramètres: " . $e->getMessage();
 }

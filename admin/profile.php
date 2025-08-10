@@ -1,70 +1,53 @@
 <?php
-
 session_start();
-if (!isset($_SESSION['admin_logged_in'])) {
-    echo "Session non définie.";
-    var_dump($_SESSION);
-    exit;
-}
 
-if ($_SESSION['admin_logged_in'] !== true) {
-    echo "Session présente mais non valide.";
-    var_dump($_SESSION);
-    exit;
-}
-
+// ❌ SUPPRIMER TOUT LE DEBUG CI-DESSOUS
+/*
+var_dump($_POST);
+var_dump($_FILES);
+echo "Nom reçu: [" . $_POST['name'] . "]<br>";
+echo "Longueur du nom: " . strlen($_POST['name']) . "<br>";
+echo "Est vide ? " . (empty($_POST['name']) ? 'OUI' : 'NON') . "<br>";
+*/
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-// Vérification de l'authentification avec debug
-if (!isset($_SESSION['admin_logged_in'])) {
-    error_log("Session admin_logged_in non définie");
+require_once __DIR__ . '/../config.php';
+
+// Vérification unique de la session admin
+if (empty($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Location: login.php');
     exit;
 }
 
-if ($_SESSION['admin_logged_in'] !== true) {
-    error_log("Session admin_logged_in = " . var_export($_SESSION['admin_logged_in'], true));
-    header('Location: login.php');
-    exit;
-}
-
-require_once '../config.php';
-
-// Debug : afficher les variables de session
-error_log("Variables de session : " . print_r($_SESSION, true));
-
-// Récupération sécurisée des variables de session
+// Variables de session
 $admin_id = $_SESSION['admin_id'] ?? null;
 $admin_name = $_SESSION['admin_name'] ?? '';
 $admin_email = $_SESSION['admin_email'] ?? '';
 
-// Vérification de l'ID admin
+// Si l'ID admin est manquant, tentative de récupération depuis l'email
 if (!$admin_id) {
-    error_log("admin_id manquant dans la session");
-    // Au lieu de rediriger immédiatement, essayons de récupérer les infos depuis la DB
-    if (isset($_SESSION['admin_email']) && !empty($_SESSION['admin_email'])) {
+    if (!empty($admin_email)) {
         try {
-            $stmt = $conn->prepare("SELECT id, name, email FROM admins WHERE email = ?");
-            $stmt->execute([$_SESSION['admin_email']]);
+            $stmt = $conn->prepare("SELECT id, username, email FROM admin WHERE email = ?");
+            $stmt->execute([$admin_email]);
             $admin_data = $stmt->fetch(PDO::FETCH_ASSOC);
-            
+
             if ($admin_data) {
                 $_SESSION['admin_id'] = $admin_data['id'];
-                $_SESSION['admin_name'] = $admin_data['name'];
+                $_SESSION['admin_name'] = $admin_data['username'];
                 $_SESSION['admin_email'] = $admin_data['email'];
-                
+
                 $admin_id = $admin_data['id'];
-                $admin_name = $admin_data['name'];
+                $admin_name = $admin_data['username'];
                 $admin_email = $admin_data['email'];
             } else {
-                error_log("Aucun admin trouvé avec cet email");
                 header('Location: logout.php');
                 exit;
             }
         } catch (PDOException $e) {
-            error_log("Erreur DB lors de la récupération admin : " . $e->getMessage());
+            error_log("Erreur DB : " . $e->getMessage());
             header('Location: logout.php');
             exit;
         }
@@ -77,66 +60,60 @@ if (!$admin_id) {
 $error = '';
 $success = '';
 
-// Fonction pour gérer l'upload de photo
+// Fonction d'upload photo
 function handlePhotoUpload($admin_id) {
     if (!isset($_FILES['profile_photo']) || $_FILES['profile_photo']['error'] !== UPLOAD_ERR_OK) {
         return null;
     }
-    
+
     $allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-    $max_size = 2 * 1024 * 1024; // 2MB
-    
+    $max_size = 2 * 1024 * 1024; // 2 Mo
+
     $file = $_FILES['profile_photo'];
-    
+
     if (!in_array($file['type'], $allowed_types)) {
         throw new Exception("Type de fichier non autorisé. Utilisez JPG, PNG ou GIF.");
     }
-    
+
     if ($file['size'] > $max_size) {
         throw new Exception("Le fichier est trop volumineux. Maximum 2MB.");
     }
-    
-    // Créer le dossier uploads s'il n'existe pas
+
     $upload_dir = '../uploads/profiles/';
     if (!is_dir($upload_dir)) {
         mkdir($upload_dir, 0755, true);
     }
-    
-    // Générer un nom unique pour le fichier
+
     $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
     $filename = 'admin_' . $admin_id . '_' . time() . '.' . $extension;
     $filepath = $upload_dir . $filename;
-    
+
     if (!move_uploaded_file($file['tmp_name'], $filepath)) {
         throw new Exception("Erreur lors du téléchargement du fichier.");
     }
-    
+
     return 'uploads/profiles/' . $filename;
 }
 
-// Récupérer les informations actuelles de l'admin
+// Récupération des infos actuelles de l'admin
 try {
-    $stmt = $conn->prepare("SELECT * FROM admins WHERE id = ?");
+    $stmt = $conn->prepare("SELECT * FROM admin WHERE id = ?");
     $stmt->execute([$admin_id]);
     $admin_data = $stmt->fetch(PDO::FETCH_ASSOC);
-    
+
     if (!$admin_data) {
-        error_log("Admin non trouvé en DB avec ID : " . $admin_id);
         header('Location: logout.php');
         exit;
     }
-    
-    // Mettre à jour les variables si nécessaire
-    $admin_name = $admin_data['name'];
+
+    $admin_name = $admin_data['username'];
     $admin_email = $admin_data['email'];
     $current_photo = $admin_data['profile_photo'] ?? '';
-    
-    // Mettre à jour la session avec les données actuelles
+
     $_SESSION['admin_name'] = $admin_name;
     $_SESSION['admin_email'] = $admin_email;
-    
+
 } catch (PDOException $e) {
-    error_log("Erreur PDO : " . $e->getMessage());
     $error = "Erreur lors de la récupération des données : " . $e->getMessage();
 }
 
@@ -149,69 +126,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $confirm_password = $_POST['confirm_password'] ?? '';
 
     try {
-        // Validation côté serveur
         if (empty($new_name)) {
             throw new Exception("Le nom est obligatoire");
         }
-        
+
         if (empty($new_email) || !filter_var($new_email, FILTER_VALIDATE_EMAIL)) {
             throw new Exception("L'email est obligatoire et doit être valide");
         }
-        
-        // Vérifier si l'email est déjà utilisé par un autre admin
+
+        // Vérifier si l'email est déjà utilisé
         if ($new_email !== $admin_email) {
-            $stmt = $conn->prepare("SELECT id FROM admins WHERE email = ? AND id != ?");
+            $stmt = $conn->prepare("SELECT id FROM admin WHERE email = ? AND id != ?");
             $stmt->execute([$new_email, $admin_id]);
             if ($stmt->fetch()) {
                 throw new Exception("Cette adresse email est déjà utilisée par un autre administrateur");
             }
         }
+
+        // ✅ VALIDATION DES MOTS DE PASSE SEULEMENT SI CHANGEMENT DEMANDÉ
+        $password_change_requested = !empty($new_password) || !empty($confirm_password);
         
-        // Vérification du mot de passe actuel si changement demandé
-        if (!empty($current_password) || !empty($new_password)) {
+        if ($password_change_requested) {
             if (empty($current_password)) {
                 throw new Exception("Le mot de passe actuel est requis pour changer le mot de passe");
             }
-            
-            $stmt = $conn->prepare("SELECT password FROM admins WHERE id = ?");
-            $stmt->execute([$admin_id]);
-            $admin = $stmt->fetch();
 
-            if (!$admin || !password_verify($current_password, $admin['password'])) {
+            if (empty($new_password)) {
+                throw new Exception("Le nouveau mot de passe est requis");
+            }
+
+            // Vérifier le mot de passe actuel
+            $stmt = $conn->prepare("SELECT password FROM admin WHERE id = ?");
+            $stmt->execute([$admin_id]);
+            $admin_row = $stmt->fetch();
+
+            if (!$admin_row || !password_verify($current_password, $admin_row['password'])) {
                 throw new Exception("Mot de passe actuel incorrect");
             }
-            
+
             if (strlen($new_password) < 6) {
                 throw new Exception("Le nouveau mot de passe doit contenir au moins 6 caractères");
             }
-            
+
             if ($new_password !== $confirm_password) {
                 throw new Exception("Les nouveaux mots de passe ne correspondent pas");
             }
         }
-        
-        // Gérer l'upload de photo
+
+        // Traitement de la photo
         $new_photo_path = $current_photo;
         if (isset($_FILES['profile_photo']) && $_FILES['profile_photo']['error'] === UPLOAD_ERR_OK) {
             $new_photo_path = handlePhotoUpload($admin_id);
-            
-            // Supprimer l'ancienne photo si elle existe
+
             if ($current_photo && file_exists('../' . $current_photo)) {
                 unlink('../' . $current_photo);
             }
         }
 
-        // Mise à jour des informations
-        if (!empty($new_password)) {
+        // Mise à jour en base
+        if ($password_change_requested && !empty($new_password)) {
             $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
-            $stmt = $conn->prepare("UPDATE admins SET name = ?, email = ?, password = ?, profile_photo = ? WHERE id = ?");
+            $stmt = $conn->prepare("UPDATE admin SET username = ?, email = ?, password = ?, profile_photo = ? WHERE id = ?");
             $stmt->execute([$new_name, $new_email, $hashed_password, $new_photo_path, $admin_id]);
         } else {
-            $stmt = $conn->prepare("UPDATE admins SET name = ?, email = ?, profile_photo = ? WHERE id = ?");
+            $stmt = $conn->prepare("UPDATE admin SET username = ?, email = ?, profile_photo = ? WHERE id = ?");
             $stmt->execute([$new_name, $new_email, $new_photo_path, $admin_id]);
         }
 
-        // Met à jour la session
         $_SESSION['admin_name'] = $new_name;
         $_SESSION['admin_email'] = $new_email;
 
@@ -220,11 +201,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $current_photo = $new_photo_path;
 
         $success = "Profil mis à jour avec succès";
-        
+
     } catch (Exception $e) {
         $error = $e->getMessage();
     } catch (PDOException $e) {
-        error_log("Erreur PDO lors de la mise à jour : " . $e->getMessage());
         $error = "Erreur lors de la mise à jour : " . $e->getMessage();
     }
 }

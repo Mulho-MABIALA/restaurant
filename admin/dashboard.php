@@ -145,7 +145,31 @@ if (isset($_POST['mark_all_read'])) {
 $stmt = $conn->query("SELECT * FROM notifications WHERE vue = 0 ORDER BY date DESC");
 $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Infos admin avec photo de profil
+$admin_name = $_SESSION['admin_name'] ?? 'Admin';
+$admin_email = $_SESSION['admin_email'] ?? '';
+$admin_id = $_SESSION['admin_id'] ?? 0;
+
+// 👤 Récupérer la photo de profil
+$admin_photo = null;
+if ($admin_id > 0) {
+    try {
+        $stmt = $conn->prepare("SELECT profile_photo FROM admin WHERE id = ?");
+        $stmt->execute([$admin_id]);
+        $admin_data = $stmt->fetch(PDO::FETCH_ASSOC);
+        $admin_photo = $admin_data['profile_photo'] ?? null;
+        
+        // Vérifier si le fichier existe réellement
+        if ($admin_photo && !file_exists($admin_photo)) {
+            $admin_photo = null;
+        }
+    } catch (PDOException $e) {
+        error_log("Erreur lors de la récupération de la photo de profil : " . $e->getMessage());
+        $admin_photo = null;
+    }
+}
 ?>
+
 
 <!DOCTYPE html>
 <html lang="fr">
@@ -614,19 +638,33 @@ $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
                            <!-- Menu Profil -->
 <div class="relative" style="z-index: 1000;">
     <!-- Bouton Profil Principal -->
-    <button 
+      <button 
         @click="profileOpen = !profileOpen"
-        class="w-14 h-14 bg-gradient-to-r from-corporate-violet to-corporate-blue rounded-2xl flex items-center justify-center shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-corporate-violet/30 group animate-glow relative"
+        class="relative w-14 h-14 rounded-2xl flex items-center justify-center shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-corporate-violet/30 group animate-glow overflow-hidden"
         style="z-index: 1001;"
         type="button"
     >
-        <span class="text-white font-bold text-lg group-hover:scale-110 transition-transform">
-            <?= strtoupper(substr($admin_name ?? 'A', 0, 1)) ?>
-        </span>
+         <?php if (!empty($admin_photo) && file_exists($admin_photo)): ?>
+            <!-- Photo de profil -->
+            <img src="<?= htmlspecialchars($admin_photo) ?>" 
+                 alt="Photo de profil" 
+                 class="w-full h-full object-cover rounded-2xl group-hover:scale-110 transition-transform duration-300">
+            <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-2xl"></div>
+        <?php else: ?>
+            <!-- Initiale par défaut -->
+            <div class="w-full h-full bg-gradient-to-r from-corporate-violet to-corporate-blue rounded-2xl flex items-center justify-center">
+                <span class="text-white font-bold text-lg group-hover:scale-110 transition-transform">
+                    <?= strtoupper(substr($admin_name ?? 'A', 0, 1)) ?>
+                </span>
+            </div>
+        <?php endif; ?>
+        
+        <!-- Badge en ligne -->
+        <div class="absolute -bottom-1 -right-1 w-5 h-5 bg-green-400 border-2 border-white rounded-full animate-pulse"></div>
     </button>
     
     <!-- Dropdown Profil -->
-    <div 
+   <div 
         x-show="profileOpen"
         @click.away="profileOpen = false"
         x-transition:enter="transition ease-out duration-300"
@@ -636,18 +674,34 @@ $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
         x-transition:leave-start="transform opacity-100 scale-100 translate-y-0"
         x-transition:leave-end="transform opacity-0 scale-95 translate-y-2"
         class="fixed top-20 right-4 w-80 rounded-3xl shadow-2xl overflow-hidden border border-white/30"
-        style="background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(20px); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);"
-        style="z-index: 9999; position: fixed !important;"
+        style="background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(20px); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); z-index: 9999; position: fixed !important;"
         x-cloak
     >
-        <!-- En-tête du Profil -->
+        <!-- En-tête du Profil avec Photo -->
         <div class="px-6 py-6" style="background: rgba(88, 28, 135, 0.1); border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
             <div class="flex items-center space-x-4">
-                <!-- Avatar -->
-                <div class="w-16 h-16 bg-gradient-to-r from-corporate-violet to-corporate-blue rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0">
-                    <span class="text-white font-bold text-xl">
-                        <?= strtoupper(substr($admin_name ?? 'A', 0, 1)) ?>
-                    </span>
+                <!-- Avatar Large -->
+                <div class="relative flex-shrink-0">
+                    <div class="w-16 h-16 rounded-2xl overflow-hidden shadow-lg">
+                        <?php if (!empty($admin_photo) && file_exists($admin_photo)): ?>
+                            <img src="<?= htmlspecialchars($admin_photo) ?>" 
+                                 alt="Photo de profil" 
+                                 class="w-full h-full object-cover">
+                        <?php else: ?>
+                            <div class="w-full h-full bg-gradient-to-r from-corporate-violet to-corporate-blue flex items-center justify-center">
+                                <span class="text-white font-bold text-xl">
+                                    <?= strtoupper(substr($admin_name ?? 'A', 0, 1)) ?>
+                                </span>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                    <!-- Bouton modifier photo -->
+                    <button onclick="document.getElementById('photo-upload').click()" 
+                            class="absolute -bottom-2 -right-2 w-7 h-7 bg-corporate-violet rounded-full flex items-center justify-center border-2 border-white hover:scale-110 transition-transform">
+                        <i class="fas fa-camera text-white text-xs"></i>
+                    </button>
+                    <!-- Input caché pour upload -->
+                    <input type="file" id="photo-upload" accept="image/*" style="display: none;" onchange="uploadProfilePhoto(this)">
                 </div>
                 
                 <!-- Informations Utilisateur -->
@@ -670,7 +724,6 @@ $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 </div>
             </div>
         </div>
-        
         <!-- Séparateur -->
         <div class="h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
         
@@ -974,7 +1027,7 @@ $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                         
                         <div class="mt-8 text-center">
-                            <a href="plats.php" class="inline-flex items-center px-8 py-4 bg-warning-gradient text-white rounded-2xl font-semibold hover:opacity-90 transition-all duration-300 shadow-2xl hover:shadow-3xl hover:scale-105">
+                            <a href="gestion_plats.php" class="inline-flex items-center px-8 py-4 bg-warning-gradient text-white rounded-2xl font-semibold hover:opacity-90 transition-all duration-300 shadow-2xl hover:shadow-3xl hover:scale-105">
                                 <i class="fas fa-utensils mr-3"></i>
                                 Explorer le menu complet
                                 <i class="fas fa-arrow-right ml-3"></i>
@@ -1465,8 +1518,82 @@ $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
             revenusChart.update('active');
         }, 500);
     </script>
-
+<script>
+function uploadProfilePhoto(input) {
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        
+        // Vérifier le type de fichier
+        if (!file.type.match('image.*')) {
+            alert('Veuillez sélectionner une image valide');
+            return;
+        }
+        
+        // Vérifier la taille (max 2MB)
+        if (file.size > 2 * 1024 * 1024) {
+            alert('La taille de l\'image ne doit pas dépasser 2MB');
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('profile_photo', file);
+        
+        // Afficher un indicateur de chargement
+        const button = document.querySelector('button[onclick*="photo-upload"]');
+        const originalIcon = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin text-white text-xs"></i>';
+        button.disabled = true;
+        
+        fetch('upload_profile_photo.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Actualiser l'image de profil
+                const profileImages = document.querySelectorAll('img[alt="Photo de profil"]');
+                profileImages.forEach(img => {
+                    img.src = data.photo_url + '?t=' + new Date().getTime(); // Cache busting
+                });
+                
+                // Actualiser aussi les divs d'initiales s'il y en a
+                const initialeDivs = document.querySelectorAll('.bg-gradient-to-r.from-corporate-violet.to-corporate-blue');
+                initialeDivs.forEach(div => {
+                    if (div.querySelector('span')) {
+                        div.innerHTML = `<img src="${data.photo_url}?t=${new Date().getTime()}" alt="Photo de profil" class="w-full h-full object-cover rounded-2xl">`;
+                    }
+                });
+                
+                alert('Photo de profil mise à jour avec succès !');
+            } else {
+                alert('Erreur lors de l\'upload : ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            alert('Erreur lors de l\'upload de la photo');
+        })
+        .finally(() => {
+            // Restaurer le bouton
+            button.innerHTML = originalIcon;
+            button.disabled = false;
+        });
+    }
+}
+</script>
     <!-- Effets visuels professionnels -->
+     <style>
+.profile-img {
+    object-fit: cover;
+    width: 100%;
+    height: 100%;
+}
+
+.profile-container {
+    overflow: hidden;
+}
+</style>
     <style>
         .glass-card::before {
             content: '';
