@@ -1,15 +1,6 @@
 <?php
 session_start();
 
-// ❌ SUPPRIMER TOUT LE DEBUG CI-DESSOUS
-/*
-var_dump($_POST);
-var_dump($_FILES);
-echo "Nom reçu: [" . $_POST['name'] . "]<br>";
-echo "Longueur du nom: " . strlen($_POST['name']) . "<br>";
-echo "Est vide ? " . (empty($_POST['name']) ? 'OUI' : 'NON') . "<br>";
-*/
-
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
@@ -60,41 +51,6 @@ if (!$admin_id) {
 $error = '';
 $success = '';
 
-// Fonction d'upload photo
-function handlePhotoUpload($admin_id) {
-    if (!isset($_FILES['profile_photo']) || $_FILES['profile_photo']['error'] !== UPLOAD_ERR_OK) {
-        return null;
-    }
-
-    $allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-    $max_size = 2 * 1024 * 1024; // 2 Mo
-
-    $file = $_FILES['profile_photo'];
-
-    if (!in_array($file['type'], $allowed_types)) {
-        throw new Exception("Type de fichier non autorisé. Utilisez JPG, PNG ou GIF.");
-    }
-
-    if ($file['size'] > $max_size) {
-        throw new Exception("Le fichier est trop volumineux. Maximum 2MB.");
-    }
-
-    $upload_dir = '../uploads/profiles/';
-    if (!is_dir($upload_dir)) {
-        mkdir($upload_dir, 0755, true);
-    }
-
-    $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
-    $filename = 'admin_' . $admin_id . '_' . time() . '.' . $extension;
-    $filepath = $upload_dir . $filename;
-
-    if (!move_uploaded_file($file['tmp_name'], $filepath)) {
-        throw new Exception("Erreur lors du téléchargement du fichier.");
-    }
-
-    return 'uploads/profiles/' . $filename;
-}
-
 // Récupération des infos actuelles de l'admin
 try {
     $stmt = $conn->prepare("SELECT * FROM admin WHERE id = ?");
@@ -143,7 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        // ✅ VALIDATION DES MOTS DE PASSE SEULEMENT SI CHANGEMENT DEMANDÉ
+        // VALIDATION DES MOTS DE PASSE SEULEMENT SI CHANGEMENT DEMANDÉ
         $password_change_requested = !empty($new_password) || !empty($confirm_password);
         
         if ($password_change_requested) {
@@ -173,24 +129,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        // Traitement de la photo
-        $new_photo_path = $current_photo;
-        if (isset($_FILES['profile_photo']) && $_FILES['profile_photo']['error'] === UPLOAD_ERR_OK) {
-            $new_photo_path = handlePhotoUpload($admin_id);
-
-            if ($current_photo && file_exists('../' . $current_photo)) {
-                unlink('../' . $current_photo);
-            }
-        }
-
         // Mise à jour en base
         if ($password_change_requested && !empty($new_password)) {
             $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
-            $stmt = $conn->prepare("UPDATE admin SET username = ?, email = ?, password = ?, profile_photo = ? WHERE id = ?");
-            $stmt->execute([$new_name, $new_email, $hashed_password, $new_photo_path, $admin_id]);
+            $stmt = $conn->prepare("UPDATE admin SET username = ?, email = ?, password = ? WHERE id = ?");
+            $stmt->execute([$new_name, $new_email, $hashed_password, $admin_id]);
         } else {
-            $stmt = $conn->prepare("UPDATE admin SET username = ?, email = ?, profile_photo = ? WHERE id = ?");
-            $stmt->execute([$new_name, $new_email, $new_photo_path, $admin_id]);
+            $stmt = $conn->prepare("UPDATE admin SET username = ?, email = ? WHERE id = ?");
+            $stmt->execute([$new_name, $new_email, $admin_id]);
         }
 
         $_SESSION['admin_name'] = $new_name;
@@ -198,7 +144,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $admin_name = $new_name;
         $admin_email = $new_email;
-        $current_photo = $new_photo_path;
 
         $success = "Profil mis à jour avec succès";
 
@@ -218,28 +163,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <title>Mon Profil - Administration</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        .profile-photo-preview {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 4px solid #e5e7eb;
-        }
-        .photo-upload-area {
-            transition: all 0.3s ease;
-        }
-        .photo-upload-area:hover {
-            background-color: #f3f4f6;
-        }
-    </style>
 </head>
 <body class="bg-gray-100">
-    <!-- Debug info (à supprimer en production) -->
-    <div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 text-xs" style="display: none;">
-        <strong>Debug:</strong> Admin ID: <?= $admin_id ?>, Name: <?= htmlspecialchars($admin_name) ?>, Email: <?= htmlspecialchars($admin_email) ?>
-    </div>
-    
     <div class="flex h-screen overflow-hidden">
         <?php include 'sidebar.php'; ?>
         
@@ -278,15 +203,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <!-- En-tête -->
                         <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-6">
                             <div class="flex items-center space-x-4">
-                                <!-- Photo de profil actuelle -->
+                                <!-- Avatar par défaut -->
                                 <div class="flex-shrink-0">
-                                    <?php if ($current_photo && file_exists('../' . $current_photo)): ?>
-                                        <img src="../<?= htmlspecialchars($current_photo) ?>" alt="Photo de profil" class="profile-photo-preview">
-                                    <?php else: ?>
-                                        <div class="profile-photo-preview bg-gray-300 flex items-center justify-center">
-                                            <i class="fas fa-user text-gray-600 text-3xl"></i>
-                                        </div>
-                                    <?php endif; ?>
+                                    <div class="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                                        <i class="fas fa-user text-white text-2xl"></i>
+                                    </div>
                                 </div>
                                 <div>
                                     <h2 class="text-2xl font-bold text-white"><?= htmlspecialchars($admin_name) ?></h2>
@@ -300,39 +221,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
                         
                         <!-- Formulaire -->
-                        <form method="POST" enctype="multipart/form-data" class="p-6 space-y-8" id="profileForm">
-                            <!-- Section Photo de profil -->
-                            <div class="border-b border-gray-200 pb-6">
-                                <h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                                    <i class="fas fa-camera mr-2 text-blue-600"></i>
-                                    Photo de profil
-                                </h3>
-                                
-                                <div class="flex items-center space-x-6">
-                                    <div class="flex-shrink-0">
-                                        <img id="photoPreview" 
-                                             src="<?= $current_photo && file_exists('../' . $current_photo) ? '../' . htmlspecialchars($current_photo) : 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgdmlld0JveD0iMCAwIDEyMCAxMjAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMjAiIGhlaWdodD0iMTIwIiBmaWxsPSIjRTVFN0VCIiByeD0iNjAiLz4KPHN2ZyB4PSIzNSIgeT0iMzUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjNkI3MjgwIj4KPHA+CjxwYXRoIGQ9Ik0xMiAxMmM2LjYgMCAxMi01LjQgMTItMTJzLTUuNC0xMi0xMi0xMi0xMiA1LjQtMTIgMTIgNS40IDEyIDEyIDEyem0wLTEuNWMtMi44IDAtNS4yLTEuNC02LjYtMy41IDEuNS0yLjEgMy44LTMuNSA2LjYtMy41czUuMSAxLjQgNi42IDMuNWMtMS40IDIuMS0zLjggMy41LTYuNiAzLjV6bTAtN2MxLjcgMCAzIDEuMyAzIDNzLTEuMyAzLTMgMy0zLTEuMy0zLTMgMS4zLTMgMy0zeiIvPgo8L3N2Zz4K' ?>"
-                                             alt="Photo de profil" 
-                                             class="profile-photo-preview">
-                                    </div>
-                                    
-                                    <div class="flex-1">
-                                        <label for="profile_photo" class="block text-sm font-medium text-gray-700 mb-2">
-                                            Choisir une nouvelle photo
-                                        </label>
-                                        <div class="photo-upload-area border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer" 
-                                             onclick="document.getElementById('profile_photo').click()">
-                                            <input type="file" id="profile_photo" name="profile_photo" 
-                                                   accept="image/jpeg,image/jpg,image/png,image/gif" 
-                                                   class="hidden" onchange="previewPhoto(this)">
-                                            <i class="fas fa-cloud-upload-alt text-gray-400 text-2xl mb-2"></i>
-                                            <p class="text-sm text-gray-600">Cliquez pour télécharger ou glissez une image</p>
-                                            <p class="text-xs text-gray-500 mt-1">JPG, PNG, GIF (max. 2MB)</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
+                        <form method="POST" class="p-6 space-y-8" id="profileForm">
                             <!-- Section Informations personnelles -->
                             <div class="border-b border-gray-200 pb-6">
                                 <h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
@@ -680,77 +569,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         
-        // Fonction pour prévisualiser la photo
-        function previewPhoto(input) {
-            if (input.files && input.files[0]) {
-                const file = input.files[0];
-                
-                // Vérifier la taille du fichier (2MB max)
-                if (file.size > 2 * 1024 * 1024) {
-                    alert('Le fichier est trop volumineux. Taille maximum: 2MB');
-                    input.value = '';
-                    return;
-                }
-                
-                // Vérifier le type de fichier
-                const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-                if (!allowedTypes.includes(file.type)) {
-                    alert('Type de fichier non autorisé. Utilisez JPG, PNG ou GIF.');
-                    input.value = '';
-                    return;
-                }
-                
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    document.getElementById('photoPreview').src = e.target.result;
-                }
-                reader.readAsDataURL(file);
-            }
-        }
-        
-        // Drag and drop pour la photo
-        document.addEventListener('DOMContentLoaded', function() {
-            const uploadArea = document.querySelector('.photo-upload-area');
-            const fileInput = document.getElementById('profile_photo');
-            
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                uploadArea.addEventListener(eventName, preventDefaults, false);
-            });
-            
-            function preventDefaults(e) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-            
-            ['dragenter', 'dragover'].forEach(eventName => {
-                uploadArea.addEventListener(eventName, highlight, false);
-            });
-            
-            ['dragleave', 'drop'].forEach(eventName => {
-                uploadArea.addEventListener(eventName, unhighlight, false);
-            });
-            
-            function highlight(e) {
-                uploadArea.classList.add('border-blue-500', 'bg-blue-50');
-            }
-            
-            function unhighlight(e) {
-                uploadArea.classList.remove('border-blue-500', 'bg-blue-50');
-            }
-            
-            uploadArea.addEventListener('drop', handleDrop, false);
-            
-            function handleDrop(e) {
-                const dt = e.dataTransfer;
-                const files = dt.files;
-                
-                if (files.length > 0) {
-                    fileInput.files = files;
-                    previewPhoto(fileInput);
-                }
-            }
-        });
-        
         // Confirmation avant de quitter si des modifications sont en cours
         let formChanged = false;
         document.addEventListener('DOMContentLoaded', function() {
@@ -774,30 +592,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 formChanged = false;
             });
         });
-        
-        // Animation de succès
-        function showSuccessAnimation() {
-            const submitBtn = document.getElementById('submitBtn');
-            const originalText = submitBtn.innerHTML;
-            
-            submitBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Sauvegardé !';
-            submitBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
-            submitBtn.classList.add('bg-green-600');
-            
-            setTimeout(() => {
-                submitBtn.innerHTML = originalText;
-                submitBtn.classList.remove('bg-green-600');
-                submitBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
-            }, 2000);
-        }
-        
-        // Validation en temps réel de l'email côté serveur (optionnel)
-        function checkEmailAvailability(email, currentEmail) {
-            if (email === currentEmail) return;
-            
-            // Ici vous pouvez ajouter un appel AJAX pour vérifier si l'email est déjà utilisé
-            // par un autre administrateur
-        }
         
         // Formatage automatique des champs
         document.addEventListener('DOMContentLoaded', function() {

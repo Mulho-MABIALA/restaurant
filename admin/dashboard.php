@@ -746,7 +746,7 @@ if ($admin_id > 0) {
             </a>
             
             <!-- Paramètres -->
-            <a href="settings.php" 
+            <!-- <a href="settings.php" 
                class="flex items-center px-6 py-4 text-gray-200 hover:text-white transition-all duration-200 group"
                onmouseover="this.style.background='rgba(255, 255, 255, 0.1)'"
                onmouseout="this.style.background='transparent'">
@@ -758,10 +758,10 @@ if ($admin_id > 0) {
                     <span class="text-xs text-text-secondary/70">Configuration système</span>
                 </div>
                 <i class="fas fa-chevron-right text-xs opacity-40 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200"></i>
-            </a>
+            </a> -->
             
             <!-- Changer Email -->
-            <a href="changer_email.php" 
+            <!-- <a href="changer_email.php" 
                class="flex items-center px-6 py-4 text-gray-200 hover:text-white transition-all duration-200 group"
                onmouseover="this.style.background='rgba(255, 255, 255, 0.1)'"
                onmouseout="this.style.background='transparent'">
@@ -773,7 +773,7 @@ if ($admin_id > 0) {
                     <span class="text-xs text-text-secondary/70">Modifier mon adresse</span>
                 </div>
                 <i class="fas fa-chevron-right text-xs opacity-40 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200"></i>
-            </a>
+            </a> -->
         </div>
         
         <!-- Séparateur avant Déconnexion -->

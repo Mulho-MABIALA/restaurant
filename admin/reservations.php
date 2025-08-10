@@ -392,131 +392,161 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
         <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-slide-up">
           <div class="overflow-x-auto">
             <table class="w-full">
-              <thead>
-                <tr class="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-                  <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    <div class="flex items-center">
-                      <span class="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-                      ID
-                    </div>
-                  </th>
-                  <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Client</th>
-                  <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Contact</th>
-                  <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Réservation</th>
-                  <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Personnes</th>
-                  <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Statut</th>
-                  <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
+             <thead>
+  <tr class="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+      <div class="flex items-center">
+        <span class="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+        ID
+      </div>
+    </th>
+    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Client</th>
+    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Contact</th>
+    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Réservation</th>
+    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Personnes</th>
+    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Message</th>
+    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Statut</th>
+    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
+  </tr>
+</thead>
+
               <tbody class="divide-y divide-gray-100">
-                <?php if (!empty($reservations) && is_array($reservations)): ?>
-                  <?php foreach ($reservations as $index => $res): ?>
-                    <tr class="hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 group">
-                      <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="flex items-center">
-                          <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                            <span class="text-white text-xs font-bold"><?= $res['id'] ?></span>
-                          </div>
-                        </div>
-                      </td>
-                      <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="flex items-center">
-                          <div class="w-10 h-10 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center mr-3">
-                            <span class="text-white font-bold text-sm"><?= strtoupper(substr(htmlspecialchars($res['nom'] ?? ''), 0, 1)) ?></span>
-                          </div>
-                          <div>
-                            <div class="text-sm font-semibold text-gray-900"><?= htmlspecialchars($res['nom'] ?? '', ENT_QUOTES, 'UTF-8') ?></div>
-                          </div>
-                        </div>
-                      </td>
-                      <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm text-gray-900 font-medium"><?= htmlspecialchars($res['email'] ?? '', ENT_QUOTES, 'UTF-8') ?></div>
-                        <div class="text-sm text-gray-500 flex items-center mt-1">
-                          <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/>
-                          </svg>
-                          <?= htmlspecialchars($res['telephone'] ?? '', ENT_QUOTES, 'UTF-8') ?>
-                        </div>
-                      </td>
-                      <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="flex items-center">
-                          <svg class="w-4 h-4 text-blue-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/>
-                          </svg>
-                          <div>
-                            <div class="text-sm font-semibold text-gray-900"><?= htmlspecialchars($res['date_reservation'] ?? '', ENT_QUOTES, 'UTF-8') ?></div>
-                            <div class="text-sm text-gray-500"><?= htmlspecialchars($res['heure_reservation'] ?? '', ENT_QUOTES, 'UTF-8') ?></div>
-                          </div>
-                        </div>
-                      </td>
-                      <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="flex items-center">
-                          <div class="w-8 h-8 bg-gradient-to-r from-orange-400 to-red-500 rounded-full flex items-center justify-center mr-2">
-                            <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
-                            </svg>
-                          </div>
-                          <span class="text-sm font-bold text-gray-900"><?= htmlspecialchars($res['personnes'] ?? '', ENT_QUOTES, 'UTF-8') ?></span>
-                        </div>
-                      </td>
-                      <td class="px-6 py-4 whitespace-nowrap">
-                        <?php if ($res['statut'] === 'non_lu'): ?>
-                          <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-amber-100 to-orange-100 text-amber-800 border border-amber-200">
-                            <svg class="w-3 h-3 mr-1 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
-                              <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
-                            </svg>
-                            Non lu
-                          </span>
-                        <?php else: ?>
-                          <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-800 border border-emerald-200">
-                            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                            </svg>
-                            Lu
-                          </span>
-                        <?php endif; ?>
-                      </td>
-                      <td class="px-6 py-4 whitespace-nowrap">
-  <div class="flex space-x-2">
-    <button onclick="openViewModal(<?= $res['id'] ?>)" class="inline-flex items-center px-3 py-2 text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-all duration-200 hover:scale-105 border border-green-200">
-      <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-        <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
-        <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
-      </svg>
-      Voir
-    </button>
-    <button onclick="openEditModal(<?= $res['id'] ?>)" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all duration-200 hover:scale-105 border border-blue-200">
-      <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
-      </svg>
-      Modifier
-    </button>
-    <a href="?delete=<?= $res['id'] ?>" onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette réservation ?')" class="inline-flex items-center px-3 py-2 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-all duration-200 hover:scale-105 border border-red-200">
-      <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-        <path fill-rule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" clip-rule="evenodd"/>
-        <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3l1.5 1.5a1 1 0 01-1.414 1.414L10 10.414V6a1 1 0 011-1z" clip-rule="evenodd"/>
-        <path fill-rule="evenodd" d="M3 5a2 2 0 012-2h1a1 1 0 000 2H5v11a2 2 0 002 2h6a2 2 0 002-2V5h-1a1 1 0 100-2h1a2 2 0 012 2v11a4 4 0 01-4 4H7a4 4 0 01-4-4V5z" clip-rule="evenodd"/>
-      </svg>
-      Supprimer
-    </a>
-  </div>
-</td>
-                    </tr>
-                  <?php endforeach; ?>
-                <?php else: ?>
-                  <tr>
-                    <td colspan="7" class="text-center py-12">
-                      <div class="flex flex-col items-center">
-                        <svg class="w-16 h-16 text-gray-300 mb-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
-                        </svg>
-                        <p class="text-gray-500 text-lg font-medium">Aucune réservation trouvée</p>
-                        <p class="text-gray-400 text-sm mt-1">Essayez de modifier vos critères de recherche</p>
-                      </div>
-                    </td>
-                  </tr>
-                <?php endif; ?>
-              </tbody>
+  <?php if (!empty($reservations) && is_array($reservations)): ?>
+    <?php foreach ($reservations as $index => $res): ?>
+      <tr class="hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 group">
+        <td class="px-6 py-4 whitespace-nowrap">
+          <div class="flex items-center">
+            <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+              <span class="text-white text-xs font-bold"><?= $res['id'] ?></span>
+            </div>
+          </div>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap">
+          <div class="flex items-center">
+            <div class="w-10 h-10 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center mr-3">
+              <span class="text-white font-bold text-sm"><?= strtoupper(substr(htmlspecialchars($res['nom'] ?? ''), 0, 1)) ?></span>
+            </div>
+            <div>
+              <div class="text-sm font-semibold text-gray-900"><?= htmlspecialchars($res['nom'] ?? '', ENT_QUOTES, 'UTF-8') ?></div>
+            </div>
+          </div>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap">
+          <div class="text-sm text-gray-900 font-medium"><?= htmlspecialchars($res['email'] ?? '', ENT_QUOTES, 'UTF-8') ?></div>
+          <div class="text-sm text-gray-500 flex items-center mt-1">
+            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/>
+            </svg>
+            <?= htmlspecialchars($res['telephone'] ?? '', ENT_QUOTES, 'UTF-8') ?>
+          </div>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap">
+          <div class="flex items-center">
+            <svg class="w-4 h-4 text-blue-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/>
+            </svg>
+            <div>
+              <div class="text-sm font-semibold text-gray-900"><?= htmlspecialchars($res['date_reservation'] ?? '', ENT_QUOTES, 'UTF-8') ?></div>
+              <div class="text-sm text-gray-500"><?= htmlspecialchars($res['heure_reservation'] ?? '', ENT_QUOTES, 'UTF-8') ?></div>
+            </div>
+          </div>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap">
+          <div class="flex items-center">
+            <div class="w-8 h-8 bg-gradient-to-r from-orange-400 to-red-500 rounded-full flex items-center justify-center mr-2">
+              <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
+              </svg>
+            </div>
+            <span class="text-sm font-bold text-gray-900"><?= htmlspecialchars($res['personnes'] ?? '', ENT_QUOTES, 'UTF-8') ?></span>
+          </div>
+        </td>
+        <!-- NOUVELLE COLONNE MESSAGE -->
+        <td class="px-6 py-4">
+          <div class="max-w-xs">
+            <?php if (!empty($res['message'])): ?>
+              <div class="flex items-start">
+                <svg class="w-4 h-4 text-blue-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd"/>
+                </svg>
+                <div class="text-sm text-gray-700 line-clamp-2">
+                  <?= htmlspecialchars(substr($res['message'], 0, 100) . (strlen($res['message']) > 100 ? '...' : ''), ENT_QUOTES, 'UTF-8') ?>
+                </div>
+              </div>
+              <?php if (strlen($res['message']) > 100): ?>
+                <button onclick="showFullMessage('<?= htmlspecialchars(addslashes($res['message']), ENT_QUOTES, 'UTF-8') ?>')" 
+                        class="text-xs text-blue-600 hover:text-blue-800 mt-1 font-medium">
+                  Voir plus
+                </button>
+              <?php endif; ?>
+            <?php else: ?>
+              <span class="text-xs text-gray-400 italic flex items-center">
+                <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+                </svg>
+                Aucun message
+              </span>
+            <?php endif; ?>
+          </div>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap">
+          <?php if ($res['statut'] === 'non_lu'): ?>
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-amber-100 to-orange-100 text-amber-800 border border-amber-200">
+              <svg class="w-3 h-3 mr-1 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+              </svg>
+              Non lu
+            </span>
+          <?php else: ?>
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-800 border border-emerald-200">
+              <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+              </svg>
+              Lu
+            </span>
+          <?php endif; ?>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap">
+          <div class="flex space-x-2">
+            <button onclick="openViewModal(<?= $res['id'] ?>)" class="inline-flex items-center px-3 py-2 text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-all duration-200 hover:scale-105 border border-green-200">
+              <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+                <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
+              </svg>
+              Voir
+            </button>
+            <button onclick="openEditModal(<?= $res['id'] ?>)" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all duration-200 hover:scale-105 border border-blue-200">
+              <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+              </svg>
+              Modifier
+            </button>
+            <a href="?delete=<?= $res['id'] ?>" onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette réservation ?')" class="inline-flex items-center px-3 py-2 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-all duration-200 hover:scale-105 border border-red-200">
+              <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" clip-rule="evenodd"/>
+                <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3l1.5 1.5a1 1 0 01-1.414 1.414L10 10.414V6a1 1 0 011-1z" clip-rule="evenodd"/>
+                <path fill-rule="evenodd" d="M3 5a2 2 0 012-2h1a1 1 0 000 2H5v11a2 2 0 002 2h6a2 2 0 002-2V5h-1a1 1 0 100-2h1a2 2 0 012 2v11a4 4 0 01-4 4H7a4 4 0 01-4-4V5z" clip-rule="evenodd"/>
+              </svg>
+              Supprimer
+            </a>
+          </div>
+        </td>
+      </tr>
+    <?php endforeach; ?>
+  <?php else: ?>
+    <tr>
+      <td colspan="8" class="text-center py-12">
+        <div class="flex flex-col items-center">
+          <svg class="w-16 h-16 text-gray-300 mb-4" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
+          </svg>
+          <p class="text-gray-500 text-lg font-medium">Aucune réservation trouvée</p>
+          <p class="text-gray-400 text-sm mt-1">Essayez de modifier vos critères de recherche</p>
+        </div>
+      </td>
+    </tr>
+  <?php endif; ?>
+</tbody>
             </table>
           </div>
 
@@ -825,9 +855,9 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
       </div>
     </div>
   </div>
-
-  <div id="viewReservationModal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto animate-slide-up">
+<!-- MODAL DE VISUALISATION MODIFIÉ AVEC LE MESSAGE -->
+<div id="viewReservationModal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto animate-slide-up">
     <div class="p-8">
       <div class="flex justify-between items-center mb-6">
         <div>
@@ -949,15 +979,25 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
                 <p class="text-xs text-gray-500 uppercase tracking-wide">Nombre de personnes</p>
                 <p id="view_personnes" class="text-sm font-semibold text-gray-900"></p>
               </div>
-              
             </div>
-            <!-- Dans le modal d'ajout -->
-<div class="col-md-12">
-  <label for="message" class="block text-sm font-semibold text-gray-700 mb-2">
-    Message
-  </label>
-  <textarea id="message" name="message" class="px-4 py-3 border border-gray-300 rounded-xl w-full focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200 hover:border-gray-400"></textarea>
-</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- NOUVELLE SECTION MESSAGE -->
+      <div class="mt-8 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-6 border border-amber-100">
+        <div class="flex items-center mb-4">
+          <div class="p-2 bg-gradient-to-r from-amber-500 to-orange-600 rounded-lg">
+            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd"/>
+            </svg>
+          </div>
+          <h4 class="text-lg font-semibold text-gray-800 ml-3">Message du client</h4>
+        </div>
+        
+        <div class="bg-white rounded-lg p-4 shadow-sm min-h-[100px]">
+          <div id="view_message_content">
+            <!-- Le contenu du message sera injecté ici -->
           </div>
         </div>
       </div>
@@ -1018,6 +1058,10 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
           Fermer
         </button>
       </div>
+    </div>
+  </div>
+</div>
+
     </div>
   </div>
 </div>
@@ -1120,6 +1164,28 @@ function openViewModal(reservationId) {
       document.getElementById('view_date_reservation').textContent = formatDate(data.date_reservation);
       document.getElementById('view_heure_reservation').textContent = data.heure_reservation || 'Non spécifiée';
       
+      // GESTION DU MESSAGE
+      const messageContent = document.getElementById('view_message_content');
+      if (data.message && data.message.trim() !== '') {
+        messageContent.innerHTML = `
+          <div class="flex items-start">
+            <svg class="w-5 h-5 text-amber-500 mr-3 mt-1 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd"/>
+            </svg>
+            <div class="text-gray-700 leading-relaxed whitespace-pre-wrap">${escapeHtml(data.message)}</div>
+          </div>
+        `;
+      } else {
+        messageContent.innerHTML = `
+          <div class="flex items-center justify-center h-16 text-gray-400">
+            <svg class="w-8 h-8 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+            </svg>
+            <span class="text-lg font-medium italic">Aucun message laissé par le client</span>
+          </div>
+        `;
+      }
+      
       // Statut avec formatage
       const statutElement = document.getElementById('view_statut');
       if (data.statut === 'non_lu') {
@@ -1149,6 +1215,18 @@ document.getElementById('viewReservationModal').addEventListener('click', functi
   }
 });
 
+// Fonction utilitaire pour échapper le HTML
+function escapeHtml(text) {
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+}
+
 // Fonction utilitaire pour formater la date
 function formatDate(dateString) {
   const date = new Date(dateString);
@@ -1171,7 +1249,6 @@ function formatDateTime(dateString) {
     minute: '2-digit'
   });
 }
-
     // Vérifier toutes les 2 minutes
     setInterval(checkNewReservations, 120000);
     document.addEventListener('DOMContentLoaded', checkNewReservations);
