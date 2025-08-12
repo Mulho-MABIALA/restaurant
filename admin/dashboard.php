@@ -745,23 +745,8 @@ if ($admin_id > 0) {
                 <i class="fas fa-chevron-right text-xs opacity-40 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200"></i>
             </a>
             
-            <!-- Paramètres -->
-            <!-- <a href="settings.php" 
-               class="flex items-center px-6 py-4 text-gray-200 hover:text-white transition-all duration-200 group"
-               onmouseover="this.style.background='rgba(255, 255, 255, 0.1)'"
-               onmouseout="this.style.background='transparent'">
-                <div class="w-11 h-11 bg-corporate-teal/15 rounded-xl flex items-center justify-center mr-4 group-hover:bg-corporate-teal/25 group-hover:scale-105 transition-all duration-200">
-                    <i class="fas fa-cog text-corporate-teal text-lg"></i>
-                </div>
-                <div class="flex-1">
-                    <span class="font-medium text-base block">Paramètres</span>
-                    <span class="text-xs text-text-secondary/70">Configuration système</span>
-                </div>
-                <i class="fas fa-chevron-right text-xs opacity-40 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200"></i>
-            </a> -->
-            
             <!-- Changer Email -->
-            <!-- <a href="changer_email.php" 
+            <a href="changer_email.php" 
                class="flex items-center px-6 py-4 text-gray-200 hover:text-white transition-all duration-200 group"
                onmouseover="this.style.background='rgba(255, 255, 255, 0.1)'"
                onmouseout="this.style.background='transparent'">
@@ -773,8 +758,8 @@ if ($admin_id > 0) {
                     <span class="text-xs text-text-secondary/70">Modifier mon adresse</span>
                 </div>
                 <i class="fas fa-chevron-right text-xs opacity-40 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200"></i>
-            </a> -->
-        </div>
+            </a>
+        </div> 
         
         <!-- Séparateur avant Déconnexion -->
         <div class="h-px bg-gradient-to-r from-transparent via-white/20 to-transparent mx-6"></div>

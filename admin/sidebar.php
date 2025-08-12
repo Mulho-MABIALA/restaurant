@@ -485,28 +485,48 @@ try {
                     </div>
                     <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
                 </a>
-                
-                <a href="badgeuse.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
-                    <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
-                        <i class="fas fa-id-card nav-icon text-lg"></i>
-                    </div>
-                    <div class="flex-1">
-                        <span class="font-medium text-base">Badgeuse</span>
-                        <p class="nav-description text-sm text-gray-400 opacity-80">Pointage employé</p>
-                    </div>
-                    <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
+        <!-- Pointage Dropdown -->
+        <div x-data="{ open: false }" class="relative">
+            <button type="button"
+                class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl w-full focus:outline-none"
+                @click="open = !open"
+                aria-haspopup="true"
+                :aria-expanded="open"
+            >
+                <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
+                    <i class="fas fa-fingerprint nav-icon text-lg"></i>
+                </div>
+                <div class="flex-1 text-left">
+                    <span class="font-medium text-base">Pointage</span>
+                    <p class="nav-description text-sm text-gray-400 opacity-80">Gestion du pointage</p>
+                </div>
+                <i class="fas fa-chevron-down text-xs ml-2 transition-transform duration-300"
+                   :class="open ? 'rotate-180' : ''"></i>
+            </button>
+            <div x-show="open" @click.away="open = false"
+                 x-transition:enter="transition ease-out duration-300"
+                 x-transition:enter-start="opacity-0 scale-95 -translate-y-2"
+                 x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                 x-transition:leave="transition ease-in duration-200"
+                 x-transition:leave-start="opacity-100 scale-100 translate-y-0"
+                 x-transition:leave-end="opacity-0 scale-95 -translate-y-2"
+                 class="mt-3 ml-8 space-y-1 dropdown-menu rounded-xl shadow-2xl py-3 w-[85%] z-10 absolute left-0"
+                 style="display: none;"
+            >
+                <a href="badgeuse.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                    <i class="fas fa-id-card mr-3 w-5 text-sm"></i>
+                    <span class="font-medium">Badgeuse</span>
                 </a>
-                
-                <a href="presence.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
-                    <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
-                        <i class="fas fa-user-check nav-icon text-lg"></i>
-                    </div>
-                    <div class="flex-1">
-                        <span class="font-medium text-base">Présence</span>
-                        <p class="nav-description text-sm text-gray-400 opacity-80">Gestion présence</p>
-                    </div>
-                    <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
+                <a href="presence.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                    <i class="fas fa-user-check mr-3 w-5 text-sm"></i>
+                    <span class="font-medium">Présence</span>
                 </a>
+                <a href="generate_badges.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                    <i class="fas fa-barcode mr-3 w-5 text-sm"></i>
+                    <span class="font-medium">Générer badges</span>
+                </a>
+            </div>
+        </div>
 
                 <!-- Communication Dropdown -->
                 <div x-data="{ open: false }" class="relative">

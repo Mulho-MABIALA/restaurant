@@ -144,6 +144,7 @@ function getPriorite($dateCommande, $tempsPrevu) {
         }
     </style>
 </head>
+  
 <body class="font-sans">
 
     <!-- Header avec statistiques -->

@@ -383,8 +383,12 @@ $allCategories = $stmt->fetchAll(PDO::FETCH_COLUMN);
     <title>Galerie — Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="p-6 bg-gray-50">
-    <div class="max-w-6xl mx-auto">
+<body class="bg-gray-100 font-sans antialiased">
+       <div class="flex h-screen overflow-hidden relative z-10">
+        <!-- Sidebar (préservé tel quel) -->
+        <?php include 'sidebar.php'; ?>
+        
+    <div class="flex-1 p-6 overflow-y-auto">
         <div class="flex justify-between items-center mb-6">
             <h1 class="text-2xl font-semibold">Galerie d'images</h1>
             <div class="flex gap-2">

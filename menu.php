@@ -1370,24 +1370,30 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
 </head>
 <body>
     <!-- Header -->
-    <header class="header">
-        <div class="header-content">
-            <div class="logo">Mulho</div>
-            <div class="header-actions">
-                <button class="header-btn" onclick="showMenu()">
-                    <i class="fas fa-utensils"></i>
-                    Menu
-                </button>
-                <button class="header-btn">
-                    <i class="fas fa-info"></i>
-                </button>
-                <button class="header-btn" onclick="openCartModal()" id="cartBtn">
-                    <i class="fas fa-shopping-bag"></i>
-                    <span class="cart-badge" id="cartBadge">0</span>
-                </button>
-            </div>
+   <header class="header">
+    <div class="header-content">
+
+        <div class="logo" style="display: flex; align-items: center; gap: 10px;">
+            <img src="assets/img/logo.jpg" alt="Logo Mulho" style="width:60px; height:60px; object-fit:cover; border-radius:8px;">
+            <span style="font-size: 1.8rem; font-weight: bold;">Mulho</span>
         </div>
-    </header>
+
+        <div class="header-actions">
+            <button class="header-btn" onclick="showMenu()">
+                <i class="fas fa-utensils"></i>
+                Menu
+            </button>
+            <button class="header-btn">
+                <i class="fas fa-info"></i>
+            </button>
+            <button class="header-btn" onclick="openCartModal()" id="cartBtn">
+                <i class="fas fa-shopping-bag"></i>
+                <span class="cart-badge" id="cartBadge">0</span>
+            </button>
+        </div>
+    </div>
+</header>
+
 
     <!-- Modal Panier -->
     <div class="cart-modal" id="cartModal">
