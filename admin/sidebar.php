@@ -454,7 +454,7 @@ try {
                     <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
                 </a>
         
-                <a href="admin_gallery.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
+                <a href="gallery.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-images nav-icon text-lg"></i>
                     </div>

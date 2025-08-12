@@ -19,9 +19,6 @@ if (empty($_SESSION['csrf_token'])) {
 
 // Pagination & filtres
 $search = $_GET['search'] ?? '';
-$perPage = 10;
-$currentPage = max(1, (int) ($_GET['page'] ?? 1));
-$offset = ($currentPage - 1) * $perPage;
 $date_filter = $_GET['date_filter'] ?? '';
 $personnes_filter = $_GET['personnes_filter'] ?? '';
 
@@ -74,17 +71,10 @@ if (!empty($personnes_filter)) {
 }
 
 // Récupération paginée
-$queryWithLimit = $query . " ORDER BY date_reservation DESC LIMIT $perPage OFFSET $offset";
+$queryWithLimit = $query . " ORDER BY date_envoi DESC, id DESC";
 $stmt = $conn->prepare($queryWithLimit);
 $stmt->execute($params);
 $reservations = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Nombre total pour la pagination
-$countQuery = preg_replace('/SELECT \* FROM/', 'SELECT COUNT(*) as total FROM', $query, 1);
-$countStmt = $conn->prepare($countQuery);
-$countStmt->execute($params);
-$totalReservations = $countStmt->fetch()['total'] ?? 0;
-$totalPages = ceil($totalReservations / $perPage);
 
 // Nouvelles réservations
 $stmt_nouvelles = $conn->query("SELECT COUNT(*) AS total FROM reservations WHERE statut = 'non_lu'");
@@ -551,64 +541,8 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
           </div>
 
           <!-- Pagination modernisée -->
-          <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-t border-gray-200">
-            <div class="flex items-center justify-between">
-              <div class="text-sm text-gray-600 font-medium">
-                Affichage de <span class="font-bold text-gray-900"><?= ($currentPage - 1) * $perPage + 1 ?></span> à 
-                <span class="font-bold text-gray-900"><?= min($currentPage * $perPage, $totalReservations) ?></span> 
-                sur <span class="font-bold text-gray-900"><?= $totalReservations ?></span> réservations
-              </div>
-              
-              <div class="flex items-center space-x-2">
-                <?php if ($currentPage > 1): ?>
-                  <a href="?<?= http_build_query(array_merge($_GET, ['page' => $currentPage - 1])) ?>" 
-                     class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all duration-200">
-                    <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/>
-                    </svg>
-                    Précédent
-                  </a>
-                <?php endif; ?>
-                
-                <div class="flex space-x-1">
-                  <?php 
-                  $start = max(1, $currentPage - 2);
-                  $end = min($totalPages, $currentPage + 2);
-                  
-                  if ($start > 1): ?>
-                    <a href="?<?= http_build_query(array_merge($_GET, ['page' => 1])) ?>" 
-                       class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">1</a>
-                    <?php if ($start > 2): ?>
-                      <span class="px-3 py-2 text-sm text-gray-500">...</span>
-                    <?php endif; ?>
-                  <?php endif; ?>
-                  
-                  <?php for ($i = $start; $i <= $end; $i++): ?>
-                    <a href="?<?= http_build_query(array_merge($_GET, ['page' => $i])) ?>" 
-                       class="px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 <?= $i == $currentPage ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg' : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50' ?>">
-                      <?= $i ?>
-                    </a>
-                  <?php endfor; ?>
-                  
-                  <?php if ($end < $totalPages): ?>
-                    <?php if ($end < $totalPages - 1): ?>
-                      <span class="px-3 py-2 text-sm text-gray-500">...</span>
-                    <?php endif; ?>
-                    <a href="?<?= http_build_query(array_merge($_GET, ['page' => $totalPages])) ?>" 
-                       class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"><?= $totalPages ?></a>
-                  <?php endif; ?>
-                </div>
-                
-                <?php if ($currentPage < $totalPages): ?>
-                  <a href="?<?= http_build_query(array_merge($_GET, ['page' => $currentPage + 1])) ?>" 
-                     class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all duration-200">
-                    Suivant
-                    <svg class="w-4 h-4 ml-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
-                    </svg>
-                  </a>
-                <?php endif; ?>
-              </div>
+           
+             
             </div>
           </div>
         </div>
@@ -691,7 +625,20 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
               <input type="number" id="edit_personnes" name="personnes" min="1" required 
                      class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-400">
             </div>
-            
+            <div class="md:col-span-2">
+  <label for="edit_message" class="block text-sm font-semibold text-gray-700 mb-2">
+    <span class="flex items-center">
+      <svg class="w-4 h-4 mr-2 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd"/>
+      </svg>
+      Message du client
+    </span>
+  </label>
+  <textarea id="edit_message" name="message" rows="4" 
+           class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-400" 
+           placeholder="Message ou demandes spéciales du client..."></textarea>
+</div>
+
             <div>
               <label for="edit_date_reservation" class="block text-sm font-semibold text-gray-700 mb-2">
                 <span class="flex items-center">
@@ -1086,25 +1033,27 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
 
     // Gestion du modal d'édition
     function openEditModal(reservationId) {
-      fetch('get_reservation.php?id=' + reservationId)
-        .then(response => response.json())
-        .then(data => {
-          document.getElementById('edit_id').value = data.id;
-          document.getElementById('edit_nom').value = data.nom;
-          document.getElementById('edit_email').value = data.email;
-          document.getElementById('edit_telephone').value = data.telephone;
-          document.getElementById('edit_personnes').value = data.personnes;
-          document.getElementById('edit_date_reservation').value = data.date_reservation;
-          document.getElementById('edit_heure_reservation').value = data.heure_reservation;
-          
-          document.getElementById('editReservationModal').classList.remove('hidden');
-        })
-        .catch(error => {
-          console.error('Error:', error);
-          alert('Une erreur est survenue lors du chargement des données');
-        });
-    }
-
+  fetch('get_reservation.php?id=' + reservationId)
+    .then(response => response.json())
+    .then(data => {
+      document.getElementById('edit_id').value = data.id;
+      document.getElementById('edit_nom').value = data.nom;
+      document.getElementById('edit_email').value = data.email;
+      document.getElementById('edit_telephone').value = data.telephone;
+      document.getElementById('edit_personnes').value = data.personnes;
+      document.getElementById('edit_date_reservation').value = data.date_reservation;
+      document.getElementById('edit_heure_reservation').value = data.heure_reservation;
+      
+      // AJOUT : Récupération du message
+      document.getElementById('edit_message').value = data.message || '';
+      
+      document.getElementById('editReservationModal').classList.remove('hidden');
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alert('Une erreur est survenue lors du chargement des données');
+    });
+}
     function closeEditModal() {
       document.getElementById('editReservationModal').classList.add('hidden');
     }

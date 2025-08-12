@@ -1,6 +1,7 @@
 <?php
-require_once '../config.php';
 session_start();
+require_once '../config.php';
+
 
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Location: login.php');
@@ -21,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt = $conn->prepare("UPDATE commandes SET statut = ?, vu_admin = ? WHERE id = ?");
     $stmt->execute([$statut, $vu_admin, $id]);
 
-    header('Location: index.php');
+    header('Location: commandes.php');
     exit;
 }
 

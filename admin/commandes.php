@@ -13,6 +13,25 @@ function e($value) {
     return htmlspecialchars($value ?? '', ENT_QUOTES, 'UTF-8');
 }
 
+// Gestion de la suppression AJAX
+if (isset($_POST['action']) && $_POST['action'] === 'supprimer' && isset($_POST['id'])) {
+    header('Content-Type: application/json');
+    
+    try {
+        $stmt = $conn->prepare("DELETE FROM commandes WHERE id = :id");
+        $stmt->execute(['id' => $_POST['id']]);
+        
+        if ($stmt->rowCount() > 0) {
+            echo json_encode(['success' => true, 'message' => 'Commande supprimée avec succès']);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Commande non trouvée']);
+        }
+    } catch (PDOException $e) {
+        echo json_encode(['success' => false, 'message' => 'Erreur lors de la suppression: ' . $e->getMessage()]);
+    }
+    exit;
+}
+
 // Recherche & filtre par statut
 $search = $_GET['search'] ?? '';
 $filtre_statut = $_GET['statut'] ?? '';
@@ -346,7 +365,7 @@ $moyenne_cmd = $total_cmd > 0 ? round($total_ventes / $total_cmd, 2) : 0;
                                     </th>
                                 </tr>
                             </thead>
-                            <tbody class="bg-white/90 backdrop-blur-sm">
+                            <tbody class="bg-white/90 backdrop-blur-sm" id="commandesTableBody">
                                 <?php if (empty($commandes)): ?>
                                     <tr>
                                         <td colspan="8" class="px-8 py-20 text-center">
@@ -364,7 +383,7 @@ $moyenne_cmd = $total_cmd > 0 ? round($total_ventes / $total_cmd, 2) : 0;
                                     </tr>
                                 <?php else: ?>
                                     <?php foreach ($commandes as $index => $cmd): ?>
-                                        <tr class="table-row border-b border-gray-100/50" style="animation-delay: <?= $index * 0.05 ?>s;">
+                                        <tr class="table-row border-b border-gray-100/50" id="commande-<?= $cmd['id'] ?>" style="animation-delay: <?= $index * 0.05 ?>s;">
                                             <td class="px-8 py-6 whitespace-nowrap">
                                                 <div class="flex items-center">
                                                     <div class="p-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg mr-3">
@@ -458,12 +477,17 @@ $moyenne_cmd = $total_cmd > 0 ? round($total_ventes / $total_cmd, 2) : 0;
                                                         <i class="fas fa-receipt mr-2"></i>
                                                         Reçu
                                                     </a>
-                                                    <a href="supprimer_commande.php?id=<?= $cmd['id'] ?>" 
-                                                       onclick="return confirm('⚠️ Êtes-vous absolument sûr de vouloir supprimer cette commande ?');"
+                                                    <a href="modifier_commande.php?id=<?= $cmd['id'] ?>" 
+                                                       target="_blank"
+                                                       class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-yellow-500 to-indigo-600 text-white rounded-xl hover:from-blue-600 hover:to-indigo-700 focus:ring-4 focus:ring-blue-500/20 transform hover:scale-105 transition-all duration-300 font-bold shadow-lg hover:shadow-xl">
+                                                        <i class="fas fa-receipt mr-2"></i>
+                                                        modifier
+                                                    </a>
+                                                    <button onclick="confirmDelete(<?= $cmd['id'] ?>)"
                                                        class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-red-500 to-pink-600 text-white rounded-xl hover:from-red-600 hover:to-pink-700 focus:ring-4 focus:ring-red-500/20 transform hover:scale-105 transition-all duration-300 font-bold shadow-lg hover:shadow-xl">
                                                         <i class="fas fa-trash mr-2"></i>
                                                         Supprimer
-                                                    </a>
+                                                    </button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -477,7 +501,250 @@ $moyenne_cmd = $total_cmd > 0 ? round($total_ventes / $total_cmd, 2) : 0;
         </div>
     </div>
 
+    <!-- Modal de confirmation de suppression -->
+    <div id="deleteModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+        <div class="glass-card rounded-3xl p-8 m-4 max-w-md w-full animate-bounce-in">
+            <div class="text-center">
+                <div class="p-4 bg-gradient-to-r from-red-500 to-pink-600 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center animate-pulse">
+                    <i class="fas fa-exclamation-triangle text-white text-3xl"></i>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900 mb-4">⚠️ Confirmer la suppression</h3>
+                <p class="text-gray-600 mb-2">Vous êtes sur le point de supprimer définitivement la commande :</p>
+                <div class="bg-gradient-to-r from-red-50 to-pink-50 rounded-2xl p-4 mb-6">
+                    <p class="font-bold text-red-800" id="deleteCommandeInfo"></p>
+                </div>
+                <p class="text-red-600 font-semibold mb-8">⚠️ Cette action est irréversible !</p>
+                <div class="flex space-x-4">
+                    <button onclick="closeDeleteModal()" 
+                            class="flex-1 px-6 py-3 bg-gray-200 text-gray-800 rounded-2xl font-bold hover:bg-gray-300 transition-colors transform hover:scale-105">
+                        <i class="fas fa-times mr-2"></i>
+                        Annuler
+                    </button>
+                    <button onclick="deleteCommande()" 
+                            id="confirmDeleteBtn"
+                            class="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-pink-600 text-white rounded-2xl font-bold hover:from-red-600 hover:to-pink-700 transition-all transform hover:scale-105 shadow-xl">
+                        <i class="fas fa-trash mr-2"></i>
+                        Supprimer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-4"></div>
+
     <script>
+        let commandeToDelete = null;
+
+        // Fonction pour afficher la modale de confirmation
+        function confirmDelete(id) {
+            commandeToDelete = id;
+            const modal = document.getElementById('deleteModal');
+            const commandeRow = document.getElementById('commande-' + id);
+            const nomClient = commandeRow.querySelector('.text-lg.font-bold.text-gray-900').textContent;
+            
+            document.getElementById('deleteCommandeInfo').textContent = `Commande #${id} - ${nomClient}`;
+            modal.classList.remove('hidden');
+            
+            // Animation d'apparition
+            setTimeout(() => {
+                modal.classList.add('animate-fade-in');
+            }, 10);
+        }
+
+        // Fonction pour fermer la modale
+        function closeDeleteModal() {
+            const modal = document.getElementById('deleteModal');
+            modal.classList.add('opacity-0', 'scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('opacity-0', 'scale-95', 'animate-fade-in');
+            }, 300);
+            commandeToDelete = null;
+        }
+
+        // Fonction pour supprimer la commande via AJAX
+        function deleteCommande() {
+            if (!commandeToDelete) return;
+            
+            const confirmBtn = document.getElementById('confirmDeleteBtn');
+            const originalText = confirmBtn.innerHTML;
+            
+            // Animation de chargement
+            confirmBtn.innerHTML = `
+                <i class="fas fa-spinner fa-spin mr-2"></i>
+                Suppression...
+            `;
+            confirmBtn.disabled = true;
+            
+            // Requête AJAX
+            fetch(window.location.href, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `action=supprimer&id=${commandeToDelete}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Animation de suppression de la ligne
+                    const row = document.getElementById('commande-' + commandeToDelete);
+                    row.style.transform = 'translateX(-100%)';
+                    row.style.opacity = '0';
+                    
+                    setTimeout(() => {
+                        row.remove();
+                        updateStats();
+                    }, 300);
+                    
+                    showToast('✅ Commande supprimée avec succès!', 'success');
+                    closeDeleteModal();
+                } else {
+                    showToast('❌ Erreur: ' + data.message, 'error');
+                    confirmBtn.innerHTML = originalText;
+                    confirmBtn.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+                showToast('❌ Erreur de connexion', 'error');
+                confirmBtn.innerHTML = originalText;
+                confirmBtn.disabled = false;
+            });
+        }
+
+        // Fonction pour afficher les notifications toast
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            const bgColor = type === 'success' ? 'from-green-500 to-emerald-600' : 'from-red-500 to-pink-600';
+            const icon = type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle';
+            
+            toast.className = `glass-card px-6 py-4 bg-gradient-to-r ${bgColor} text-white rounded-2xl shadow-2xl transform translate-x-full transition-all duration-500 font-bold max-w-sm`;
+            toast.innerHTML = `
+                <div class="flex items-center">
+                    <i class="${icon} mr-3 text-xl"></i>
+                    <span>${message}</span>
+                    <button onclick="this.closest('.glass-card').remove()" class="ml-4 text-white/80 hover:text-white">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            
+            container.appendChild(toast);
+            
+            // Animation d'apparition
+            setTimeout(() => {
+                toast.style.transform = 'translateX(0)';
+            }, 100);
+            
+            // Auto-suppression après 5 secondes
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.style.transform = 'translateX(100%)';
+                    setTimeout(() => toast.remove(), 500);
+                }
+            }, 5000);
+        }
+
+        // Fonction pour mettre à jour les statistiques
+        function updateStats() {
+            const remainingRows = document.querySelectorAll('#commandesTableBody tr:not([colspan])');
+            const totalCommandes = remainingRows.length;
+            
+            // Mettre à jour le compteur total
+            const totalElement = document.querySelector('.text-4xl.font-black.bg-gradient-to-r.from-blue-600');
+            if (totalElement) {
+                animateCounter(totalElement, totalCommandes);
+            }
+            
+            // Recalculer et mettre à jour le total des ventes
+            let totalVentes = 0;
+            remainingRows.forEach(row => {
+                const totalCell = row.querySelector('.text-xl.font-black.bg-gradient-to-r.from-yellow-600');
+                if (totalCell) {
+                    const amount = parseInt(totalCell.textContent.replace(/[^\d]/g, ''));
+                    totalVentes += amount;
+                }
+            });
+            
+            const ventesElement = document.querySelector('.text-4xl.font-black.bg-gradient-to-r.from-green-600');
+            if (ventesElement) {
+                animateCounter(ventesElement, totalVentes);
+            }
+            
+            // Recalculer la moyenne
+            const moyenne = totalCommandes > 0 ? Math.round(totalVentes / totalCommandes) : 0;
+            const moyenneElement = document.querySelector('.text-4xl.font-black.bg-gradient-to-r.from-purple-600');
+            if (moyenneElement) {
+                animateCounter(moyenneElement, moyenne);
+            }
+            
+            // Mettre à jour le compteur de résultats
+            const resultatsElement = document.querySelector('.text-white.font-bold.text-sm');
+            if (resultatsElement) {
+                resultatsElement.textContent = `${totalCommandes} résultats`;
+            }
+            
+            // Vérifier s'il n'y a plus de commandes
+            if (totalCommandes === 0) {
+                const tbody = document.getElementById('commandesTableBody');
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="px-8 py-20 text-center">
+                            <div class="flex flex-col items-center animate-bounce-in">
+                                <div class="p-8 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full mb-6">
+                                    <i class="fas fa-search-minus text-6xl bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent"></i>
+                                </div>
+                                <h3 class="text-2xl font-bold text-gray-700 mb-2">Aucune commande trouvée</h3>
+                                <p class="text-gray-500 text-lg">Toutes les commandes ont été supprimées</p>
+                                <div class="mt-6 px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-full shadow-lg">
+                                    <span class="font-semibold">🔄 Rechargez la page pour voir les nouvelles commandes</span>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        // Animation de compteur
+        function animateCounter(element, targetValue) {
+            const currentValue = parseInt(element.textContent.replace(/[^\d]/g, ''));
+            const increment = (targetValue - currentValue) / 20;
+            let current = currentValue;
+            
+            const timer = setInterval(() => {
+                current += increment;
+                if (Math.abs(current - targetValue) < Math.abs(increment)) {
+                    current = targetValue;
+                    clearInterval(timer);
+                }
+                
+                if (targetValue > 1000) {
+                    element.textContent = Math.floor(current).toLocaleString();
+                } else {
+                    element.textContent = Math.floor(current);
+                }
+            }, 50);
+        }
+
+        // Fermer la modale en cliquant à l'extérieur
+        document.getElementById('deleteModal').addEventListener('click', (e) => {
+            if (e.target.id === 'deleteModal') {
+                closeDeleteModal();
+            }
+        });
+
+        // Fermer la modale avec Escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !document.getElementById('deleteModal').classList.contains('hidden')) {
+                closeDeleteModal();
+            }
+        });
+
         // Animations avancées au chargement
         document.addEventListener('DOMContentLoaded', function() {
             // Animation des cartes statistiques
@@ -520,13 +787,17 @@ $moyenne_cmd = $total_cmd > 0 ? round($total_ventes / $total_cmd, 2) : 0;
             const buttons = document.querySelectorAll('button, a[class*="bg-gradient"]');
             buttons.forEach(button => {
                 button.addEventListener('mouseenter', () => {
-                    button.style.transform = 'translateY(-2px) scale(1.05)';
-                    button.style.boxShadow = '0 20px 40px rgba(0,0,0,0.2)';
+                    if (!button.disabled) {
+                        button.style.transform = 'translateY(-2px) scale(1.05)';
+                        button.style.boxShadow = '0 20px 40px rgba(0,0,0,0.2)';
+                    }
                 });
                 
                 button.addEventListener('mouseleave', () => {
-                    button.style.transform = 'translateY(0) scale(1)';
-                    button.style.boxShadow = '';
+                    if (!button.disabled) {
+                        button.style.transform = 'translateY(0) scale(1)';
+                        button.style.boxShadow = '';
+                    }
                 });
             });
 
@@ -567,29 +838,6 @@ $moyenne_cmd = $total_cmd > 0 ? round($total_ventes / $total_cmd, 2) : 0;
 
             setInterval(createParticle, 500);
 
-            // Notification toast pour les actions
-            window.showToast = function(message, type = 'success') {
-                const toast = document.createElement('div');
-                const bgColor = type === 'success' ? 'from-green-500 to-emerald-600' : 'from-red-500 to-pink-600';
-                toast.className = `fixed top-4 right-4 px-6 py-4 bg-gradient-to-r ${bgColor} text-white rounded-2xl shadow-2xl transform translate-x-full transition-all duration-500 z-50 font-bold`;
-                toast.innerHTML = `
-                    <div class="flex items-center">
-                        <i class="fas fa-${type === 'success' ? 'check' : 'exclamation'}-circle mr-3 text-xl"></i>
-                        ${message}
-                    </div>
-                `;
-                document.body.appendChild(toast);
-                
-                setTimeout(() => {
-                    toast.style.transform = 'translateX(0)';
-                }, 100);
-                
-                setTimeout(() => {
-                    toast.style.transform = 'translateX(full)';
-                    setTimeout(() => toast.remove(), 500);
-                }, 3000);
-            };
-
             // Effet de recherche en temps réel
             const searchInput = document.querySelector('input[name="search"]');
             let searchTimeout;
@@ -606,11 +854,18 @@ $moyenne_cmd = $total_cmd > 0 ? round($total_ventes / $total_cmd, 2) : 0;
             const form = document.querySelector('form');
             form?.addEventListener('submit', (e) => {
                 const submitBtn = form.querySelector('button[type="submit"]');
+                const originalText = submitBtn.innerHTML;
                 submitBtn.innerHTML = `
                     <i class="fas fa-spinner fa-spin mr-2"></i>
                     Recherche...
                 `;
                 submitBtn.disabled = true;
+                
+                // Rétablir après 2 secondes si la page ne se recharge pas
+                setTimeout(() => {
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.disabled = false;
+                }, 2000);
             });
 
             // Animation des icônes
@@ -647,35 +902,13 @@ $moyenne_cmd = $total_cmd > 0 ? round($total_ventes / $total_cmd, 2) : 0;
             });
         }
 
-        // Confirmation stylée pour la suppression
-        function confirmDelete(id) {
-            const modal = document.createElement('div');
-            modal.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50';
-            modal.innerHTML = `
-                <div class="glass-card rounded-3xl p-8 m-4 max-w-md w-full animate-bounce-in">
-                    <div class="text-center">
-                        <div class="p-4 bg-gradient-to-r from-red-500 to-pink-600 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-                            <i class="fas fa-exclamation-triangle text-white text-3xl"></i>
-                        </div>
-                        <h3 class="text-2xl font-bold text-gray-900 mb-4">Confirmer la suppression</h3>
-                        <p class="text-gray-600 mb-8">Cette action est irréversible. Êtes-vous sûr de vouloir supprimer cette commande ?</p>
-                        <div class="flex space-x-4">
-                            <button onclick="this.closest('.fixed').remove()" class="flex-1 px-6 py-3 bg-gray-200 text-gray-800 rounded-2xl font-bold hover:bg-gray-300 transition-colors">
-                                Annuler
-                            </button>
-                            <a href="supprimer_commande.php?id=${id}" class="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-pink-600 text-white rounded-2xl font-bold hover:from-red-600 hover:to-pink-700 transition-all text-center">
-                                Supprimer
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(modal);
-            
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) modal.remove();
-            });
-        }
+        // Confirmation de sortie si une suppression est en cours
+        window.addEventListener('beforeunload', (e) => {
+            if (commandeToDelete && !document.getElementById('deleteModal').classList.contains('hidden')) {
+                e.preventDefault();
+                e.returnValue = 'Une suppression est en cours. Êtes-vous sûr de vouloir quitter ?';
+            }
+        });
     </script>
 </body>
 </html>

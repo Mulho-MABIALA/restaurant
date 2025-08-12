@@ -1,9 +1,30 @@
 [
     {
-        "id": "6895e6c0106bc",
-        "img": "assets\/img\/gallery\/6895e6c0103e8.png",
+        "id": "689a69b19c954",
+        "img": "assets\/img\/gallery\/689a69b19a569.jpeg",
+        "title": "f\u00eate Tabaski",
+        "category": "evenements",
+        "date_added": "2025-08-11 22:07:45"
+    },
+    {
+        "id": "689a6acfe2c0a",
+        "img": "assets\/img\/gallery\/689a6acfe1b7d.jpg",
+        "title": "mulho",
+        "category": "ambiance",
+        "date_added": "2025-08-11 22:12:31"
+    },
+    {
+        "id": "689a6af588d40",
+        "img": "assets\/img\/gallery\/689a6af58816e.jpeg",
         "title": "MAFE",
         "category": "evenements",
-        "date_added": "2025-08-08 12:00:00"
+        "date_added": "2025-08-11 22:13:09"
+    },
+    {
+        "id": "689a6dcc2b952",
+        "img": "assets\/img\/gallery\/689a6dcc2ad48.jpg",
+        "title": "salde",
+        "category": "plats",
+        "date_added": "2025-08-11 22:25:16"
     }
 ]

@@ -522,7 +522,7 @@ try {
                     <!-- Prix -->
                     <div>
                         <label for="edit_prix" class="block text-sm font-bold text-gray-700 mb-2">
-                            <i class="fas fa-euro-sign mr-2 text-green-600"></i>Prix (FCFA)
+                            <i class=" mr-2 text-green-600"></i>Prix (FCFA)
                         </label>
                         <input type="number" id="edit_prix" name="prix" step="0.01" required
                                class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:ring-4 focus:ring-green-100 focus:border-green-500 transition-all duration-300">

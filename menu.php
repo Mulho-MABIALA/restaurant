@@ -108,7 +108,7 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TERAL - Restaurant</title>
+    <title>Mulho - Restaurant</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
@@ -1372,7 +1372,7 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
     <!-- Header -->
     <header class="header">
         <div class="header-content">
-            <div class="logo">TERAL</div>
+            <div class="logo">Mulho</div>
             <div class="header-actions">
                 <button class="header-btn" onclick="showMenu()">
                     <i class="fas fa-utensils"></i>
