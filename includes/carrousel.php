@@ -483,8 +483,8 @@
                 <h1 class="slide-title">Saveurs Authentiques du Sénégal</h1>
                 <p class="slide-subtitle">Découvrez une expérience culinaire exceptionnelle où tradition et modernité se rencontrent. Nos chefs passionnés préparent chaque plat avec des ingrédients frais et authentiques.</p>
                 <div class="slide-cta-wrapper">
-                    <a href="#menu" class="slide-cta">Découvrir le Menu</a>
-                    <a href="#about" class="slide-cta slide-cta-secondary">Notre Histoire</a>
+                    <a href="menu.php" class="slide-cta">Découvrir le Menu</a>
+                    <a href="#A propos" class="slide-cta slide-cta-secondary">Notre Histoire</a>
                 </div>
             </div>
         </div>
@@ -509,7 +509,7 @@
                 <p class="slide-subtitle">Plongez dans une atmosphère conviviale qui célèbre la richesse culturelle du Sénégal. Parfait pour vos repas en famille, entre amis ou vos occasions spéciales.</p>
                 <div class="slide-cta-wrapper">
                     <a href="#book-a-table" class="slide-cta">Réserver une Table</a>
-                    <a href="galerie.php" class="slide-cta slide-cta-secondary">Voir la Galerie</a>
+                    <a href="gallery_public.php" class="slide-cta slide-cta-secondary">Voir la Galerie</a>
                 </div>
             </div>
         </div>

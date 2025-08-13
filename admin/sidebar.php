@@ -560,13 +560,21 @@ try {
                             <i class="fas fa-bullhorn mr-3 w-5 text-sm"></i>
                             <span class="font-medium">Annonces internes</span>
                         </a>
+                        <a href="communication/annonces_public.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                            <i class="fas fa-bullhorn mr-3 w-5 text-sm"></i>
+                            <span class="font-medium">Annonces public</span>
+                        </a>
                         <a href="communication/messagerie.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                             <i class="fas fa-envelope mr-3 w-5 text-sm"></i>
                             <span class="font-medium">Messagerie interne</span>
                         </a>
+                         <a href="communication/add_procedure.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                            <i class="fas fa-book mr-3 w-5 text-sm"></i>
+                            <span class="font-medium">Ajouter Procédures internes</span>
+                        </a>
                         <a href="communication/procedures.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                             <i class="fas fa-book mr-3 w-5 text-sm"></i>
-                            <span class="font-medium">Procédures internes</span>
+                            <span class="font-medium">voir Procédures internes</span>
                         </a>
                         <a href="communication/signalements.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                             <i class="fas fa-exclamation-triangle mr-3 w-5 text-sm"></i>

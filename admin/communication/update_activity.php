@@ -1,38 +1,47 @@
 <?php
-require_once '../../config.php';
 session_start();
+require_once '../../config.php';
 
-header('Content-Type: application/json');
-
-if (!isset($_SESSION['admin_id'])) {
-    echo json_encode(['error' => 'not_authenticated']);
-    exit;
+// SÉCURITÉ : Vérification de l'authentification et de la méthode
+if (!isset($_SESSION['admin_id']) || $_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(401);
+    echo json_encode(['error' => 'Non autorisé']);
+    exit();
 }
 
-$employe_id = $_SESSION['admin_id'];
+$user_id = $_SESSION['admin_id'];
 
 try {
-    // Mettre à jour le statut d'activité de l'utilisateur
+    // SÉCURITÉ : Mise à jour UNIQUEMENT pour l'utilisateur connecté
     $stmt = $conn->prepare("
         INSERT INTO user_status (user_id, last_activity, is_online) 
         VALUES (?, NOW(), TRUE) 
-        ON DUPLICATE KEY UPDATE 
-            last_activity = NOW(), 
-            is_online = TRUE
-    ");
-    $stmt->execute([$employe_id]);
-    
-    // Marquer les utilisateurs inactifs comme hors ligne (5+ minutes d'inactivité)
-    $conn->query("
-        UPDATE user_status 
-        SET is_online = FALSE 
-        WHERE last_activity < DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+        ON DUPLICATE KEY UPDATE last_activity = NOW(), is_online = TRUE
     ");
     
-    echo json_encode(['status' => 'success', 'updated_at' => date('Y-m-d H:i:s')]);
+    $result = $stmt->execute([$user_id]);
     
-} catch (PDOException $e) {
-    error_log("Erreur update_activity: " . $e->getMessage());
-    echo json_encode(['error' => 'database_error']);
+    if ($result) {
+        // Marquer les autres utilisateurs hors ligne si inactifs
+        $conn->query("
+            UPDATE user_status 
+            SET is_online = FALSE 
+            WHERE last_activity < DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+        ");
+        
+        echo json_encode([
+            'success' => true,
+            'timestamp' => date('Y-m-d H:i:s')
+        ]);
+    } else {
+        throw new Exception('Échec de la mise à jour');
+    }
+    
+} catch (Exception $e) {
+    // Log sécurisé
+    error_log("Erreur update_activity - User ID: {$user_id} - " . $e->getMessage());
+    
+    http_response_code(500);
+    echo json_encode(['error' => 'Erreur technique']);
 }
 ?>

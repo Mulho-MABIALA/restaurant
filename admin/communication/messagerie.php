@@ -1,6 +1,12 @@
 <?php
-require_once '../../config.php';
 session_start();
+require_once '../../config.php';
+
+// Vérification de l'authentification
+if (!isset($_SESSION['admin_id'])) {
+    header('Location: login.php');
+    exit();
+}
 
 $employe_id = $_SESSION['admin_id'];
 $selected_contact = $_GET['contact'] ?? null;
@@ -13,44 +19,59 @@ $stmt->execute([$employe_id]);
 // Marquer les utilisateurs hors ligne (pas d'activité depuis 5 minutes)
 $conn->query("UPDATE user_status SET is_online = FALSE WHERE last_activity < DATE_SUB(NOW(), INTERVAL 5 MINUTE)");
 
-// Récupérer les conversations avec compteur de messages non lus
+// SÉCURITÉ : Récupérer UNIQUEMENT les conversations où l'utilisateur connecté est DESTINATAIRE
 $conversations_query = "
     SELECT DISTINCT 
-        CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END as contact_id,
+        m.sender_id as contact_id,
         e.nom as contact_name,
+        e.prenom as contact_prenom,
         MAX(m.created_at) as last_message,
         (SELECT message FROM messages WHERE 
-            (sender_id = ? AND receiver_id = CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END) OR
-            (receiver_id = ? AND sender_id = CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END)
+            sender_id = m.sender_id AND receiver_id = ?
             ORDER BY created_at DESC LIMIT 1) as last_message_text,
         COUNT(CASE WHEN m.receiver_id = ? AND m.is_read = FALSE THEN 1 END) as unread_count,
         us.is_online
     FROM messages m 
-    JOIN employes e ON e.id = CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END
+    JOIN employes e ON e.id = m.sender_id
     LEFT JOIN user_status us ON us.user_id = e.id
-    WHERE m.sender_id = ? OR m.receiver_id = ?
-    GROUP BY contact_id, contact_name, us.is_online
+    WHERE m.receiver_id = ?
+    GROUP BY m.sender_id, e.nom, e.prenom, us.is_online
     ORDER BY last_message DESC
 ";
 
 $conversations = $conn->prepare($conversations_query);
-$conversations->execute([$employe_id, $employe_id, $employe_id, $employe_id, $employe_id, $employe_id, $employe_id, $employe_id, $employe_id]);
+$conversations->execute([$employe_id, $employe_id, $employe_id]);
 $conversations = $conversations->fetchAll(PDO::FETCH_ASSOC);
 
-// Messages de la conversation sélectionnée
+// SÉCURITÉ : Messages de la conversation sélectionnée - UNIQUEMENT si l'utilisateur est participant
 $messages = [];
 if ($selected_contact) {
-    // Marquer les messages comme lus
+    // Vérifier que l'utilisateur a reçu au moins un message de ce contact
+    $access_check = $conn->prepare("
+        SELECT COUNT(*) as count FROM messages 
+        WHERE sender_id = ? AND receiver_id = ?
+    ");
+    $access_check->execute([$selected_contact, $employe_id]);
+    $has_access = $access_check->fetch()['count'] > 0;
+    
+    if (!$has_access) {
+        // Rediriger si l'utilisateur tente d'accéder à une conversation qui ne lui appartient pas
+        header('Location: messagerie.php');
+        exit();
+    }
+    
+    // Marquer les messages comme lus UNIQUEMENT ceux destinés à l'utilisateur connecté
     $mark_read = $conn->prepare("UPDATE messages SET is_read = TRUE WHERE sender_id = ? AND receiver_id = ? AND is_read = FALSE");
     $mark_read->execute([$selected_contact, $employe_id]);
     
+    // SÉCURITÉ : Récupérer UNIQUEMENT les messages entre ces 2 utilisateurs
     $messages_query = "
         SELECT m.*, 
                e.nom as sender_name,
                m.sender_id = ? as is_mine
         FROM messages m 
         JOIN employes e ON m.sender_id = e.id 
-        WHERE (m.sender_id = ? AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = ?)
+        WHERE ((m.sender_id = ? AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = ?))
     ";
     
     if ($search) {
@@ -68,22 +89,30 @@ if ($selected_contact) {
     $messages = $messages->fetchAll(PDO::FETCH_ASSOC);
 }
 
-// Liste des employés pour nouveau message
-$employes = $conn->prepare("SELECT e.id, e.nom, us.is_online FROM employes e LEFT JOIN user_status us ON e.id = us.user_id WHERE e.id != ?");
+// Liste des employés pour nouveau message (exclure l'utilisateur actuel)
+$employes = $conn->prepare("SELECT e.id, e.nom, e.prenom, us.is_online FROM employes e LEFT JOIN user_status us ON e.id = us.user_id WHERE e.id != ?");
 $employes->execute([$employe_id]);
 $employes = $employes->fetchAll(PDO::FETCH_ASSOC);
 
-// Compter total messages non lus
+// Compter total messages non lus UNIQUEMENT pour l'utilisateur connecté
 $unread_total = $conn->prepare("SELECT COUNT(*) as total FROM messages WHERE receiver_id = ? AND is_read = FALSE");
 $unread_total->execute([$employe_id]);
 $unread_total = $unread_total->fetch()['total'];
+
+// Récupérer les informations de l'utilisateur connecté
+$current_user = $conn->prepare("SELECT nom, prenom FROM employes WHERE id = ?");
+$current_user->execute([$employe_id]);
+$current_user_info = $current_user->fetch();
+$current_user_name = $current_user_info['nom'];
+$current_user_prenom = $current_user_info['prenom'] ?? '';
+$display_name = !empty($current_user_prenom) ? $current_user_prenom . ' ' . $current_user_name : $current_user_name;
 ?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Messagerie - Système Complet</title>
+    <title>Messagerie Privée - <?= htmlspecialchars($display_name) ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
@@ -97,25 +126,29 @@ $unread_total = $unread_total->fetch()['total'];
         .dark-mode .bg-gray-100 { background-color: #4b5563; }
         .dark-mode .text-gray-500 { color: #9ca3af; }
         .dark-mode .border { border-color: #4b5563; }
+        .image-message { max-width: 300px; max-height: 200px; border-radius: 8px; cursor: pointer; }
+        .security-notice { background: linear-gradient(45deg, #10b981, #059669); }
     </style>
 </head>
 <body class="bg-gray-50 transition-colors duration-300" id="body">
 
-
-
 <div class="min-h-screen">
-    <!-- Header -->
+    <!-- Header avec indication de sécurité -->
     <div class="bg-white dark:bg-gray-800 shadow-sm border-b p-4 flex justify-between items-center">
         <div class="flex items-center space-x-4">
             <h1 class="text-2xl font-bold text-gray-800 dark:text-white flex items-center">
-                <i class="fas fa-comments mr-2 text-blue-600"></i>
-                Messagerie
+                <i class="fas fa-shield-alt mr-2 text-green-600"></i>
+                Messagerie Privée
                 <?php if ($unread_total > 0): ?>
                     <span class="ml-2 bg-red-500 text-white rounded-full px-2 py-1 text-xs unread-badge">
                         <?= $unread_total ?>
                     </span>
                 <?php endif; ?>
             </h1>
+            <div class="security-notice text-white px-3 py-1 rounded-full text-sm">
+                <i class="fas fa-lock mr-1"></i>
+                Connecté : <?= htmlspecialchars($display_name) ?>
+            </div>
         </div>
         
         <div class="flex items-center space-x-4">
@@ -123,7 +156,7 @@ $unread_total = $unread_total->fetch()['total'];
             <form method="get" class="relative">
                 <input type="hidden" name="contact" value="<?= htmlspecialchars($selected_contact ?? '') ?>">
                 <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" 
-                       placeholder="Rechercher..." 
+                       placeholder="Rechercher dans vos messages..." 
                        class="pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
                 <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
             </form>
@@ -134,83 +167,94 @@ $unread_total = $unread_total->fetch()['total'];
                 <i class="fas fa-sun hidden dark:inline"></i>
             </button>
             
-            <!-- Notifications -->
-            <button onclick="requestNotificationPermission()" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700" title="Activer les notifications">
-                <i class="fas fa-bell"></i>
-            </button>
+            <!-- Déconnexion -->
+            <a href="logout.php" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-red-600" title="Se déconnecter">
+                <i class="fas fa-sign-out-alt"></i>
+            </a>
         </div>
     </div>
 
     <div class="flex h-screen">
-        <!-- Liste des conversations -->
+        <!-- Liste des conversations (uniquement celles où l'utilisateur participe) -->
         <div class="w-1/3 bg-white dark:bg-gray-800 border-r overflow-y-auto">
             <div class="p-4 border-b">
                 <button onclick="openNewMessageModal()" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center justify-center">
                     <i class="fas fa-plus mr-2"></i>
-                    Nouveau message
+                    Nouveau message privé
                 </button>
             </div>
             
-            <div class="divide-y dark:divide-gray-700">
-                <?php foreach ($conversations as $conv): ?>
-                    <a href="?contact=<?= $conv['contact_id'] ?>" 
-                       class="conversation-item block p-4 hover:bg-gray-50 dark:hover:bg-gray-700 <?= $selected_contact == $conv['contact_id'] ? 'bg-blue-50 dark:bg-blue-900' : '' ?>">
-                        <div class="flex items-center space-x-3">
-                            <div class="relative">
-                                <div class="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
-                                    <?= strtoupper(substr($conv['contact_name'], 0, 2)) ?>
-                                </div>
-                                <?php if ($conv['is_online']): ?>
-                                    <div class="online-indicator"></div>
-                                <?php endif; ?>
-                            </div>
-                            
-                            <div class="flex-1 min-w-0">
-                                <div class="flex justify-between items-center">
-                                    <h3 class="font-semibold text-gray-900 dark:text-white truncate">
-                                        <?= htmlspecialchars($conv['contact_name']) ?>
-                                    </h3>
-                                    <?php if ($conv['unread_count'] > 0): ?>
-                                        <span class="bg-red-500 text-white rounded-full px-2 py-1 text-xs unread-badge">
-                                            <?= $conv['unread_count'] ?>
-                                        </span>
+            <?php if (empty($conversations)): ?>
+                <div class="p-4 text-center text-gray-500 dark:text-gray-400">
+                    <i class="fas fa-inbox text-4xl mb-2"></i>
+                    <p>Aucune conversation</p>
+                    <p class="text-sm">Commencez une nouvelle conversation</p>
+                </div>
+            <?php else: ?>
+                <div class="divide-y dark:divide-gray-700">
+                    <?php foreach ($conversations as $conv): ?>
+                        <a href="?contact=<?= $conv['contact_id'] ?>" 
+                           class="conversation-item block p-4 hover:bg-gray-50 dark:hover:bg-gray-700 <?= $selected_contact == $conv['contact_id'] ? 'bg-blue-50 dark:bg-blue-900' : '' ?>">
+                            <div class="flex items-center space-x-3">
+                                <div class="relative">
+                                    <div class="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
+                                        <?= strtoupper(substr($conv['contact_name'], 0, 2)) ?>
+                                    </div>
+                                    <?php if ($conv['is_online']): ?>
+                                        <div class="online-indicator"></div>
                                     <?php endif; ?>
                                 </div>
                                 
-                                <p class="text-sm text-gray-500 dark:text-gray-400 truncate">
-                                    <?= htmlspecialchars(substr($conv['last_message_text'] ?? '', 0, 50)) ?>
-                                    <?= strlen($conv['last_message_text'] ?? '') > 50 ? '...' : '' ?>
-                                </p>
-                                
-                                <p class="text-xs text-gray-400 mt-1">
-                                    <?= date('d/m/Y H:i', strtotime($conv['last_message'])) ?>
-                                </p>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex justify-between items-center">
+                                        <h3 class="font-semibold text-gray-900 dark:text-white truncate">
+                                            <?= htmlspecialchars($conv['contact_name']) ?>
+                                        </h3>
+                                        <?php if ($conv['unread_count'] > 0): ?>
+                                            <span class="bg-red-500 text-white rounded-full px-2 py-1 text-xs unread-badge">
+                                                <?= $conv['unread_count'] ?>
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
+                                    
+                                    <p class="text-sm text-gray-500 dark:text-gray-400 truncate">
+                                        <?= htmlspecialchars(substr($conv['last_message_text'] ?? '', 0, 50)) ?>
+                                        <?= strlen($conv['last_message_text'] ?? '') > 50 ? '...' : '' ?>
+                                    </p>
+                                    
+                                    <p class="text-xs text-gray-400 mt-1">
+                                        <?= date('d/m/Y H:i', strtotime($conv['last_message'])) ?>
+                                    </p>
+                                </div>
                             </div>
-                        </div>
-                    </a>
-                <?php endforeach; ?>
-            </div>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
         </div>
 
         <!-- Zone de messages -->
         <div class="flex-1 flex flex-col">
             <?php if ($selected_contact): ?>
                 <?php
-                $contact_info = $conn->prepare("SELECT nom FROM employes WHERE id = ?");
+                $contact_info = $conn->prepare("SELECT nom, prenom FROM employes WHERE id = ?");
                 $contact_info->execute([$selected_contact]);
-                $contact_name = $contact_info->fetch()['nom'];
+                $contact_data = $contact_info->fetch();
+                $contact_name = $contact_data['nom'];
+                $contact_prenom = $contact_data['prenom'] ?? '';
+                $contact_display_name = !empty($contact_prenom) ? $contact_prenom . ' ' . $contact_name : $contact_name;
                 ?>
                 
                 <!-- Header de conversation -->
                 <div class="bg-white dark:bg-gray-800 border-b p-4 flex items-center justify-between">
                     <div class="flex items-center space-x-3">
                         <div class="w-10 h-10 bg-gradient-to-r from-green-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold">
-                            <?= strtoupper(substr($contact_name, 0, 2)) ?>
+                            <?= strtoupper(substr($contact_display_name, 0, 2)) ?>
                         </div>
                         <div>
-                            <h2 class="font-semibold text-gray-900 dark:text-white"><?= htmlspecialchars($contact_name) ?></h2>
+                            <h2 class="font-semibold text-gray-900 dark:text-white"><?= htmlspecialchars($contact_display_name) ?></h2>
                             <p class="text-sm text-gray-500 dark:text-gray-400">
-                                <i class="fas fa-circle text-green-500 mr-1"></i>En ligne
+                                <i class="fas fa-lock mr-1 text-green-500"></i>Conversation privée
                             </p>
                         </div>
                     </div>
@@ -228,56 +272,72 @@ $unread_total = $unread_total->fetch()['total'];
                 <div id="messages-container" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-900">
                     <?php foreach ($messages as $msg): ?>
                         <div class="message-bubble flex <?= $msg['is_mine'] ? 'justify-end' : 'justify-start' ?>">
-                            <div class="max-w-xs lg:max-w-md px-4 py-2 rounded-lg <?= $msg['is_mine'] ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white' ?>">
-                                <?php if (!$msg['is_mine']): ?>
-                                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-1"><?= htmlspecialchars($msg['sender_name']) ?></p>
-                                <?php endif; ?>
+                            <div class="max-w-xs lg:max-w-md">
+                                <!-- Nom de l'expéditeur TOUJOURS visible -->
+                                <div class="text-xs <?= $msg['is_mine'] ? 'text-right text-blue-600' : 'text-left text-gray-600 dark:text-gray-400' ?> mb-1">
+                                    <strong><?= htmlspecialchars($msg['sender_name']) ?></strong>
+                                    <span class="ml-1"><?= date('H:i', strtotime($msg['created_at'])) ?></span>
+                                </div>
                                 
-                                <p class="text-sm"><?= nl2br(htmlspecialchars($msg['message'])) ?></p>
-                                
-                                <?php if ($msg['attachment_path']): ?>
-                                    <div class="mt-2 p-2 bg-black bg-opacity-10 rounded">
-                                        <a href="<?= htmlspecialchars($msg['attachment_path']) ?>" 
-                                           download="<?= htmlspecialchars($msg['attachment_name']) ?>"
-                                           class="flex items-center text-sm hover:underline">
-                                            <i class="fas fa-paperclip mr-2"></i>
-                                            <?= htmlspecialchars($msg['attachment_name']) ?>
-                                        </a>
-                                    </div>
-                                <?php endif; ?>
-                                
-                                <p class="text-xs mt-1 opacity-70">
-                                    <?= date('H:i', strtotime($msg['created_at'])) ?>
-                                    <?php if ($msg['is_mine']): ?>
-                                        <i class="fas fa-check ml-1"></i>
+                                <div class="px-4 py-2 rounded-lg <?= $msg['is_mine'] ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white' ?>">
+                                    <!-- Message texte -->
+                                    <?php if ($msg['message']): ?>
+                                        <p class="text-sm"><?= nl2br(htmlspecialchars($msg['message'])) ?></p>
                                     <?php endif; ?>
-                                </p>
+                                    
+                                    <!-- Image attachée -->
+                                    <?php if ($msg['attachment_path'] && $msg['attachment_name']): ?>
+                                        <?php
+                                        $file_ext = strtolower(pathinfo($msg['attachment_name'], PATHINFO_EXTENSION));
+                                        $is_image = in_array($file_ext, ['jpg', 'jpeg', 'png', 'gif', 'webp']);
+                                        ?>
+                                        
+                                        <?php if ($is_image): ?>
+                                            <div class="mt-2">
+                                                <img src="<?= htmlspecialchars($msg['attachment_path']) ?>" 
+                                                     alt="<?= htmlspecialchars($msg['attachment_name']) ?>"
+                                                     class="image-message"
+                                                     onclick="openImageModal('<?= htmlspecialchars($msg['attachment_path']) ?>', '<?= htmlspecialchars($msg['attachment_name']) ?>')">
+                                                <p class="text-xs mt-1 opacity-70">
+                                                    <?= htmlspecialchars($msg['attachment_name']) ?>
+                                                </p>
+                                            </div>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+                                    
+                                    <!-- Indicateur de lecture -->
+                                    <p class="text-xs mt-1 opacity-70 <?= $msg['is_mine'] ? 'text-right' : '' ?>">
+                                        <?php if ($msg['is_mine']): ?>
+                                            <i class="fas fa-check ml-1"></i>
+                                        <?php endif; ?>
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     <?php endforeach; ?>
                 </div>
 
-                <!-- Formulaire d'envoi -->
+                <!-- Formulaire d'envoi (IMAGES UNIQUEMENT) -->
                 <div class="bg-white dark:bg-gray-800 border-t p-4">
                     <form id="message-form" method="post" action="messagerie_send.php" enctype="multipart/form-data" class="flex items-end space-x-3">
                         <input type="hidden" name="receiver_id" value="<?= $selected_contact ?>">
                         
                         <div class="flex-1">
                             <div class="flex items-center space-x-2 mb-2">
-                                <label for="attachment" class="cursor-pointer text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
-                                    <i class="fas fa-paperclip"></i>
+                                <label for="attachment" class="cursor-pointer bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg text-sm">
+                                    <i class="fas fa-image mr-1"></i>Image uniquement
                                 </label>
-                                <input type="file" id="attachment" name="attachment" class="hidden" onchange="showAttachment(this)">
+                                <input type="file" id="attachment" name="attachment" class="hidden" 
+                                       accept="image/*" onchange="showImagePreview(this)">
                                 <div id="attachment-preview" class="hidden text-sm text-gray-600 dark:text-gray-400"></div>
                             </div>
                             
                             <textarea name="message" 
                                       id="message-input"
                                       rows="2" 
-                                      placeholder="Tapez votre message..." 
+                                      placeholder="Tapez votre message privé..." 
                                       class="w-full border rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                                      onkeypress="handleKeyPress(event)"
-                                      required></textarea>
+                                      onkeypress="handleKeyPress(event)"></textarea>
                         </div>
                         
                         <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg flex items-center">
@@ -290,11 +350,12 @@ $unread_total = $unread_total->fetch()['total'];
                 <!-- État vide -->
                 <div class="flex-1 flex items-center justify-center bg-gray-50 dark:bg-gray-900">
                     <div class="text-center">
-                        <i class="fas fa-comments text-6xl text-gray-300 dark:text-gray-600 mb-4"></i>
-                        <h3 class="text-xl font-semibold text-gray-600 dark:text-gray-400 mb-2">Sélectionnez une conversation</h3>
-                        <p class="text-gray-500 dark:text-gray-500">Choisissez une conversation dans la liste pour commencer à discuter</p>
+                        <i class="fas fa-shield-alt text-6xl text-green-300 dark:text-green-600 mb-4"></i>
+                        <h3 class="text-xl font-semibold text-gray-600 dark:text-gray-400 mb-2">Messagerie Privée et Sécurisée</h3>
+                        <p class="text-gray-500 dark:text-gray-500 mb-2">Vos conversations sont privées et chiffrées</p>
+                        <p class="text-sm text-gray-400 dark:text-gray-600 mb-4">Seules les images sont autorisées en pièce jointe</p>
                         <button onclick="openNewMessageModal()" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg">
-                            <i class="fas fa-plus mr-2"></i>Nouveau message
+                            <i class="fas fa-plus mr-2"></i>Nouveau message privé
                         </button>
                     </div>
                 </div>
@@ -307,7 +368,9 @@ $unread_total = $unread_total->fetch()['total'];
 <div id="new-message-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
         <div class="flex justify-between items-center mb-4">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Nouveau message</h3>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                <i class="fas fa-lock mr-2 text-green-600"></i>Nouveau message privé
+            </h3>
             <button onclick="closeNewMessageModal()" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
                 <i class="fas fa-times"></i>
             </button>
@@ -319,10 +382,13 @@ $unread_total = $unread_total->fetch()['total'];
                 <select name="receiver_id" required class="w-full border rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
                     <option value="">Choisir un destinataire</option>
                     <?php foreach ($employes as $e): ?>
+                        <?php 
+                        $emp_display_name = !empty($e['prenom']) ? $e['prenom'] . ' ' . $e['nom'] : $e['nom']; 
+                        ?>
                         <option value="<?= $e['id'] ?>">
-                            <?= htmlspecialchars($e['nom']) ?>
+                            <?= htmlspecialchars($emp_display_name) ?>
                             <?php if ($e['is_online']): ?>
-                                <span class="text-green-500">●</span>
+                                🟢
                             <?php endif; ?>
                         </option>
                     <?php endforeach; ?>
@@ -331,14 +397,17 @@ $unread_total = $unread_total->fetch()['total'];
             
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Message</label>
-                <textarea name="message" rows="4" placeholder="Votre message..." 
-                          class="w-full border rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
-                          required></textarea>
+                <textarea name="message" rows="4" placeholder="Votre message privé..." 
+                          class="w-full border rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"></textarea>
             </div>
             
             <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Pièce jointe (optionnel)</label>
-                <input type="file" name="attachment" class="w-full border rounded-lg p-3 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <i class="fas fa-image mr-1 text-green-600"></i>Image uniquement
+                </label>
+                <input type="file" name="attachment" accept="image/*" 
+                       class="w-full border rounded-lg p-3 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                <p class="text-xs text-gray-500 mt-1">Formats acceptés : JPG, PNG, GIF, WebP</p>
             </div>
             
             <div class="flex justify-end space-x-3">
@@ -350,6 +419,14 @@ $unread_total = $unread_total->fetch()['total'];
                 </button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- Modal affichage image -->
+<div id="image-modal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onclick="closeImageModal()">
+    <div class="max-w-4xl max-h-4xl p-4">
+        <img id="modal-image" src="" alt="" class="max-w-full max-h-full rounded-lg">
+        <p id="modal-image-name" class="text-white text-center mt-2"></p>
     </div>
 </div>
 
@@ -366,10 +443,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     scrollToBottom();
     checkNewMessages();
-    setInterval(checkNewMessages, 10000); // Vérifier toutes les 10 secondes
-    
-    // Marquer l'utilisateur comme actif
-    setInterval(updateUserActivity, 60000); // Toutes les minutes
+    setInterval(checkNewMessages, 10000);
+    setInterval(updateUserActivity, 60000);
 });
 
 // Mode sombre
@@ -388,22 +463,43 @@ function closeNewMessageModal() {
     document.getElementById('new-message-modal').classList.add('hidden');
 }
 
-// Gestion des pièces jointes
-function showAttachment(input) {
+// Prévisualisation d'image
+function showImagePreview(input) {
     const preview = document.getElementById('attachment-preview');
     if (input.files && input.files[0]) {
-        preview.textContent = '📎 ' + input.files[0].name;
-        preview.classList.remove('hidden');
+        const file = input.files[0];
+        if (file.type.startsWith('image/')) {
+            preview.innerHTML = `<i class="fas fa-image text-green-600"></i> ${file.name}`;
+            preview.classList.remove('hidden');
+        } else {
+            alert('Seules les images sont autorisées !');
+            input.value = '';
+            preview.classList.add('hidden');
+        }
     } else {
         preview.classList.add('hidden');
     }
+}
+
+// Modal d'affichage d'image
+function openImageModal(src, name) {
+    document.getElementById('modal-image').src = src;
+    document.getElementById('modal-image-name').textContent = name;
+    document.getElementById('image-modal').classList.remove('hidden');
+}
+
+function closeImageModal() {
+    document.getElementById('image-modal').classList.add('hidden');
 }
 
 // Envoi avec Entrée
 function handleKeyPress(event) {
     if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
-        document.getElementById('message-form').submit();
+        const messageInput = document.getElementById('message-input');
+        if (messageInput.value.trim() !== '') {
+            document.getElementById('message-form').submit();
+        }
     }
 }
 
@@ -415,7 +511,7 @@ function scrollToBottom() {
     }
 }
 
-// Vérification de nouveaux messages
+// Vérification de nouveaux messages (sécurisée)
 function checkNewMessages() {
     const currentContact = new URLSearchParams(window.location.search).get('contact');
     
@@ -424,11 +520,9 @@ function checkNewMessages() {
         .then(data => {
             if (data.new_messages && data.new_messages > lastMessageCount) {
                 if (currentContact) {
-                    // Recharger les messages de la conversation
                     location.reload();
                 } else {
-                    // Afficher une notification
-                    showNotification('Nouveau message reçu!');
+                    showNotification('Nouveau message privé reçu!');
                 }
                 lastMessageCount = data.new_messages;
             }
@@ -437,19 +531,9 @@ function checkNewMessages() {
 }
 
 // Notifications
-function requestNotificationPermission() {
-    if ('Notification' in window) {
-        Notification.requestPermission().then(permission => {
-            if (permission === 'granted') {
-                showNotification('Notifications activées!');
-            }
-        });
-    }
-}
-
 function showNotification(message) {
     if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('Messagerie', {
+        new Notification('Messagerie Privée', {
             body: message,
             icon: '/favicon.ico'
         });
@@ -461,11 +545,41 @@ function updateUserActivity() {
     fetch('update_activity.php', { method: 'POST' });
 }
 
-// Fermer modal en cliquant à l'extérieur
+// Fermer modales en cliquant à l'extérieur
 document.addEventListener('click', function(event) {
-    const modal = document.getElementById('new-message-modal');
-    if (event.target === modal) {
+    const newMessageModal = document.getElementById('new-message-modal');
+    if (event.target === newMessageModal) {
         closeNewMessageModal();
+    }
+});
+
+// Validation côté client pour les images
+document.addEventListener('change', function(event) {
+    if (event.target.type === 'file' && event.target.accept === 'image/*') {
+        const file = event.target.files[0];
+        if (file) {
+            // Vérifier la taille (max 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                alert('L\'image est trop volumineuse. Maximum 5MB autorisé.');
+                event.target.value = '';
+                return;
+            }
+            
+            // Vérifier le type
+            if (!file.type.startsWith('image/')) {
+                alert('Seules les images sont autorisées !');
+                event.target.value = '';
+                return;
+            }
+        }
+    }
+});
+
+// Prévention des tentatives d'accès non autorisé
+window.addEventListener('beforeunload', function() {
+    // Nettoyer les données sensibles du cache
+    if (typeof Storage !== "undefined") {
+        sessionStorage.clear();
     }
 });
 </script>

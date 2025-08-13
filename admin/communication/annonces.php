@@ -1,9 +1,5 @@
 <?php
-// annonces.php
-
-require_once '../../config.php'; // Inclusion du fichier de configuration
-
-// Connexion à la base de données (supposons que $pdo est défini dans config.php)
+require_once '../../config.php'; 
 if (!isset($conn)) {
     die('Erreur de connexion à la base de données.');
 }
