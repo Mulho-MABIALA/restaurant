@@ -19,24 +19,6 @@ try {
     $results = []; // Valeur de repli
 }
 
-// Requête pour récupérer les plats disponibles (triés du plus récent au plus ancien)
-try {
-    $stmt = $conn->query("SELECT * FROM plats ORDER BY created_at DESC");
-    $produits = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    error_log("Erreur SQL produits : " . $e->getMessage());
-    $produits = [];
-}
-
-// Compter les articles dans le panier
-$nb_articles_panier = 0;
-if (!empty($_SESSION['panier']) && is_array($_SESSION['panier'])) {
-    foreach ($_SESSION['panier'] as $id => $details) {
-        if (isset($details['quantite']) && is_numeric($details['quantite'])) {
-            $nb_articles_panier += (int)$details['quantite'];
-        }
-    }
-}
 ?>
 
 <!DOCTYPE html>

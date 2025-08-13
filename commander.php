@@ -2,10 +2,47 @@
 require_once 'config.php';
 require 'vendor/autoload.php';
 session_start();
+// Ajouter ce code après session_start() dans commander.php
 
+// Gestionnaire pour la synchronisation du panier localStorage
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['action'] == 'sync_cart') {
+    header('Content-Type: application/json');
+    
+    try {
+        $cartData = json_decode($_POST['cart_data'], true);
+        
+        if ($cartData && is_array($cartData)) {
+            $_SESSION['panier'] = [];
+            
+            // Récupérer les produits de la base pour validation
+            $stmt = $conn->prepare("SELECT id, nom, prix FROM plats WHERE nom = ?");
+            
+            foreach ($cartData as $item) {
+                $stmt->execute([$item['item']]);
+                $produit = $stmt->fetch();
+                
+                if ($produit) {
+                    $_SESSION['panier'][$produit['id']] = intval($item['quantity']);
+                }
+            }
+            
+            echo json_encode([
+                'success' => true, 
+                'message' => 'Panier synchronisé',
+                'session_count' => count($_SESSION['panier'])
+            ]);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Données invalides']);
+        }
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+    exit;
+}
 // Initialisation sécurisée des variables
 $total = 0;
 $produits = [];
+
 
 // Vérification et initialisation du panier
 if (!isset($_SESSION['panier']) || !is_array($_SESSION['panier'])) {
@@ -50,55 +87,103 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $telephone = trim($_POST['telephone']);
     $adresse = trim($_POST['adresse']);
     $mode_retrait = $_POST['mode_retrait'] ?? '';
-
+    $num_table = trim($_POST['num_table'] ?? '');
+ }
     if (empty($nom) || empty($email) || empty($adresse)) {
         $erreur = "Veuillez remplir tous les champs obligatoires.";
     } else {
-        $total = 0;
-        $ids = array_keys($_SESSION['panier']);
-        $stmt = $conn->prepare("SELECT * FROM plats WHERE id = ?");
+        // CORRECTION 1: Récupérer les produits AVANT de commencer la transaction
         $produits = [];
+        $total = 0;
 
-        foreach ($ids as $id) {
-            $stmt->execute([$id]);
-            $produit = $stmt->fetch();
-            if ($produit) {
-                $produit['quantite'] = $_SESSION['panier'][$produit['id']];
-                $total += $produit['prix'] * $produit['quantite'];
-                $produits[] = $produit;
+        // Vérifier d'abord la session
+        if (!empty($_SESSION['panier']) && is_array($_SESSION['panier'])) {
+            $ids = array_keys($_SESSION['panier']);
+            if (!empty($ids)) {
+                $stmt = $conn->prepare("SELECT * FROM plats WHERE id = ?");
+                foreach ($ids as $id) {
+                    if (is_numeric($id)) {
+                        $stmt->execute([$id]);
+                        $produit = $stmt->fetch();
+                        if ($produit) {
+                            $produit['quantite'] = $_SESSION['panier'][$produit['id']];
+                            $total += $produit['prix'] * $produit['quantite'];
+                            $produits[] = $produit;
+                        }
+                    }
+                }
             }
         }
 
-        $transactionActive = false;
-        try {
-            $conn->beginTransaction();
-            $transactionActive = true;
-
-            // Insertion de la commande
-            $stmt = $conn->prepare("INSERT INTO commandes 
-                (nom_client, email, telephone, adresse, mode_retrait, total, date_commande, statut, vu_admin, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, NOW(), 'En cours', 0, NOW())");
-            $stmt->execute([$nom, $email, $telephone, $adresse, $mode_retrait, $total]);
-            $commande_id = $conn->lastInsertId();
-
-            // Insertion des détails
-            foreach ($produits as $plat) {
-                $stmt = $conn->prepare("INSERT INTO commande_details (commande_id, nom_plat, quantite, prix) VALUES (?, ?, ?, ?)");
-                $stmt->execute([$commande_id, $plat['nom'], $plat['quantite'], $plat['prix']]);
-
-                $stmt = $conn->prepare("UPDATE plats SET stock = stock - ? WHERE id = ?");
-                $stmt->execute([$plat['quantite'], $plat['id']]);
+        // CORRECTION 2: Si panier session vide, essayer localStorage via AJAX
+        if (empty($produits) && isset($_POST['cart_data'])) {
+            $cartData = json_decode($_POST['cart_data'], true);
+            if ($cartData && is_array($cartData)) {
+                $stmt = $conn->prepare("SELECT * FROM plats WHERE nom = ?");
+                foreach ($cartData as $item) {
+                    $stmt->execute([$item['item']]);
+                    $produit = $stmt->fetch();
+                    if ($produit) {
+                        $produit['quantite'] = $item['quantity'];
+                        $total += $produit['prix'] * $produit['quantite'];
+                        $produits[] = $produit;
+                    }
+                }
             }
+        }
 
-            // Notification admin
-            $notif = $conn->prepare("INSERT INTO notifications (message, type, date, vue) VALUES (?, ?, NOW(), 0)");
-            $notif->execute(['Un client vient de passer une commande.', 'info']);
+        // CORRECTION 3: Vérifier qu'on a des produits avant de continuer
+        if (empty($produits) || $total <= 0) {
+            $erreur = "Erreur : Aucun produit trouvé dans votre panier. Veuillez retourner au menu.";
+        } else {
+            // Debug - à supprimer après résolution
+            error_log("Produits à sauvegarder: " . print_r($produits, true));
+            error_log("Total calculé: " . $total);
 
-            $conn->commit();
             $transactionActive = false;
+            try {
+                $conn->beginTransaction();
+                $transactionActive = true;
 
-            // Template HTML pour l'email de reçu (identique à la page de confirmation)
-            $emailTemplate = "
+                // CORRECTION 4: Insertion de la commande avec le bon total
+                $stmt = $conn->prepare("INSERT INTO commandes 
+                    (nom_client, email, telephone, adresse, mode_retrait, num_table, total, date_commande, statut, vu_admin, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), 'En cours', 0, NOW())");
+                $stmt->execute([$nom, $email, $telephone, $adresse, $mode_retrait, $num_table, $total]);
+                $commande_id = $conn->lastInsertId();
+
+                // Debug
+                error_log("Commande ID créé: " . $commande_id);
+
+                // CORRECTION 5: Insertion des détails avec vérification
+                foreach ($produits as $plat) {
+                    $stmt = $conn->prepare("INSERT INTO commande_details (commande_id, nom_plat, quantite, prix) VALUES (?, ?, ?, ?)");
+                    $result = $stmt->execute([$commande_id, $plat['nom'], $plat['quantite'], $plat['prix']]);
+                    
+                    if (!$result) {
+                        throw new Exception("Erreur insertion détail: " . implode(", ", $stmt->errorInfo()));
+                    }
+
+                    // Mise à jour du stock
+                    $stmt = $conn->prepare("UPDATE plats SET stock = stock - ? WHERE id = ?");
+                    $stmt->execute([$plat['quantite'], $plat['id']]);
+                    
+                    error_log("Détail inséré: " . $plat['nom'] . " x" . $plat['quantite'] . " = " . ($plat['prix'] * $plat['quantite']));
+                }
+
+                // Notification admin
+                $notif = $conn->prepare("INSERT INTO notifications (message, type, date, vue) VALUES (?, ?, NOW(), 0)");
+                $notif->execute(['Un client vient de passer une commande.', 'info']);
+
+                $conn->commit();
+                $transactionActive = false;
+
+                // CORRECTION 6: Nettoyer le panier après succès
+                $_SESSION['panier'] = [];
+                unset($_SESSION['panier']);
+
+                // Template HTML pour l'email (votre code existant...)
+                $emailTemplate = "
             <!DOCTYPE html>
             <html lang='fr'>
             <head>
@@ -265,94 +350,105 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 </style>
             </head>
             <body>
-                <div class='receipt-container'>
-                    <!-- Header avec cercle vert et titre -->
-                    <div class='header'>
-                        <div class='success-circle'></div>
-                        <h1>Commande confirmée !</h1>
-                        <p>Merci pour votre commande !</p>
-                    </div>
-                    
-                    <!-- Section détails de la commande -->
-                    <div class='details-section'>
-                        <div class='section-title'>Détails de la commande</div>
-                        
-                        <div class='detail-row'>
-                            <span class='detail-label'>N° de commande:  </span>
-                            <span class='detail-value order-number'>#" . str_pad($commande_id, 6, '0', STR_PAD_LEFT) . "</span>
-                        </div>
-                        
-                        <div class='detail-row'>
-                            <span class='detail-label'>Date:  </span>
-                            <span class='detail-value'>" . date('d/m/Y') . "</span>
-                        </div>
-                        
-                        <div class='detail-row'>
-                            <span class='detail-label'>Client:  </span>
-                            <span class='detail-value'>" . htmlspecialchars($nom) . "</span>
-                        </div>";
-                        
-            if (!empty($telephone)) {
-                $emailTemplate .= "
-                        <div class='detail-row'>
-                            <span class='detail-label'>Téléphone:  </span>
-                            <span class='detail-value'>" . htmlspecialchars($telephone) . "</span>
-                        </div>";
-            }
+    <div class='receipt-container'>
+        <!-- Header avec cercle vert et titre -->
+        <div class='header'>
+            <div class='success-circle'></div>
+            <h1>Commande confirmée !</h1>
+            <p>Merci pour votre commande !</p>
+        </div>
+        
+        <!-- Section détails de la commande -->
+        <div class='details-section'>
+            <div class='section-title'>Détails de la commande</div>
             
-            $emailTemplate .= "
-                        <div class='detail-row'>
-                            <span class='detail-label'>Email:  </span>
-                            <span class='detail-value'>" . htmlspecialchars($email) . "</span>
-                        </div>
-                        
-                        <div class='detail-row'>
-                            <span class='detail-label'>Adresse:  </span>
-                            <span class='detail-value'>" . htmlspecialchars($adresse) . "</span>
-                        </div>
-                        
-                        <div class='detail-row'>
-                            <span class='detail-label'>Total:  </span>
-                            <span class='detail-value total-value'>" . number_format($total, 2) . " fcfa</span>
-                        </div>
-                    </div>
-                    
-                    <!-- Section produits commandés -->
-                    <div class='products-section'>
-                        <div class='section-title'>Produits commandés:  </div>
-                        
-                        <table class='products-table'>
-                            <thead>
-                                <tr>
-                                    <th>Produit:  </th>
-                                    <th>Quantité:  </th>
-                                    <th>Prix<br>unitaire:  </th>
-                                    <th>Sous-total:  </th>
-                                </tr>
-                            </thead>
-                            <tbody>";
-                            
-            foreach ($produits as $plat) {
-                $sousTotal = $plat['prix'] * $plat['quantite'];
-                $emailTemplate .= "
-                                <tr>
-                                    <td class='product-name'>" . htmlspecialchars($plat['nom']) . "</td>
-                                    <td>" . $plat['quantite'] . "</td>
-                                    <td class='price-text'>" . number_format($plat['prix'], 2) . "<br>fcfa</td>
-                                    <td class='price-text'>" . number_format($sousTotal, 2) . "<br>fcfa</td>
-                                </tr>";
-            }
+            <div class='detail-row'>
+                <span class='detail-label'>N° de commande:  </span>
+                <span class='detail-value order-number'>#" . str_pad($commande_id, 6, '0', STR_PAD_LEFT) . "</span>
+            </div>
             
-            $emailTemplate .= "
-                                <tr class='total-row'>
-                                    <td colspan='3'><strong>Total</strong></td>
-                                    <td class='total-amount'><strong>" . number_format($total, 2) . "<br>fcfa</strong></td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </body>
+            <div class='detail-row'>
+                <span class='detail-label'>Date:  </span>
+                <span class='detail-value'>" . date('d/m/Y') . "</span>
+            </div>
+            
+            <div class='detail-row'>
+                <span class='detail-label'>Client:  </span>
+                <span class='detail-value'>" . htmlspecialchars($nom) . "</span>
+            </div>";
+            
+if (!empty($telephone)) {
+    $emailTemplate .= "
+            <div class='detail-row'>
+                <span class='detail-label'>Téléphone:  </span>
+                <span class='detail-value'>" . htmlspecialchars($telephone) . "</span>
+            </div>";
+}
+
+$emailTemplate .= "
+            <div class='detail-row'>
+                <span class='detail-label'>Email:  </span>
+                <span class='detail-value'>" . htmlspecialchars($email) . "</span>
+            </div>
+            
+            <div class='detail-row'>
+                <span class='detail-label'>Adresse:  </span>
+                <span class='detail-value'>" . htmlspecialchars($adresse) . "</span>
+            </div>";
+
+if (!empty($num_table)) {
+    $emailTemplate .= "
+            <div class='detail-row'>
+                <span class='detail-label'>Numéro de table:  </span>
+                <span class='detail-value'>" . htmlspecialchars($num_table) . "</span>
+            </div>";
+}
+
+$emailTemplate .= "
+            <div class='detail-row'>
+                <span class='detail-label'>Total:  </span>
+                <span class='detail-value total-value'>" . number_format($total, 2) . " fcfa</span>
+            </div>
+        </div>
+        
+        <!-- Section produits commandés -->
+        <div class='products-section'>
+            <div class='section-title'>Produits commandés:  </div>
+            
+            <table class='products-table'>
+                <thead>
+                    <tr>
+                        <th>Produit:  </th>
+                        <th>Quantité:  </th>
+                        <th>Prix<br>unitaire:  </th>
+                        <th>Sous-total:  </th>
+                    </tr>
+                </thead>
+                <tbody>";
+                
+// Boucle pour générer les produits (CORRECTION ICI)
+foreach ($produits as $plat) {
+    $sousTotal = $plat['prix'] * $plat['quantite'];
+    $emailTemplate .= "
+                    <tr>
+                        <td class='product-name'>" . htmlspecialchars($plat['nom']) . "</td>
+                        <td>" . $plat['quantite'] . "</td>
+                        <td class='price-text'>" . number_format($plat['prix'], 2) . "<br>fcfa</td>
+                        <td class='price-text'>" . number_format($sousTotal, 2) . "<br>fcfa</td>
+                    </tr>";
+}
+
+$emailTemplate .= "
+                    <tr class='total-row'>
+                        <td colspan='3'><strong>Total</strong></td>
+                        <td class='total-amount'><strong>" . number_format($total, 2) . "<br>fcfa</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+
             </html>";
 
             // Envoi de l'e-mail
@@ -442,7 +538,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center mr-3">
                             <span class="text-white font-bold text-sm">1</span>
                         </div>
-                        <h2 class="text-xl font-bold text-gray-800">Informations de livraison</h2>
+                        <h2 class="text-xl font-bold text-gray-800">Informations pour finaliser la commande</h2>
                     </div>
 
                     <?php if(isset($erreur)): ?>
@@ -526,7 +622,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 </svg>
                             </div>
                         </div>
-
+<div>
+    <label for="num_table" class="block text-sm font-semibold text-gray-700 mb-2">
+        Numéro de table
+    </label>
+    <div class="relative">
+        <input type="number" 
+               id="num_table" 
+               name="num_table" 
+               min="1"
+               value="<?= isset($_POST['num_table']) ? htmlspecialchars($_POST['num_table']) : '' ?>"
+               placeholder="Entrez votre numéro de table"
+               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors pl-10 bg-gray-50 focus:bg-white">
+        <svg class="w-5 h-5 text-gray-400 absolute left-3 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+        </svg>
+    </div>
+</div>
                         <button type="submit" 
                                 class="w-full bg-gradient-to-r from-primary to-primary-dark text-white font-bold py-4 px-6 rounded-lg hover:from-primary-dark hover:to-primary transform hover:scale-[1.02] transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center space-x-2">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -582,10 +694,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             <span class="text-gray-600">Sous-total</span>
                             <span class="font-medium" id="subtotalAmount"><?= number_format($total, 0) ?> FCFA</span>
                         </div>
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-gray-600">Livraison</span>
-                            <span class="font-medium text-primary">Gratuite</span>
-                        </div>
+                        
                         <div class="border-t pt-2 mt-4">
                             <div class="flex justify-between items-center">
                                 <span class="text-lg font-bold text-gray-800">Total</span>
@@ -600,7 +709,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
                             </svg>
                             <div>
-                                <p class="text-sm font-medium text-blue-800">Information de livraison</p>
+                                <p class="text-sm font-medium text-blue-800">Information sur la commande</p>
                                 <p class="text-xs text-blue-600 mt-1">
                                     Vous recevrez un email de confirmation avec les détails de votre commande.
                                 </p>
@@ -713,4 +822,50 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         </div>
     </footer>
 </body>
+// Ajouter ce script à la fin de commander.php, avant </body>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    
+    form.addEventListener('submit', function(e) {
+        // Récupérer le panier du localStorage si nécessaire
+        const cartItems = JSON.parse(localStorage.getItem('cartItems') || '[]');
+        
+        if (cartItems.length > 0) {
+            // Créer un champ caché pour envoyer les données du panier
+            const cartInput = document.createElement('input');
+            cartInput.type = 'hidden';
+            cartInput.name = 'cart_data';
+            cartInput.value = JSON.stringify(cartItems);
+            form.appendChild(cartInput);
+            
+            console.log('Données panier envoyées:', cartItems);
+        }
+    });
+    
+    // Fonction pour synchroniser avec le serveur (comme dans votre code existant)
+    function updateServerCart(cartItems) {
+        fetch('commander.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'action=sync_cart&cart_data=' + encodeURIComponent(JSON.stringify(cartItems))
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Panier synchronisé:', data);
+        })
+        .catch(error => {
+            console.error('Erreur sync:', error);
+        });
+    }
+    
+    // Synchroniser au chargement de la page
+    const cartItems = JSON.parse(localStorage.getItem('cartItems') || '[]');
+    if (cartItems.length > 0) {
+        updateServerCart(cartItems);
+    }
+});
+</script>
 </html>
