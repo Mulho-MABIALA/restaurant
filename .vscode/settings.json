@@ -1,3 +1,13 @@
 {
-    "liveServer.settings.port": 5501
+    "files.exclude": {
+        "**/node_modules": true
+    },
+    "intelephense.files.exclude": [
+        "**/node_modules/**",
+        "**/vendor/**",
+        "**/.vscode/**"
+    ],
+    "intelephense.environment.includePaths": [
+        "${workspaceFolder}"
+    ]
 }
