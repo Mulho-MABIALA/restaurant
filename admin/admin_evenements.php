@@ -213,7 +213,9 @@ if (isset($_GET['get_event']) && isset($_GET['id'])) {
         }
     </style>
 </head>
+
 <body class="bg-light">
+    
     <div class="admin-header">
         <div class="container">
             <h1 class="mb-0"><i class="fas fa-calendar-alt me-3"></i>Administration - Gestion des Événements</h1>

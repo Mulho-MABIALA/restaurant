@@ -1065,7 +1065,7 @@ try {
             </div>
         </div>
     </section>
-    <?php include('includes/evenements.php'); ?>
+    <?php include('evenements.php'); ?>
     <!-- Section Réserver une table -->
     <section id="book-a-table" class="book-a-table section">
         <div class="container section-title" data-aos="fade-up">

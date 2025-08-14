@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../config.php';
+require_once 'config.php';
 
 // Récupérer uniquement les événements à venir, triés par date croissante
 $stmt = $conn->prepare("
@@ -386,6 +386,7 @@ function estBientot($date) {
     </style>
 </head>
 <body>
+    
     <!-- Header -->
     <header class="events-header">
         <div class="container">
@@ -450,8 +451,8 @@ function estBientot($date) {
                              data-category="<?= $estBientot ? 'soon' : '' ?> <?= $thisMonth ? 'this-month' : '' ?>">
                             <div class="events-card">
                                 <div class="events-image">
-                                    <?php if ($evenement['image'] && file_exists("../admin/uploads/evenements/" . $evenement['image'])): ?>
-                                        <img src="../admin/uploads/evenements/<?= htmlspecialchars($evenement['image']) ?>" 
+                                    <?php if ($evenement['image'] && file_exists("admin/uploads/evenements/" . $evenement['image'])): ?>
+                                        <img src="admin/uploads/evenements/<?= htmlspecialchars($evenement['image']) ?>" 
                                              alt="<?= htmlspecialchars($evenement['titre']) ?>">
                                     <?php else: ?>
                                         <div class="events-placeholder">
@@ -645,7 +646,7 @@ function estBientot($date) {
             modalTitle.innerHTML = `<i class="fas fa-calendar-alt me-2"></i>${evenement.titre}`;
             
             const imageHtml = evenement.image 
-                ? `<img src="../admin/uploads/evenements/${evenement.image}" class="img-fluid rounded mb-3" alt="${evenement.titre}">`
+                ? `<img src="admin/uploads/evenements/${evenement.image}" class="img-fluid rounded mb-3" alt="${evenement.titre}">`
                 : `<div class="text-center mb-3 p-4 bg-light rounded">
                      <i class="fas fa-calendar-alt text-muted" style="font-size: 3rem;"></i>
                    </div>`;
