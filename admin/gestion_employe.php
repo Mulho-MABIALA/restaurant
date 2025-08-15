@@ -1,3 +1,390 @@
+<?php
+// =============================================================================
+// GESTION DES REQUÊTES AJAX
+// =============================================================================
+
+// Vérifier si c'est une requête AJAX
+if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action']))) {
+    require_once '../config.php';
+    require_once 'phpqrcode/qrlib.php';
+    
+    header('Content-Type: application/json');
+    
+    $action = $_GET['action'] ?? $_POST['ajax_action'] ?? '';
+    
+    switch ($action) {
+        
+        // =============================================================================
+        // RÉCUPÉRATION DES EMPLOYÉS
+        // =============================================================================
+        case 'get_employees':
+            try {
+                $stmt = $conn->query("SELECT * FROM vue_employes_complet ORDER BY nom, prenom");
+                $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                echo json_encode([
+                    'success' => true,
+                    'employees' => $employees
+                ]);
+            } catch (Exception $e) {
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Erreur lors du chargement des employés'
+                ]);
+            }
+            exit;
+            
+        // =============================================================================
+        // RÉCUPÉRATION DES STATISTIQUES
+        // =============================================================================
+        case 'get_statistics':
+            try {
+                // Total employés actifs
+                $stmt = $conn->query("SELECT COUNT(*) as total FROM employes WHERE statut = 'actif'");
+                $total_actifs = $stmt->fetch()['total'];
+                
+                // Présents aujourd'hui (statut actif, pas en congé ou absent)
+                $stmt = $conn->query("SELECT COUNT(*) as total FROM employes WHERE statut = 'actif'");
+                $presents_aujourd_hui = $stmt->fetch()['total'];
+                
+                // Nouveaux ce mois
+                $stmt = $conn->query("SELECT COUNT(*) as total FROM employes WHERE DATE_FORMAT(date_embauche, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')");
+                $nouveaux_ce_mois = $stmt->fetch()['total'];
+                
+                // Total administrateurs
+                $stmt = $conn->query("SELECT COUNT(*) as total FROM employes WHERE is_admin = 1 AND statut != 'inactif'");
+                $total_admins = $stmt->fetch()['total'];
+                
+                echo json_encode([
+                    'success' => true,
+                    'statistics' => [
+                        'total_actifs' => $total_actifs,
+                        'presents_aujourd_hui' => $presents_aujourd_hui,
+                        'nouveaux_ce_mois' => $nouveaux_ce_mois,
+                        'total_admins' => $total_admins
+                    ]
+                ]);
+            } catch (Exception $e) {
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Erreur lors du chargement des statistiques'
+                ]);
+            }
+            exit;
+            
+        // =============================================================================
+        // RÉCUPÉRATION DES POSTES
+        // =============================================================================
+        case 'get_postes':
+            try {
+                $stmt = $conn->query("SELECT * FROM postes ORDER BY nom");
+                $postes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                echo json_encode([
+                    'success' => true,
+                    'postes' => $postes
+                ]);
+            } catch (Exception $e) {
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Erreur lors du chargement des postes'
+                ]);
+            }
+            exit;
+            
+        // =============================================================================
+        // AJOUT D'UN EMPLOYÉ
+        // =============================================================================
+        case 'add_employee':
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
+                exit;
+            }
+            
+            try {
+                // Validation des champs requis
+                $required_fields = ['nom', 'prenom', 'email', 'date_embauche'];
+                foreach ($required_fields as $field) {
+                    if (empty($_POST[$field])) {
+                        throw new Exception("Le champ $field est requis");
+                    }
+                }
+                
+                // Vérifier si l'email existe déjà
+                $stmt = $conn->prepare("SELECT id FROM employes WHERE email = ? AND statut != 'inactif'");
+                $stmt->execute([$_POST['email']]);
+                if ($stmt->fetch()) {
+                    throw new Exception('Cet email est déjà utilisé par un autre employé actif');
+                }
+                
+                // Gestion de l'upload de photo
+                $photo_filename = 'default-avatar.png';
+                if (isset($_FILES['photo']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
+                    $upload_dir = 'uploads/photos/';
+                    if (!is_dir($upload_dir)) {
+                        mkdir($upload_dir, 0755, true);
+                    }
+                    
+                    $file_ext = strtolower(pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION));
+                    $allowed_exts = ['jpg', 'jpeg', 'png', 'gif'];
+                    
+                    if (in_array($file_ext, $allowed_exts) && $_FILES['photo']['size'] <= 5000000) {
+                        $photo_filename = uniqid() . '.' . $file_ext;
+                        $upload_path = $upload_dir . $photo_filename;
+                        
+                        if (!move_uploaded_file($_FILES['photo']['tmp_name'], $upload_path)) {
+                            throw new Exception('Erreur lors de l\'upload de la photo');
+                        }
+                    } else {
+                        throw new Exception('Format de photo non valide ou taille trop importante');
+                    }
+                }
+                
+                // Insertion de l'employé
+                $stmt = $conn->prepare("
+                    INSERT INTO employes (nom, prenom, email, telephone, poste_id, salaire, date_embauche, 
+                                          heure_debut, heure_fin, photo, is_admin, statut) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                
+                $stmt->execute([
+                    $_POST['nom'],
+                    $_POST['prenom'],
+                    $_POST['email'],
+                    $_POST['telephone'] ?? null,
+                    $_POST['poste_id'] ?? null,
+                    $_POST['salaire'] ?? null,
+                    $_POST['date_embauche'],
+                    $_POST['heure_debut'] ?? '08:00:00',
+                    $_POST['heure_fin'] ?? '17:00:00',
+                    $photo_filename,
+                    isset($_POST['is_admin']) ? 1 : 0,
+                    $_POST['statut'] ?? 'actif'
+                ]);
+                
+                $employee_id = $conn->lastInsertId();
+                
+                // Génération du QR Code
+                $qr_data = json_encode([
+                    'id' => $employee_id,
+                    'nom' => $_POST['nom'],
+                    'prenom' => $_POST['prenom'],
+                    'email' => $_POST['email'],
+                    'generated' => date('Y-m-d H:i:s')
+                ]);
+                
+                $qr_dir = 'qrcodes/';
+                if (!is_dir($qr_dir)) {
+                    mkdir($qr_dir, 0755, true);
+                }
+                
+                $qr_filename = 'qr_employee_' . $employee_id . '.png';
+                $qr_path = $qr_dir . $qr_filename;
+                
+                QRcode::png($qr_data, $qr_path, QR_ECLEVEL_L, 4);
+                
+                // Mise à jour avec le QR Code
+                $stmt = $conn->prepare("UPDATE employes SET qr_code = ?, qr_data = ? WHERE id = ?");
+                $stmt->execute([$qr_filename, $qr_data, $employee_id]);
+                
+                // Log de l'activité
+                $stmt = $conn->prepare("
+                    INSERT INTO logs_activite (action, table_concernee, id_enregistrement, details) 
+                    VALUES (?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    'CREATE_EMPLOYEE',
+                    'employes',
+                    $employee_id,
+                    json_encode(['nom' => $_POST['nom'], 'prenom' => $_POST['prenom']])
+                ]);
+                
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'Employé ajouté avec succès',
+                    'employee_id' => $employee_id
+                ]);
+                
+            } catch (Exception $e) {
+                echo json_encode([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ]);
+            }
+            exit;
+            
+        // =============================================================================
+        // MODIFICATION D'UN EMPLOYÉ
+        // =============================================================================
+        case 'update_employee':
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
+                exit;
+            }
+            
+            try {
+                if (empty($_POST['id'])) {
+                    throw new Exception('ID employé requis');
+                }
+                
+                $employee_id = $_POST['id'];
+                
+                // Vérifier si l'employé existe
+                $stmt = $conn->prepare("SELECT * FROM employes WHERE id = ?");
+                $stmt->execute([$employee_id]);
+                $current_employee = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$current_employee) {
+                    throw new Exception('Employé non trouvé');
+                }
+                
+                // Vérifier l'email unique (sauf pour l'employé actuel)
+                $stmt = $conn->prepare("SELECT id FROM employes WHERE email = ? AND id != ? AND statut != 'inactif'");
+                $stmt->execute([$_POST['email'], $employee_id]);
+                if ($stmt->fetch()) {
+                    throw new Exception('Cet email est déjà utilisé par un autre employé actif');
+                }
+                
+                $photo_filename = $current_employee['photo'];
+                
+                // Gestion de l'upload de photo
+                if (isset($_FILES['photo']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
+                    $upload_dir = 'uploads/photos/';
+                    
+                    $file_ext = strtolower(pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION));
+                    $allowed_exts = ['jpg', 'jpeg', 'png', 'gif'];
+                    
+                    if (in_array($file_ext, $allowed_exts) && $_FILES['photo']['size'] <= 5000000) {
+                        $photo_filename = uniqid() . '.' . $file_ext;
+                        $upload_path = $upload_dir . $photo_filename;
+                        
+                        if (move_uploaded_file($_FILES['photo']['tmp_name'], $upload_path)) {
+                            // Supprimer l'ancienne photo (sauf default)
+                            if ($current_employee['photo'] !== 'default-avatar.png') {
+                                $old_photo = $upload_dir . $current_employee['photo'];
+                                if (file_exists($old_photo)) {
+                                    unlink($old_photo);
+                                }
+                            }
+                        } else {
+                            throw new Exception('Erreur lors de l\'upload de la photo');
+                        }
+                    } else {
+                        throw new Exception('Format de photo non valide ou taille trop importante');
+                    }
+                }
+                
+                // Mise à jour de l'employé
+                $stmt = $conn->prepare("
+                    UPDATE employes 
+                    SET nom = ?, prenom = ?, email = ?, telephone = ?, poste_id = ?, salaire = ?, 
+                        date_embauche = ?, heure_debut = ?, heure_fin = ?, photo = ?, 
+                        is_admin = ?, statut = ?
+                    WHERE id = ?
+                ");
+                
+                $stmt->execute([
+                    $_POST['nom'],
+                    $_POST['prenom'],
+                    $_POST['email'],
+                    $_POST['telephone'] ?? null,
+                    $_POST['poste_id'] ?? null,
+                    $_POST['salaire'] ?? null,
+                    $_POST['date_embauche'],
+                    $_POST['heure_debut'] ?? '08:00:00',
+                    $_POST['heure_fin'] ?? '17:00:00',
+                    $photo_filename,
+                    isset($_POST['is_admin']) ? 1 : 0,
+                    $_POST['statut'] ?? 'actif',
+                    $employee_id
+                ]);
+                
+                // Log de l'activité
+                $stmt = $conn->prepare("
+                    INSERT INTO logs_activite (action, table_concernee, id_enregistrement, details) 
+                    VALUES (?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    'UPDATE_EMPLOYEE',
+                    'employes',
+                    $employee_id,
+                    json_encode(['nom' => $_POST['nom'], 'prenom' => $_POST['prenom']])
+                ]);
+                
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'Employé modifié avec succès'
+                ]);
+                
+            } catch (Exception $e) {
+                echo json_encode([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ]);
+            }
+            exit;
+            
+        // =============================================================================
+        // DÉSACTIVATION D'UN EMPLOYÉ
+        // =============================================================================
+        case 'delete_employee':
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
+                exit;
+            }
+            
+            $input = json_decode(file_get_contents('php://input'), true);
+            
+            try {
+                if (empty($input['id'])) {
+                    throw new Exception('ID employé requis');
+                }
+                
+                $employee_id = $input['id'];
+                
+                // Désactivation logique (pas de suppression physique)
+                $stmt = $conn->prepare("UPDATE employes SET statut = 'inactif' WHERE id = ?");
+                $stmt->execute([$employee_id]);
+                
+                if ($stmt->rowCount() === 0) {
+                    throw new Exception('Employé non trouvé');
+                }
+                
+                // Log de l'activité
+                $stmt = $conn->prepare("
+                    INSERT INTO logs_activite (action, table_concernee, id_enregistrement, details) 
+                    VALUES (?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    'DEACTIVATE_EMPLOYEE',
+                    'employes',
+                    $employee_id,
+                    json_encode(['statut' => 'inactif'])
+                ]);
+                
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'Employé désactivé avec succès'
+                ]);
+                
+            } catch (Exception $e) {
+                echo json_encode([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ]);
+            }
+            exit;
+            
+        default:
+            echo json_encode(['success' => false, 'message' => 'Action non reconnue']);
+            exit;
+    }
+}
+
+// =============================================================================
+// INTERFACE UTILISATEUR HTML
+// =============================================================================
+?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -5,7 +392,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestion des Employés - Restaurant</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         .fade-in { animation: fadeIn 0.3s ease-in; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -156,6 +543,7 @@
                 
                 <form id="employeeForm" class="p-6" enctype="multipart/form-data">
                     <input type="hidden" id="employeeId" name="id">
+                    <input type="hidden" name="ajax_action" id="ajaxAction" value="add_employee">
                     
                     <!-- Photo de profil -->
                     <div class="mb-6 text-center">
@@ -268,7 +656,10 @@
     <div id="notification" class="notification hidden"></div>
 
     <script>
-        // Variables globales
+        // =============================================================================
+        // VARIABLES GLOBALES ET INITIALISATION
+        // =============================================================================
+        
         let currentView = localStorage.getItem('preferredView') || 'table';
         let employees = [];
         let postes = [];
@@ -291,7 +682,10 @@
             document.getElementById('employeeForm').addEventListener('submit', saveEmployee);
         });
 
-        // Gestion des vues
+        // =============================================================================
+        // GESTION DES VUES
+        // =============================================================================
+        
         function toggleView() {
             currentView = currentView === 'table' ? 'cards' : 'table';
             localStorage.setItem('preferredView', currentView);
@@ -317,9 +711,12 @@
             }
         }
 
-        // Chargement des données
+        // =============================================================================
+        // CHARGEMENT DES DONNÉES
+        // =============================================================================
+        
         function loadStatistics() {
-            fetch('get_statistics.php')
+            fetch('?action=get_statistics')
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
@@ -333,7 +730,7 @@
         }
 
         function loadPostes() {
-            fetch('get_postes.php')
+            fetch('?action=get_postes')
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
@@ -359,7 +756,7 @@
         }
 
         function loadEmployees() {
-            fetch('get_employees.php')
+            fetch('?action=get_employees')
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
@@ -370,7 +767,10 @@
                 .catch(error => console.error('Erreur:', error));
         }
 
-        // Affichage des employés
+        // =============================================================================
+        // AFFICHAGE DES EMPLOYÉS
+        // =============================================================================
+        
         function displayEmployees(employeesList) {
             if (currentView === 'table') {
                 displayTableView(employeesList);
@@ -395,9 +795,20 @@
             
             row.innerHTML = `
                 <td class="px-6 py-4 whitespace-nowrap">
+                    <img src="uploads/photos/${employee.photo || 'default-avatar.png'}" 
+                         class="h-10 w-10 rounded-full object-cover">
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm font-medium text-gray-900">
+                        ${employee.prenom} ${employee.nom}
+                        ${employee.is_admin ? '<i class="fas fa-crown text-yellow-500 ml-1" title="Administrateur"></i>' : ''}
+                    </div>
+                    <div class="text-sm text-gray-500">ID: ${employee.id}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
                     <div class="flex items-center">
                         <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" 
-                              style="background-color: ${employee.poste_couleur}20; color: ${employee.poste_couleur};">
+                              style="background-color: ${employee.poste_couleur || '#6B7280'}20; color: ${employee.poste_couleur || '#6B7280'};">
                             ${employee.poste_nom || 'Non défini'}
                         </span>
                     </div>
@@ -462,7 +873,7 @@
                             </h3>
                             <div class="flex items-center mt-1">
                                 <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" 
-                                      style="background-color: ${employee.poste_couleur}20; color: ${employee.poste_couleur};">
+                                      style="background-color: ${employee.poste_couleur || '#6B7280'}20; color: ${employee.poste_couleur || '#6B7280'};">
                                     ${employee.poste_nom || 'Non défini'}
                                 </span>
                                 <span class="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusClass(employee.statut)}">
@@ -519,7 +930,10 @@
             return card;
         }
 
-        // Fonctions utilitaires
+        // =============================================================================
+        // FONCTIONS UTILITAIRES
+        // =============================================================================
+        
         function getStatusClass(statut) {
             const classes = {
                 'actif': 'bg-green-100 text-green-800',
@@ -546,7 +960,10 @@
             return date.toLocaleDateString('fr-FR');
         }
 
-        // Filtrage et recherche
+        // =============================================================================
+        // FILTRAGE ET RECHERCHE
+        // =============================================================================
+        
         function filterEmployees() {
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
             const posteFilter = document.getElementById('filterPoste').value;
@@ -574,11 +991,15 @@
             displayEmployees(employees);
         }
 
-        // Gestion du modal
+        // =============================================================================
+        // GESTION DU MODAL
+        // =============================================================================
+        
         function openAddModal() {
             document.getElementById('modalTitle').textContent = 'Ajouter un employé';
             document.getElementById('employeeForm').reset();
             document.getElementById('employeeId').value = '';
+            document.getElementById('ajaxAction').value = 'add_employee';
             document.getElementById('photoPreview').src = 'uploads/photos/default-avatar.png';
             document.getElementById('employeeModal').classList.remove('hidden');
         }
@@ -589,6 +1010,7 @@
             
             document.getElementById('modalTitle').textContent = 'Modifier l\'employé';
             document.getElementById('employeeId').value = employee.id;
+            document.getElementById('ajaxAction').value = 'update_employee';
             document.getElementById('nom').value = employee.nom;
             document.getElementById('prenom').value = employee.prenom;
             document.getElementById('email').value = employee.email;
@@ -609,7 +1031,10 @@
             document.getElementById('employeeModal').classList.add('hidden');
         }
 
-        // Prévisualisation de la photo
+        // =============================================================================
+        // PRÉVISUALISATION DE LA PHOTO
+        // =============================================================================
+        
         function previewPhoto(event) {
             const file = event.target.files[0];
             if (file) {
@@ -621,14 +1046,16 @@
             }
         }
 
-        // Sauvegarde de l'employé
+        // =============================================================================
+        // SAUVEGARDE DE L'EMPLOYÉ
+        // =============================================================================
+        
         function saveEmployee(event) {
             event.preventDefault();
             
             const formData = new FormData(event.target);
-            const url = formData.get('id') ? 'update_employee.php' : 'add_employee.php';
             
-            fetch(url, {
+            fetch(window.location.href, {
                 method: 'POST',
                 body: formData
             })
@@ -649,7 +1076,10 @@
             });
         }
 
-        // Actions sur les employés
+        // =============================================================================
+        // ACTIONS SUR LES EMPLOYÉS
+        // =============================================================================
+        
         function viewEmployee(id) {
             // Ouvrir une modal de détails ou rediriger vers une page de détails
             window.open(`employee_details.php?id=${id}`, '_blank');
@@ -661,7 +1091,7 @@
 
         function deleteEmployee(id) {
             if (confirm('Êtes-vous sûr de vouloir désactiver cet employé?')) {
-                fetch('delete_employee.php', {
+                fetch('?action=delete_employee', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -685,7 +1115,10 @@
             }
         }
 
-        // Notifications
+        // =============================================================================
+        // NOTIFICATIONS
+        // =============================================================================
+        
         function showNotification(message, type = 'info') {
             const notification = document.getElementById('notification');
             const colors = {
@@ -716,7 +1149,10 @@
             document.getElementById('notification').classList.add('hidden');
         }
 
-        // Gestion du clic en dehors du modal
+        // =============================================================================
+        // GESTION DU CLIC EN DEHORS DU MODAL
+        // =============================================================================
+        
         document.getElementById('employeeModal').addEventListener('click', function(e) {
             if (e.target === this) {
                 closeModal();
@@ -724,3 +1160,4 @@
         });
     </script>
 </body>
+</html>

@@ -39,7 +39,6 @@ $employes = $conn->query($employes_query)->fetchAll(PDO::FETCH_ASSOC);
 $employe_id = $_GET['employe_id'] ?? $_SESSION['admin_id'] ?? null; // Par défaut, employé connecté
 $date_debut = $_GET['date_debut'] ?? date('Y-m-d', strtotime('-7 days'));
 $date_fin = $_GET['date_fin'] ?? date('Y-m-d');
-$departement = $_GET['departement'] ?? '';
 $vue_type = $_GET['vue_type'] ?? 'journaliere';
 
 // Récupération des données selon les filtres - TOUJOURS afficher quelque chose
@@ -54,7 +53,7 @@ if (!$employe_id && isset($_SESSION['admin_id'])) {
 if ($employe_id) {
     // Requête pour récupérer les pointages
     $stmt = $conn->prepare("
-        SELECT p.*, e.nom, e.departement
+        SELECT p.*, e.nom
         FROM pointages p
         LEFT JOIN employes e ON p.employe_id = e.id  
         WHERE p.employe_id = ? AND DATE(p.created_at) BETWEEN ? AND ?
@@ -69,7 +68,7 @@ if ($employe_id) {
 } else {
     // Afficher tous les pointages récents si aucun employé spécifique
     $stmt = $conn->prepare("
-        SELECT p.*, e.nom, e.departement
+        SELECT p.*, e.nom
         FROM pointages p
         LEFT JOIN employes e ON p.employe_id = e.id  
         WHERE DATE(p.created_at) BETWEEN ? AND ?
@@ -241,7 +240,6 @@ $chart_data = [
                     <?php foreach ($employes as $e): ?>
                         <option value="<?= $e['id'] ?>" <?= $e['id'] == $employe_id ? 'selected' : '' ?>>
                             <?= htmlspecialchars($e['nom'] ?? 'Employé #' . $e['id']) ?> 
-                            <?= $e['departement'] ? "({$e['departement']})" : '' ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
@@ -409,7 +407,6 @@ $chart_data = [
                             </span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap"><?= htmlspecialchars($p['nom'] ?? '') ?></td>
-                        <td class="px-6 py-4 whitespace-nowrap"><?= htmlspecialchars($p['departement'] ?? '') ?></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>

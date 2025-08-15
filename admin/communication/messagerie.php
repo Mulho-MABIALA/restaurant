@@ -102,17 +102,22 @@ $unread_total = $unread_total->fetch()['total'];
 // Récupérer les informations de l'utilisateur connecté
 $current_user = $conn->prepare("SELECT nom, prenom FROM employes WHERE id = ?");
 $current_user->execute([$employe_id]);
-$current_user_info = $current_user->fetch();
-$current_user_name = $current_user_info['nom'];
+$current_user_info = $current_user->fetch(PDO::FETCH_ASSOC);
+
+// Vérifier si l'utilisateur existe
+$current_user_name = $current_user_info['nom'] ?? 'Utilisateur';
 $current_user_prenom = $current_user_info['prenom'] ?? '';
 $display_name = !empty($current_user_prenom) ? $current_user_prenom . ' ' . $current_user_name : $current_user_name;
+
+// S'assurer que htmlspecialchars reçoit toujours une chaîne
+$display_name_safe = htmlspecialchars($display_name ?? '', ENT_QUOTES, 'UTF-8');
 ?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Messagerie Privée - <?= htmlspecialchars($display_name) ?></title>
+    <title>Messagerie Privée - <?= $display_name_safe ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
@@ -139,17 +144,18 @@ $display_name = !empty($current_user_prenom) ? $current_user_prenom . ' ' . $cur
             <h1 class="text-2xl font-bold text-gray-800 dark:text-white flex items-center">
                 <i class="fas fa-shield-alt mr-2 text-green-600"></i>
                 Messagerie Privée
-                <?php if ($unread_total > 0): ?>
+                <?php if (!empty($unread_total) && $unread_total > 0): ?>
                     <span class="ml-2 bg-red-500 text-white rounded-full px-2 py-1 text-xs unread-badge">
-                        <?= $unread_total ?>
+                        <?= htmlspecialchars($unread_total ?? 0, ENT_QUOTES, 'UTF-8') ?>
                     </span>
                 <?php endif; ?>
             </h1>
             <div class="security-notice text-white px-3 py-1 rounded-full text-sm">
                 <i class="fas fa-lock mr-1"></i>
-                Connecté : <?= htmlspecialchars($display_name) ?>
+                Connecté : <?= $display_name_safe ?>
             </div>
         </div>
+
         
         <div class="flex items-center space-x-4">
             <!-- Recherche -->
