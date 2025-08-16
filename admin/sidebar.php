@@ -613,16 +613,44 @@ try {
                     </div>
                     <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
                 </a>
-                <a href="gestion_employe.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
+            <!-- Employés Dropdown -->
+            <div x-data="{ open: false }" class="relative">
+                <button type="button"
+                    class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl w-full focus:outline-none"
+                    @click="open = !open"
+                    aria-haspopup="true"
+                    :aria-expanded="open"
+                >
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-user-tie nav-icon text-lg"></i>
                     </div>
-                    <div class="flex-1">
+                    <div class="flex-1 text-left">
                         <span class="font-medium text-base">Employés</span>
                         <p class="nav-description text-sm text-gray-400 opacity-80">Gestion des employés</p>
                     </div>
-                    <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
-                </a>
+                    <i class="fas fa-chevron-down text-xs ml-2 transition-transform duration-300"
+                       :class="open ? 'rotate-180' : ''"></i>
+                </button>
+                <div x-show="open" @click.away="open = false"
+                     x-transition:enter="transition ease-out duration-300"
+                     x-transition:enter-start="opacity-0 scale-95 -translate-y-2"
+                     x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                     x-transition:leave="transition ease-in duration-200"
+                     x-transition:leave-start="opacity-100 scale-100 translate-y-0"
+                     x-transition:leave-end="opacity-0 scale-95 -translate-y-2"
+                     class="mt-3 ml-8 space-y-1 dropdown-menu rounded-xl shadow-2xl py-3 w-[85%] z-10 absolute left-0"
+                     style="display: none;"
+                >
+                    <a href="gestion_employe.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                        <i class="fas fa-users mr-3 w-5 text-sm"></i>
+                        <span class="font-medium">Liste des employés</span>
+                    </a>
+                    <a href="gestion_postes.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                        <i class="fas fa-briefcase mr-3 w-5 text-sm"></i>
+                        <span class="font-medium">Gestion des postes</span>
+                    </a>
+                </div>
+            </div>
                 <a href="admin_gestion.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-users-cog nav-icon text-lg"></i>
