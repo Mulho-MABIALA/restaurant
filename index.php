@@ -8,14 +8,14 @@ try {
     // Requête pour récupérer les horaires d'ouverture/fermeture par jour
     $query = "
         SELECT jour, heure_ouverture, heure_fermeture, ferme
-        FROM horaires
+        FROM horaires_ouverture
         ORDER BY FIELD(jour, 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche')
     ";
     $stmt = $conn->prepare($query);
     $stmt->execute();
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
-    error_log("Erreur SQL horaires : " . $e->getMessage());
+    error_log("Erreur SQL horaires_ouverture : " . $e->getMessage());
     $results = []; // Valeur de repli
 }
 

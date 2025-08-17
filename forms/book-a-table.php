@@ -1,4 +1,5 @@
 <?php
+
 header('Content-Type: application/json');
 require_once('../config.php');
 
@@ -46,7 +47,7 @@ function estOuvert($date, $heure, $conn) {
     ];
     $jourFr = $jours[date('l', strtotime($date))];
 
-    $stmt = $conn->prepare("SELECT heure_ouverture, heure_fermeture, ferme FROM horaires WHERE jour = ?");
+    $stmt = $conn->prepare("SELECT heure_ouverture, heure_fermeture, ferme FROM horaires_ouverture WHERE jour = ?");
     $stmt->execute([$jourFr]);
     $h = $stmt->fetch();
 

@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ferme = isset($_POST["{$jour}_ferme"]) ? 1 : 0;
 
         $stmt = $mysqli->prepare("
-            INSERT INTO horaires (jour, heure_ouverture, heure_fermeture, ferme)
+            INSERT INTO horaires_ouverture (jour, heure_ouverture, heure_fermeture, ferme)
             VALUES (?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE 
                 heure_ouverture = VALUES(heure_ouverture),
@@ -38,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Récupération des horaires existants pour affichage
 $horaires = [];
-$result = $mysqli->query("SELECT * FROM horaires");
+$result = $mysqli->query("SELECT * FROM horaires_ouverture");   
 while ($row = $result->fetch_assoc()) {
     $horaires[$row['jour']] = $row;
 }

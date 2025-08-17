@@ -9,7 +9,7 @@ if (!isset($_SESSION['admin_logged_in'])) {
 }
 
 // Récupérer tous les employés
-$stmt = $conn->prepare("SELECT id, nom, qr_code FROM employes ORDER BY nom");
+$stmt = $conn->prepare("SELECT id, nom, prenom, qr_code, code_numerique FROM employes ORDER BY nom");
 $stmt->execute();
 $employes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
@@ -70,7 +70,7 @@ $employes = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
 
         <!-- Liste des employés avec badges -->
-      <div id="badgesContainer" class="text-center">
+     
     <?php foreach ($employes as $employe): ?>
         <div class="badge-container inline-block">
             <div class="no-print mb-2">
@@ -85,51 +85,67 @@ $employes = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <div class="flex-1 text-left">
                         <div class="text-xs font-bold text-indigo-600 mb-1">BADGE EMPLOYÉ</div>
                         <div class="text-sm font-semibold mb-1" style="line-height: 1.2;">
-                            <?= htmlspecialchars($employe['nom'] ?? '', ENT_QUOTES, 'UTF-8') ?>
+                            <?= htmlspecialchars(($employe['prenom'] ?? '') . ' ' . ($employe['nom'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
                         </div>
-                       
-                        <div class="text-xs text-gray-500">
+                        
+                        <div class="text-xs text-gray-500 mb-1">
                             ID: <?= $employe['id'] ?>
                         </div>
+                        
+                        <?php if (!empty($employe['code_numerique'])): ?>
+                        <div class="text-xs font-mono bg-gray-100 px-2 py-1 rounded border" style="font-size: 10px;">
+                            Code: <?= htmlspecialchars($employe['code_numerique'], ENT_QUOTES, 'UTF-8') ?>
+                        </div>
+                        <?php endif; ?>
                     </div>
 
-                            <div class="flex-shrink-0 ml-2">
-                                <canvas id="qr-<?= $employe['id'] ?>" width="80" height="80"></canvas>
-                            </div>
-                        </div>
+                    <div class="flex-shrink-0 ml-2">
+                        <canvas id="qr-<?= $employe['id'] ?>" width="80" height="80"></canvas>
                     </div>
                 </div>
-            <?php endforeach; ?>
+            </div>
         </div>
-
-        <!-- Instructions -->
-        <div class="no-print mt-8 bg-blue-50 rounded-lg p-6">
-            <h3 class="font-semibold text-blue-800 mb-3">📋 Instructions d'utilisation :</h3>
-            <ul class="text-sm text-blue-700 space-y-2">
-                <li><strong>Impression :</strong> Utilisez du papier épais (200-250g) pour une meilleure durabilité</li>
-                <li><strong>Format :</strong> Les badges sont dimensionnés pour du papier A4 standard</li>
-                <li><strong>Plastification :</strong> Recommandée pour une utilisation intensive</li>
-                <li><strong>Test :</strong> Testez chaque badge avec le scanner avant distribution</li>
-            </ul>
-        </div>
+    <?php endforeach; ?>
+</div>
+<div class="no-print mt-8 bg-blue-50 rounded-lg p-6">
+    <h3 class="font-semibold text-blue-800 mb-3">Instructions d'utilisation :</h3>
+    <ul class="text-sm text-blue-700 space-y-2">
+        <li><strong>QR Code :</strong> Scan avec l'application de pointage</li>
+        <li><strong>Code numérique :</strong> Saisie manuelle si le scan ne fonctionne pas</li>
+        <li><strong>Impression :</strong> Utilisez du papier épais (200-250g) pour une meilleure durabilité</li>
+        <li><strong>Format :</strong> Les badges sont dimensionnés pour du papier A4 standard</li>
+        <li><strong>Plastification :</strong> Recommandée pour une utilisation intensive</li>
+        <li><strong>Test :</strong> Testez chaque badge avec le scanner avant distribution</li>
+    </ul>
+</div>
     </div>
 
     <script>
     // Génération des QR codes
-    document.addEventListener('DOMContentLoaded', function() {
-        <?php foreach ($employes as $employe): ?>
-            const qr<?= $employe['id'] ?> = new QRious({
-                element: document.getElementById('qr-<?= $employe['id'] ?>'),
-                value: '<?= $employe['qr_code'] ?: 'EMP_' . $employe['id'] ?>',
-                size: 80,
-                background: 'white',
-                foreground: '#4F46E5',
-                level: 'M'
-            });
-        <?php endforeach; ?>
+    // Génération des QR codes (mise à jour pour inclure le code numérique)
+document.addEventListener('DOMContentLoaded', function() {
+    <?php foreach ($employes as $employe): ?>
+        // Créer les données QR avec le code numérique
+        const qrData<?= $employe['id'] ?> = JSON.stringify({
+            id: <?= $employe['id'] ?>,
+            nom: "<?= htmlspecialchars($employe['nom'] ?? '', ENT_QUOTES, 'UTF-8') ?>",
+            prenom: "<?= htmlspecialchars($employe['prenom'] ?? '', ENT_QUOTES, 'UTF-8') ?>",
+            code_numerique: "<?= htmlspecialchars($employe['code_numerique'] ?? '', ENT_QUOTES, 'UTF-8') ?>",
+            generated: "<?= date('Y-m-d H:i:s') ?>"
+        });
         
-        updateSelectedCount();
-    });
+        const qr<?= $employe['id'] ?> = new QRious({
+            element: document.getElementById('qr-<?= $employe['id'] ?>'),
+            value: qrData<?= $employe['id'] ?>,
+            size: 80,
+            background: 'white',
+            foreground: '#4F46E5',
+            level: 'M'
+        });
+    <?php endforeach; ?>
+    
+    updateSelectedCount();
+});
 
     // Gestion de la sélection
     document.getElementById('selectAll').addEventListener('change', function() {

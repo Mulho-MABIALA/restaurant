@@ -96,11 +96,11 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
         // AJOUT D'UN EMPLOYÉ
         // =============================================================================
         case 'add_employee':
-            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-                echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
-                exit;
-            }
-            
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
+        exit;
+    }
+    
             try {
                 // Validation des champs requis
                 $required_fields = ['nom', 'prenom', 'email', 'date_embauche'];
@@ -140,79 +140,110 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
                     }
                 }
                 
+                // Convertir le salaire en entier si fourni
+                $salaire = null;
+                if (!empty($_POST['salaire'])) {
+                    $salaire = (int) $_POST['salaire'];
+                }
+                
                 // Insertion de l'employé
                 $stmt = $conn->prepare("
                     INSERT INTO employes (nom, prenom, email, telephone, poste_id, salaire, date_embauche, 
                                           heure_debut, heure_fin, photo, is_admin, statut) 
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
+                  $stmt->execute([
+            $_POST['nom'],
+            $_POST['prenom'],
+            $_POST['email'],
+            $_POST['telephone'] ?? null,
+            $_POST['poste_id'] ?? null,
+            $salaire,
+            $_POST['date_embauche'],
+            $_POST['heure_debut'] ?? '08:00:00',
+            $_POST['heure_fin'] ?? '17:00:00',
+            $photo_filename,
+            isset($_POST['is_admin']) ? 1 : 0,
+            $_POST['statut'] ?? 'actif'
+        ]);
+        
+        $employee_id = $conn->lastInsertId();
                 
-                $stmt->execute([
-                    $_POST['nom'],
-                    $_POST['prenom'],
-                    $_POST['email'],
-                    $_POST['telephone'] ?? null,
-                    $_POST['poste_id'] ?? null,
-                    $_POST['salaire'] ?? null,
-                    $_POST['date_embauche'],
-                    $_POST['heure_debut'] ?? '08:00:00',
-                    $_POST['heure_fin'] ?? '17:00:00',
-                    $photo_filename,
-                    isset($_POST['is_admin']) ? 1 : 0,
-                    $_POST['statut'] ?? 'actif'
-                ]);
-                
-                $employee_id = $conn->lastInsertId();
-                
-                // Génération du QR Code
-                $qr_data = json_encode([
-                    'id' => $employee_id,
-                    'nom' => $_POST['nom'],
-                    'prenom' => $_POST['prenom'],
-                    'email' => $_POST['email'],
-                    'generated' => date('Y-m-d H:i:s')
-                ]);
-                
-                $qr_dir = 'qrcodes/';
-                if (!is_dir($qr_dir)) {
-                    mkdir($qr_dir, 0755, true);
-                }
-                
-                $qr_filename = 'qr_employee_' . $employee_id . '.png';
-                $qr_path = $qr_dir . $qr_filename;
-                
-                QRcode::png($qr_data, $qr_path, QR_ECLEVEL_L, 4);
-                
-                // Mise à jour avec le QR Code
-                $stmt = $conn->prepare("UPDATE employes SET qr_code = ?, qr_data = ? WHERE id = ?");
-                $stmt->execute([$qr_filename, $qr_data, $employee_id]);
-                
-                // Log de l'activité
-                $stmt = $conn->prepare("
-                    INSERT INTO logs_activite (action, table_concernee, id_enregistrement, details) 
-                    VALUES (?, ?, ?, ?)
-                ");
-                $stmt->execute([
-                    'CREATE_EMPLOYEE',
-                    'employes',
-                    $employee_id,
-                    json_encode(['nom' => $_POST['nom'], 'prenom' => $_POST['prenom']])
-                ]);
-                
-                echo json_encode([
-                    'success' => true,
-                    'message' => 'Employé ajouté avec succès',
-                    'employee_id' => $employee_id
-                ]);
-                
-            } catch (Exception $e) {
-                echo json_encode([
-                    'success' => false,
-                    'message' => $e->getMessage()
-                ]);
-            }
-            exit;
+                // ============= NOUVEAU : GÉNÉRATION DU CODE NUMÉRIQUE =============
+        function generateNumericCode($employee_id, $conn) {
+            // Générer un code unique de 8 chiffres
+            $base_code = str_pad($employee_id, 4, '0', STR_PAD_LEFT); // ID sur 4 chiffres
+            $random_suffix = str_pad(rand(1000, 9999), 4, '0', STR_PAD_LEFT); // 4 chiffres aléatoires
             
+            $numeric_code = $base_code . $random_suffix;
+            
+            // Vérifier l'unicité du code généré
+            $stmt = $conn->prepare("SELECT id FROM employes WHERE code_numerique = ?");
+            $stmt->execute([$numeric_code]);
+            
+            // Si le code existe déjà, régénérer (très peu probable)
+            if ($stmt->fetch()) {
+                return generateNumericCode($employee_id, $conn); // Récursion
+            }
+            
+            return $numeric_code;
+        }
+        
+        $numeric_code = generateNumericCode($employee_id, $conn);
+        
+        // Génération du QR Code avec données enrichies
+        $qr_data = json_encode([
+            'id' => $employee_id,
+            'nom' => $_POST['nom'],
+            'prenom' => $_POST['prenom'],
+            'email' => $_POST['email'],
+            'code_numerique' => $numeric_code, // Ajout du code numérique dans le QR
+            'generated' => date('Y-m-d H:i:s')
+        ]);
+                 $qr_dir = 'qrcodes/';
+        if (!is_dir($qr_dir)) {
+            mkdir($qr_dir, 0755, true);
+        }
+        
+        $qr_filename = 'qr_employee_' . $employee_id . '.png';
+        $qr_path = $qr_dir . $qr_filename;
+        
+        QRcode::png($qr_data, $qr_path, QR_ECLEVEL_L, 4);
+        
+        // Mise à jour avec le QR Code ET le code numérique
+        $stmt = $conn->prepare("UPDATE employes SET qr_code = ?, qr_data = ?, code_numerique = ? WHERE id = ?");
+        $stmt->execute([$qr_filename, $qr_data, $numeric_code, $employee_id]);
+        
+        // Log de l'activité
+        $stmt = $conn->prepare("
+            INSERT INTO logs_activite (action, table_concernee, id_enregistrement, details) 
+            VALUES (?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            'CREATE_EMPLOYEE',
+            'employes',
+            $employee_id,
+            json_encode([
+                'nom' => $_POST['nom'], 
+                'prenom' => $_POST['prenom'],
+                'code_numerique' => $numeric_code
+            ])
+        ]);
+        
+        echo json_encode([
+            'success' => true,
+            'message' => 'Employé ajouté avec succès',
+            'employee_id' => $employee_id,
+            'numeric_code' => $numeric_code // Retourner le code pour affichage
+        ]);
+        
+    } catch (Exception $e) {
+        echo json_encode([
+            'success' => false,
+            'message' => $e->getMessage()
+        ]);
+    }
+    exit;
         // =============================================================================
         // MODIFICATION D'UN EMPLOYÉ
         // =============================================================================
@@ -274,6 +305,12 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
                     }
                 }
                 
+                // Convertir le salaire en entier si fourni
+                $salaire = null;
+                if (!empty($_POST['salaire'])) {
+                    $salaire = (int) $_POST['salaire'];
+                }
+                
                 // Mise à jour de l'employé
                 $stmt = $conn->prepare("
                     UPDATE employes 
@@ -289,7 +326,7 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
                     $_POST['email'],
                     $_POST['telephone'] ?? null,
                     $_POST['poste_id'] ?? null,
-                    $_POST['salaire'] ?? null,
+                    $salaire,
                     $_POST['date_embauche'],
                     $_POST['heure_debut'] ?? '08:00:00',
                     $_POST['heure_fin'] ?? '17:00:00',
@@ -591,8 +628,8 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
                         </div>
                         
                         <div>
-                            <label for="salaire" class="block text-sm font-medium text-gray-700 mb-2">Salaire (€)</label>
-                            <input type="number" id="salaire" name="salaire" step="0.01" min="0" 
+                            <label for="salaire" class="block text-sm font-medium text-gray-700 mb-2">Salaire (FCFA)</label>
+                            <input type="number" id="salaire" name="salaire" min="0" step="1" 
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
                         
@@ -823,7 +860,7 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
                     </span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ${employee.salaire ? employee.salaire + ' €' : 'Non défini'}
+                    ${employee.salaire ? formatSalaire(employee.salaire) + ' FCFA' : 'Non défini'}
                     <div class="text-xs text-gray-500">${employee.heure_debut} - ${employee.heure_fin}</div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -904,8 +941,8 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
                         </div>
                         ${employee.salaire ? `
                             <div class="flex items-center">
-                                <i class="fas fa-euro-sign w-4 mr-2"></i>
-                                ${employee.salaire} €
+                                <i class="fas fa-money-bill w-4 mr-2"></i>
+                                ${formatSalaire(employee.salaire)} FCFA
                             </div>
                         ` : ''}
                     </div>
@@ -958,6 +995,12 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
             if (!dateString) return '';
             const date = new Date(dateString);
             return date.toLocaleDateString('fr-FR');
+        }
+
+        function formatSalaire(salaire) {
+            if (!salaire) return '';
+            // Formater le salaire en entier avec des espaces comme séparateurs de milliers
+            return parseInt(salaire).toLocaleString('fr-FR');
         }
 
         // =============================================================================

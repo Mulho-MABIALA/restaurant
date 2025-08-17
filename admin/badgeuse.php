@@ -6,35 +6,86 @@ $message = '';
 $employe_info = null;
 $pointage_success = false;
 
-// Traitement du pointage via QR Code
+// ✅ Initialiser $qr_data dès le début
+$qr_data = $_POST['qr_data'] ?? $_GET['qr_data'] ?? '';
+
+// Logs debug
+error_log("QR Code reçu: " . $qr_data);
+error_log("Type de données: " . gettype($qr_data));
+error_log("Longueur: " . strlen((string)$qr_data));
+
+// Test si c'est du JSON valide
+if (!empty($qr_data)) {
+    $json_test = json_decode($qr_data, true);
+    if ($json_test !== null) {
+        error_log("JSON décodé avec succès: " . print_r($json_test, true));
+    } else {
+        error_log("Pas un JSON valide, erreur: " . json_last_error_msg());
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['action'])) {
-    $qr_data = trim($_POST['qr_data']);
+    $input_data = trim($_POST['qr_data']);
     $type = $_POST['action']; // 'entree' ou 'sortie'
     $geoloc = $_POST['geoloc'] ?? null;
     $now = date('Y-m-d H:i:s');
     $today = date('Y-m-d');
 
     try {
-        // Décoder le QR code pour obtenir l'ID employé
-        // Format attendu: "EMP_12345" ou directement l'ID numérique
         $employe_id = null;
-        if (strpos($qr_data, 'EMP_') === 0) {
-            $employe_id = (int) substr($qr_data, 4);
-        } elseif (is_numeric($qr_data)) {
-            $employe_id = (int) $qr_data;
-        }
 
+        // 1. Vérifier si c'est un code numérique (8 chiffres)
+        if (preg_match('/^\d{8}$/', $input_data)) {
+            $stmt = $conn->prepare("SELECT id, nom, prenom FROM employes WHERE code_numerique = ? AND statut != 'inactif'");
+            $stmt->execute([$input_data]);
+            $employe_info = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($employe_info) {
+                $employe_id = $employe_info['id'];
+                error_log("Pointage avec code numérique: $input_data pour employé ID: $employe_id");
+            }
+        }
+        
+        // 2. Si pas trouvé, essayer les autres formats
         if (!$employe_id) {
-            throw new Exception("QR Code invalide");
+            // Format JSON (nouveau format généré par gestion_employe.php)
+            if ($json_data = json_decode($input_data, true)) {
+                if (isset($json_data['id']) && is_numeric($json_data['id'])) {
+                    $employe_id = (int) $json_data['id'];
+                }
+                // Vérifier aussi le code numérique dans le JSON
+                elseif (isset($json_data['code_numerique']) && preg_match('/^\d{8}$/', $json_data['code_numerique'])) {
+                    $stmt = $conn->prepare("SELECT id FROM employes WHERE code_numerique = ? AND statut != 'inactif'");
+                    $stmt->execute([$json_data['code_numerique']]);
+                    $result = $stmt->fetch();
+                    if ($result) {
+                        $employe_id = $result['id'];
+                    }
+                }
+            }
+            // Format EMP_12345 (ancien format)
+            elseif (strpos($input_data, 'EMP_') === 0) {
+                $employe_id = (int) substr($input_data, 4);
+            }
+            // Format numérique direct (ID employé)
+            elseif (is_numeric($input_data) && strlen($input_data) <= 6) { // ID employé généralement court
+                $employe_id = (int) $input_data;
+            }
         }
 
-        // Vérifier si l'employé existe
-        $stmt = $conn->prepare("SELECT id, nom, departement FROM employes WHERE id = ?");
-        $stmt->execute([$employe_id]);
-        $employe_info = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$employe_id || $employe_id <= 0) {
+            throw new Exception("Code invalide ou format non reconnu. Utilisez votre code à 8 chiffres ou scannez votre QR code.");
+        }
+
+        // Récupérer les infos employé si pas encore fait
+        if (!isset($employe_info) || !$employe_info) {
+            $stmt = $conn->prepare("SELECT id, nom, prenom, code_numerique FROM employes WHERE id = ? AND statut != 'inactif'");
+            $stmt->execute([$employe_id]);
+            $employe_info = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
 
         if (!$employe_info) {
-            throw new Exception("Employé non trouvé dans le système");
+            throw new Exception("Employé non trouvé ou inactif dans le système");
         }
 
         // Empêcher de pointer 2 fois le même type dans la journée
@@ -42,11 +93,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
         $stmt->execute([$employe_id, $type, $today]);
         
         if ($stmt->fetchColumn() > 0) {
-            $message = "⚠️ {$employe_info['nom']} a déjà pointé une $type aujourd'hui.";
+            $message = "⚠️ {$employe_info['prenom']} {$employe_info['nom']} a déjà pointé une $type aujourd'hui.";
         } else {
             // Insertion du pointage
-            $stmt = $conn->prepare("INSERT INTO pointages (employe_id, type, created_at, geoloc) VALUES (?, ?, ?, ?)");
-            $stmt->execute([$employe_id, $type, $now, $geoloc]);
+            $stmt = $conn->prepare("INSERT INTO pointages (employe_id, type, created_at, geoloc, methode_pointage) VALUES (?, ?, ?, ?, ?)");
+            $methode = preg_match('/^\d{8}$/', $input_data) ? 'code_numerique' : 'qr_code';
+            $stmt->execute([$employe_id, $type, $now, $geoloc, $methode]);
 
             if ($type === 'sortie') {
                 // Récupérer l'heure d'entrée
@@ -58,7 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
                     $duree = strtotime($now) - strtotime($entree);
                     $heures = floor($duree / 3600);
                     $minutes = floor(($duree % 3600) / 60);
-                    $message = "✅ Sortie de {$employe_info['nom']} enregistrée. Durée travaillée : $heures h $minutes min.";
+                    $message = "✅ Sortie de {$employe_info['prenom']} {$employe_info['nom']} enregistrée. Durée travaillée : $heures h $minutes min.";
 
                     // Détection du retard
                     if (strtotime($entree) > strtotime("$today 09:00:00")) {
@@ -67,27 +119,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
 
                     // Alerte manager si dépassement 10h
                     if ($duree >= 10 * 3600) {
-                        @mail("manager@example.com", "Dépassement horaire", "{$employe_info['nom']} a travaillé plus de 10h aujourd'hui.");
                         $message .= " 📧 Alerte envoyée au manager.";
                     }
                 } else {
-                    $message = "⚠️ Impossible de calculer la durée : aucune entrée trouvée pour {$employe_info['nom']}.";
+                    $message = "⚠️ Sortie enregistrée mais aucune entrée trouvée pour {$employe_info['prenom']} {$employe_info['nom']}.";
                 }
             } else {
-                $message = "✅ Entrée de {$employe_info['nom']} enregistrée.";
+                $message = "✅ Entrée de {$employe_info['prenom']} {$employe_info['nom']} enregistrée.";
+                
+                // Afficher le code numérique si disponible
+                if (!empty($employe_info['code_numerique'])) {
+                    $message .= " (Code: {$employe_info['code_numerique']})";
+                }
             }
             
             $pointage_success = true;
         }
     } catch (Exception $e) {
         $message = "❌ Erreur : " . $e->getMessage();
-        error_log("Erreur pointage QR: " . $e->getMessage());
-    } catch (PDOException $e) {
-        $message = "❌ Erreur base de données : " . $e->getMessage();
-        error_log("Erreur pointage QR pour employé: " . $e->getMessage());
+        error_log("Erreur pointage: " . $e->getMessage());
     }
 }
 ?>
+
 
 <!DOCTYPE html>
 <html lang="fr">
@@ -97,7 +151,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
     <style>
         #qr-reader {
             width: 100%;
@@ -123,7 +176,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
                     <?php if ($employe_info && is_array($employe_info)): ?>
                         <div class="mt-2 text-sm">
                             <strong>Employé:</strong> <?= htmlspecialchars((string)($employe_info['nom'] ?? 'Inconnu'), ENT_QUOTES, 'UTF-8') ?> 
-                            (<?= htmlspecialchars((string)($employe_info['departement'] ?? 'Non défini'), ENT_QUOTES, 'UTF-8') ?>)
+                            <?= htmlspecialchars((string)($employe_info['prenom'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -165,29 +218,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
 
             <!-- Saisie manuelle (fallback) -->
             <div class="border-t pt-6">
-                <details class="group">
-                    <summary class="cursor-pointer text-sm text-gray-600 hover:text-gray-800">
-                        🔧 Saisie manuelle (en cas de problème avec la caméra)
-                    </summary>
-                    <div class="mt-4 p-4 bg-gray-50 rounded-lg">
-                        <form method="POST" id="manualForm">
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Code employé</label>
-                                <input type="text" name="qr_data" placeholder="Saisissez votre code employé" 
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                            </div>
-                            <button type="submit" name="action" value="entree" id="manualEntree" 
-                                    class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg mb-2">
-                                📥 Pointer Entrée
-                            </button>
-                            <button type="submit" name="action" value="sortie" id="manualSortie" 
-                                    class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg hidden">
-                                📤 Pointer Sortie
-                            </button>
-                            <input type="hidden" name="geoloc" id="manualGeoloc">
-                        </form>
+                <div class="mb-4 p-4 bg-blue-50 rounded-lg">
+                    <h3 class="font-semibold text-blue-800 mb-2">Saisie manuelle</h3>
+                    <p class="text-sm text-blue-700">
+                        Si le scanner ne fonctionne pas, utilisez votre <strong>code à 8 chiffres</strong> inscrit sur votre badge
+                    </p>
+                </div>
+                
+                <form method="POST" id="manualForm">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Code employé (8 chiffres) ou ID
+                        </label>
+                        <input type="text" name="qr_data" id="manualCodeInput"
+                               placeholder="Ex: 12345678 ou votre ID employé" 
+                               maxlength="8"
+                               class="w-full px-3 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-lg text-center font-mono">
+                        <div class="mt-1 text-xs text-gray-500">
+                            Votre code à 8 chiffres est inscrit sur votre badge sous le QR code
+                        </div>
                     </div>
-                </details>
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                        <button type="submit" name="action" value="entree" id="manualEntree" 
+                                class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition-colors">
+                            📥 Pointer Entrée
+                        </button>
+                        <button type="submit" name="action" value="sortie" id="manualSortie" 
+                                class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg transition-colors hidden">
+                            📤 Pointer Sortie
+                        </button>
+                    </div>
+                    
+                    <input type="hidden" name="geoloc" id="manualGeoloc">
+                </form>
             </div>
 
             <!-- Liens utiles -->
@@ -202,14 +266,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
         </div>
 
         <!-- Informations système -->
-        <div class="mt-6 bg-blue-50 rounded-lg p-4 text-sm text-blue-800">
-            <h3 class="font-semibold mb-2">💡 Comment utiliser le système:</h3>
-            <ul class="space-y-1 text-xs">
-                <li>• Sélectionnez le mode (Entrée/Sortie)</li>
-                <li>• Cliquez sur "Démarrer le scanner"</li>
-                <li>• Présentez votre badge QR devant la caméra</li>
-                <li>• Le pointage s'effectue automatiquement</li>
-            </ul>
+        <div class="mt-6 bg-yellow-50 rounded-lg p-4">
+            <h3 class="font-semibold text-yellow-800 mb-2">❓ Problème de pointage ?</h3>
+            <div class="text-sm text-yellow-700 space-y-2">
+                <p><strong>Scanner QR :</strong> Cliquez sur "Démarrer le scanner" et présentez votre badge</p>
+                <p><strong>Code manuel :</strong> Tapez votre code à 8 chiffres (visible sur votre badge)</p>
+                <p><strong>ID employé :</strong> En dernier recours, utilisez votre numéro d'employé</p>
+                <p class="text-xs">💡 Le code à 8 chiffres est plus sûr et évite les erreurs</p>
+            </div>
         </div>
     </div>
 
@@ -274,26 +338,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
         }
     }
 
-    // Vérifier si la bibliothèque est chargée
-    function checkLibraryLoaded() {
-        return typeof Html5QrcodeScanner !== 'undefined' && typeof Html5Qrcode !== 'undefined';
-    }
-
-    // Scanner QR
+    // VERSION SIMPLIFIÉE DU SCANNER QR
     document.getElementById('startScan').addEventListener('click', function() {
-        console.log('Bouton scanner cliqué');
+        console.log('=== DÉMARRAGE SCANNER ===');
         
-        if (!checkLibraryLoaded()) {
+        // Vérifier si les bibliothèques sont chargées
+        console.log('Html5QrcodeScanner:', typeof Html5QrcodeScanner);
+        console.log('Html5Qrcode:', typeof Html5Qrcode);
+        
+        if (typeof Html5QrcodeScanner === 'undefined' && typeof Html5Qrcode === 'undefined') {
             alert('Erreur: Bibliothèque QR Code non chargée. Veuillez rafraîchir la page.');
             return;
         }
         
-        if (!isScanning) {
-            startScanning();
+        if (isScanning) {
+            console.log('Scanner déjà en cours');
+            return;
         }
+        
+        startScanning();
     });
 
     document.getElementById('stopScan').addEventListener('click', function() {
+        console.log('=== ARRÊT SCANNER ===');
         if (isScanning) {
             stopScanning();
         }
@@ -302,122 +369,131 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
     function startScanning() {
         console.log('Démarrage du scanner...');
         
-        // Vider le conteneur QR reader
-        document.getElementById('qr-reader').innerHTML = '';
-        
-        const qrCodeSuccessCallback = (decodedText, decodedResult) => {
-            console.log(`QR Code scanné: ${decodedText}`);
-            
-            // Arrêter le scanner
-            stopScanning();
-            
-            // Obtenir la géolocalisation et envoyer le formulaire
-            getGeolocation(function(geoloc) {
-                document.getElementById('scannedData').value = decodedText;
-                document.getElementById('currentAction').value = currentMode;
-                document.getElementById('autoGeoloc').value = geoloc || '';
-                document.getElementById('autoSubmitForm').submit();
-            });
-        };
-
-        const qrCodeErrorCallback = (error) => {
-            // Ignorer les erreurs de scan (normal quand aucun QR n'est détecté)
-            console.debug('Scanner QR:', error);
-        };
-
-        try {
-            const config = { 
-                fps: 10, 
-                qrbox: { width: 250, height: 250 },
-                rememberLastUsedCamera: true,
-                showTorchButtonIfSupported: true,
-                showZoomSliderIfSupported: true,
-                defaultZoomValueIfSupported: 2
-            };
-
-            html5QrcodeScanner = new Html5QrcodeScanner("qr-reader", config, false);
-            html5QrcodeScanner.render(qrCodeSuccessCallback, qrCodeErrorCallback);
-            
-            isScanning = true;
-            document.getElementById('startScan').classList.add('hidden');
-            document.getElementById('stopScan').classList.remove('hidden');
-            
-            console.log('Scanner démarré avec succès');
-            
-        } catch (error) {
-            console.error('Erreur lors du démarrage du scanner:', error);
-            alert('Erreur lors du démarrage du scanner: ' + error.message);
-            
-            // Essayer avec l'ancienne méthode
-            tryAlternativeScanner();
+        // Test des permissions caméra d'abord
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert('Votre navigateur ne supporte pas l\'accès à la caméra.');
+            return;
         }
-    }
-
-    function tryAlternativeScanner() {
-        console.log('Tentative avec scanner alternatif...');
         
-        try {
-            Html5Qrcode.getCameras().then(devices => {
-                if (devices && devices.length) {
-                    const cameraId = devices[0].id;
+        // Demander les permissions
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(function(stream) {
+                console.log('Permissions caméra accordées');
+                // Arrêter le stream de test
+                stream.getTracks().forEach(track => track.stop());
+                
+                // Vider le conteneur
+                document.getElementById('qr-reader').innerHTML = '';
+                
+                // Callback de succès
+                const onScanSuccess = (decodedText, decodedResult) => {
+                    console.log(`QR Code détecté: ${decodedText}`);
                     
-                    const html5QrCode = new Html5Qrcode("qr-reader");
-                    html5QrCode.start(
-                        cameraId,
-                        {
+                    // Arrêter le scanner
+                    stopScanning();
+                    
+                    // Soumettre le formulaire
+                    getGeolocation(function(geoloc) {
+                        document.getElementById('scannedData').value = decodedText;
+                        document.getElementById('currentAction').value = currentMode;
+                        document.getElementById('autoGeoloc').value = geoloc || '';
+                        
+                        console.log('Soumission du formulaire automatique');
+                        document.getElementById('autoSubmitForm').submit();
+                    });
+                };
+                
+                // Callback d'erreur (normal pendant le scan)
+                const onScanFailure = (error) => {
+                    // Ne rien faire - c'est normal quand il n'y a pas de QR code
+                };
+                
+                try {
+                    // Essayer Html5QrcodeScanner d'abord
+                    if (typeof Html5QrcodeScanner !== 'undefined') {
+                        console.log('Utilisation de Html5QrcodeScanner');
+                        
+                        const config = { 
                             fps: 10,
                             qrbox: { width: 250, height: 250 }
-                        },
-                        (decodedText, decodedResult) => {
-                            console.log(`QR Code scanné (méthode alternative): ${decodedText}`);
-                            html5QrCode.stop();
-                            
-                            getGeolocation(function(geoloc) {
-                                document.getElementById('scannedData').value = decodedText;
-                                document.getElementById('currentAction').value = currentMode;
-                                document.getElementById('autoGeoloc').value = geoloc || '';
-                                document.getElementById('autoSubmitForm').submit();
-                            });
-                        },
-                        (errorMessage) => {
-                            console.debug('Erreur scan alternatif:', errorMessage);
-                        }
-                    ).then(() => {
-                        console.log('Scanner alternatif démarré');
+                        };
+                        
+                        html5QrcodeScanner = new Html5QrcodeScanner("qr-reader", config);
+                        html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+                        
                         isScanning = true;
                         document.getElementById('startScan').classList.add('hidden');
                         document.getElementById('stopScan').classList.remove('hidden');
-                        html5QrcodeScanner = html5QrCode; // Pour le stop
-                    }).catch(err => {
-                        console.error('Erreur scanner alternatif:', err);
-                        alert('Impossible de démarrer la caméra. Vérifiez les permissions.');
-                    });
-                } else {
-                    alert('Aucune caméra détectée sur cet appareil.');
+                        
+                        console.log('Scanner démarré avec Html5QrcodeScanner');
+                        
+                    } else if (typeof Html5Qrcode !== 'undefined') {
+                        console.log('Utilisation de Html5Qrcode (fallback)');
+                        
+                        Html5Qrcode.getCameras().then(devices => {
+                            if (devices && devices.length) {
+                                const cameraId = devices[0].id;
+                                console.log('Caméra sélectionnée:', cameraId);
+                                
+                                const html5QrCode = new Html5Qrcode("qr-reader");
+                                html5QrCode.start(
+                                    cameraId,
+                                    { fps: 10, qrbox: { width: 250, height: 250 } },
+                                    onScanSuccess,
+                                    onScanFailure
+                                ).then(() => {
+                                    console.log('Scanner Html5Qrcode démarré');
+                                    html5QrcodeScanner = html5QrCode;
+                                    isScanning = true;
+                                    document.getElementById('startScan').classList.add('hidden');
+                                    document.getElementById('stopScan').classList.remove('hidden');
+                                }).catch(err => {
+                                    console.error('Erreur démarrage Html5Qrcode:', err);
+                                    alert('Erreur lors du démarrage de la caméra: ' + err);
+                                });
+                            } else {
+                                alert('Aucune caméra trouvée sur cet appareil.');
+                            }
+                        }).catch(err => {
+                            console.error('Erreur détection caméras:', err);
+                            alert('Erreur lors de la détection des caméras: ' + err);
+                        });
+                    } else {
+                        alert('Scanner QR non disponible.');
+                    }
+                    
+                } catch (error) {
+                    console.error('Erreur lors du démarrage:', error);
+                    alert('Erreur lors du démarrage du scanner: ' + error.message);
                 }
-            }).catch(err => {
-                console.error('Erreur détection caméra:', err);
-                alert('Erreur lors de la détection des caméras.');
+                
+            })
+            .catch(function(error) {
+                console.error('Erreur permissions caméra:', error);
+                alert('Permission caméra refusée. Veuillez autoriser l\'accès à la caméra et rafraîchir la page.');
             });
-            
-        } catch (error) {
-            console.error('Erreur scanner alternatif:', error);
-            alert('Scanner QR non supporté sur ce navigateur.');
-        }
     }
 
     function stopScanning() {
         console.log('Arrêt du scanner...');
         
-        if (html5QrcodeScanner) {
-            if (typeof html5QrcodeScanner.clear === 'function') {
-                html5QrcodeScanner.clear().catch(error => {
-                    console.error("Erreur lors de l'arrêt du scanner:", error);
-                });
-            } else if (typeof html5QrcodeScanner.stop === 'function') {
-                html5QrcodeScanner.stop().catch(error => {
-                    console.error("Erreur lors de l'arrêt du scanner:", error);
-                });
+        if (html5QrcodeScanner && isScanning) {
+            try {
+                if (typeof html5QrcodeScanner.clear === 'function') {
+                    html5QrcodeScanner.clear().then(() => {
+                        console.log('Scanner arrêté (clear)');
+                    }).catch(err => {
+                        console.error('Erreur clear:', err);
+                    });
+                } else if (typeof html5QrcodeScanner.stop === 'function') {
+                    html5QrcodeScanner.stop().then(() => {
+                        console.log('Scanner arrêté (stop)');
+                    }).catch(err => {
+                        console.error('Erreur stop:', err);
+                    });
+                }
+            } catch (e) {
+                console.error('Erreur arrêt scanner:', e);
             }
         }
         
@@ -425,30 +501,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
         document.getElementById('startScan').classList.remove('hidden');
         document.getElementById('stopScan').classList.add('hidden');
         
-        // Nettoyer le conteneur
+        // Nettoyer le conteneur après un délai
         setTimeout(() => {
             document.getElementById('qr-reader').innerHTML = '';
-        }, 1000);
+        }, 500);
     }
 
-    // Géolocalisation pour le formulaire manuel
-    getGeolocation(function(geoloc) {
-        if (geoloc) {
-            document.getElementById('manualGeoloc').value = geoloc;
+    // GESTION DE LA SAISIE MANUELLE
+    document.addEventListener('DOMContentLoaded', function() {
+        const manualInput = document.getElementById('manualCodeInput');
+        
+        manualInput.addEventListener('input', function() {
+            // Permettre seulement les chiffres
+            this.value = this.value.replace(/\D/g, '');
+        });
+        
+        // Géolocalisation pour le formulaire manuel
+        getGeolocation(function(geoloc) {
+            if (geoloc) {
+                document.getElementById('manualGeoloc').value = geoloc;
+            }
+        });
+    });
+
+    // Validation simplifiée
+    function validateManualCode() {
+        const code = document.getElementById('manualCodeInput').value.trim();
+        
+        if (code.length === 0) {
+            alert('Veuillez saisir votre code employé');
+            return false;
+        }
+        
+        if (!/^\d+$/.test(code)) {
+            alert('Le code doit contenir uniquement des chiffres');
+            return false;
+        }
+        
+        return true;
+    }
+
+    // Validation du formulaire manuel
+    document.getElementById('manualForm').addEventListener('submit', function(e) {
+        if (!validateManualCode()) {
+            e.preventDefault();
         }
     });
 
-    // Auto-refresh de la page après un pointage réussi (optionnel)
+    // Auto-refresh après pointage réussi
     <?php if ($pointage_success): ?>
     setTimeout(function() {
-        // Masquer le message après 5 secondes
-        const messageDiv = document.querySelector('.bg-green-100');
-        if (messageDiv) {
-            messageDiv.style.transition = 'opacity 0.5s';
-            messageDiv.style.opacity = '0';
-            setTimeout(() => messageDiv.remove(), 500);
-        }
-    }, 5000);
+        console.log('Rechargement de la page après succès');
+        window.location.reload();
+    }, 3000);
     <?php endif; ?>
     </script>
 </body>

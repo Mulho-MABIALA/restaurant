@@ -1625,17 +1625,53 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
         <input type="hidden" name="cart_data" id="cartDataInput">
     </form>
 <script>
+    // Sauvegarder le panier dans sessionStorage
+function saveCartToStorage() {
+    try {
+        sessionStorage.setItem('mulho_cart', JSON.stringify(cartItems));
+        console.log('Panier sauvegardé:', cartItems);
+    } catch (error) {
+        console.error('Erreur lors de la sauvegarde du panier:', error);
+    }
+}
+
+// Charger le panier depuis sessionStorage
+function loadCartFromStorage() {
+    try {
+        const savedCart = sessionStorage.getItem('mulho_cart');
+        if (savedCart) {
+            cartItems = JSON.parse(savedCart);
+            console.log('Panier chargé:', cartItems);
+            updateCartDisplay();
+            return true;
+        }
+    } catch (error) {
+        console.error('Erreur lors du chargement du panier:', error);
+        cartItems = [];
+    }
+    return false;
+}
+
+// Vider le panier du storage
+function clearCartStorage() {
+    try {
+        sessionStorage.removeItem('mulho_cart');
+    } catch (error) {
+        console.error('Erreur lors du vidage du panier:', error);
+    }
+}
     
         // Variables globales
         let selectedItem = {};
         let currentQuantity = 1;
         let cartItems = [];
 
-        // Afficher le menu directement au chargement
-        document.addEventListener('DOMContentLoaded', function() {
-            showMenu();
-            updateCartDisplay();
-        });
+      document.addEventListener('DOMContentLoaded', function() {
+    // Charger le panier sauvegardé
+    loadCartFromStorage();
+    showMenu();
+    updateCartDisplay();
+});
 
         // Gestion du panier
         function openCartModal() {
@@ -1703,26 +1739,38 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
             document.getElementById('cartTotalAmount').textContent = totalAmount.toLocaleString() + ' F';
         }
 
-        function updateCartItemQuantity(index, change) {
-            if (cartItems[index]) {
-                const newQuantity = cartItems[index].quantity + change;
-                if (newQuantity > 0) {
-                    cartItems[index].quantity = newQuantity;
-                    cartItems[index].total = cartItems[index].price * newQuantity;
-                    renderCartItems();
-                    updateCartDisplay();
-                } else {
-                    removeCartItem(index);
-                }
-            }
-        }
-
-        function removeCartItem(index) {
-            cartItems.splice(index, 1);
+        // Fonction updateCartItemQuantity modifiée
+function updateCartItemQuantity(index, change) {
+    if (cartItems[index]) {
+        const newQuantity = cartItems[index].quantity + change;
+        if (newQuantity > 0) {
+            cartItems[index].quantity = newQuantity;
+            cartItems[index].total = cartItems[index].price * newQuantity;
+            saveCartToStorage(); // Sauvegarder après modification
             renderCartItems();
             updateCartDisplay();
-            showToast('Article supprimé du panier');
+        } else {
+            removeCartItem(index);
         }
+    }
+}
+        // Fonction removeCartItem modifiée
+function removeCartItem(index) {
+    cartItems.splice(index, 1);
+    saveCartToStorage(); // Sauvegarder après modification
+    renderCartItems();
+    updateCartDisplay();
+    showToast('Article supprimé du panier');
+}
+
+// Fonction pour vider complètement le panier (optionnelle)
+function clearCart() {
+    cartItems = [];
+    saveCartToStorage();
+    renderCartItems();
+    updateCartDisplay();
+    showToast('Panier vidé');
+}
 
         function updateCartDisplay() {
             const cartBadge = document.getElementById('cartBadge');
@@ -1736,33 +1784,60 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
             }
         }
 
-        function proceedToCheckout() {
-            if (cartItems.length === 0) {
-                showToast('Votre panier est vide');
-                return;
-            }
-            
-            // Envoyer les données au serveur via AJAX
-            fetch('menu.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: 'action=update_cart&cart_data=' + encodeURIComponent(JSON.stringify(cartItems))
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    window.location.href = 'commander.php';
-                }
-            })
-            .catch(error => {
-                console.error('Erreur:', error);
-                // Fallback : utiliser localStorage quand même
-                localStorage.setItem('cartItems', JSON.stringify(cartItems));
-                window.location.href = 'commander.php';
-            });
+      // Remplacez votre fonction proceedToCheckout dans menu.php par celle-ci :
+
+function proceedToCheckout() {
+    if (cartItems.length === 0) {
+        showToast('Votre panier est vide');
+        return;
+    }
+    
+    console.log('Procédure de checkout avec:', cartItems);
+    
+    // Sauvegarder dans sessionStorage avant de quitter la page
+    saveCartToStorage();
+    
+    // Méthode 1 : Redirection simple (recommandée)
+    window.location.href = 'commander.php';
+}
+
+// Version alternative avec envoi AJAX (si vous préférez)
+function proceedToCheckoutWithAjax() {
+    if (cartItems.length === 0) {
+        showToast('Votre panier est vide');
+        return;
+    }
+    
+    console.log('Checkout AJAX avec:', cartItems);
+    
+    // Sauvegarder dans le storage
+    saveCartToStorage();
+    
+    // Envoyer au serveur pour synchroniser la session
+    fetch('commander.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'action=sync_cart&cart_data=' + encodeURIComponent(JSON.stringify(cartItems))
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('Panier synchronisé, redirection...');
+            window.location.href = 'commander.php';
+        } else {
+            console.error('Erreur de synchronisation:', data.message);
+            // Redirection quand même avec les données dans le storage
+            window.location.href = 'commander.php';
         }
+    })
+    .catch(error => {
+        console.error('Erreur AJAX:', error);
+        // Redirection de secours
+        window.location.href = 'commander.php';
+    });
+}
 
         // Alternative : fonction de redirection directe (à tester si la première ne marche pas)
         function redirectToCommander() {
@@ -1815,42 +1890,39 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
         function closeOrderModal() {
             document.getElementById('orderModal').style.display = 'none';
         }
+// Fonction quickAddToCart modifiée
+function quickAddToCart(name, price, image, description) {
+    const orderData = {
+        item: name,
+        price: price,
+        quantity: 1,
+        total: price,
+        specialInstructions: '',
+        image: image,
+        id: Date.now()
+    };
+                cartItems.push(orderData);
+    saveCartToStorage(); // Sauvegarder après modification
+    updateCartDisplay();
 
-        // Ajout rapide au panier (nouveau)
-        function quickAddToCart(name, price, image, description) {
-            const orderData = {
-                item: name,
-                price: price,
-                quantity: 1,
-                total: price,
-                specialInstructions: '',
-                image: image,
-                id: Date.now() // ID unique pour chaque item
-            };
-
-            // Ajouter au panier
-            cartItems.push(orderData);
-            updateCartDisplay();
             
             // Trouver le bouton qui a été cliqué
-            const clickedButton = event.target.closest('.quick-add-btn');
+             const clickedButton = event.target.closest('.quick-add-btn');
             
-            // Animation du bouton
-            clickedButton.classList.add('quick-add-success');
-            clickedButton.innerHTML = '<i class="fas fa-check"></i>';
             
-            // Afficher une notification
-            showToast(`${name} ajouté au panier !`);
-            
-            // Reset du bouton après 1 seconde
-            setTimeout(() => {
-                clickedButton.classList.remove('quick-add-success');
-                clickedButton.innerHTML = '<i class="fas fa-plus"></i>';
-            }, 1000);
+          
+    clickedButton.classList.add('quick-add-success');
+    clickedButton.innerHTML = '<i class="fas fa-check"></i>';
+    
+    showToast(`${name} ajouté au panier !`);
+    
+    setTimeout(() => {
+        clickedButton.classList.remove('quick-add-success');
+        clickedButton.innerHTML = '<i class="fas fa-plus"></i>';
+    }, 1000);
 
-            console.log('Panier mis à jour:', cartItems);
-        }
-
+    console.log('Panier mis à jour:', cartItems);
+}
         // Changer la quantité
         function changeQuantity(change) {
             const newQuantity = currentQuantity + change;
@@ -1871,40 +1943,39 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
         }
 
         // Ajouter au panier depuis la modal
-        function addToCart() {
-            const specialInstructions = document.getElementById('specialInstructions').value;
-            
-            const orderData = {
-                item: selectedItem.name,
-                price: selectedItem.price,
-                quantity: currentQuantity,
-                total: selectedItem.price * currentQuantity,
-                specialInstructions: specialInstructions,
-                image: selectedItem.image,
-                id: Date.now()
-            };
+       // Fonction addToCart modifiée
+function addToCart() {
+    const specialInstructions = document.getElementById('specialInstructions').value;
+    
+    const orderData = {
+        item: selectedItem.name,
+        price: selectedItem.price,
+        quantity: currentQuantity,
+        total: selectedItem.price * currentQuantity,
+        specialInstructions: specialInstructions,
+        image: selectedItem.image,
+        id: Date.now()
+    };
 
-            // Ajouter au panier
-            cartItems.push(orderData);
-            updateCartDisplay();
+    cartItems.push(orderData);
+    saveCartToStorage(); // Sauvegarder après modification
+    updateCartDisplay();
 
-            // Animation du bouton
-            const btn = document.querySelector('.add-to-cart-btn');
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-check"></i> Ajouté !';
-            btn.style.background = 'linear-gradient(135deg, var(--success), #16a34a)';
-            
-            // Afficher une notification
-            showToast(`${selectedItem.name} ajouté au panier !`);
-            
-            setTimeout(() => {
-                btn.innerHTML = originalText;
-                btn.style.background = 'linear-gradient(135deg, var(--accent), #c19654)';
-                closeOrderModal();
-            }, 1500);
+    const btn = document.querySelector('.add-to-cart-btn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-check"></i> Ajouté !';
+    btn.style.background = 'linear-gradient(135deg, var(--success), #16a34a)';
+    
+    showToast(`${selectedItem.name} ajouté au panier !`);
+    
+    setTimeout(() => {
+        btn.innerHTML = originalText;
+        btn.style.background = 'linear-gradient(135deg, var(--accent), #c19654)';
+        closeOrderModal();
+    }, 1500);
 
-            console.log('Panier mis à jour:', cartItems);
-        }
+    console.log('Panier mis à jour:', cartItems);
+}
 
         // Afficher une notification toast
         function showToast(message) {
@@ -1959,6 +2030,5 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
         });
    
 </script>
-    <script src="menu.js"></script>
 </body>
 </html>

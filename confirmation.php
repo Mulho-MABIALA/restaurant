@@ -79,7 +79,7 @@ if ($totalCommande == 0 && isset($_SESSION['panier']) && !empty($_SESSION['panie
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Commande confirmée</title>
+    <title>Commande confirmée - Reçu Impayé</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -110,7 +110,7 @@ if ($totalCommande == 0 && isset($_SESSION['panier']) && !empty($_SESSION['panie
             }
         }
         
-        /* Styles pour le reçu (similaire à l'email) */
+        /* Styles pour le reçu (identique à l'email) */
         .receipt-container {
             max-width: 400px;
             margin: 0 auto;
@@ -135,6 +135,37 @@ if ($totalCommande == 0 && isset($_SESSION['panier']) && !empty($_SESSION['panie
             justify-content: center;
             font-size: 24px;
             color: #22c55e;
+        }
+        /* Nouveau style pour le statut impayé */
+        .payment-status {
+            background-color: #fef2f2;
+            border: 2px solid #fecaca;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin: 20px;
+            text-align: center;
+        }
+        .payment-status .status-icon {
+            width: 40px;
+            height: 40px;
+            background-color: #fee2e2;
+            border-radius: 50%;
+            margin: 0 auto 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: #dc2626;
+        }
+        .payment-status h3 {
+            color: #dc2626;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        .payment-status p {
+            color: #991b1b;
+            font-size: 12px;
         }
         .details-section {
             padding: 20px;
@@ -233,6 +264,34 @@ if ($totalCommande == 0 && isset($_SESSION['panier']) && !empty($_SESSION['panie
             font-weight: 600;
             font-size: 14px;
         }
+        /* Footer avec informations de paiement */
+        .payment-footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-top: 1px solid #e9ecef;
+            text-align: center;
+        }
+        .payment-footer h4 {
+            color: #495057;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .payment-footer p {
+            color: #6c757d;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        @media (max-width: 500px) {
+            .receipt-container {
+                margin: 0;
+                border-radius: 0;
+            }
+            .payment-status {
+                margin: 15px;
+                padding: 10px 12px;
+            }
+        }
     </style>
     <script>
         // Nettoyer le localStorage après confirmation
@@ -258,6 +317,15 @@ if ($totalCommande == 0 && isset($_SESSION['panier']) && !empty($_SESSION['panie
                     </p>
                 </div>
                 
+                <!-- Nouveau: Statut de paiement impayé -->
+                <div class="payment-status">
+                    <div class="status-icon">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <h3>REÇU IMPAYÉ</h3>
+                    <p>Cette commande est en attente de paiement</p>
+                </div>
+                
                 <!-- Section détails de la commande -->
                 <div class="details-section">
                     <div class="section-title">Détails de la commande</div>
@@ -269,7 +337,12 @@ if ($totalCommande == 0 && isset($_SESSION['panier']) && !empty($_SESSION['panie
                     
                     <div class="detail-row">
                         <span class="detail-label">Date :</span>
-                        <span class="detail-value"><?= date('d/m/Y', strtotime($commande['date_commande'])) ?></span>
+                        <span class="detail-value"><?= date('d/m/Y à H:i', strtotime($commande['date_commande'])) ?></span>
+                    </div>
+                    
+                    <div class="detail-row">
+                        <span class="detail-label">Statut :</span>
+                        <span class="detail-value" style="color: #dc2626; font-weight: 600;">IMPAYÉ</span>
                     </div>
                     
                     <div class="detail-row">
@@ -302,14 +375,14 @@ if ($totalCommande == 0 && isset($_SESSION['panier']) && !empty($_SESSION['panie
                     <?php endif; ?>
                     
                     <div class="detail-row">
-                        <span class="detail-label">Total :</span>
-                        <span class="detail-value total-value"><?= number_format($totalCommande, 2) ?> fcfa</span>
+                        <span class="detail-label">Total à payer :</span>
+                        <span class="detail-value total-value"><?= number_format($totalCommande, 2) ?> FCFA</span>
                     </div>
                 </div>
                 
                 <!-- Section produits commandés -->
                 <div class="products-section">
-                    <div class="section-title">Produits commandés :</div>
+                    <div class="section-title">Produits commandés</div>
                     
                     <?php if (!empty($details)): ?>
                     <table class="products-table">
@@ -327,13 +400,13 @@ if ($totalCommande == 0 && isset($_SESSION['panier']) && !empty($_SESSION['panie
                             <tr>
                                 <td class="product-name"><?= htmlspecialchars($item['nom_plat']) ?></td>
                                 <td><?= (int)$item['quantite'] ?></td>
-                                <td class="price-text"><?= number_format($item['prix'], 2) ?><br>fcfa</td>
-                                <td class="price-text"><?= number_format($sousTotal, 2) ?><br>fcfa</td>
+                                <td class="price-text"><?= number_format($item['prix'], 2) ?><br>FCFA</td>
+                                <td class="price-text"><?= number_format($sousTotal, 2) ?><br>FCFA</td>
                             </tr>
                             <?php endforeach; ?>
                             <tr class="total-row">
-                                <td colspan="3"><strong>Total</strong></td>
-                                <td class="total-amount"><strong><?= number_format($totalCommande, 2) ?><br>fcfa</strong></td>
+                                <td colspan="3"><strong>Total à payer</strong></td>
+                                <td class="total-amount"><strong><?= number_format($totalCommande, 2) ?><br>FCFA</strong></td>
                             </tr>
                         </tbody>
                     </table>
@@ -354,24 +427,34 @@ if ($totalCommande == 0 && isset($_SESSION['panier']) && !empty($_SESSION['panie
                     </div>
                     <?php endif; ?>
                 </div>
+                
+                <!-- Footer avec informations de paiement -->
+                <div class="payment-footer">
+                    <h4><i class="fas fa-exclamation-triangle"></i> Paiement requis</h4>
+                    <p>Cette commande sera traitée après réception du paiement.<br>
+                    Veuillez contacter notre équipe pour finaliser votre paiement.<br>
+                    <strong>Merci de conserver ce reçu jusqu'au paiement complet.</strong></p>
+                </div>
             </div>
         </div>
         
         <!-- Boutons d'action (masqués à l'impression) -->
         <div class="max-w-md mx-auto mt-6 space-y-3 no-print">
-            <!-- Prochaines étapes -->
-            <div class="bg-blue-50 rounded-lg p-4 text-left border border-blue-200">
-                <h4 class="font-semibold text-blue-800 mb-2">
-                    <i class="fas fa-info-circle mr-2"></i> Prochaines étapes
+            <!-- Prochaines étapes avec avertissement paiement -->
+            <div class="bg-red-50 rounded-lg p-4 text-left border border-red-200">
+                <h4 class="font-semibold text-red-800 mb-2">
+                    <i class="fas fa-credit-card mr-2"></i> Paiement requis
                 </h4>
-                <ul class="text-sm text-blue-700 space-y-1">
+                <ul class="text-sm text-red-700 space-y-1">
+                    <li>• Cette commande nécessite un paiement</li>
                     <li>• Un e-mail de confirmation vous a été envoyé</li>
-                    <li>• Préparation de votre commande en cours</li>
-                    <li>• Livraison dans les délais annoncés</li>
-                    <li>• Paiement à la livraison</li>
+                    <li>• Contactez-nous pour finaliser le paiement</li>
+                    <li>• La préparation débutera après paiement</li>
                 </ul>
             </div>
 
+            <!-- Contact pour paiement -->
+            
             <button onclick="window.print()" 
                     class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-lg font-semibold transition-colors">
                 <i class="fas fa-print mr-2"></i> Imprimer le reçu
