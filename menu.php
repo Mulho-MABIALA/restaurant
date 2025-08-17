@@ -1,6 +1,6 @@
 <?php
 include('config.php');
-
+require_once 'admin/communication/fonctions_annonces.php';
 if ($_POST['action'] ?? '' === 'add_to_cart') {
     if (!isset($_SESSION['panier'])) {
         $_SESSION['panier'] = [];
@@ -111,6 +111,7 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
     <title>Mulho - Restaurant</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         
         * {
@@ -1369,6 +1370,16 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
     </style>
 </head>
 <body>
+   
+    <?php 
+    // Vérification et notification pour le menu
+    if (compterAnnoncesActives('menu') > 0) {
+        echo '<div class="menu-annonces-section">';
+        afficherNotificationAnnonces('menu');
+        afficherAnnonces('menu', 'top');
+        echo '</div>';
+    }
+    ?>
     <!-- Header -->
    <header class="header">
     <div class="header-content">

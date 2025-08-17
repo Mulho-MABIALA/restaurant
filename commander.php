@@ -672,7 +672,7 @@ $emailTemplate .= "
                         
                         <div>
                             <label for="adresse" class="block text-sm font-semibold text-gray-700 mb-2">
-                                Adresse de livraison <span class="text-red-500">*</span>
+                                Adresse <span class="text-red-500">*</span>
                             </label>
                             <div class="relative">
                                 <textarea id="adresse" 
@@ -785,8 +785,6 @@ $emailTemplate .= "
             </div>
         </div>
     </div>
-
-   // Remplacez votre section JavaScript dans commander.php par ce code :
 
 <script>
 // Variables globales pour gérer le panier

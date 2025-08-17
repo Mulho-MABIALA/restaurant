@@ -141,8 +141,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
     }
 }
 ?>
-
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -150,7 +148,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
     <title>Badgeuse QR Code</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
+    <!-- Version plus récente et CDN de backup -->
+    
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
     <style>
         #qr-reader {
             width: 100%;
@@ -163,12 +163,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
             border-radius: 8px !important;
             margin: 4px !important;
         }
+        .loading-spinner {
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #4F46E5;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-4">
     <div class="max-w-2xl mx-auto">
         <div class="bg-white shadow-lg rounded-xl p-6">
             <h1 class="text-3xl font-bold mb-6 text-center text-indigo-600">📱 Badgeuse QR Code</h1>
+
+            <!-- Message d'état de chargement -->
+            <div id="libraryStatus" class="mb-4 p-3 bg-blue-50 text-blue-700 rounded-lg text-center text-sm">
+                <div class="loading-spinner mb-2"></div>
+                Chargement de la bibliothèque QR Code...
+            </div>
 
             <?php if (!empty($message)): ?>
                 <div class="mb-6 p-4 <?= $pointage_success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' ?> rounded-lg text-center">
@@ -195,7 +214,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
             </div>
 
             <!-- Scanner QR -->
-            <div class="mb-6">
+            <div class="mb-6" id="qrScannerSection" style="display: none;">
                 <div class="text-center mb-4">
                     <h2 class="text-lg font-semibold text-gray-800">Scannez votre badge QR</h2>
                     <p class="text-sm text-gray-600">Placez votre code QR devant la caméra</p>
@@ -216,12 +235,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
                 </div>
             </div>
 
+            <!-- Message d'erreur bibliothèque -->
+            <div id="qrErrorSection" class="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg" style="display: none;">
+                <h3 class="font-semibold text-yellow-800 mb-2">⚠️ Scanner QR indisponible</h3>
+                <p class="text-sm text-yellow-700 mb-2">
+                    La bibliothèque de scan QR n'a pas pu se charger. Cela peut être dû à :
+                </p>
+                <ul class="text-sm text-yellow-700 ml-4 list-disc">
+                    <li>Une connexion internet lente ou instable</li>
+                    <li>Un bloqueur de publicité qui bloque les CDN</li>
+                    <li>Des restrictions réseau</li>
+                </ul>
+                <p class="text-sm text-yellow-700 mt-2">
+                    <strong>Solution :</strong> Utilisez la saisie manuelle avec votre code à 8 chiffres ci-dessous.
+                </p>
+            </div>
+
             <!-- Saisie manuelle (fallback) -->
             <div class="border-t pt-6">
                 <div class="mb-4 p-4 bg-blue-50 rounded-lg">
                     <h3 class="font-semibold text-blue-800 mb-2">Saisie manuelle</h3>
                     <p class="text-sm text-blue-700">
-                        Si le scanner ne fonctionne pas, utilisez votre <strong>code à 8 chiffres</strong> inscrit sur votre badge
+                        Utilisez votre <strong>code à 8 chiffres</strong> inscrit sur votre badge
                     </p>
                 </div>
                 
@@ -288,6 +323,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
     let html5QrcodeScanner;
     let currentMode = 'entree';
     let isScanning = false;
+    let libraryLoaded = false;
+
+    // Fonction pour charger une bibliothèque de backup
+    function loadBackupQRLibrary() {
+        console.log('Chargement de la bibliothèque de backup...');
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js';
+        script.onload = function() {
+            console.log('Bibliothèque de backup chargée');
+            checkLibraryStatus();
+        };
+        script.onerror = function() {
+            console.log('Échec du chargement de la bibliothèque de backup');
+            showLibraryError();
+        };
+        document.head.appendChild(script);
+    }
+
+    // Vérification du statut de la bibliothèque
+    function checkLibraryStatus() {
+        console.log('=== VÉRIFICATION BIBLIOTHÈQUE ===');
+        console.log('Html5QrcodeScanner:', typeof Html5QrcodeScanner);
+        console.log('Html5Qrcode:', typeof Html5Qrcode);
+        
+        if (typeof Html5QrcodeScanner !== 'undefined' || typeof Html5Qrcode !== 'undefined') {
+            libraryLoaded = true;
+            showLibrarySuccess();
+        } else {
+            showLibraryError();
+        }
+    }
+
+    function showLibrarySuccess() {
+        document.getElementById('libraryStatus').style.display = 'none';
+        document.getElementById('qrScannerSection').style.display = 'block';
+        document.getElementById('qrErrorSection').style.display = 'none';
+    }
+
+    function showLibraryError() {
+        document.getElementById('libraryStatus').innerHTML = 
+            '<div class="text-red-700">❌ Impossible de charger la bibliothèque QR Code</div>';
+        document.getElementById('libraryStatus').className = 'mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-center text-sm';
+        
+        setTimeout(() => {
+            document.getElementById('libraryStatus').style.display = 'none';
+            document.getElementById('qrErrorSection').style.display = 'block';
+        }, 2000);
+    }
+
+    // Vérification initiale après chargement de la page
+    window.addEventListener('load', function() {
+        setTimeout(checkLibraryStatus, 1000);
+    });
 
     // Gestion des modes entrée/sortie
     document.getElementById('entreeBtn').addEventListener('click', function() {
@@ -338,16 +426,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
         }
     }
 
-    // VERSION SIMPLIFIÉE DU SCANNER QR
+    // GESTION DU SCANNER QR AMÉLIORÉE
     document.getElementById('startScan').addEventListener('click', function() {
         console.log('=== DÉMARRAGE SCANNER ===');
         
-        // Vérifier si les bibliothèques sont chargées
-        console.log('Html5QrcodeScanner:', typeof Html5QrcodeScanner);
-        console.log('Html5Qrcode:', typeof Html5Qrcode);
-        
-        if (typeof Html5QrcodeScanner === 'undefined' && typeof Html5Qrcode === 'undefined') {
-            alert('Erreur: Bibliothèque QR Code non chargée. Veuillez rafraîchir la page.');
+        if (!libraryLoaded) {
+            alert('La bibliothèque QR Code n\'est pas chargée. Utilisez la saisie manuelle.');
             return;
         }
         
@@ -369,7 +453,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
     function startScanning() {
         console.log('Démarrage du scanner...');
         
-        // Test des permissions caméra d'abord
+        // Vérification finale de la bibliothèque
+        if (typeof Html5QrcodeScanner === 'undefined' && typeof Html5Qrcode === 'undefined') {
+            alert('Bibliothèque QR Code non disponible. Utilisez la saisie manuelle.');
+            return;
+        }
+        
+        // Test des permissions caméra
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             alert('Votre navigateur ne supporte pas l\'accès à la caméra.');
             return;
@@ -379,20 +469,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
         navigator.mediaDevices.getUserMedia({ video: true })
             .then(function(stream) {
                 console.log('Permissions caméra accordées');
-                // Arrêter le stream de test
                 stream.getTracks().forEach(track => track.stop());
                 
-                // Vider le conteneur
                 document.getElementById('qr-reader').innerHTML = '';
                 
-                // Callback de succès
                 const onScanSuccess = (decodedText, decodedResult) => {
                     console.log(`QR Code détecté: ${decodedText}`);
-                    
-                    // Arrêter le scanner
                     stopScanning();
                     
-                    // Soumettre le formulaire
                     getGeolocation(function(geoloc) {
                         document.getElementById('scannedData').value = decodedText;
                         document.getElementById('currentAction').value = currentMode;
@@ -403,19 +487,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
                     });
                 };
                 
-                // Callback d'erreur (normal pendant le scan)
                 const onScanFailure = (error) => {
-                    // Ne rien faire - c'est normal quand il n'y a pas de QR code
+                    // Erreur normale pendant le scan
                 };
                 
                 try {
-                    // Essayer Html5QrcodeScanner d'abord
                     if (typeof Html5QrcodeScanner !== 'undefined') {
                         console.log('Utilisation de Html5QrcodeScanner');
                         
                         const config = { 
                             fps: 10,
-                            qrbox: { width: 250, height: 250 }
+                            qrbox: { width: 250, height: 250 },
+                            aspectRatio: 1.0
                         };
                         
                         html5QrcodeScanner = new Html5QrcodeScanner("qr-reader", config);
@@ -458,8 +541,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
                             console.error('Erreur détection caméras:', err);
                             alert('Erreur lors de la détection des caméras: ' + err);
                         });
-                    } else {
-                        alert('Scanner QR non disponible.');
                     }
                     
                 } catch (error) {
@@ -501,7 +582,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
         document.getElementById('startScan').classList.remove('hidden');
         document.getElementById('stopScan').classList.add('hidden');
         
-        // Nettoyer le conteneur après un délai
         setTimeout(() => {
             document.getElementById('qr-reader').innerHTML = '';
         }, 500);
@@ -512,11 +592,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
         const manualInput = document.getElementById('manualCodeInput');
         
         manualInput.addEventListener('input', function() {
-            // Permettre seulement les chiffres
             this.value = this.value.replace(/\D/g, '');
         });
         
-        // Géolocalisation pour le formulaire manuel
         getGeolocation(function(geoloc) {
             if (geoloc) {
                 document.getElementById('manualGeoloc').value = geoloc;
@@ -524,7 +602,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
         });
     });
 
-    // Validation simplifiée
     function validateManualCode() {
         const code = document.getElementById('manualCodeInput').value.trim();
         
@@ -541,7 +618,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
         return true;
     }
 
-    // Validation du formulaire manuel
     document.getElementById('manualForm').addEventListener('submit', function(e) {
         if (!validateManualCode()) {
             e.preventDefault();

@@ -2,6 +2,7 @@
 session_start();
 include('lang.php');
 require_once 'config.php';
+require_once 'admin/communication/fonctions_annonces.php';
 
 try {
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -48,9 +49,74 @@ try {
     <link href="assets/css/main.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+/* Styles pour les annonces du site */
+.annonces-section {
+    margin: 20px 0;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+}
+
+.menu-annonces-section {
+    margin-bottom: 30px;
+}
+
+/* Styles pour les annonces urgentes */
+.annonce-banner.urgent {
+    border-left: 4px solid #dc3545 !important;
+    background-color: #dc354520 !important;
+    animation: pulse 2s infinite;
+}
+
+.annonce-banner.urgent .annonce-titre {
+    color: #dc3545 !important;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+}
+
+/* Styles responsive pour mobile */
+@media (max-width: 576px) {
+    .annonces-container {
+        margin: 10px -15px 20px -15px;
+    }
     
+    .annonce-banner {
+        border-radius: 0;
+        margin-bottom: 5px;
+    }
+}
+
+/* Styles pour integration dans menu */
+.menu-sidebar .annonces-container {
+    position: sticky;
+    top: 20px;
+}
+
+.menu-sidebar .annonce-banner {
+    margin-bottom: 15px;
+    font-size: 0.85em;
+}
+
+/* Styles pour annonces avec icônes spécialisées */
+.annonce-banner[data-type="promo"] .annonce-titre::before {
+    content: "🎉 ";
+}
+
+.annonce-banner[data-type="fermeture"] .annonce-titre::before {
+    content: "⚠️ ";
+}
+
+.annonce-banner[data-type="nouveau"] .annonce-titre::before {
+    content: "✨ ";
+}
+</style>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
@@ -948,6 +1014,14 @@ try {
     </style>
 </head>
 <body class="index-page">
+    
+    <?php 
+    // Notification optionnelle
+    afficherNotificationAnnonces('site');
+    
+    // Affichage des annonces en haut
+    afficherAnnonces('site', 'top'); 
+    ?>
     <?php include('includes/navbar.php'); ?>
     
     <!-- Inclusion du carrousel -->

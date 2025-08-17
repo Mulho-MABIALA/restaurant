@@ -8,22 +8,55 @@ require_once '../config.php';
 
 // Récupération des données avec dernière connexion et statistiques
 $stmt = $conn->query("
-    SELECT a.*, 
-           COALESCE(a.last_login, 'Jamais') as last_login_display,
-           CASE WHEN a.status = 1 THEN 'Actif' ELSE 'Inactif' END as status_display
-    FROM admin a 
-    ORDER BY a.id DESC
+    SELECT 
+        a.id,
+        a.username,
+        a.email,
+        a.role,
+        a.status,
+        a.last_login,
+        a.created_at,
+        'admin_table' as source,
+        NULL as employee_id,
+        COALESCE(a.last_login, 'Jamais') as last_login_display,
+        CASE WHEN a.status = 1 THEN 'Actif' ELSE 'Inactif' END as status_display
+    FROM admin a
+    
+    UNION ALL
+    
+    SELECT 
+        CONCAT('emp_', e.id) as id,
+        CONCAT(e.prenom, '.', e.nom) as username,
+        e.email,
+        'admin' as role,
+        CASE WHEN e.statut = 'actif' THEN 1 ELSE 0 END as status,
+        NULL as last_login,
+        e.date_embauche as created_at,
+        'employee_table' as source,
+        e.id as employee_id,
+        'Jamais connecté' as last_login_display,
+        CASE 
+            WHEN e.statut = 'actif' THEN 'Actif (Employé)' 
+            ELSE 'Inactif (Employé)' 
+        END as status_display
+    FROM employes e 
+    WHERE e.is_admin = 1
+    AND e.email NOT IN (SELECT email FROM admin WHERE email IS NOT NULL)
+    
+    ORDER BY created_at DESC
 ");
 $admins = $stmt->fetchAll();
 
-// Statistiques
+// Adapter les statistiques
 $stats = [
     'total' => count($admins),
     'super_admin' => count(array_filter($admins, fn($a) => $a['role'] === 'super_admin')),
     'admin' => count(array_filter($admins, fn($a) => $a['role'] === 'admin')),
     'active' => count(array_filter($admins, fn($a) => $a['status'] == 1)),
-    'inactive' => count(array_filter($admins, fn($a) => $a['status'] != 1))
+    'inactive' => count(array_filter($admins, fn($a) => $a['status'] != 1)),
+    'from_employees' => count(array_filter($admins, fn($a) => $a['source'] === 'employee_table'))
 ];
+
 
 // Gestion des actions AJAX
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
@@ -502,36 +535,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                                                     </span>
                                                 </div>
                                             </td>
-                                            <td class="py-4 px-6">
-                                                <div class="flex items-center space-x-4">
-                                                    <div class="relative">
-                                                        <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center ring-2 ring-blue-100">
-                                                            <span class="text-white font-bold text-sm">
-                                                                <?= strtoupper(substr(htmlspecialchars($admin['username']), 0, 1)) ?>
-                                                            </span>
-                                                        </div>
-                                                        <?php if ($_SESSION['admin_username'] === $admin['username']): ?>
-                                                            <div class="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
-                                                                <i class="fas fa-check text-white text-xs"></i>
-                                                            </div>
-                                                        <?php endif; ?>
-                                                    </div>
-                                                    <div>
-                                                        <div class="font-semibold text-slate-800 flex items-center">
-                                                            <?= htmlspecialchars($admin['username']) ?>
-                                                            <?php if ($_SESSION['admin_username'] === $admin['username']): ?>
-                                                                <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                                    <i class="fas fa-user-check mr-1"></i>
-                                                                    C'est vous
-                                                                </span>
-                                                            <?php endif; ?>
-                                                        </div>
-                                                        <div class="text-sm text-slate-500">
-                                                            Créé le <?= date('d/m/Y', strtotime($admin['created_at'] ?? 'now')) ?>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </td>
+                                           <td class="py-4 px-6">
+    <div class="flex items-center space-x-4">
+        <div class="relative">
+            <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center ring-2 ring-blue-100">
+                <span class="text-white font-bold text-sm">
+                    <?= strtoupper(substr(htmlspecialchars($admin['username']), 0, 1)) ?>
+                </span>
+            </div>
+            <?php if ($admin['source'] === 'employee_table'): ?>
+                <div class="absolute -top-1 -right-1 w-4 h-4 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center" title="Compte employé">
+                    <i class="fas fa-user text-white text-xs"></i>
+                </div>
+            <?php endif; ?>
+        </div>
+        <div>
+            <div class="font-semibold text-slate-800 flex items-center">
+                <?= htmlspecialchars($admin['username']) ?>
+                <?php if ($admin['source'] === 'employee_table'): ?>
+                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                        <i class="fas fa-user-friends mr-1"></i>
+                        Employé-Admin
+                    </span>
+                <?php endif; ?>
+            </div>
+            <div class="text-sm text-slate-500">
+                <?= $admin['source'] === 'employee_table' ? 'Employé ID: ' . $admin['employee_id'] : 'Admin ID: ' . $admin['id'] ?>
+            </div>
+        </div>
+    </div>
+</td>
                                             <td class="py-4 px-6">
                                                 <div class="flex items-center space-x-2">
                                                     <i class="fas fa-envelope text-slate-400 text-sm"></i>

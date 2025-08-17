@@ -1,9 +1,78 @@
 <?php
-// =============================================================================
-// GESTION DES REQUÊTES AJAX
-// =============================================================================
+// Fonctions utilitaires (à placer avant le switch)
+function generateNumericCode($employee_id, $conn) {
+    // Approche plus robuste pour le code unique
+    $max_attempts = 10;
+    $attempt = 0;
+    
+    do {
+        // Format: YYYYMMDD + ID sur 4 chiffres + 2 chiffres aléatoires
+        $date_prefix = date('Ymd'); // 20241217 par exemple
+        $id_part = str_pad($employee_id, 4, '0', STR_PAD_LEFT);
+        $random_part = str_pad(rand(10, 99), 2, '0', STR_PAD_LEFT);
+        
+        $numeric_code = $date_prefix . $id_part . $random_part;
+        
+        // Vérifier l'unicité
+        $stmt = $conn->prepare("SELECT id FROM employes WHERE code_numerique = ?");
+        $stmt->execute([$numeric_code]);
+        
+        if (!$stmt->fetch()) {
+            return $numeric_code; // Code unique trouvé
+        }
+        
+        $attempt++;
+    } while ($attempt < $max_attempts);
+    
+    // Fallback si aucun code unique trouvé (très improbable)
+    return $date_prefix . $id_part . str_pad(rand(100, 999), 3, '0', STR_PAD_LEFT);
+}
 
-// Vérifier si c'est une requête AJAX
+function optimizeQRImage($source_path, $destination_path) {
+    if (!extension_loaded('gd')) {
+        return false;
+    }
+    
+    try {
+        // Charger l'image source
+        $source = imagecreatefrompng($source_path);
+        if (!$source) return false;
+        
+        $width = imagesx($source);
+        $height = imagesy($source);
+        
+        // Créer une nouvelle image avec une résolution plus élevée
+        $target_size = 400; // Taille cible en pixels
+        $new_image = imagecreatetruecolor($target_size, $target_size);
+        
+        // Fond blanc
+        $white = imagecolorallocate($new_image, 255, 255, 255);
+        imagefill($new_image, 0, 0, $white);
+        
+        // Redimensionner avec une interpolation de haute qualité
+        imagecopyresampled(
+            $new_image, $source,
+            0, 0, 0, 0,
+            $target_size, $target_size,
+            $width, $height
+        );
+        
+        // Sauvegarder avec la meilleure qualité PNG
+        imagesavealpha($new_image, true);
+        imagepng($new_image, $destination_path, 0); // 0 = pas de compression
+        
+        // Libérer la mémoire
+        imagedestroy($source);
+        imagedestroy($new_image);
+        
+        return true;
+        
+    } catch (Exception $e) {
+        error_log("Erreur optimisation QR: " . $e->getMessage());
+        return false;
+    }
+}
+
 if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action']))) {
     require_once '../config.php';
     require_once 'phpqrcode/qrlib.php';
@@ -13,10 +82,6 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
     $action = $_GET['action'] ?? $_POST['ajax_action'] ?? '';
     
     switch ($action) {
-        
-        // =============================================================================
-        // RÉCUPÉRATION DES EMPLOYÉS
-        // =============================================================================
         case 'get_employees':
             try {
                 $stmt = $conn->query("SELECT * FROM vue_employes_complet ORDER BY nom, prenom");
@@ -34,9 +99,6 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
             }
             exit;
             
-        // =============================================================================
-        // RÉCUPÉRATION DES STATISTIQUES
-        // =============================================================================
         case 'get_statistics':
             try {
                 // Total employés actifs
@@ -72,9 +134,6 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
             }
             exit;
             
-        // =============================================================================
-        // RÉCUPÉRATION DES POSTES
-        // =============================================================================
         case 'get_postes':
             try {
                 $stmt = $conn->query("SELECT * FROM postes ORDER BY nom");
@@ -92,15 +151,12 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
             }
             exit;
             
-        // =============================================================================
-        // AJOUT D'UN EMPLOYÉ
-        // =============================================================================
         case 'add_employee':
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
-        exit;
-    }
-    
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
+                exit;
+            }
+            
             try {
                 // Validation des champs requis
                 $required_fields = ['nom', 'prenom', 'email', 'date_embauche'];
@@ -148,105 +204,197 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
                 
                 // Insertion de l'employé
                 $stmt = $conn->prepare("
-                    INSERT INTO employes (nom, prenom, email, telephone, poste_id, salaire, date_embauche, 
-                                          heure_debut, heure_fin, photo, is_admin, statut) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ");
-                  $stmt->execute([
-            $_POST['nom'],
-            $_POST['prenom'],
-            $_POST['email'],
-            $_POST['telephone'] ?? null,
-            $_POST['poste_id'] ?? null,
-            $salaire,
-            $_POST['date_embauche'],
-            $_POST['heure_debut'] ?? '08:00:00',
-            $_POST['heure_fin'] ?? '17:00:00',
-            $photo_filename,
-            isset($_POST['is_admin']) ? 1 : 0,
-            $_POST['statut'] ?? 'actif'
-        ]);
+    INSERT INTO employes (nom, prenom, email, telephone, poste_id, salaire, date_embauche, 
+                          heure_debut, heure_fin, photo, is_admin, statut) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+");
+$stmt->execute([
+    $_POST['nom'],
+    $_POST['prenom'],
+    $_POST['email'],
+    $_POST['telephone'] ?? null,
+    $_POST['poste_id'] ?? null,
+    $salaire,
+    $_POST['date_embauche'],
+    $_POST['heure_debut'] ?? '08:00:00',
+    $_POST['heure_fin'] ?? '17:00:00',
+    $photo_filename,
+    isset($_POST['is_admin']) ? 1 : 0,
+    $_POST['statut'] ?? 'actif'
+]);
+
+$employee_id = $conn->lastInsertId();
+// NOUVEAU : Si l'employé est admin, créer le compte admin
+if (isset($_POST['is_admin']) && $_POST['is_admin'] == 1) {
+    try {
+        // Vérifier si le compte admin existe déjà
+        $stmt = $conn->prepare("SELECT id FROM admin WHERE email = ?");
+        $stmt->execute([$_POST['email']]);
         
-        $employee_id = $conn->lastInsertId();
-                
-                // ============= NOUVEAU : GÉNÉRATION DU CODE NUMÉRIQUE =============
-        function generateNumericCode($employee_id, $conn) {
-            // Générer un code unique de 8 chiffres
-            $base_code = str_pad($employee_id, 4, '0', STR_PAD_LEFT); // ID sur 4 chiffres
-            $random_suffix = str_pad(rand(1000, 9999), 4, '0', STR_PAD_LEFT); // 4 chiffres aléatoires
+        if (!$stmt->fetch()) {
+            // Générer un mot de passe temporaire
+            $temp_password = generateTempPassword();
+            $hashed_password = password_hash($temp_password, PASSWORD_DEFAULT);
             
-            $numeric_code = $base_code . $random_suffix;
+            // Créer le username à partir du prénom et nom
+            $username = strtolower($_POST['prenom'] . '.' . $_POST['nom']);
+            $username = removeAccents($username); // Fonction pour supprimer les accents
             
-            // Vérifier l'unicité du code généré
-            $stmt = $conn->prepare("SELECT id FROM employes WHERE code_numerique = ?");
-            $stmt->execute([$numeric_code]);
-            
-            // Si le code existe déjà, régénérer (très peu probable)
-            if ($stmt->fetch()) {
-                return generateNumericCode($employee_id, $conn); // Récursion
+            // Vérifier l'unicité du username
+            $original_username = $username;
+            $counter = 1;
+            while (true) {
+                $stmt = $conn->prepare("SELECT id FROM admin WHERE username = ?");
+                $stmt->execute([$username]);
+                if (!$stmt->fetch()) break;
+                $username = $original_username . $counter;
+                $counter++;
             }
             
-            return $numeric_code;
+            // Insérer dans la table admin
+            $stmt = $conn->prepare("
+                INSERT INTO admin (username, email, password, role, status, employee_id, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?, NOW())
+            ");
+            $stmt->execute([
+                $username,
+                $_POST['email'],
+                $hashed_password,
+                'admin', // ou 'super_admin' selon vos besoins
+                1, // actif
+                $employee_id
+            ]);
+      // Log du mot de passe temporaire (à envoyer par email en production)
+            error_log("Compte admin créé - Username: $username, Password: $temp_password, Email: " . $_POST['email']);
+            
+            // Ajouter les infos dans la réponse JSON
+            $response_data = [
+                'success' => true,
+                'message' => 'Employé ajouté avec succès. Compte administrateur créé.',
+                'employee_id' => $employee_id,
+                'numeric_code' => $numeric_code,
+                'admin_created' => true,
+                'admin_username' => $username,
+                'temp_password' => $temp_password // À supprimer en production
+            ];
         }
-        
-        $numeric_code = generateNumericCode($employee_id, $conn);
-        
-        // Génération du QR Code avec données enrichies
-        $qr_data = json_encode([
-            'id' => $employee_id,
-            'nom' => $_POST['nom'],
-            'prenom' => $_POST['prenom'],
-            'email' => $_POST['email'],
-            'code_numerique' => $numeric_code, // Ajout du code numérique dans le QR
-            'generated' => date('Y-m-d H:i:s')
-        ]);
-                 $qr_dir = 'qrcodes/';
-        if (!is_dir($qr_dir)) {
-            mkdir($qr_dir, 0755, true);
-        }
-        
-        $qr_filename = 'qr_employee_' . $employee_id . '.png';
-        $qr_path = $qr_dir . $qr_filename;
-        
-        QRcode::png($qr_data, $qr_path, QR_ECLEVEL_L, 4);
-        
-        // Mise à jour avec le QR Code ET le code numérique
-        $stmt = $conn->prepare("UPDATE employes SET qr_code = ?, qr_data = ?, code_numerique = ? WHERE id = ?");
-        $stmt->execute([$qr_filename, $qr_data, $numeric_code, $employee_id]);
-        
-        // Log de l'activité
-        $stmt = $conn->prepare("
-            INSERT INTO logs_activite (action, table_concernee, id_enregistrement, details) 
-            VALUES (?, ?, ?, ?)
-        ");
-        $stmt->execute([
-            'CREATE_EMPLOYEE',
-            'employes',
-            $employee_id,
-            json_encode([
-                'nom' => $_POST['nom'], 
-                'prenom' => $_POST['prenom'],
-                'code_numerique' => $numeric_code
-            ])
-        ]);
-        
-        echo json_encode([
-            'success' => true,
-            'message' => 'Employé ajouté avec succès',
-            'employee_id' => $employee_id,
-            'numeric_code' => $numeric_code // Retourner le code pour affichage
-        ]);
-        
     } catch (Exception $e) {
-        echo json_encode([
-            'success' => false,
-            'message' => $e->getMessage()
-        ]);
+        error_log("Erreur création compte admin: " . $e->getMessage());
+        // Ne pas faire échouer l'ajout de l'employé pour autant
     }
-    exit;
-        // =============================================================================
-        // MODIFICATION D'UN EMPLOYÉ
-        // =============================================================================
+}
+
+// Fonctions utilitaires à ajouter
+function generateTempPassword($length = 12) {
+    $characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+    $password = '';
+    for ($i = 0; $i < $length; $i++) {
+        $password .= $characters[rand(0, strlen($characters) - 1)];
+    }
+    return $password;
+}
+
+function removeAccents($str) {
+    $accents = array(
+        'À' => 'A', 'Á' => 'A', 'Â' => 'A', 'Ã' => 'A', 'Ä' => 'A', 'Å' => 'A',
+        'à' => 'a', 'á' => 'a', 'â' => 'a', 'ã' => 'a', 'ä' => 'a', 'å' => 'a',
+        'È' => 'E', 'É' => 'E', 'Ê' => 'E', 'Ë' => 'E',
+        'è' => 'e', 'é' => 'e', 'ê' => 'e', 'ë' => 'e',
+        'Ì' => 'I', 'Í' => 'I', 'Î' => 'I', 'Ï' => 'I',
+        'ì' => 'i', 'í' => 'i', 'î' => 'i', 'ï' => 'i',
+        'Ò' => 'O', 'Ó' => 'O', 'Ô' => 'O', 'Õ' => 'O', 'Ö' => 'O',
+        'ò' => 'o', 'ó' => 'o', 'ô' => 'o', 'õ' => 'o', 'ö' => 'o',
+        'Ù' => 'U', 'Ú' => 'U', 'Û' => 'U', 'Ü' => 'U',
+        'ù' => 'u', 'ú' => 'u', 'û' => 'u', 'ü' => 'u',
+        'Ç' => 'C', 'ç' => 'c'
+    );
+    return strtr($str, $accents);
+}
+                
+                // ============= GÉNÉRATION DU QR CODE HAUTE QUALITÉ =============
+                $numeric_code = generateNumericCode($employee_id, $conn);
+                
+                // Données optimisées pour le QR code
+                $qr_data = json_encode([
+                    'type' => 'employee_badge',
+                    'id' => (int)$employee_id,
+                    'code' => $numeric_code,
+                    'nom' => trim($_POST['nom']),
+                    'prenom' => trim($_POST['prenom']),
+                    'email' => $_POST['email'],
+                    'poste_id' => $_POST['poste_id'] ?? null,
+                    'timestamp' => time(),
+                    'version' => '1.0'
+                ], JSON_UNESCAPED_UNICODE);
+                
+                $qr_dir = 'qrcodes/';
+                if (!is_dir($qr_dir)) {
+                    mkdir($qr_dir, 0755, true);
+                }
+                
+                $qr_filename = 'employee_' . $employee_id . '_' . $numeric_code . '.png';
+                $qr_path = $qr_dir . $qr_filename;
+                
+                // Paramètres optimisés pour une haute qualité
+                // QR_ECLEVEL_H = Correction d'erreur élevée (30% de récupération)
+                // Size 10 = Taille de pixel importante pour une meilleure résolution
+                // Border 2 = Bordure minimale mais suffisante
+                try {
+                    QRcode::png($qr_data, $qr_path, QR_ECLEVEL_H, 10, 2);
+                    
+                    // Amélioration supplémentaire : redimensionner pour une qualité optimale
+                    if (extension_loaded('gd')) {
+                        $qr_optimized_path = $qr_dir . 'hq_' . $qr_filename;
+                        optimizeQRImage($qr_path, $qr_optimized_path);
+                        
+                        // Remplacer l'original par la version optimisée
+                        if (file_exists($qr_optimized_path)) {
+                            unlink($qr_path);
+                            rename($qr_optimized_path, $qr_path);
+                        }
+                    }
+                    
+                } catch (Exception $e) {
+                    error_log("Erreur génération QR: " . $e->getMessage());
+                    // QR code par défaut en cas d'erreur
+                    QRcode::png($numeric_code, $qr_path, QR_ECLEVEL_M, 8, 2);
+                }
+                
+                // Mise à jour avec le QR Code ET le code numérique
+                $stmt = $conn->prepare("UPDATE employes SET qr_code = ?, qr_data = ?, code_numerique = ? WHERE id = ?");
+                $stmt->execute([$qr_filename, $qr_data, $numeric_code, $employee_id]);
+                
+                // Log de l'activité
+                $stmt = $conn->prepare("
+                    INSERT INTO logs_activite (action, table_concernee, id_enregistrement, details) 
+                    VALUES (?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    'CREATE_EMPLOYEE',
+                    'employes',
+                    $employee_id,
+                    json_encode([
+                        'nom' => $_POST['nom'], 
+                        'prenom' => $_POST['prenom'],
+                        'code_numerique' => $numeric_code
+                    ])
+                ]);
+                
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'Employé ajouté avec succès',
+                    'employee_id' => $employee_id,
+                    'numeric_code' => $numeric_code // Retourner le code pour affichage
+                ]);
+                
+            } catch (Exception $e) {
+                echo json_encode([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ]);
+            }
+            exit;
+            
         case 'update_employee':
             if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
                 echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
@@ -361,9 +509,6 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
             }
             exit;
             
-        // =============================================================================
-        // DÉSACTIVATION D'UN EMPLOYÉ
-        // =============================================================================
         case 'delete_employee':
             if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
                 echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
@@ -417,10 +562,6 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
             exit;
     }
 }
-
-// =============================================================================
-// INTERFACE UTILISATEUR HTML
-// =============================================================================
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -693,9 +834,6 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
     <div id="notification" class="notification hidden"></div>
 
     <script>
-        // =============================================================================
-        // VARIABLES GLOBALES ET INITIALISATION
-        // =============================================================================
         
         let currentView = localStorage.getItem('preferredView') || 'table';
         let employees = [];
@@ -718,10 +856,6 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
             document.getElementById('photo').addEventListener('change', previewPhoto);
             document.getElementById('employeeForm').addEventListener('submit', saveEmployee);
         });
-
-        // =============================================================================
-        // GESTION DES VUES
-        // =============================================================================
         
         function toggleView() {
             currentView = currentView === 'table' ? 'cards' : 'table';
@@ -748,9 +882,6 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
             }
         }
 
-        // =============================================================================
-        // CHARGEMENT DES DONNÉES
-        // =============================================================================
         
         function loadStatistics() {
             fetch('?action=get_statistics')
@@ -803,10 +934,6 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
                 })
                 .catch(error => console.error('Erreur:', error));
         }
-
-        // =============================================================================
-        // AFFICHAGE DES EMPLOYÉS
-        // =============================================================================
         
         function displayEmployees(employeesList) {
             if (currentView === 'table') {
@@ -966,10 +1093,6 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
             
             return card;
         }
-
-        // =============================================================================
-        // FONCTIONS UTILITAIRES
-        // =============================================================================
         
         function getStatusClass(statut) {
             const classes = {
@@ -1003,10 +1126,6 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
             return parseInt(salaire).toLocaleString('fr-FR');
         }
 
-        // =============================================================================
-        // FILTRAGE ET RECHERCHE
-        // =============================================================================
-        
         function filterEmployees() {
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
             const posteFilter = document.getElementById('filterPoste').value;
@@ -1033,11 +1152,6 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
             document.getElementById('filterStatut').value = '';
             displayEmployees(employees);
         }
-
-        // =============================================================================
-        // GESTION DU MODAL
-        // =============================================================================
-        
         function openAddModal() {
             document.getElementById('modalTitle').textContent = 'Ajouter un employé';
             document.getElementById('employeeForm').reset();
@@ -1074,10 +1188,6 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
             document.getElementById('employeeModal').classList.add('hidden');
         }
 
-        // =============================================================================
-        // PRÉVISUALISATION DE LA PHOTO
-        // =============================================================================
-        
         function previewPhoto(event) {
             const file = event.target.files[0];
             if (file) {
@@ -1089,10 +1199,6 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
             }
         }
 
-        // =============================================================================
-        // SAUVEGARDE DE L'EMPLOYÉ
-        // =============================================================================
-        
         function saveEmployee(event) {
             event.preventDefault();
             
@@ -1118,18 +1224,13 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
                 showNotification('Erreur lors de la sauvegarde', 'error');
             });
         }
-
-        // =============================================================================
-        // ACTIONS SUR LES EMPLOYÉS
-        // =============================================================================
-        
         function viewEmployee(id) {
             // Ouvrir une modal de détails ou rediriger vers une page de détails
             window.open(`employee_details.php?id=${id}`, '_blank');
         }
 
         function generateBadge(id) {
-            window.open(`generate_badges.php?id=${id}`, '_blank');
+            window.open(`generate_badge.php?id=${id}`, '_blank');
         }
 
         function deleteEmployee(id) {
@@ -1157,11 +1258,6 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
                 });
             }
         }
-
-        // =============================================================================
-        // NOTIFICATIONS
-        // =============================================================================
-        
         function showNotification(message, type = 'info') {
             const notification = document.getElementById('notification');
             const colors = {
@@ -1191,10 +1287,6 @@ if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_
         function hideNotification() {
             document.getElementById('notification').classList.add('hidden');
         }
-
-        // =============================================================================
-        // GESTION DU CLIC EN DEHORS DU MODAL
-        // =============================================================================
         
         document.getElementById('employeeModal').addEventListener('click', function(e) {
             if (e.target === this) {

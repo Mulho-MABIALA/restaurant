@@ -1,4 +1,7 @@
 <?php
+// 1. MODIFICATION DE LA BASE DE DONNÉES (à exécuter une seule fois)
+// ALTER TABLE commandes ADD COLUMN statut_paiement ENUM('Impayé', 'Payé') DEFAULT 'Impayé';
+
 require_once '../config.php';
 session_start();
 
@@ -32,18 +35,45 @@ function updateOldOrdersVuStatus($conn) {
 // Mettre à jour le statut "vu" des anciennes commandes automatiquement
 updateOldOrdersVuStatus($conn);
 
-// Gestion de la modification AJAX
+// Gestion de la modification du statut de paiement (AJAX)
+if (isset($_POST['action']) && $_POST['action'] === 'update_payment_status' && isset($_POST['id'])) {
+    header('Content-Type: application/json');
+    
+    try {
+        $id = $_POST['id'];
+        $statut_paiement = $_POST['statut_paiement'] ?? 'Impayé';
+
+        $stmt = $conn->prepare("UPDATE commandes SET statut_paiement = :statut_paiement WHERE id = :id");
+        $result = $stmt->execute([
+            'statut_paiement' => $statut_paiement,
+            'id' => $id
+        ]);
+        
+        if ($result) {
+            echo json_encode(['success' => true, 'message' => 'Statut de paiement modifié avec succès']);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Erreur lors de la modification']);
+        }
+    } catch (PDOException $e) {
+        echo json_encode(['success' => false, 'message' => 'Erreur lors de la modification: ' . $e->getMessage()]);
+    }
+    exit;
+}
+
+// Gestion de la modification AJAX (modifiée pour inclure le statut de paiement)
 if (isset($_POST['action']) && $_POST['action'] === 'modifier' && isset($_POST['id'])) {
     header('Content-Type: application/json');
     
     try {
         $id = $_POST['id'];
         $statut = $_POST['statut'] ?? '';
+        $statut_paiement = $_POST['statut_paiement'] ?? 'Impayé';
         $vu_admin = isset($_POST['vu_admin']) && $_POST['vu_admin'] === '1' ? 1 : 0;
 
-        $stmt = $conn->prepare("UPDATE commandes SET statut = :statut, vu_admin = :vu_admin WHERE id = :id");
+        $stmt = $conn->prepare("UPDATE commandes SET statut = :statut, statut_paiement = :statut_paiement, vu_admin = :vu_admin WHERE id = :id");
         $result = $stmt->execute([
             'statut' => $statut,
+            'statut_paiement' => $statut_paiement,
             'vu_admin' => $vu_admin,
             'id' => $id
         ]);
@@ -101,6 +131,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'supprimer' && isset($_POST[
 // Recherche & filtre par statut
 $search = $_GET['search'] ?? '';
 $filtre_statut = $_GET['statut'] ?? '';
+$filtre_paiement = $_GET['paiement'] ?? '';
 
 try {
     $sql = "SELECT * FROM commandes WHERE 1";
@@ -114,6 +145,11 @@ try {
     if (!empty($filtre_statut)) {
         $sql .= " AND statut = :statut";
         $params['statut'] = $filtre_statut;
+    }
+
+    if (!empty($filtre_paiement)) {
+        $sql .= " AND statut_paiement = :paiement";
+        $params['paiement'] = $filtre_paiement;
     }
 
     $sql .= " ORDER BY id DESC";
@@ -130,6 +166,10 @@ $nouvelles_cmd = count(array_filter($commandes, fn($c) => !$c['vu_admin']));
 $cmd_aujourdhui = count(array_filter($commandes, fn($c) => date('Y-m-d', strtotime($c['created_at'] ?? $c['date_commande'] ?? 'now')) === date('Y-m-d')));
 $total_ventes = array_sum(array_column($commandes, 'total'));
 $moyenne_cmd = $total_cmd > 0 ? intval($total_ventes / $total_cmd) : 0;
+
+// Statistiques de paiement
+$commandes_payees = count(array_filter($commandes, fn($c) => ($c['statut_paiement'] ?? 'Impayé') === 'Payé'));
+$commandes_impayees = $total_cmd - $commandes_payees;
 
 // Liste des statuts possibles
 $statuts_disponibles = ['En cours', 'Préparation en cours', 'Livré', 'Terminée', 'Annulé'];
@@ -168,17 +208,23 @@ $statuts_disponibles = ['En cours', 'Préparation en cours', 'Livré', 'Terminé
         .card-nouvelles { border-color: rgba(239, 68, 68, 0.4); }
         .card-aujourdhui { border-color: rgba(6, 182, 212, 0.4); }
         .card-ventes { border-color: rgba(16, 185, 129, 0.4); }
+        .card-payees { border-color: rgba(34, 197, 94, 0.4); }
+        .card-impayees { border-color: rgba(251, 146, 60, 0.4); }
         
         .card-total:hover { border-color: rgba(99, 102, 241, 0.7); }
         .card-nouvelles:hover { border-color: rgba(239, 68, 68, 0.7); }
         .card-aujourdhui:hover { border-color: rgba(6, 182, 212, 0.7); }
         .card-ventes:hover { border-color: rgba(16, 185, 129, 0.7); }
+        .card-payees:hover { border-color: rgba(34, 197, 94, 0.7); }
+        .card-impayees:hover { border-color: rgba(251, 146, 60, 0.7); }
         
         /* Icônes colorées pour chaque card */
         .icon-total { color: #6366f1; background: rgba(99, 102, 241, 0.1); }
         .icon-nouvelles { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
         .icon-aujourdhui { color: #06b6d4; background: rgba(6, 182, 212, 0.1); }
         .icon-ventes { color: #10b981; background: rgba(16, 185, 129, 0.1); }
+        .icon-payees { color: #22c55e; background: rgba(34, 197, 94, 0.1); }
+        .icon-impayees { color: #fb923c; background: rgba(251, 146, 60, 0.1); }
         
         /* Indicateurs de tendance */
         .trend-indicator {
@@ -290,77 +336,118 @@ $statuts_disponibles = ['En cours', 'Préparation en cours', 'Livré', 'Terminé
                     <h2 class="text-xs uppercase tracking-widest text-gray-600 font-semibold mb-4">TABLEAU DE BORD</h2>
                 </div>
 
-                <!-- Statistiques Cards - Design simplifié et élégant -->
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                    <!-- Total Commandes -->
-                    <div class="stat-card card-total p-6">
-                        <div class="flex items-start justify-between">
-                            <div class="flex-1">
-                                <div class="flex items-center mb-4">
-                                    <div class="w-12 h-12 rounded-xl icon-total flex items-center justify-center mr-4">
-                                        <i class="fas fa-shopping-cart text-xl"></i>
+                <!-- Statistiques Cards - Layout corrigé en 2 rangées -->
+                <div class="space-y-6 mb-8">
+                    <!-- Première rangée - 3 cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- Total Commandes -->
+                        <div class="stat-card card-total p-6">
+                            <div class="flex items-center justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-center mb-4">
+                                        <div class="w-12 h-12 rounded-xl icon-total flex items-center justify-center mr-4">
+                                            <i class="fas fa-shopping-cart text-xl"></i>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Total Commandes</p>
+                                            <h3 class="text-3xl font-bold text-gray-900 mt-1"><?= $total_cmd ?></h3>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Total Commandes</p>
-                                        <h3 class="text-2xl font-bold text-gray-900 mt-1"><?= $total_cmd ?></h3>
-                                    </div>
+                                    <div class="trend-indicator icon-total"></div>
                                 </div>
-                                <div class="trend-indicator icon-total"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Nouvelles Commandes -->
+                        <div class="stat-card card-nouvelles p-6">
+                            <div class="flex items-center justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-center mb-4">
+                                        <div class="w-12 h-12 rounded-xl icon-nouvelles flex items-center justify-center mr-4">
+                                            <i class="fas fa-bell text-xl"></i>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Nouvelles</p>
+                                            <h3 class="text-3xl font-bold text-gray-900 mt-1"><?= $nouvelles_cmd ?></h3>
+                                        </div>
+                                    </div>
+                                    <div class="trend-indicator icon-nouvelles" style="width: <?= $total_cmd > 0 ? min(($nouvelles_cmd / $total_cmd) * 60, 60) : 0 ?>px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Aujourd'hui -->
+                        <div class="stat-card card-aujourdhui p-6">
+                            <div class="flex items-center justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-center mb-4">
+                                        <div class="w-12 h-12 rounded-xl icon-aujourdhui flex items-center justify-center mr-4">
+                                            <i class="fas fa-calendar-day text-xl"></i>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Aujourd'hui</p>
+                                            <h3 class="text-3xl font-bold text-gray-900 mt-1"><?= $cmd_aujourdhui ?></h3>
+                                        </div>
+                                    </div>
+                                    <div class="trend-indicator icon-aujourdhui" style="width: <?= $total_cmd > 0 ? min(($cmd_aujourdhui / $total_cmd) * 60, 60) : 0 ?>px;"></div>
+                                </div>
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Nouvelles Commandes -->
-                    <div class="stat-card card-nouvelles p-6">
-                        <div class="flex items-start justify-between">
-                            <div class="flex-1">
-                                <div class="flex items-center mb-4">
-                                    <div class="w-12 h-12 rounded-xl icon-nouvelles flex items-center justify-center mr-4">
-                                        <i class="fas fa-bell text-xl"></i>
+
+                    <!-- Deuxième rangée - 3 cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- Total Ventes -->
+                        <div class="stat-card card-ventes p-6">
+                            <div class="flex items-center justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-center mb-4">
+                                        <div class="w-12 h-12 rounded-xl icon-ventes flex items-center justify-center mr-4">
+                                            <i class="fas fa-chart-line text-xl"></i>
+                                        </div>
+                                        <div class="flex-1 min-w-0">
+                                            <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Total Ventes</p>
+                                            <h3 class="text-2xl font-bold text-gray-900 mt-1"><?= number_format($total_ventes, 0, ',', ' ') ?> FCFA</h3>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Nouvelles</p>
-                                        <h3 class="text-2xl font-bold text-gray-900 mt-1"><?= $nouvelles_cmd ?></h3>
-                                    </div>
+                                    <div class="trend-indicator icon-ventes"></div>
                                 </div>
-                                <div class="trend-indicator icon-nouvelles" style="width: <?= $total_cmd > 0 ? min(($nouvelles_cmd / $total_cmd) * 60, 60) : 0 ?>px;"></div>
                             </div>
                         </div>
-                    </div>
-                    
-                    <!-- Aujourd'hui -->
-                    <div class="stat-card card-aujourdhui p-6">
-                        <div class="flex items-start justify-between">
-                            <div class="flex-1">
-                                <div class="flex items-center mb-4">
-                                    <div class="w-12 h-12 rounded-xl icon-aujourdhui flex items-center justify-center mr-4">
-                                        <i class="fas fa-calendar-day text-xl"></i>
+
+                        <!-- Commandes Payées -->
+                        <div class="stat-card card-payees p-6">
+                            <div class="flex items-center justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-center mb-4">
+                                        <div class="w-12 h-12 rounded-xl icon-payees flex items-center justify-center mr-4">
+                                            <i class="fas fa-check-circle text-xl"></i>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Payées</p>
+                                            <h3 class="text-3xl font-bold text-gray-900 mt-1"><?= $commandes_payees ?></h3>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Aujourd'hui</p>
-                                        <h3 class="text-2xl font-bold text-gray-900 mt-1"><?= $cmd_aujourdhui ?></h3>
-                                    </div>
+                                    <div class="trend-indicator icon-payees" style="width: <?= $total_cmd > 0 ? min(($commandes_payees / $total_cmd) * 60, 60) : 0 ?>px;"></div>
                                 </div>
-                                <div class="trend-indicator icon-aujourdhui" style="width: <?= $total_cmd > 0 ? min(($cmd_aujourdhui / $total_cmd) * 60, 60) : 0 ?>px;"></div>
                             </div>
                         </div>
-                    </div>
-                    
-                    <!-- Total Ventes -->
-                    <div class="stat-card card-ventes p-6">
-                        <div class="flex items-start justify-between">
-                            <div class="flex-1">
-                                <div class="flex items-center mb-4">
-                                    <div class="w-12 h-12 rounded-xl icon-ventes flex items-center justify-center mr-4">
-                                        <i class="fas fa-chart-line text-xl"></i>
+
+                        <!-- Commandes Impayées -->
+                        <div class="stat-card card-impayees p-6">
+                            <div class="flex items-center justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-center mb-4">
+                                        <div class="w-12 h-12 rounded-xl icon-impayees flex items-center justify-center mr-4">
+                                            <i class="fas fa-exclamation-circle text-xl"></i>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Impayées</p>
+                                            <h3 class="text-3xl font-bold text-gray-900 mt-1"><?= $commandes_impayees ?></h3>
+                                        </div>
                                     </div>
-                                    <div class="flex-1 min-w-0">
-                                        <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Total Ventes</p>
-                                        <h3 class="text-2xl font-bold text-gray-900 mt-1 truncate"><?= number_format($total_ventes, 0, ',', ' ') ?></h3>
-                                        <p class="text-sm font-medium text-gray-500 mt-1">FCFA</p>
-                                    </div>
+                                    <div class="trend-indicator icon-impayees" style="width: <?= $total_cmd > 0 ? min(($commandes_impayees / $total_cmd) * 60, 60) : 0 ?>px;"></div>
                                 </div>
-                                <div class="trend-indicator icon-ventes"></div>
                             </div>
                         </div>
                     </div>
@@ -376,7 +463,7 @@ $statuts_disponibles = ['En cours', 'Préparation en cours', 'Livré', 'Terminé
                 <!-- Filtres et Recherche -->
                 <div class="bg-white/80 backdrop-blur-md border border-gray-200 rounded-lg shadow-md p-6 mb-8">
                     <form method="get" class="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
-                        <div class="md:col-span-6">
+                        <div class="md:col-span-5">
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Recherche</label>
                             <div class="relative">
                                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -390,13 +477,22 @@ $statuts_disponibles = ['En cours', 'Préparation en cours', 'Livré', 'Terminé
                             </div>
                         </div>
                         
-                        <div class="md:col-span-4">
+                        <div class="md:col-span-3">
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Statut</label>
                             <select name="statut" class="block w-full px-3 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors text-base">
                                 <option value="">Tous les statuts</option>
                                 <option value="En cours" <?= $filtre_statut == 'En cours' ? 'selected' : '' ?>>En cours</option>
                                 <option value="Livré" <?= $filtre_statut == 'Livré' ? 'selected' : '' ?>>Livré</option>
                                 <option value="Annulé" <?= $filtre_statut == 'Annulé' ? 'selected' : '' ?>>Annulé</option>
+                            </select>
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Paiement</label>
+                            <select name="paiement" class="block w-full px-3 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors text-base">
+                                <option value="">Tous</option>
+                                <option value="Payé" <?= $filtre_paiement == 'Payé' ? 'selected' : '' ?>>Payé</option>
+                                <option value="Impayé" <?= $filtre_paiement == 'Impayé' ? 'selected' : '' ?>>Impayé</option>
                             </select>
                         </div>
                         
@@ -432,6 +528,7 @@ $statuts_disponibles = ['En cours', 'Préparation en cours', 'Livré', 'Terminé
                                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Contact</th>
                                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Total</th>
                                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Statut</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Paiement</th>
                                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Vu</th>
                                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
                                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
@@ -440,7 +537,7 @@ $statuts_disponibles = ['En cours', 'Préparation en cours', 'Livré', 'Terminé
                             <tbody class="bg-white/50 divide-y divide-gray-200" id="commandesTableBody">
                                 <?php if (empty($commandes)): ?>
                                     <tr>
-                                        <td colspan="8" class="px-6 py-20 text-center">
+                                        <td colspan="9" class="px-6 py-20 text-center">
                                             <div class="flex flex-col items-center">
                                                 <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                                                     <i class="fas fa-search-minus text-gray-400 text-2xl"></i>
@@ -495,6 +592,13 @@ $statuts_disponibles = ['En cours', 'Préparation en cours', 'Livré', 'Terminé
                                                 }
                                                 ?>
                                                 <span class="status-badge <?= $statutClass ?>" id="statut-<?= $cmd['id'] ?>"><?= e($cmd['statut']) ?></span>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <?php
+                                                $statutPaiement = $cmd['statut_paiement'] ?? 'Impayé';
+                                                $paiementClass = $statutPaiement === 'Payé' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800';
+                                                ?>
+                                                <span class="status-badge <?= $paiementClass ?>" id="paiement-<?= $cmd['id'] ?>"><?= e($statutPaiement) ?></span>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 <?php if ($cmd['vu_admin']): ?>
@@ -564,6 +668,14 @@ $statuts_disponibles = ['En cours', 'Préparation en cours', 'Livré', 'Terminé
                         <?php foreach ($statuts_disponibles as $statut): ?>
                             <option value="<?= e($statut) ?>"><?= e($statut) ?></option>
                         <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-3">Statut de paiement</label>
+                    <select id="editStatutPaiement" name="statut_paiement" class="form-input block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-base">
+                        <option value="Impayé">Impayé</option>
+                        <option value="Payé">Payé</option>
                     </select>
                 </div>
                 
@@ -658,6 +770,7 @@ $statuts_disponibles = ['En cours', 'Préparation en cours', 'Livré', 'Terminé
                     document.getElementById('editCommandeId').value = commande.id;
                     document.getElementById('editCommandeInfo').textContent = `#${commande.id} - ${commande.nom_client}`;
                     document.getElementById('editStatut').value = commande.statut;
+                    document.getElementById('editStatutPaiement').value = commande.statut_paiement || 'Impayé';
                     document.getElementById('editVuAdmin').checked = commande.vu_admin == 1;
                     
                     // Afficher le modal
@@ -759,6 +872,12 @@ $statuts_disponibles = ['En cours', 'Préparation en cours', 'Livré', 'Terminé
                 default:
                     statutElement.className += ' bg-gray-100 text-gray-800';
             }
+
+            // Mettre à jour le statut de paiement
+            const paiementElement = document.getElementById('paiement-' + commandeId);
+            const newPaiement = formData.get('statut_paiement');
+            paiementElement.textContent = newPaiement;
+            paiementElement.className = 'status-badge ' + (newPaiement === 'Payé' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800');
             
             // Mettre à jour le statut "vu"
             const vuElement = document.getElementById('vu-' + commandeId);
@@ -884,45 +1003,70 @@ $statuts_disponibles = ['En cours', 'Préparation en cours', 'Livré', 'Terminé
             const remainingRows = document.querySelectorAll('#commandesTableBody tr:not([colspan])');
             const totalCommandes = remainingRows.length;
             
-            // Compter les nouvelles commandes
+            // Compter les nouvelles commandes et les payées/impayées
             let nouvellesCommandes = 0;
             let commandesAujourdhui = 0;
+            let commandesPayees = 0;
             
             remainingRows.forEach(row => {
                 // Compter les nouvelles
-                const vuCell = row.cells[5];
+                const vuCell = row.cells[6];
                 if (vuCell && vuCell.textContent.includes('Nouveau')) {
                     nouvellesCommandes++;
                 }
                 
+                // Compter les payées
+                const paiementCell = row.cells[5];
+                if (paiementCell && paiementCell.textContent.includes('Payé')) {
+                    commandesPayees++;
+                }
+                
                 // Compter aujourd'hui (vous devrez adapter selon votre format de date)
-                const dateCell = row.cells[6];
+                const dateCell = row.cells[7];
                 if (dateCell && dateCell.textContent.includes(new Date().toISOString().split('T')[0])) {
                     commandesAujourdhui++;
                 }
             });
             
+            const commandesImpayees = totalCommandes - commandesPayees;
+            
             // Mettre à jour les cards de statistiques
             const statCards = document.querySelectorAll('.stat-card');
             
-            // Total
+            // Total (première card)
             if (statCards[0]) {
-                statCards[0].querySelector('.text-2xl.font-bold').textContent = totalCommandes;
+                statCards[0].querySelector('.text-3xl.font-bold').textContent = totalCommandes;
             }
             
-            // Nouvelles
+            // Nouvelles (deuxième card)
             if (statCards[1]) {
-                statCards[1].querySelector('.text-2xl.font-bold').textContent = nouvellesCommandes;
+                statCards[1].querySelector('.text-3xl.font-bold').textContent = nouvellesCommandes;
                 const trendIndicator = statCards[1].querySelector('.trend-indicator');
                 const newWidth = totalCommandes > 0 ? Math.min((nouvellesCommandes / totalCommandes) * 60, 60) : 0;
                 trendIndicator.style.width = newWidth + 'px';
             }
             
-            // Aujourd'hui
+            // Aujourd'hui (troisième card)
             if (statCards[2]) {
-                statCards[2].querySelector('.text-2xl.font-bold').textContent = commandesAujourdhui;
+                statCards[2].querySelector('.text-3xl.font-bold').textContent = commandesAujourdhui;
                 const trendIndicator = statCards[2].querySelector('.trend-indicator');
                 const newWidth = totalCommandes > 0 ? Math.min((commandesAujourdhui / totalCommandes) * 60, 60) : 0;
+                trendIndicator.style.width = newWidth + 'px';
+            }
+
+            // Payées (cinquième card)
+            if (statCards[4]) {
+                statCards[4].querySelector('.text-3xl.font-bold').textContent = commandesPayees;
+                const trendIndicator = statCards[4].querySelector('.trend-indicator');
+                const newWidth = totalCommandes > 0 ? Math.min((commandesPayees / totalCommandes) * 60, 60) : 0;
+                trendIndicator.style.width = newWidth + 'px';
+            }
+
+            // Impayées (sixième card)
+            if (statCards[5]) {
+                statCards[5].querySelector('.text-3xl.font-bold').textContent = commandesImpayees;
+                const trendIndicator = statCards[5].querySelector('.trend-indicator');
+                const newWidth = totalCommandes > 0 ? Math.min((commandesImpayees / totalCommandes) * 60, 60) : 0;
                 trendIndicator.style.width = newWidth + 'px';
             }
             
@@ -931,7 +1075,7 @@ $statuts_disponibles = ['En cours', 'Préparation en cours', 'Livré', 'Terminé
                 const tbody = document.getElementById('commandesTableBody');
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="8" class="px-6 py-20 text-center">
+                        <td colspan="9" class="px-6 py-20 text-center">
                             <div class="flex flex-col items-center">
                                 <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                                     <i class="fas fa-search-minus text-gray-400 text-2xl"></i>
@@ -1014,34 +1158,12 @@ $statuts_disponibles = ['En cours', 'Préparation en cours', 'Livré', 'Terminé
                 }
             })
             .catch(error => {
-                console.log('Vérification des statuts échouée:', error);
+                console.error('Erreur lors de la vérification des statuts:', error);
             });
         }
 
-        // Vérifier les mises à jour de statut toutes les 10 minutes
-        setInterval(checkStatusUpdates, 600000); // 10 minutes
-
-        // Notification en temps réel pour les nouvelles commandes
-        function checkNewOrders() {
-            const currentCount = parseInt(document.querySelector('.stat-card .text-2xl.font-bold').textContent);
-            
-            fetch(window.location.href + '?ajax_count=1')
-            .then(response => response.json())
-            .then(data => {
-                if (data.count > currentCount) {
-                    showToast(`${data.count - currentCount} nouvelle(s) commande(s) reçue(s)!`, 'success');
-                    setTimeout(() => {
-                        location.reload();
-                    }, 3000);
-                }
-            })
-            .catch(error => {
-                console.log('Vérification des nouvelles commandes échouée:', error);
-            });
-        }
-
-        // Vérifier les nouvelles commandes toutes les 2 minutes
-        setInterval(checkNewOrders, 120000); // 2 minutes
+        // Exemple d'appel périodique (toutes les 10 minutes)
+        setInterval(checkStatusUpdates, 600000);
     </script>
 </body>
 </html>

@@ -11,7 +11,7 @@
             theme: {
                 extend: {
                     fontFamily: {
-                        'sans': ['Inter', 'system-ui', 'sans-serif'],
+                        'sans': ['Poppins', 'sans-serif'],
                     },
                     animation: {
                         'slide-down': 'slideDown 0.3s ease-out',
@@ -24,7 +24,7 @@
         }
     </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
         
         /* Animations personnalisées */
         @keyframes slideDown {
@@ -246,63 +246,46 @@
                 
                 <!-- Navigation Desktop -->
                 <nav class="hidden lg:flex items-center space-x-1">
-                    <a href="#hero" class="nav-item active px-3 py-2 text-sm text-gray-700 hover:text-pink-600 font-medium rounded-lg hover:bg-gray-50/50 transition-all duration-300 flex items-center space-x-1.5">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
-                        </svg>
+                    <a href="#hero" class="nav-item active px-4 py-3 text-base text-gray-800 hover:text-pink-600 font-semibold rounded-xl hover:bg-gradient-to-r hover:from-pink-50 hover:to-orange-50 hover:shadow-md transition-all duration-300">
                         <span>Accueil</span>
                     </a>
-                    <a href="#about" class="nav-item px-3 py-2 text-sm text-gray-700 hover:text-pink-600 font-medium rounded-lg hover:bg-gray-50/50 transition-all duration-300 flex items-center space-x-1.5">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
+                    <a href="#about" class="nav-item px-4 py-3 text-base text-gray-800 hover:text-pink-600 font-semibold rounded-xl hover:bg-gradient-to-r hover:from-pink-50 hover:to-orange-50 hover:shadow-md transition-all duration-300">
                         <span>À propos</span>
                     </a>
-                    <a href="menu.php" class="nav-item px-3 py-2 text-sm text-gray-700 hover:text-pink-600 font-medium rounded-lg hover:bg-gray-50/50 transition-all duration-300 flex items-center space-x-1.5">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v6a2 2 0 002 2h2m0 0h2a2 2 0 002-2V7a2 2 0 00-2-2H9m0 0V3a2 2 012-2h2a2 2 012 2v2M7 13h10l-4-8H7l4 8z"></path>
-                        </svg>
+                    <a href="menu.php" class="nav-item px-4 py-3 text-base text-gray-800 hover:text-pink-600 font-semibold rounded-xl hover:bg-gradient-to-r hover:from-pink-50 hover:to-orange-50 hover:shadow-md transition-all duration-300">
                         <span>Menu</span>
                     </a>
-                    <a href="#events" class="nav-item px-3 py-2 text-sm text-gray-700 hover:text-pink-600 font-medium rounded-lg hover:bg-gray-50/50 transition-all duration-300 flex items-center space-x-1.5">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                        </svg>
+                    <a href="#events" class="nav-item px-4 py-3 text-base text-gray-800 hover:text-pink-600 font-semibold rounded-xl hover:bg-gradient-to-r hover:from-pink-50 hover:to-orange-50 hover:shadow-md transition-all duration-300">
                         <span>Événements</span>
                     </a>
-                    <a href="gallery_public.php" class="nav-item px-3 py-2 text-sm text-gray-700 hover:text-pink-600 font-medium rounded-lg hover:bg-gray-50/50 transition-all duration-300 flex items-center space-x-1.5">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                        </svg>
+                    <a href="gallery_public.php" class="nav-item px-4 py-3 text-base text-gray-800 hover:text-pink-600 font-semibold rounded-xl hover:bg-gradient-to-r hover:from-pink-50 hover:to-orange-50 hover:shadow-md transition-all duration-300">
                         <span>Galerie</span>
                     </a>
-                    <a href="#contact" class="nav-item px-3 py-2 text-sm text-gray-700 hover:text-pink-600 font-medium rounded-lg hover:bg-gray-50/50 transition-all duration-300 flex items-center space-x-1.5">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-                        </svg>
+                    <a href="#contact" class="nav-item px-4 py-3 text-base text-gray-800 hover:text-pink-600 font-semibold rounded-xl hover:bg-gradient-to-r hover:from-pink-50 hover:to-orange-50 hover:shadow-md transition-all duration-300">
                         <span>Contact</span>
                     </a>
 
                     <!-- Language Dropdown -->
                     <div class="relative dropdown ml-2">
-                        <button class="flex items-center space-x-1.5 px-3 py-2 text-sm text-gray-700 hover:text-pink-600 font-medium rounded-lg hover:bg-gray-50/50 transition-all duration-300">
-                            <span class="text-base">🌐</span>
-                            <svg class="w-3 h-3 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <button class="flex items-center space-x-2 px-4 py-3 text-base text-gray-800 hover:text-pink-600 font-semibold rounded-xl hover:bg-gradient-to-r hover:from-pink-50 hover:to-orange-50 hover:shadow-md transition-all duration-300">
+                            <span class="text-lg">🌐</span>
+                            <span>Langue</span>
+                            <svg class="w-4 h-4 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                             </svg>
                         </button>
-                        <div class="dropdown-content absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-xl border border-gray-100 py-1 overflow-hidden">
-                            <a href="?lang=fr" onclick="changeLanguage('fr')" class="flex items-center space-x-2 px-3 py-2.5 text-sm hover:bg-gradient-to-r hover:from-pink-50 hover:to-orange-50 transition-all duration-200">
-                                <span class="text-sm">🇫🇷</span>
-                                <span class="text-gray-700 font-medium">Français</span>
+                        <div class="dropdown-content absolute right-0 mt-3 w-48 bg-white rounded-2xl shadow-2xl border border-gray-200 py-2 overflow-hidden backdrop-blur-lg">
+                            <a href="?lang=fr" onclick="changeLanguage('fr')" class="flex items-center space-x-3 px-4 py-3 text-base hover:bg-gradient-to-r hover:from-pink-50 hover:to-orange-50 hover:text-pink-600 transition-all duration-200 font-medium">
+                                <span class="text-lg">🇫🇷</span>
+                                <span class="text-gray-700">Français</span>
                             </a>
-                            <a href="?lang=en" onclick="changeLanguage('en')" class="flex items-center space-x-2 px-3 py-2.5 text-sm hover:bg-gradient-to-r hover:from-pink-50 hover:to-orange-50 transition-all duration-200">
-                                <span class="text-sm">🇬🇧</span>
-                                <span class="text-gray-700 font-medium">English</span>
+                            <a href="?lang=en" onclick="changeLanguage('en')" class="flex items-center space-x-3 px-4 py-3 text-base hover:bg-gradient-to-r hover:from-pink-50 hover:to-orange-50 hover:text-pink-600 transition-all duration-200 font-medium">
+                                <span class="text-lg">🇬🇧</span>
+                                <span class="text-gray-700">English</span>
                             </a>
-                            <a href="?lang=wo" onclick="changeLanguage('wo')" class="flex items-center space-x-2 px-3 py-2.5 text-sm hover:bg-gradient-to-r hover:from-pink-50 hover:to-orange-50 transition-all duration-200">
-                                <span class="text-sm">🇸🇳</span>
-                                <span class="text-gray-700 font-medium">Wolof</span>
+                            <a href="?lang=wo" onclick="changeLanguage('wo')" class="flex items-center space-x-3 px-4 py-3 text-base hover:bg-gradient-to-r hover:from-pink-50 hover:to-orange-50 hover:text-pink-600 transition-all duration-200 font-medium">
+                                <span class="text-lg">🇸🇳</span>
+                                <span class="text-gray-700">Wolof</span>
                             </a>
                         </div>
                     </div>
@@ -310,13 +293,8 @@
                 
                 <!-- Actions Desktop -->
                 <div class="hidden lg:flex items-center">
-                    <a href="#book-a-table" class="btn-primary bg-gradient-to-r from-pink-500 to-orange-500 text-white px-4 py-2 rounded-full font-medium hover:from-pink-600 hover:to-orange-600 transition-all duration-300 text-sm whitespace-nowrap">
-                        <span class="flex items-center space-x-1.5">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                            </svg>
-                            <span>Réserver</span>
-                        </span>
+                    <a href="#book-a-table" class="btn-primary bg-gradient-to-r from-pink-500 via-pink-600 to-orange-500 text-white px-6 py-3 rounded-2xl font-semibold hover:from-pink-600 hover:via-pink-700 hover:to-orange-600 transition-all duration-300 text-base whitespace-nowrap shadow-lg hover:shadow-xl">
+                        <span>Réserver</span>
                     </a>
                 </div>
 
@@ -398,18 +376,18 @@
                     <!-- Languages Section Mobile -->
                     <div class="mt-6">
                         <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 px-3">Langues</h3>
-                        <div class="space-y-1">
-                            <a href="?lang=fr" onclick="changeLanguage('fr')" class="mobile-nav-item flex items-center space-x-3 text-gray-700 hover:text-pink-600 hover:bg-pink-50 font-medium py-2.5 px-3 rounded-lg transition-all duration-300">
-                                <span class="text-base">🇫🇷</span>
-                                <span class="text-sm">Français</span>
+                        <div class="space-y-2">
+                            <a href="?lang=fr" onclick="changeLanguage('fr')" class="mobile-nav-item flex items-center space-x-3 text-gray-800 hover:text-pink-600 hover:bg-gradient-to-r hover:from-pink-50 hover:to-orange-50 font-semibold py-3 px-4 rounded-xl transition-all duration-300">
+                                <span class="text-xl">🇫🇷</span>
+                                <span class="text-base">Français</span>
                             </a>
-                            <a href="?lang=en" onclick="changeLanguage('en')" class="mobile-nav-item flex items-center space-x-3 text-gray-700 hover:text-pink-600 hover:bg-pink-50 font-medium py-2.5 px-3 rounded-lg transition-all duration-300">
-                                <span class="text-base">🇬🇧</span>
-                                <span class="text-sm">English</span>
+                            <a href="?lang=en" onclick="changeLanguage('en')" class="mobile-nav-item flex items-center space-x-3 text-gray-800 hover:text-pink-600 hover:bg-gradient-to-r hover:from-pink-50 hover:to-orange-50 font-semibold py-3 px-4 rounded-xl transition-all duration-300">
+                                <span class="text-xl">🇬🇧</span>
+                                <span class="text-base">English</span>
                             </a>
-                            <a href="?lang=wo" onclick="changeLanguage('wo')" class="mobile-nav-item flex items-center space-x-3 text-gray-700 hover:text-pink-600 hover:bg-pink-50 font-medium py-2.5 px-3 rounded-lg transition-all duration-300">
-                                <span class="text-base">🇸🇳</span>
-                                <span class="text-sm">Wolof</span>
+                            <a href="?lang=wo" onclick="changeLanguage('wo')" class="mobile-nav-item flex items-center space-x-3 text-gray-800 hover:text-pink-600 hover:bg-gradient-to-r hover:from-pink-50 hover:to-orange-50 font-semibold py-3 px-4 rounded-xl transition-all duration-300">
+                                <span class="text-xl">🇸🇳</span>
+                                <span class="text-base">Wolof</span>
                             </a>
                         </div>
                     </div>
@@ -418,12 +396,7 @@
                 <!-- Mobile CTA -->
                 <div class="p-4 border-t border-gray-100">
                     <a href="#book-a-table" class="btn-primary block w-full bg-gradient-to-r from-pink-500 to-orange-500 text-white text-center px-4 py-3 rounded-xl font-medium hover:from-pink-600 hover:to-orange-600 transition-all duration-300">
-                        <span class="flex items-center justify-center space-x-2">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                            </svg>
-                            <span>Réserver une table</span>
-                        </span>
+                        <span>Réserver une table</span>
                     </a>
                 </div>
             </div>
