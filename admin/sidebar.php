@@ -575,19 +575,19 @@ try {
                             <i class="fas fa-bullhorn mr-3 w-5 text-sm"></i>
                             <span class="font-medium">Annonces public</span>
                         </a>
-                        <a href="communication/messagerie.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
-                            <i class="fas fa-envelope mr-3 w-5 text-sm"></i>
-                            <span class="font-medium">Messagerie interne</span>
-                        </a>
                          <a href="communication/add_procedure.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                             <i class="fas fa-book mr-3 w-5 text-sm"></i>
                             <span class="font-medium">Ajouter Procédures internes</span>
+                        </a>
+                        <a href="communication/voir_annonce.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                            <i class="fas fa-bullhorn mr-3 w-5 text-sm"></i>
+                            <span class="font-medium">Voir annonces</span>
                         </a>
                         <a href="communication/procedures.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                             <i class="fas fa-book mr-3 w-5 text-sm"></i>
                             <span class="font-medium">voir Procédures internes</span>
                         </a>
-                        <a href="communication/signalements.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                        <a href="communication/incidents.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                             <i class="fas fa-exclamation-triangle mr-3 w-5 text-sm"></i>
                             <span class="font-medium">Signalements</span>
                         </a>
@@ -661,7 +661,16 @@ try {
                     </div>
                     <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
                 </a>
-                
+                <a href="gestion_droits.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
+                    <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
+                        <i class="fas fa-user-shield nav-icon text-lg"></i>
+                    </div>
+                    <div class="flex-1">
+                        <span class="font-medium text-base">Gestion des Droits</span>
+                        <p class="nav-description text-sm text-gray-400 opacity-80">Gestion des accès et permissions</p>
+                    </div>
+                    <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
+                </a>
                 <a href="statistiques.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-chart-line nav-icon text-lg"></i>

@@ -55,14 +55,21 @@ try {
     <title>Gestion des Plats</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
             theme: {
                 extend: {
+                    fontFamily: {
+                        'inter': ['Inter', 'sans-serif'],
+                    },
                     animation: {
                         'fade-in': 'fadeIn 0.5s ease-in-out',
                         'slide-up': 'slideUp 0.6s ease-out',
                         'bounce-in': 'bounceIn 0.8s ease-out',
+                        'float': 'float 3s ease-in-out infinite',
                     },
                     keyframes: {
                         fadeIn: {
@@ -78,6 +85,10 @@ try {
                             '50%': { opacity: '1', transform: 'scale(1.05)' },
                             '70%': { transform: 'scale(0.9)' },
                             '100%': { opacity: '1', transform: 'scale(1)' }
+                        },
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-8px)' }
                         }
                     }
                 }
@@ -85,84 +96,107 @@ try {
         }
     </script>
     <style>
-        .glass-effect {
-            background: rgba(255, 255, 255, 0.25);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.18);
+        body {
+            font-family: 'Inter', sans-serif;
         }
+        
+        .dashboard-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid rgba(229, 231, 235, 0.4);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .dashboard-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--card-accent, #3b82f6);
+            border-radius: 16px 16px 0 0;
+        }
+        
+        .dashboard-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+        
+        .card-purple { --card-accent: #8b5cf6; }
+        .card-red { --card-accent: #ef4444; }
+        .card-blue { --card-accent: #3b82f6; }
+        .card-green { --card-accent: #10b981; }
+        .card-orange { --card-accent: #f59e0b; }
+        .card-cyan { --card-accent: #06b6d4; }
+        
+        .action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+        }
+        
+        .btn-view {
+            background: rgba(16, 185, 129, 0.1);
+            color: #059669;
+            border-color: rgba(16, 185, 129, 0.2);
+        }
+        
+        .btn-view:hover {
+            background: rgba(16, 185, 129, 0.2);
+        }
+        
+        .btn-edit {
+            background: rgba(59, 130, 246, 0.1);
+            color: #2563eb;
+            border-color: rgba(59, 130, 246, 0.2);
+        }
+        
+        .btn-edit:hover {
+            background: rgba(59, 130, 246, 0.2);
+        }
+        
+        .btn-delete {
+            background: rgba(239, 68, 68, 0.1);
+            color: #dc2626;
+            border-color: rgba(239, 68, 68, 0.2);
+        }
+        
+        .btn-delete:hover {
+            background: rgba(239, 68, 68, 0.2);
+        }
+        
+        .icon-wrapper {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+        
+        .icon-purple { background: rgba(139, 92, 246, 0.1); color: #8b5cf6; }
+        .icon-red { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+        .icon-blue { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+        .icon-green { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+        .icon-orange { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+        .icon-cyan { background: rgba(6, 182, 212, 0.1); color: #06b6d4; }
         
         .gradient-primary {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
         
-        .gradient-secondary {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        }
-        
-        .gradient-success {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-        }
-        
-        .card-elevated {
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        
-        .card-elevated:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-        }
-        
-        .btn-modern {
-            position: relative;
-            overflow: hidden;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        
-        .btn-modern::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: left 0.5s;
-        }
-        
-        .btn-modern:hover::before {
-            left: 100%;
-        }
-        
-        .table-modern tr {
-            transition: all 0.2s ease;
-        }
-        
-        .table-modern tr:hover {
-            background: linear-gradient(90deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
-            transform: scale(1.01);
-        }
-        
-        .floating-card {
-            animation: float 6s ease-in-out infinite;
-        }
-        
-        @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-        }
-        
-        .status-indicator {
-            animation: pulse 2s infinite;
-        }
-        
-        @media (max-width: 1024px) {
-            .sidebar-container {
-                width: auto;
-            }
-        }
-
-        /* Styles pour le modal */
         .modal-backdrop {
             background: rgba(0, 0, 0, 0.5);
             backdrop-filter: blur(4px);
@@ -197,111 +231,104 @@ try {
                 transform: scale(0.9) translateY(-20px);
             }
         }
+        
+        .table-modern tr {
+            transition: all 0.2s ease;
+        }
+        
+        .table-modern tr:hover {
+            background: rgba(249, 250, 251, 0.8);
+        }
     </style>
 </head>
 
-<body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 min-h-screen">
+<body class="bg-gray-50 font-inter">
     <div class="flex h-screen overflow-hidden">
         <?php include 'sidebar.php'; ?>
         
         <div class="flex-1 overflow-x-hidden overflow-y-auto">
-            <div class="p-4 lg:p-8">
+            <div class="p-6">
                 <!-- Header avec design moderne -->
-                <div class="gradient-primary rounded-3xl p-6 lg:p-8 mb-8 text-white relative overflow-hidden">
-                    <div class="absolute inset-0 bg-black opacity-10"></div>
-                    <div class="absolute top-0 right-0 w-40 h-40 bg-white opacity-10 rounded-full -mr-20 -mt-20"></div>
-                    <div class="absolute bottom-0 left-0 w-32 h-32 bg-white opacity-5 rounded-full -ml-16 -mb-16"></div>
-                    
-                    <div class="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-                        <div class="animate-slide-up">
-                            <div class="flex items-center mb-4">
-                                <div class="bg-white bg-opacity-20 p-3 rounded-2xl mr-4">
-                                    <i class="fas fa-utensils text-2xl lg:text-3xl"></i>
-                                </div>
-                                <div>
-                                    <h1 class="text-3xl lg:text-5xl font-bold mb-2">Gestion des Plats</h1>
-                                    <p class="text-white/90 text-lg">Interface moderne pour gérer votre menu</p>
-                                </div>
-                            </div>
+                <div class="mb-8">
+                    <div class="flex items-center mb-4">
+                        <div class="bg-blue-100 p-3 rounded-xl mr-4">
+                            <i class="fas fa-utensils text-2xl text-blue-600"></i>
                         </div>
-                        
-                        <div class="floating-card">
-                            <div class="glass-effect rounded-2xl p-6 text-center">
-                                <div class="bg-white bg-opacity-30 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3">
-                                    <i class="fas fa-chart-line text-2xl"></i>
-                                </div>
-                                <p class="text-sm font-medium">Dashboard</p>
-                                <p class="text-xs opacity-80">Temps réel</p>
-                            </div>
+                        <div>
+                            <h1 class="text-4xl font-bold mb-2 text-gray-900">Gestion des Plats</h1>
+                            <p class="text-gray-600 text-lg font-medium">Interface d'administration avancée</p>
                         </div>
                     </div>
                 </div>
 
                 <!-- Cartes statistiques modernes -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <div class="card-elevated bg-white rounded-2xl p-6 animate-bounce-in">
+                    <!-- Total des plats -->
+                    <div class="dashboard-card card-purple animate-fade-in">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-sm font-medium text-gray-600 mb-1">Total des plats</p>
+                                <p class="text-gray-600 text-sm font-medium mb-1">Total des plats</p>
                                 <p class="text-3xl font-bold text-gray-900"><?= count($plats) ?></p>
-                                <p class="text-xs text-green-600 flex items-center mt-1">
+                                <p class="text-sm text-green-600 flex items-center mt-2">
                                     <i class="fas fa-arrow-up mr-1"></i>
                                     +12% ce mois
                                 </p>
                             </div>
-                            <div class="gradient-primary w-16 h-16 rounded-2xl flex items-center justify-center">
-                                <i class="fas fa-utensils text-white text-xl"></i>
+                            <div class="icon-wrapper icon-purple">
+                                <i class="fas fa-utensils"></i>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="card-elevated bg-white rounded-2xl p-6 animate-bounce-in" style="animation-delay: 0.1s;">
+                    <!-- Catégories -->
+                    <div class="dashboard-card card-blue animate-fade-in" style="animation-delay: 0.1s;">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-sm font-medium text-gray-600 mb-1">Catégories</p>
+                                <p class="text-gray-600 text-sm font-medium mb-1">Catégories</p>
                                 <p class="text-3xl font-bold text-gray-900"><?= $totalCategories ?></p>
-                                <p class="text-xs text-blue-600 flex items-center mt-1">
+                                <p class="text-sm text-blue-600 flex items-center mt-2">
                                     <i class="fas fa-equals mr-1"></i>
                                     Stable
                                 </p>
                             </div>
-                            <div class="gradient-success w-16 h-16 rounded-2xl flex items-center justify-center">
-                                <i class="fas fa-tags text-white text-xl"></i>
+                            <div class="icon-wrapper icon-blue">
+                                <i class="fas fa-tags"></i>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="card-elevated bg-white rounded-2xl p-6 animate-bounce-in" style="animation-delay: 0.2s;">
+                    <!-- Statut système -->
+                    <div class="dashboard-card card-green animate-fade-in" style="animation-delay: 0.2s;">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-sm font-medium text-gray-600 mb-1">Statut système</p>
+                                <p class="text-gray-600 text-sm font-medium mb-1">Statut système</p>
                                 <p class="text-xl font-bold text-green-600">En ligne</p>
-                                <p class="text-xs text-gray-500 flex items-center mt-1">
-                                    <div class="w-2 h-2 bg-green-500 rounded-full mr-2 status-indicator"></div>
+                                <p class="text-sm text-gray-600 flex items-center mt-2">
+                                    <div class="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
                                     Opérationnel
                                 </p>
                             </div>
-                            <div class="gradient-secondary w-16 h-16 rounded-2xl flex items-center justify-center">
-                                <i class="fas fa-server text-white text-xl"></i>
+                            <div class="icon-wrapper icon-green">
+                                <i class="fas fa-server"></i>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Section filtres et actions avec design premium -->
-                <div class="card-elevated bg-white rounded-3xl p-6 lg:p-8 mb-8 animate-fade-in">
+                <!-- Section filtres et actions -->
+                <div class="bg-white rounded-2xl p-6 mb-8 shadow-sm border border-gray-200">
                     <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-                        <!-- Filtres modernisés -->
+                        <!-- Filtres -->
                         <form method="get" class="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full lg:w-auto">
                             <div class="flex items-center gap-3">
-                                <div class="bg-gradient-to-r from-blue-500 to-purple-600 p-2 rounded-xl">
-                                    <i class="fas fa-filter text-white"></i>
+                                <div class="bg-blue-100 p-2 rounded-lg">
+                                    <i class="fas fa-filter text-blue-600"></i>
                                 </div>
-                                <label for="categorie" class="font-semibold text-gray-800">Filtrer par catégorie</label>
+                                <label for="categorie" class="font-semibold text-gray-700">Filtrer par catégorie</label>
                             </div>
                             
                             <div class="flex gap-3 w-full sm:w-auto">
-                                <select name="categorie" id="categorie" class="border-2 border-gray-200 rounded-xl px-4 py-3 focus:ring-4 focus:ring-purple-100 focus:border-purple-500 transition-all duration-300 bg-white shadow-sm min-w-48">
+                                <select name="categorie" id="categorie" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white min-w-48">
                                     <option value="">🍽️ Toutes les catégories</option>
                                     <?php foreach ($categories as $cat): ?>
                                         <option value="<?= $cat['id'] ?>" <?= ($cat['id'] == $filtreCategorie) ? 'selected' : '' ?>>
@@ -310,41 +337,41 @@ try {
                                     <?php endforeach; ?>
                                 </select>
                                 
-                                <button type="submit" class="btn-modern gradient-primary text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300">
+                                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
                                     <i class="fas fa-search mr-2"></i>Filtrer
                                 </button>
                             </div>
                             
                             <?php if($filtreCategorie): ?>
-                                <a href="gestion_plats.php" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-3 rounded-xl transition-all duration-300 flex items-center gap-2 font-medium">
+                                <a href="gestion_plats.php" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition-colors flex items-center gap-2 font-medium">
                                     <i class="fas fa-times"></i>Réinitialiser
                                 </a>
                             <?php endif; ?>
                         </form>
 
-                        <!-- Actions avec boutons modernes -->
-                        <div class="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
+                        <!-- Actions -->
+                        <div class="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
                             <form method="post" action="export_plats_pdf.php" class="inline w-full sm:w-auto">
-                                <button type="submit" class="btn-modern bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 w-full sm:w-auto">
+                                <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors w-full sm:w-auto">
                                     <i class="fas fa-file-pdf mr-2"></i>Exporter PDF
                                 </button>
                             </form>
                             
-                            <a href="ajouter_plat.php" class="btn-modern bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 flex items-center justify-center w-full sm:w-auto">
+                            <a href="ajouter_plat.php" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center w-full sm:w-auto">
                                 <i class="fas fa-plus mr-2"></i>Ajouter un plat
                             </a>
                         </div>
                     </div>
                 </div>
 
-                <!-- Tableau moderne avec design premium -->
-                <div class="card-elevated bg-white rounded-3xl overflow-hidden shadow-2xl animate-fade-in">
-                    <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
-                        <h3 class="text-xl font-bold text-gray-800 flex items-center">
-                            <i class="fas fa-table mr-3 text-purple-600"></i>
+                <!-- Tableau moderne -->
+                <div class="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-200">
+                    <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                            <i class="fas fa-table mr-3 text-gray-600"></i>
                             Liste des plats
                             <?php if($filtreCategorie): ?>
-                                <span class="ml-3 bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium">
+                                <span class="ml-3 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
                                     Filtré
                                 </span>
                             <?php endif; ?>
@@ -353,43 +380,28 @@ try {
                     
                     <div class="overflow-x-auto">
                         <table class="min-w-full table-modern">
-                            <thead class="bg-gradient-to-r from-slate-100 to-slate-200">
+                            <thead class="bg-gray-50">
                                 <tr>
-                                    <th class="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
-                                        <div class="flex items-center gap-2">
-                                            <i class="fas fa-hashtag text-purple-600"></i>
-                                            <span class="hidden sm:inline">ID</span>
-                                        </div>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                        ID
                                     </th>
-                                    <th class="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
-                                        <div class="flex items-center gap-2">
-                                            <i class="fas fa-utensils text-blue-600"></i>Nom du plat
-                                        </div>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                        Nom du plat
                                     </th>
-                                    <th class="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
-                                        <div class="flex items-center gap-2">
-                                            <i class="fas fa-align-left text-green-600"></i>Description
-                                        </div>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                        Description
                                     </th>
-                                    <th class="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
-                                        <div class="flex items-center gap-2">
-                                            <i class="fas fa-euro-sign text-yellow-600"></i>Prix
-                                        </div>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                        Prix
                                     </th>
-                                    <th class="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider hidden sm:table-cell">
-                                        <div class="flex items-center gap-2">
-                                            <i class="fas fa-tags text-indigo-600"></i>Catégorie
-                                        </div>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden sm:table-cell">
+                                        Catégorie
                                     </th>
-                                    <th class="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider hidden md:table-cell">
-                                        <div class="flex items-center gap-2">
-                                            <i class="fas fa-image text-pink-600"></i>Image
-                                        </div>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden md:table-cell">
+                                        Image
                                     </th>
-                                    <th class="px-6 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
-                                        <div class="flex items-center justify-center gap-2">
-                                            <i class="fas fa-cogs text-red-600"></i>Actions
-                                        </div>
+                                    <th class="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                        Actions
                                     </th>
                                 </tr>
                             </thead>
@@ -397,14 +409,12 @@ try {
                             <tbody class="bg-white divide-y divide-gray-100">
                                 <?php if (!empty($plats)): ?>
                                     <?php foreach ($plats as $index => $plat): ?>
-                                    <tr class="hover:bg-gradient-to-r hover:from-purple-50 hover:to-blue-50 transition-all duration-300" style="animation: fadeIn 0.5s ease-in-out <?= $index * 0.1 ?>s both;">
+                                    <tr>
                                         <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="bg-gradient-to-r from-purple-100 to-blue-100 text-purple-800 px-3 py-1 rounded-full text-sm font-bold inline-block">
-                                                #<?= $plat['id'] ?>
-                                            </div>
+                                            <span class="text-gray-900 font-medium"><?= $plat['id'] ?></span>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="font-semibold text-gray-900 text-lg">
+                                            <div class="font-semibold text-gray-900">
                                                 <?= htmlspecialchars($plat['nom']) ?>
                                             </div>
                                         </td>
@@ -414,41 +424,38 @@ try {
                                             </div>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 px-3 py-2 rounded-lg font-bold text-lg inline-block">
-                                                <?= number_format($plat['prix'], 2) ?> <span class="text-sm">FCFA</span>
-                                            </div>
+                                            <span class="font-semibold text-gray-900">
+                                                <?= number_format($plat['prix'], 0, ',', ' ') ?> FCFA
+                                            </span>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                                            <span class="bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-800 px-3 py-1 rounded-full text-sm font-medium">
+                                            <span class="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-medium">
                                                 <?= htmlspecialchars($plat['categorie_nom'] ?? 'Non catégorisé') ?>
                                             </span>
                                         </td>
                                     
                                         <td class="px-6 py-4 whitespace-nowrap hidden md:table-cell">
                                             <?php if (!empty($plat['image']) && file_exists('../uploads/' . $plat['image'])): ?>
-                                                <div class="relative group">
-                                                    <img src="../uploads/<?= htmlspecialchars($plat['image']) ?>" 
-                                                         class="h-16 w-16 rounded-2xl object-cover shadow-lg ring-4 ring-white group-hover:scale-110 transition-transform duration-300" 
-                                                         alt="<?= htmlspecialchars($plat['nom']) ?>">
-                                                    <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-2xl transition-all duration-300"></div>
-                                                </div>
+                                                <img src="../uploads/<?= htmlspecialchars($plat['image']) ?>" 
+                                                     class="h-12 w-12 rounded-lg object-cover" 
+                                                     alt="<?= htmlspecialchars($plat['nom']) ?>">
                                             <?php else: ?>
-                                                <div class="h-16 w-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center">
-                                                    <i class="fas fa-image text-gray-400 text-xl"></i>
+                                                <div class="h-12 w-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                                                    <i class="fas fa-image text-gray-400"></i>
                                                 </div>
                                             <?php endif; ?>
                                         </td>
 
-                                        <td class="px-6 py-4 whitespace-nowrap text-center">
+                                        <td class="px-6 py-4 whitespace-nowrap">
                                             <div class="flex items-center justify-center gap-2">
                                                 <button onclick="openEditModal(<?= htmlspecialchars(json_encode($plat), ENT_QUOTES, 'UTF-8') ?>)"
-                                                   class="bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white px-4 py-2 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg">
-                                                    <i class="fas fa-edit mr-1"></i>
+                                                       class="action-btn btn-edit">
+                                                    <i class="fas fa-edit"></i>
                                                     <span class="hidden sm:inline">Modifier</span>
                                                 </button>
                                                 <button onclick="confirmDelete(<?= $plat['id'] ?>, '<?= addslashes($plat['nom']) ?>')" 
-                                                        class="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white px-4 py-2 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg">
-                                                    <i class="fas fa-trash mr-1"></i>
+                                                        class="action-btn btn-delete">
+                                                    <i class="fas fa-trash"></i>
                                                     <span class="hidden sm:inline">Supprimer</span>
                                                 </button>
                                             </div>
@@ -473,7 +480,7 @@ try {
                                                     </p>
                                                 </div>
                                                 <?php if(!$filtreCategorie): ?>
-                                                    <a href="ajouter_plat.php" class="btn-modern gradient-primary text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300">
+                                                    <a href="ajouter_plat.php" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors">
                                                         <i class="fas fa-plus mr-2"></i>Ajouter le premier plat
                                                     </a>
                                                 <?php endif; ?>
@@ -491,17 +498,17 @@ try {
 
     <!-- Modal de modification -->
     <div id="editModal" class="fixed inset-0 modal-backdrop hidden items-center justify-center z-50 p-4">
-        <div class="modal-content bg-white rounded-3xl max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-6 rounded-t-3xl">
+        <div class="modal-content bg-white rounded-2xl max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-6 rounded-t-2xl">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-3">
-                        <div class="bg-white bg-opacity-20 p-2 rounded-xl">
-                            <i class="fas fa-edit text-xl"></i>
+                        <div class="bg-white bg-opacity-20 p-2 rounded-lg">
+                            <i class="fas fa-edit text-lg"></i>
                         </div>
-                        <h2 class="text-2xl font-bold">Modifier le plat</h2>
+                        <h2 class="text-xl font-bold">Modifier le plat</h2>
                     </div>
-                    <button onclick="closeEditModal()" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-xl transition-all duration-300">
-                        <i class="fas fa-times text-xl"></i>
+                    <button onclick="closeEditModal()" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition-all">
+                        <i class="fas fa-times"></i>
                     </button>
                 </div>
             </div>
@@ -512,29 +519,29 @@ try {
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <!-- Nom du plat -->
                     <div class="md:col-span-2">
-                        <label for="edit_nom" class="block text-sm font-bold text-gray-700 mb-2">
-                            <i class="fas fa-utensils mr-2 text-blue-600"></i>Nom du plat
+                        <label for="edit_nom" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Nom du plat
                         </label>
                         <input type="text" id="edit_nom" name="nom" required
-                               class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-300">
+                               class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     </div>
 
                     <!-- Prix -->
                     <div>
-                        <label for="edit_prix" class="block text-sm font-bold text-gray-700 mb-2">
-                            <i class=" mr-2 text-green-600"></i>Prix (FCFA)
+                        <label for="edit_prix" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Prix (FCFA)
                         </label>
                         <input type="number" id="edit_prix" name="prix" step="0.01" required
-                               class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:ring-4 focus:ring-green-100 focus:border-green-500 transition-all duration-300">
+                               class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 focus:border-green-500">
                     </div>
 
                     <!-- Catégorie -->
                     <div>
-                        <label for="edit_categorie" class="block text-sm font-bold text-gray-700 mb-2">
-                            <i class="fas fa-tags mr-2 text-purple-600"></i>Catégorie
+                        <label for="edit_categorie" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Catégorie
                         </label>
                         <select id="edit_categorie" name="categorie_id"
-                                class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:ring-4 focus:ring-purple-100 focus:border-purple-500 transition-all duration-300">
+                                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
                             <option value="">Sélectionner une catégorie</option>
                             <?php foreach ($categories as $cat): ?>
                                 <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['nom']) ?></option>
@@ -544,17 +551,17 @@ try {
 
                     <!-- Description -->
                     <div class="md:col-span-2">
-                        <label for="edit_description" class="block text-sm font-bold text-gray-700 mb-2">
-                            <i class="fas fa-align-left mr-2 text-indigo-600"></i>Description
+                        <label for="edit_description" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Description
                         </label>
                         <textarea id="edit_description" name="description" rows="4"
-                                  class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 transition-all duration-300 resize-none"></textarea>
+                                  class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"></textarea>
                     </div>
 
                     <!-- Image actuelle -->
                     <div class="md:col-span-2">
-                        <label class="block text-sm font-bold text-gray-700 mb-2">
-                            <i class="fas fa-image mr-2 text-pink-600"></i>Image actuelle
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            Image actuelle
                         </label>
                         <div id="current_image_container" class="mb-4">
                             <!-- L'image actuelle sera affichée ici -->
@@ -563,11 +570,11 @@ try {
 
                     <!-- Nouvelle image -->
                     <div class="md:col-span-2">
-                        <label for="edit_image" class="block text-sm font-bold text-gray-700 mb-2">
-                            <i class="fas fa-upload mr-2 text-orange-600"></i>Nouvelle image (optionnel)
+                        <label for="edit_image" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Nouvelle image (optionnel)
                         </label>
                         <input type="file" id="edit_image" name="image" accept="image/*"
-                               class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:ring-4 focus:ring-orange-100 focus:border-orange-500 transition-all duration-300">
+                               class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-orange-500 focus:border-orange-500">
                         <p class="text-sm text-gray-500 mt-2">Laissez vide pour conserver l'image actuelle</p>
                     </div>
                 </div>
@@ -578,11 +585,11 @@ try {
                 <!-- Boutons d'action -->
                 <div class="flex flex-col sm:flex-row gap-4 mt-8">
                     <button type="button" onclick="closeEditModal()" 
-                            class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 px-6 rounded-xl font-semibold transition-all duration-300">
+                            class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 px-6 rounded-lg font-semibold transition-colors">
                         <i class="fas fa-times mr-2"></i>Annuler
                     </button>
                     <button type="submit" 
-                            class="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white py-3 px-6 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105">
+                            class="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white py-3 px-6 rounded-lg font-semibold transition-all">
                         <i class="fas fa-save mr-2"></i>Enregistrer les modifications
                     </button>
                 </div>
@@ -594,15 +601,15 @@ try {
         // Animation au chargement
         document.addEventListener('DOMContentLoaded', function() {
             // Animation des cartes
-            const cards = document.querySelectorAll('.card-elevated');
+            const cards = document.querySelectorAll('.dashboard-card');
             cards.forEach((card, index) => {
                 card.style.opacity = '0';
-                card.style.transform = 'translateY(30px)';
+                card.style.transform = 'translateY(20px)';
                 setTimeout(() => {
-                    card.style.transition = 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1)';
+                    card.style.transition = 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
                     card.style.opacity = '1';
                     card.style.transform = 'translateY(0)';
-                }, index * 150);
+                }, index * 100);
             });
         });
 
@@ -629,17 +636,17 @@ try {
                 imageContainer.innerHTML = `
                     <div class="relative inline-block">
                         <img src="../uploads/${plat.image}" 
-                             class="h-32 w-32 rounded-2xl object-cover shadow-lg ring-4 ring-white" 
+                             class="h-24 w-24 rounded-lg object-cover shadow-md border border-gray-200" 
                              alt="${plat.nom}">
-                        <div class="absolute -top-2 -right-2 bg-green-500 text-white p-1 rounded-full">
-                            <i class="fas fa-check text-xs"></i>
+                        <div class="absolute -top-2 -right-2 bg-green-500 text-white p-1 rounded-full text-xs">
+                            <i class="fas fa-check"></i>
                         </div>
                     </div>
                 `;
             } else {
                 imageContainer.innerHTML = `
-                    <div class="h-32 w-32 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center">
-                        <i class="fas fa-image text-gray-400 text-2xl"></i>
+                    <div class="h-24 w-24 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
+                        <i class="fas fa-image text-gray-400 text-xl"></i>
                     </div>
                 `;
             }
@@ -699,7 +706,7 @@ try {
                 
                 if (data.success) {
                     messagesDiv.innerHTML = `
-                        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-xl">
+                        <div class="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg">
                             <div class="flex items-center">
                                 <i class="fas fa-check-circle mr-2"></i>
                                 <span>${data.message}</span>
@@ -714,7 +721,7 @@ try {
                     }, 1500);
                 } else {
                     messagesDiv.innerHTML = `
-                        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl">
+                        <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
                             <div class="flex items-center">
                                 <i class="fas fa-exclamation-circle mr-2"></i>
                                 <span>${data.message}</span>
@@ -725,7 +732,7 @@ try {
             })
             .catch(error => {
                 document.getElementById('modal_messages').innerHTML = `
-                    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl">
+                    <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
                         <div class="flex items-center">
                             <i class="fas fa-exclamation-triangle mr-2"></i>
                             <span>Une erreur est survenue lors de la modification.</span>
@@ -746,12 +753,12 @@ try {
             const modal = document.createElement('div');
             modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
             modal.innerHTML = `
-                <div class="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl transform scale-95 transition-all duration-300">
+                <div class="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl transform scale-95 transition-all duration-300">
                     <div class="text-center">
                         <div class="bg-red-100 p-4 rounded-2xl inline-block mb-4">
                             <i class="fas fa-trash text-red-600 text-3xl"></i>
                         </div>
-                        <h3 class="text-2xl font-bold text-gray-900 mb-2">Confirmer la suppression</h3>
+                        <h3 class="text-xl font-bold text-gray-900 mb-2">Confirmer la suppression</h3>
                         <p class="text-gray-600 mb-6">
                             Êtes-vous sûr de vouloir supprimer le plat <strong>"${nom}"</strong> ?
                             <br><br>
@@ -759,11 +766,11 @@ try {
                         </p>
                         <div class="flex gap-4">
                             <button onclick="this.closest('.fixed').remove()" 
-                                    class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 px-6 rounded-xl font-semibold transition-all duration-300">
+                                    class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 px-6 rounded-lg font-semibold transition-colors">
                                 <i class="fas fa-times mr-2"></i>Annuler
                             </button>
                             <button onclick="window.location.href='supprimer_plat.php?id=${id}'" 
-                                    class="flex-1 bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white py-3 px-6 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105">
+                                    class="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 px-6 rounded-lg font-semibold transition-colors">
                                 <i class="fas fa-trash mr-2"></i>Supprimer
                             </button>
                         </div>
@@ -791,18 +798,6 @@ try {
             if (e.key === 'Escape' && !document.getElementById('editModal').classList.contains('hidden')) {
                 closeEditModal();
             }
-        });
-
-        // Effet de parallaxe léger pour les éléments flottants
-        document.addEventListener('mousemove', function(e) {
-            const floating = document.querySelectorAll('.floating-card');
-            const x = e.clientX / window.innerWidth;
-            const y = e.clientY / window.innerHeight;
-            
-            floating.forEach(el => {
-                const intensity = 10;
-                el.style.transform = `translateX(${x * intensity}px) translateY(${y * intensity}px)`;
-            });
         });
     </script>
 </body>

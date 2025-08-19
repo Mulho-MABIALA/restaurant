@@ -214,13 +214,16 @@ if (isset($_GET['get_event']) && isset($_GET['id'])) {
     </style>
 </head>
 
-<body class="bg-light">
-    
-    <div class="admin-header">
-        <div class="container">
-            <h1 class="mb-0"><i class="fas fa-calendar-alt me-3"></i>Administration - Gestion des Événements</h1>
-        </div>
-    </div>
+<body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 min-h-screen">
+    <div class="flex h-screen overflow-hidden">
+        <?php include 'sidebar.php'; ?>
+        <div class="flex-1 p-4 overflow-y-auto">
+            <header class="admin-header text-center">
+                <h1 class="display-4">Gestion des Événements</h1>
+                <p class="lead">Ajoutez, modifiez ou supprimez des événements pour votre restaurant.</p>
+            </header>
+
+       
 
     <div class="container">
         <?php if ($message): ?>

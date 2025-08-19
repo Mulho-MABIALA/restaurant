@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -23,6 +24,72 @@
             }
         }
     </script>
+     <style>
+/* Styles pour les annonces du site */
+.annonces-section {
+    margin: 20px 0;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+}
+
+.menu-annonces-section {
+    margin-bottom: 30px;
+}
+
+/* Styles pour les annonces urgentes */
+.annonce-banner.urgent {
+    border-left: 4px solid #dc3545 !important;
+    background-color: #dc354520 !important;
+    animation: pulse 2s infinite;
+}
+
+.annonce-banner.urgent .annonce-titre {
+    color: #dc3545 !important;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+}
+
+/* Styles responsive pour mobile */
+@media (max-width: 576px) {
+    .annonces-container {
+        margin: 10px -15px 20px -15px;
+    }
+    
+    .annonce-banner {
+        border-radius: 0;
+        margin-bottom: 5px;
+    }
+}
+
+/* Styles pour integration dans menu */
+.menu-sidebar .annonces-container {
+    position: sticky;
+    top: 20px;
+}
+
+.menu-sidebar .annonce-banner {
+    margin-bottom: 15px;
+    font-size: 0.85em;
+}
+
+/* Styles pour annonces avec icônes spécialisées */
+.annonce-banner[data-type="promo"] .annonce-titre::before {
+    content: "🎉 ";
+}
+
+.annonce-banner[data-type="fermeture"] .annonce-titre::before {
+    content: "⚠️ ";
+}
+
+.annonce-banner[data-type="nouveau"] .annonce-titre::before {
+    content: "✨ ";
+}
+</style>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
         
@@ -217,12 +284,121 @@
             align-items: center;
             justify-content: center;
         }
+        /* Nouveaux styles pour le défilement des annonces */
+        /* Barre d'annonces compacte */
+.site-annonces-section {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 60;
+    background: linear-gradient(135deg, #d4a574, #c19654);
+    padding: 8px 0;
+    overflow: hidden;
+    border-bottom: 1px solid rgba(0,0,0,0.1);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    height: 40px;
+    display: flex;
+    align-items: center;
+}
+
+.annonces-container {
+    width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    position: relative;
+    height: 100%;
+}
+
+.annonce-wrapper {
+    display: inline-block;
+    white-space: nowrap;
+    animation: defilement-annonces 30s linear infinite;
+    padding-right: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+}
+
+/* Style des annonces - une seule ligne */
+.site-annonces-section .annonce {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 20px;
+    margin: 0 20px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    color: #2c3e50;
+    text-align: center;
+    white-space: nowrap;
+    height: 28px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* Supprimez les styles pour .annonce strong et .annonce-message */
+.site-annonces-section .annonce strong {
+    display: inline;
+    font-size: 14px;
+    color: #c19654;
+    font-weight: 700;
+    margin-right: 6px;
+}
+
+.site-annonces-section .annonce-message {
+    display: inline;
+    font-size: 14px;
+}
+
+/* Animation fluide */
+@keyframes defilement-annonces {
+    0% { transform: translateX(100%); }
+    100% { transform: translateX(-100%); }
+}
+
+/* Ajustements responsive */
+@media (max-width: 1023px) {
+    .site-annonces-section {
+        height: 36px;
+        padding: 6px 0;
+    }
+    
+    .glass-effect {
+        <?php if ($nombreAnnonces > 0): ?>
+        top: 36px !important;
+        <?php else: ?>
+        top: 0 !important;
+        <?php endif; ?>
+    }
+    
+    .site-annonces-section .annonce {
+        height: 26px;
+        padding: 0 15px;
+        font-size: 13px;
+    }
+}
     </style>
 </head>
-<body class="bg-gray-50">
 
+<body class="bg-gray-50">
+<?php 
+require_once 'admin/communication/fonctions_annonces.php';
+$nombreAnnonces = compterAnnoncesActives('site');
+?>
+
+<?php if ($nombreAnnonces > 0): ?>
+<!-- Barre d'annonces compacte -->
+<div class="site-annonces-section">
+    <div class="annonces-container">
+        <div class="annonce-wrapper">
+            <?php afficherAnnonces('site', 'top'); ?>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
     <!-- Header avec effet glassmorphism -->
-    <header id="header" class="glass-effect fixed top-0 left-0 right-0 z-50">
+<header id="header" class="glass-effect fixed <?= $nombreAnnonces > 0 ? 'top-[40px]' : 'top-0' ?> left-0 right-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16 sm:h-18 lg:h-20">
                 

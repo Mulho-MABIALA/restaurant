@@ -164,7 +164,10 @@ try {
 $total_cmd = count($commandes);
 $nouvelles_cmd = count(array_filter($commandes, fn($c) => !$c['vu_admin']));
 $cmd_aujourdhui = count(array_filter($commandes, fn($c) => date('Y-m-d', strtotime($c['created_at'] ?? $c['date_commande'] ?? 'now')) === date('Y-m-d')));
-$total_ventes = array_sum(array_column($commandes, 'total'));
+// Ne compter que les commandes payées dans le total des ventes
+$total_ventes = array_sum(array_map(function($cmd) {
+    return ($cmd['statut_paiement'] ?? 'Impayé') === 'Payé' ? $cmd['total'] : 0;
+}, $commandes));
 $moyenne_cmd = $total_cmd > 0 ? intval($total_ventes / $total_cmd) : 0;
 
 // Statistiques de paiement

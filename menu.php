@@ -1366,20 +1366,71 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
         .hidden {
             display: none !important;
         }
+
+        /* Styles pour le défilement des annonces */
+.menu-annonces-section {
+    background: linear-gradient(135deg, #d4a574, #c19654);
+    padding: 15px 0;
+    overflow: hidden;
+    position: relative;
+    border-bottom: 1px solid rgba(0,0,0,0.1);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.annonces-container {
+    width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    position: relative;
+}
+
+.annonce-wrapper {
+    display: inline-block;
+    white-space: nowrap;
+    animation: defilement-annonces 30s linear infinite;
+    padding-right: 100%; /* Espace pour le rebouclage */
+}
+
+.annonce-wrapper:hover {
+    animation-play-state: paused;
+}
+
+@keyframes defilement-annonces {
+    0% {
+        transform: translateX(100%);
+    }
+    100% {
+        transform: translateX(-100%);
+    }
+}
+
+/* Style de base des annonces (adaptez selon votre fonction afficherAnnonces) */
+.annonce {
+    display: inline-block;
+    padding: 10px 25px;
+    margin: 0 15px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    color: #2c3e50;
+    font-weight: 500;
+}
         
     </style>
 </head>
 <body>
    
-    <?php 
-    // Vérification et notification pour le menu
-    if (compterAnnoncesActives('menu') > 0) {
-        echo '<div class="menu-annonces-section">';
-        afficherNotificationAnnonces('menu');
-        afficherAnnonces('menu', 'top');
-        echo '</div>';
-    }
-    ?>
+   <?php 
+if (compterAnnoncesActives('menu') > 0) {
+    echo '<div class="menu-annonces-section">';
+    afficherNotificationAnnonces('menu');
+    echo '<div class="annonces-container">';
+    echo '<div class="annonce-wrapper">';
+    afficherAnnonces('menu', 'top');
+    echo '</div></div>';
+    echo '</div>';
+}
+?>
     <!-- Header -->
    <header class="header">
     <div class="header-content">
@@ -1952,8 +2003,6 @@ function quickAddToCart(name, price, image, description) {
             document.getElementById('addToCartText').textContent = 
                 `${total.toLocaleString()} F • Ajouter`;
         }
-
-        // Ajouter au panier depuis la modal
        // Fonction addToCart modifiée
 function addToCart() {
     const specialInstructions = document.getElementById('specialInstructions').value;

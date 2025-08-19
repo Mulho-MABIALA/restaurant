@@ -76,6 +76,13 @@ if (empty($produits)) {
     $useLocalStorage = false;
 }
 
+if (isset($_SESSION['panier'])) {
+    unset($_SESSION['panier']);
+    // ou
+    $_SESSION['panier'] = [];
+}
+
+// Importation des classes nécessaires pour PDF et email
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use PHPMailer\PHPMailer\PHPMailer;
@@ -991,7 +998,7 @@ console.log('Local Storage:', localStorage.getItem('cartItems'));
             </div>
         </div>
     </footer>
-</body>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.querySelector('form');
@@ -1037,4 +1044,21 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
+<script>
+// Vider le panier du sessionStorage après commande réussie
+function clearCartAfterOrder() {
+    try {
+        sessionStorage.removeItem('mulho_cart');
+        console.log('Panier vidé après commande');
+    } catch (error) {
+        console.error('Erreur lors du vidage du panier:', error);
+    }
+}
+
+// Appeler cette fonction après confirmation de la commande
+document.addEventListener('DOMContentLoaded', function() {
+    clearCartAfterOrder();
+});
+</script>
+</body>
 </html>

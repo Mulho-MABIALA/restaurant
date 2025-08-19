@@ -46,56 +46,59 @@ function estBientot($date) {
     <link href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css" rel="stylesheet">
     <style>
         :root {
-            --events-primary: #3b82f6;
-            --events-primary-dark: #2563eb;
-            --events-secondary: #10b981;
-            --events-accent: #f59e0b;
-            --events-danger: #ef4444;
-            --events-gray-50: #f9fafb;
-            --events-gray-100: #f3f4f6;
-            --events-gray-200: #e5e7eb;
-            --events-gray-300: #d1d5db;
-            --events-gray-500: #6b7280;
-            --events-gray-600: #4b5563;
-            --events-gray-700: #374151;
-            --events-gray-800: #1f2937;
-            --events-gray-900: #111827;
+            --events-primary: #667eea;
+            --events-primary-dark: #5a67d8;
+            --events-secondary: #f093fb;
+            --events-accent: #f6d365;
+            --events-danger: #ff6b6b;
+            --events-success: #4ecdc4;
+            --events-gray-50: #f8fafc;
+            --events-gray-100: #f1f5f9;
+            --events-gray-200: #e2e8f0;
+            --events-gray-300: #cbd5e0;
+            --events-gray-500: #64748b;
+            --events-gray-600: #475569;
+            --events-gray-700: #334155;
+            --events-gray-800: #1e293b;
+            --events-gray-900: #0f172a;
             --events-white: #ffffff;
         }
 
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background-color: var(--events-gray-50);
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
             color: var(--events-gray-800);
             line-height: 1.6;
         }
 
-        /* Header Section */
+        /* Header Section - Simplifié */
         .events-header {
-            background: linear-gradient(135deg, var(--events-primary) 0%, var(--events-primary-dark) 100%);
+            background: transparent;
             color: var(--events-white);
-            padding: 4rem 0 2rem;
+            padding: 2rem 0 1rem;
             text-align: center;
         }
 
         .events-title {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
+            font-size: 2.2rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
         }
 
         .events-subtitle {
-            font-size: 1.1rem;
-            opacity: 0.9;
-            max-width: 600px;
-            margin: 0 auto;
+            display: none; /* Caché car on va le mettre en bas */
         }
 
         /* Filters */
         .events-filters {
-            background: var(--events-white);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(15px);
             padding: 2rem 0;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
         }
 
         .events-filter-tabs {
@@ -108,199 +111,293 @@ function estBientot($date) {
         .events-filter-tab {
             padding: 0.75rem 1.5rem;
             border: 2px solid var(--events-gray-200);
-            border-radius: 25px;
+            border-radius: 50px;
             background: var(--events-white);
             color: var(--events-gray-600);
             text-decoration: none;
             font-weight: 500;
-            transition: all 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
 
         .events-filter-tab:hover,
         .events-filter-tab.events-active {
-            background: var(--events-primary);
+            background: linear-gradient(135deg, var(--events-primary), var(--events-primary-dark));
             border-color: var(--events-primary);
             color: var(--events-white);
             text-decoration: none;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
         }
 
         /* Main Content */
         .events-main {
-            padding: 3rem 0;
+            padding: 3rem 0 2rem;
         }
 
         .events-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-            gap: 2rem;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 3rem;
+            max-width: 1200px;
+            margin: 0 auto;
         }
 
+        /* Circular Event Cards */
         .events-card {
-            background: var(--events-white);
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
-            overflow: hidden;
-            transition: all 0.3s ease;
-            border: 1px solid var(--events-gray-100);
+            position: relative;
+            width: 280px;
+            height: 350px; /* Augmenté pour les boutons */
+            margin: 0 auto;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .events-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-        }
-
-        .events-image {
-            height: 200px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .events-image img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transition: transform 0.3s ease;
-        }
-
-        .events-card:hover .events-image img {
             transform: scale(1.05);
         }
 
-        .events-placeholder {
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, var(--events-primary), var(--events-secondary));
+        .events-circle {
+            width: 280px;
+            height: 280px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--events-white) 0%, #f8fafc 100%);
+            box-shadow: 
+                0 20px 40px rgba(0, 0, 0, 0.1),
+                0 10px 20px rgba(0, 0, 0, 0.05),
+                inset 0 -2px 10px rgba(0, 0, 0, 0.05);
+            position: relative;
+            overflow: hidden;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            color: var(--events-white);
+            text-align: center;
+            padding: 2rem;
+            cursor: pointer;
         }
 
-        .events-date-badge {
+        .events-circle::before {
+            content: '';
             position: absolute;
-            top: 1rem;
-            left: 1rem;
-            background: var(--events-white);
-            border-radius: 8px;
-            padding: 0.5rem;
-            text-align: center;
-            min-width: 60px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, 
+                transparent 30%, 
+                rgba(255, 255, 255, 0.1) 50%, 
+                transparent 70%);
+            transform: rotate(45deg);
+            transition: all 0.6s ease;
+            opacity: 0;
+        }
+
+        .events-card:hover .events-circle::before {
+            opacity: 1;
+            animation: shine 1.5s ease-in-out;
+        }
+
+        @keyframes shine {
+            0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+        }
+
+        /* Date Badge Circulaire */
+        .events-date-circle {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--events-primary), var(--events-primary-dark));
+            color: var(--events-white);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+            z-index: 2;
         }
 
         .events-date-day {
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: var(--events-gray-900);
+            font-size: 1.1rem;
             line-height: 1;
         }
 
         .events-date-month {
-            font-size: 0.75rem;
-            color: var(--events-gray-500);
-            text-transform: uppercase;
+            font-size: 0.7rem;
+            opacity: 0.9;
         }
 
+        /* Soon Badge */
         .events-soon-badge {
             position: absolute;
-            top: 1rem;
-            right: 1rem;
-            background: var(--events-accent);
-            color: var(--events-white);
-            padding: 0.25rem 0.75rem;
-            border-radius: 15px;
+            top: 15px;
+            left: 15px;
+            background: linear-gradient(135deg, var(--events-accent), #ffd89b);
+            color: var(--events-gray-800);
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
             font-size: 0.75rem;
             font-weight: 600;
+            box-shadow: 0 4px 15px rgba(246, 211, 101, 0.4);
+            z-index: 2;
         }
 
+        /* Event Content */
         .events-content {
-            padding: 1.5rem;
+            z-index: 1;
+            position: relative;
+            width: 100%;
+        }
+
+        .events-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--events-primary), var(--events-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
         }
 
         .events-card-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 0.8rem;
             color: var(--events-gray-900);
+            line-height: 1.3;
+            max-height: 2.6rem;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
         }
 
-        .events-meta {
+        .events-meta-circle {
             margin-bottom: 1rem;
         }
 
         .events-meta-item {
             display: flex;
             align-items: center;
+            justify-content: center;
             color: var(--events-gray-600);
-            font-size: 0.9rem;
-            margin-bottom: 0.5rem;
+            font-size: 0.8rem;
+            margin-bottom: 0.3rem;
         }
 
         .events-meta-item i {
-            width: 16px;
-            margin-right: 0.5rem;
+            width: 14px;
+            margin-right: 0.4rem;
             color: var(--events-primary);
         }
 
-        .events-description {
-            color: var(--events-gray-600);
-            margin-bottom: 1.5rem;
-            display: -webkit-box;
-            -webkit-line-clamp: 3;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
+        /* Action Buttons - En dehors du cercle */
+        .events-actions {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 0.8rem;
+            justify-content: center;
+            width: 100%;
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .events-actions {
-            display: flex;
-            gap: 0.75rem;
+        .events-card:hover .events-actions {
+            opacity: 1;
+            transform: translateX(-50%) translateY(5px);
+        }
+
+        /* Supprimer l'ancien overlay */
+        .events-actions-overlay {
+            display: none;
         }
 
         .events-btn {
-            flex: 1;
-            padding: 0.75rem 1rem;
+            padding: 0.7rem 1.5rem;
             border: none;
-            border-radius: 8px;
-            font-weight: 500;
+            border-radius: 25px;
+            font-weight: 600;
             text-decoration: none;
             text-align: center;
             transition: all 0.3s ease;
             cursor: pointer;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
         }
 
         .events-btn-primary {
-            background: var(--events-primary);
+            background: linear-gradient(135deg, var(--events-primary), var(--events-primary-dark));
             color: var(--events-white);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
         }
 
         .events-btn-primary:hover {
-            background: var(--events-primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
             color: var(--events-white);
         }
 
         .events-btn-secondary {
-            background: var(--events-secondary);
+            background: linear-gradient(135deg, var(--events-success), #26d0ce);
             color: var(--events-white);
+            box-shadow: 0 4px 15px rgba(78, 205, 196, 0.3);
         }
 
         .events-btn-secondary:hover {
-            background: #059669;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(78, 205, 196, 0.4);
             color: var(--events-white);
         }
 
-        /* Empty State */
+        /* Footer avec le texte déplacé */
+        .events-footer {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            color: var(--events-white);
+            padding: 3rem 0;
+            text-align: center;
+            margin-top: 4rem;
+        }
+
+        .events-footer-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 0.8rem;
+        }
+
+        .events-footer-text {
+            font-size: 1rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+        }
         .events-empty {
             text-align: center;
             padding: 4rem 2rem;
-            background: var(--events-white);
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(15px);
+            border-radius: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            margin: 0 auto;
         }
 
         .events-empty i {
-            font-size: 3rem;
-            color: var(--events-gray-300);
-            margin-bottom: 1rem;
+            font-size: 4rem;
+            background: linear-gradient(135deg, var(--events-gray-300), var(--events-gray-400));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 2rem;
         }
 
         .events-empty h3 {
@@ -320,10 +417,10 @@ function estBientot($date) {
         }
 
         .events-spinner {
-            width: 2rem;
-            height: 2rem;
-            border: 3px solid var(--events-gray-200);
-            border-top: 3px solid var(--events-primary);
+            width: 3rem;
+            height: 3rem;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid var(--events-white);
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin: 0 auto 1rem;
@@ -336,14 +433,15 @@ function estBientot($date) {
 
         /* Modal */
         .events-modal-header {
-            background: var(--events-primary);
+            background: linear-gradient(135deg, var(--events-primary), var(--events-primary-dark));
             color: var(--events-white);
         }
 
         .events-modal-content {
             border: none;
-            border-radius: 12px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
         }
 
         /* Responsive */
@@ -353,16 +451,31 @@ function estBientot($date) {
             }
             
             .events-grid {
-                grid-template-columns: 1fr;
-                gap: 1.5rem;
+                grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+                gap: 2rem;
+                padding: 0 1rem;
             }
             
-            .events-actions {
-                flex-direction: column;
+            .events-card {
+                width: 240px;
+                height: 240px;
+            }
+            
+            .events-circle {
+                padding: 1.5rem;
+            }
+            
+            .events-icon {
+                font-size: 2rem;
+            }
+            
+            .events-card-title {
+                font-size: 1rem;
             }
             
             .events-filter-tabs {
                 gap: 0.5rem;
+                padding: 0 1rem;
             }
             
             .events-filter-tab {
@@ -372,60 +485,67 @@ function estBientot($date) {
         }
 
         .events-fade-in {
-            animation: fadeIn 0.5s ease-in;
+            animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+        @keyframes fadeInUp {
+            from { 
+                opacity: 0; 
+                transform: translateY(30px) scale(0.95); 
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0) scale(1); 
+            }
         }
 
         .events-hidden {
             display: none !important;
+        }
+
+        /* Gradient overlay for better text readability */
+        .events-circle::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at center, transparent 60%, rgba(0, 0, 0, 0.02) 100%);
+            border-radius: 50%;
+            pointer-events: none;
         }
     </style>
 </head>
 <body>
     
     <!-- Header -->
-    <header class="events-header">
+    <header >
+           <sction class="events-footer">
         <div class="container">
             <div class="row justify-content-center">
                 <div class="col-lg-8" data-aos="fade-up">
-                    <i class="fas fa-calendar-star fa-3x mb-3"></i>
-                    <h1 class="events-title">Événements à venir</h1>
-                    <p class="events-subtitle">
-                        Découvrez nos prochains événements et réservez votre place
+                    <h2 class="events-footer-title">Découvrez nos événements</h2>
+                    <p class="events-footer-text">
+                        Participez à nos prochains événements et vivez des moments inoubliables. 
+                        Réservez votre place dès maintenant !
                     </p>
                 </div>
             </div>
         </div>
-    </header>
-
-    <!-- Filters -->
-    <section class="events-filters">
-        <div class="container">
-            <div class="events-filter-tabs" data-aos="fade-up" data-aos-delay="200">
-                <a href="#" class="events-filter-tab events-active" data-filter="all">
-                    <i class="fas fa-calendar-alt me-2"></i>Tous
-                </a>
-                <a href="#" class="events-filter-tab" data-filter="soon">
-                    <i class="fas fa-clock me-2"></i>Bientôt
-                </a>
-                <a href="#" class="events-filter-tab" data-filter="this-month">
-                    <i class="fas fa-calendar-month me-2"></i>Ce mois-ci
-                </a>
-            </div>
-        </div>
     </section>
 
+    </header>
+
+    
+ 
     <!-- Main Content -->
     <section class="events-main">
         <div class="container">
             <!-- Loading -->
             <div class="events-loading">
                 <div class="events-spinner"></div>
-                <p class="text-muted">Chargement...</p>
+                <p class="text-white">Chargement...</p>
             </div>
 
             <?php if (empty($evenements)): ?>
@@ -444,23 +564,30 @@ function estBientot($date) {
                         $estBientot = estBientot($evenement['date_evenement']);
                         $dateObj = new DateTime($evenement['date_evenement']);
                         $thisMonth = $dateObj->format('Y-m') === date('Y-m');
+                        
+                        // Déterminer l'icône basée sur le titre ou le type d'événement
+                        $icon = 'fa-calendar-alt';
+                        $titre_lower = strtolower($evenement['titre']);
+                        if (strpos($titre_lower, 'concert') !== false || strpos($titre_lower, 'musique') !== false) {
+                            $icon = 'fa-music';
+                        } elseif (strpos($titre_lower, 'formation') !== false || strpos($titre_lower, 'atelier') !== false) {
+                            $icon = 'fa-graduation-cap';
+                        } elseif (strpos($titre_lower, 'conférence') !== false) {
+                            $icon = 'fa-microphone';
+                        } elseif (strpos($titre_lower, 'sport') !== false) {
+                            $icon = 'fa-running';
+                        } elseif (strpos($titre_lower, 'exposition') !== false) {
+                            $icon = 'fa-palette';
+                        }
                         ?>
                         <div class="events-card-wrapper events-fade-in" 
-                             data-aos="fade-up" 
+                             data-aos="zoom-in" 
                              data-aos-delay="<?= 300 + ($index * 100) ?>"
                              data-category="<?= $estBientot ? 'soon' : '' ?> <?= $thisMonth ? 'this-month' : '' ?>">
                             <div class="events-card">
-                                <div class="events-image">
-                                    <?php if ($evenement['image'] && file_exists("admin/uploads/evenements/" . $evenement['image'])): ?>
-                                        <img src="admin/uploads/evenements/<?= htmlspecialchars($evenement['image']) ?>" 
-                                             alt="<?= htmlspecialchars($evenement['titre']) ?>">
-                                    <?php else: ?>
-                                        <div class="events-placeholder">
-                                            <i class="fas fa-calendar-alt fa-3x"></i>
-                                        </div>
-                                    <?php endif; ?>
+                                <div class="events-circle" onclick="voirPlus(<?= $evenement['id'] ?>)">
                                     
-                                    <div class="events-date-badge">
+                                    <div class="events-date-circle">
                                         <div class="events-date-day">
                                             <?= date('d', strtotime($evenement['date_evenement'])) ?>
                                         </div>
@@ -471,45 +598,40 @@ function estBientot($date) {
                                     
                                     <?php if ($estBientot): ?>
                                         <div class="events-soon-badge">
-                                            Bientôt
+                                            <i class="fas fa-bolt me-1"></i>Bientôt
                                         </div>
                                     <?php endif; ?>
+                                    
+                                    <div class="events-content">
+                                        <div class="events-icon">
+                                            <i class="fas <?= $icon ?>"></i>
+                                        </div>
+                                        
+                                        <h3 class="events-card-title">
+                                            <?= htmlspecialchars($evenement['titre']) ?>
+                                        </h3>
+                                        
+                                        <div class="events-meta-circle">
+                                            <div class="events-meta-item">
+                                                <i class="fas fa-clock"></i>
+                                                <?= date('H:i', strtotime($evenement['heure_evenement'])) ?>
+                                            </div>
+                                            <div class="events-meta-item">
+                                                <i class="fas fa-map-marker-alt"></i>
+                                                <?= htmlspecialchars(substr($evenement['lieu'], 0, 20) . (strlen($evenement['lieu']) > 20 ? '...' : '')) ?>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 
-                                <div class="events-content">
-                                    <h3 class="events-card-title">
-                                        <?= htmlspecialchars($evenement['titre']) ?>
-                                    </h3>
-                                    
-                                    <div class="events-meta">
-                                        <div class="events-meta-item">
-                                            <i class="fas fa-calendar-alt"></i>
-                                            <?= formatDateFr($evenement['date_evenement']) ?>
-                                        </div>
-                                        <div class="events-meta-item">
-                                            <i class="fas fa-clock"></i>
-                                            <?= date('H:i', strtotime($evenement['heure_evenement'])) ?>
-                                        </div>
-                                        <div class="events-meta-item">
-                                            <i class="fas fa-map-marker-alt"></i>
-                                            <?= htmlspecialchars($evenement['lieu']) ?>
-                                        </div>
-                                    </div>
-                                    
-                                    <?php if ($evenement['description']): ?>
-                                        <p class="events-description">
-                                            <?= htmlspecialchars($evenement['description']) ?>
-                                        </p>
-                                    <?php endif; ?>
-                                    
-                                    <div class="events-actions">
-                                        <button class="events-btn events-btn-primary" onclick="voirPlus(<?= $evenement['id'] ?>)">
-                                            <i class="fas fa-eye me-2"></i>Voir plus
-                                        </button>
-                                        <button class="events-btn events-btn-secondary" onclick="reserver(<?= $evenement['id'] ?>)">
-                                            <i class="fas fa-ticket-alt me-2"></i>Réserver
-                                        </button>
-                                    </div>
+                                <!-- Boutons à l'extérieur du cercle -->
+                                <div class="events-actions">
+                                    <button class="events-btn events-btn-primary" onclick="voirPlus(<?= $evenement['id'] ?>)">
+                                        <i class="fas fa-eye"></i>Voir plus
+                                    </button>
+                                    <button class="events-btn events-btn-secondary" onclick="reserver(<?= $evenement['id'] ?>)">
+                                        <i class="fas fa-ticket-alt"></i>Réserver
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -546,7 +668,7 @@ function estBientot($date) {
     <div class="modal fade" id="reservationModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content events-modal-content">
-                <div class="modal-header" style="background: var(--events-secondary);">
+                <div class="modal-header" style="background: linear-gradient(135deg, var(--events-success), #26d0ce);">
                     <h5 class="modal-title text-white">
                         <i class="fas fa-ticket-alt me-2"></i>Réservation
                     </h5>
@@ -580,8 +702,8 @@ function estBientot($date) {
     <script>
         // Initialisation AOS
         AOS.init({
-            duration: 600,
-            easing: 'ease-out',
+            duration: 800,
+            easing: 'ease-out-cubic',
             once: true
         });
 
@@ -718,6 +840,21 @@ function estBientot($date) {
                 })
                 .catch(error => console.log('Erreur:', error));
         }, 300000);
+
+        // Animation supplémentaire au survol des cercles
+        document.addEventListener('DOMContentLoaded', function() {
+            const circles = document.querySelectorAll('.events-circle');
+            
+            circles.forEach(circle => {
+                circle.addEventListener('mouseenter', function() {
+                    this.style.transform = 'scale(1.02)';
+                });
+                
+                circle.addEventListener('mouseleave', function() {
+                    this.style.transform = 'scale(1)';
+                });
+            });
+        });
     </script>
 </body>
 </html>

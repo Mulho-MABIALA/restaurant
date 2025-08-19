@@ -71,7 +71,7 @@ if (!empty($personnes_filter)) {
 }
 
 // Récupération paginée
-$queryWithLimit = $query . " ORDER BY date_envoi DESC, id DESC";
+$queryWithLimit = $query . " ORDER BY date_envoi ASC, id ASC";
 $stmt = $conn->prepare($queryWithLimit);
 $stmt->execute($params);
 $reservations = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -407,7 +407,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
         <td class="px-6 py-4 whitespace-nowrap">
           <div class="flex items-center">
             <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-              <span class="text-white text-xs font-bold"><?= $res['id'] ?></span>
+              <span class="text-white text-xs font-bold"><?= $index + 1 ?></span>
             </div>
           </div>
         </td>

@@ -49,31 +49,26 @@ function afficherAnnonces($type = 'site', $position = 'top') {
         default => 'annonces-top',
     };
     
-    echo '<div class="annonces-container ' . $css_class . '">';
-    
-    foreach ($annonces as $annonce) {
-        $couleur = htmlspecialchars($annonce['couleur']);
-        $titre = htmlspecialchars($annonce['titre']);
-        $contenu = htmlspecialchars($annonce['contenu']);
+   foreach ($annonces as $annonce) {
+        // Extraire uniquement le texte sans formatage
+        $contenu = strip_tags($annonce['contenu']);
+        $contenu = str_replace(["\r", "\n"], ' ', $contenu);
+        $contenu = preg_replace('/\s+/', ' ', $contenu);
         
-        echo '<div class="annonce-banner" style="background-color: ' . $couleur . '20; border-left: 4px solid ' . $couleur . ';">';
-        echo '<div class="annonce-content">';
-        echo '<h5 class="annonce-titre" style="color: ' . $couleur . ';">';
-        echo '<i class="fas fa-bullhorn"></i> ' . $titre;
-        echo '</h5>';
-        echo '<p class="annonce-texte">' . nl2br($contenu) . '</p>';
-        echo '</div>';
-        echo '<button class="annonce-fermer" onclick="fermerAnnonce(this)">';
-        echo '<i class="fas fa-times"></i>';
-        echo '</button>';
-        echo '</div>';
+        // Limiter la longueur si nécessaire
+        if (strlen($contenu) > 150) {
+            $contenu = substr($contenu, 0, 147) . '...';
+        }
+        
+        echo '<div class="annonce">' . htmlspecialchars($contenu) . '</div>';
     }
-    
-    echo '</div>';
-    
+
+   
+     echo '</div>';
     // Ajout du CSS et JS
     echo '<style>
     /* ... ton CSS ici ... */
+    
     </style>';
 
     echo '<script>
@@ -129,8 +124,8 @@ function afficherNotificationAnnonces($type = 'site') {
         $texte = $urgent ? 'Annonce importante' : 'Information';
         
         echo '<div class="alert ' . $class . ' alert-dismissible fade show" role="alert">';
-        echo '<i class="fas ' . $icon . '"></i> ';
-        echo '<strong>' . $texte . '</strong> - Consultez nos annonces ci-dessous.';
+       // echo '<i class="fas ' . $icon . '"></i> ';
+        //echo '<strong>' . $texte . '</strong> - Consultez nos annonces ci-dessous.';
         echo '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
         echo '</div>';
     }
