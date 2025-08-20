@@ -21,28 +21,6 @@ $stmt = $conn->query("
         COALESCE(a.last_login, 'Jamais') as last_login_display,
         CASE WHEN a.status = 1 THEN 'Actif' ELSE 'Inactif' END as status_display
     FROM admin a
-    
-    UNION ALL
-    
-    SELECT 
-        CONCAT('emp_', e.id) as id,
-        CONCAT(e.prenom, '.', e.nom) as username,
-        e.email,
-        'admin' as role,
-        CASE WHEN e.statut = 'actif' THEN 1 ELSE 0 END as status,
-        NULL as last_login,
-        e.date_embauche as created_at,
-        'employee_table' as source,
-        e.id as employee_id,
-        'Jamais connecté' as last_login_display,
-        CASE 
-            WHEN e.statut = 'actif' THEN 'Actif (Employé)' 
-            ELSE 'Inactif (Employé)' 
-        END as status_display
-    FROM employes e 
-    WHERE e.is_admin = 1
-    AND e.email NOT IN (SELECT email FROM admin WHERE email IS NOT NULL)
-    
     ORDER BY created_at DESC
 ");
 $admins = $stmt->fetchAll();
@@ -53,10 +31,8 @@ $stats = [
     'super_admin' => count(array_filter($admins, fn($a) => $a['role'] === 'super_admin')),
     'admin' => count(array_filter($admins, fn($a) => $a['role'] === 'admin')),
     'active' => count(array_filter($admins, fn($a) => $a['status'] == 1)),
-    'inactive' => count(array_filter($admins, fn($a) => $a['status'] != 1)),
-    'from_employees' => count(array_filter($admins, fn($a) => $a['source'] === 'employee_table'))
+    'inactive' => count(array_filter($admins, fn($a) => $a['status'] != 1))
 ];
-
 
 // Gestion des actions AJAX
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
@@ -184,7 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             <div class="p-6">
                 <div class="max-w-7xl mx-auto">
                     <!-- Statistiques -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                         <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl shadow-lg border border-blue-200 p-6 text-white transform hover:scale-105 transition-all duration-300">
                             <div class="flex items-center justify-between">
                                 <div>
@@ -245,22 +221,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                                 </div>
                                 <div class="bg-white bg-opacity-20 rounded-full p-4">
                                     <i class="fas fa-check-circle text-2xl"></i>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="bg-gradient-to-r from-red-500 to-red-600 rounded-xl shadow-lg border border-red-200 p-6 text-white transform hover:scale-105 transition-all duration-300">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-red-100 text-sm font-medium">Comptes Inactifs</p>
-                                    <p class="text-3xl font-bold mt-1"><?= $stats['inactive'] ?></p>
-                                    <p class="text-red-200 text-xs mt-1">
-                                        <i class="fas fa-exclamation-triangle mr-1"></i>
-                                        Nécessitent attention
-                                    </p>
-                                </div>
-                                <div class="bg-white bg-opacity-20 rounded-full p-4">
-                                    <i class="fas fa-times-circle text-2xl"></i>
                                 </div>
                             </div>
                         </div>
@@ -535,36 +495,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                                                     </span>
                                                 </div>
                                             </td>
-                                           <td class="py-4 px-6">
-    <div class="flex items-center space-x-4">
-        <div class="relative">
-            <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center ring-2 ring-blue-100">
-                <span class="text-white font-bold text-sm">
-                    <?= strtoupper(substr(htmlspecialchars($admin['username']), 0, 1)) ?>
-                </span>
-            </div>
-            <?php if ($admin['source'] === 'employee_table'): ?>
-                <div class="absolute -top-1 -right-1 w-4 h-4 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center" title="Compte employé">
-                    <i class="fas fa-user text-white text-xs"></i>
-                </div>
-            <?php endif; ?>
-        </div>
-        <div>
-            <div class="font-semibold text-slate-800 flex items-center">
-                <?= htmlspecialchars($admin['username']) ?>
-                <?php if ($admin['source'] === 'employee_table'): ?>
-                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                        <i class="fas fa-user-friends mr-1"></i>
-                        Employé-Admin
-                    </span>
-                <?php endif; ?>
-            </div>
-            <div class="text-sm text-slate-500">
-                <?= $admin['source'] === 'employee_table' ? 'Employé ID: ' . $admin['employee_id'] : 'Admin ID: ' . $admin['id'] ?>
-            </div>
-        </div>
-    </div>
-</td>
+                                            <td class="py-4 px-6">
+                                                <div class="flex items-center space-x-4">
+                                                    <div class="relative">
+                                                        <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center ring-2 ring-blue-100">
+                                                            <span class="text-white font-bold text-sm">
+                                                                <?= strtoupper(substr(htmlspecialchars($admin['username']), 0, 1)) ?>
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <div class="font-semibold text-slate-800 flex items-center">
+                                                            <?= htmlspecialchars($admin['username']) ?>
+                                                        </div>
+                                                        <div class="text-sm text-slate-500">
+                                                            Admin ID: <?= $admin['id'] ?>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </td>
                                             <td class="py-4 px-6">
                                                 <div class="flex items-center space-x-2">
                                                     <i class="fas fa-envelope text-slate-400 text-sm"></i>
@@ -733,10 +682,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                                     </div>
                                 <?php endforeach; ?>
                             </div>
-                 
-                                                 
-                                </tbody>
-                            </table>
                         </div>
                         
                         <?php if (empty($admins)): ?>
@@ -765,7 +710,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         
                         <div class="text-sm text-slate-500">
                             <i class="fas fa-info-circle mr-1"></i>
-                            <span id="resultCount">Total: <?= count($admins) ?> administrateur(s)</span>
+                            <span id="footerResultCount">Total: <?= count($admins) ?> administrateur(s)</span>
                         </div>
                     </div>
                 </div>
@@ -1088,6 +1033,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 <i class="fas fa-search mr-1"></i>
                 Affichage: ${visibleCount} administrateur(s)
             `;
+            
+            document.getElementById('footerResultCount').textContent = `Total: ${visibleCount} administrateur(s)`;
         }
 
         // Nouvelles fonctions ajoutées
@@ -1206,37 +1153,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             searchInput.addEventListener('input', filterTable);
             roleFilter.addEventListener('change', filterTable);
             statusFilter.addEventListener('change', filterTable);
-        }
-
-        // Filtrage du tableau
-        function filterTable() {
-            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-            const roleFilter = document.getElementById('roleFilter').value;
-            const statusFilter = document.getElementById('statusFilter').value;
-            const rows = document.querySelectorAll('.admin-row');
-            let visibleCount = 0;
-
-            rows.forEach(row => {
-                const username = row.dataset.username;
-                const email = row.dataset.email;
-                const role = row.dataset.role;
-                const status = row.dataset.status;
-
-                const matchesSearch = !searchTerm || 
-                    username.includes(searchTerm) || 
-                    email.includes(searchTerm);
-                const matchesRole = !roleFilter || role === roleFilter;
-                const matchesStatus = !statusFilter || status === statusFilter;
-
-                if (matchesSearch && matchesRole && matchesStatus) {
-                    row.style.display = '';
-                    visibleCount++;
-                } else {
-                    row.style.display = 'none';
-                }
-            });
-
-            document.getElementById('resultCount').textContent = `Affichage: ${visibleCount} administrateur(s)`;
         }
 
         // Tri du tableau
@@ -1557,4 +1473,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     </script>
 </body>
-</html>
+</html> 

@@ -1,567 +1,841 @@
 <?php
-// Fonctions utilitaires (à placer avant le switch)
-function generateNumericCode($employee_id, $conn) {
-    // Approche plus robuste pour le code unique
-    $max_attempts = 10;
-    $attempt = 0;
+/**
+ * Système de Gestion des Employés - Restaurant
+ * Version: 2.1 - Améliorée avec intégration complète des postes
+ * Auteur: Restaurant Management System
+ * Description: Interface complète de gestion des employés avec génération de bulletins de paie
+ */
+
+// =============================================================================
+// CONFIGURATION ET INCLUDES
+// =============================================================================
+require_once '../config.php';
+require_once 'phpqrcode/qrlib.php';
+
+// =============================================================================
+// CLASSES UTILITAIRES
+// =============================================================================
+
+class EmployeeManager {
+    private $conn;
     
-    do {
-        // Format: YYYYMMDD + ID sur 4 chiffres + 2 chiffres aléatoires
-        $date_prefix = date('Ymd'); // 20241217 par exemple
-        $id_part = str_pad($employee_id, 4, '0', STR_PAD_LEFT);
-        $random_part = str_pad(rand(10, 99), 2, '0', STR_PAD_LEFT);
+    public function __construct(PDO $connection) {
+        $this->conn = $connection;
+    }
+    
+    /**
+     * Récupère tous les employés avec leurs informations complètes incluant les détails du poste
+     */
+    public function getAllEmployees(): array {
+        $stmt = $this->conn->query("
+            SELECT e.*, 
+                   p.nom as poste_nom,
+                   p.couleur as poste_couleur,
+                   p.salaire as poste_salaire,
+                   p.type_contrat,
+                   p.duree_contrat,
+                   p.niveau_hierarchique,
+                   p.competences_requises,
+                   p.avantages,
+                   p.code_paie,
+                   p.categorie_paie,
+                   p.regime_social,
+                   p.taux_cotisation,
+                   p.salaire_min,
+                   p.salaire_max,
+                   ps.nom as poste_superieur_nom
+            FROM employes e 
+            LEFT JOIN postes p ON e.poste_id = p.id 
+            LEFT JOIN postes ps ON p.poste_superieur_id = ps.id
+            ORDER BY e.nom, e.prenom
+        ");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    
+    /**
+     * Récupère un employé par son ID avec toutes ses informations
+     */
+    public function getEmployeeById(int $id): ?array {
+        $stmt = $this->conn->prepare("
+            SELECT e.*, 
+                   p.nom as poste_nom,
+                   p.couleur as poste_couleur,
+                   p.salaire as poste_salaire,
+                   p.type_contrat,
+                   p.duree_contrat,
+                   p.niveau_hierarchique,
+                   p.competences_requises,
+                   p.avantages,
+                   p.code_paie,
+                   p.categorie_paie,
+                   p.regime_social,
+                   p.taux_cotisation,
+                   p.salaire_min,
+                   p.salaire_max
+            FROM employes e 
+            LEFT JOIN postes p ON e.poste_id = p.id 
+            WHERE e.id = ?
+        ");
+        $stmt->execute([$id]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ?: null;
+    }
+    
+    /**
+     * Récupère les statistiques des employés
+     */
+    public function getStatistics(): array {
+        $stats = [];
         
-        $numeric_code = $date_prefix . $id_part . $random_part;
+        // Total employés actifs
+        $stmt = $this->conn->query("SELECT COUNT(*) as total FROM employes WHERE statut = 'actif'");
+        $stats['total_actifs'] = $stmt->fetch()['total'];
         
-        // Vérifier l'unicité
-        $stmt = $conn->prepare("SELECT id FROM employes WHERE code_numerique = ?");
-        $stmt->execute([$numeric_code]);
+        // Présents aujourd'hui (employés actifs)
+        $stats['presents_aujourd_hui'] = $stats['total_actifs'];
         
-        if (!$stmt->fetch()) {
-            return $numeric_code; // Code unique trouvé
+        // Nouveaux ce mois
+        $stmt = $this->conn->query("SELECT COUNT(*) as total FROM employes WHERE DATE_FORMAT(date_embauche, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')");
+        $stats['nouveaux_ce_mois'] = $stmt->fetch()['total'];
+        
+        // Total administrateurs
+        $stmt = $this->conn->query("SELECT COUNT(*) as total FROM employes WHERE is_admin = 1 AND statut != 'inactif'");
+        $stats['total_admins'] = $stmt->fetch()['total'];
+        
+        // Statistiques par type de contrat
+        $stmt = $this->conn->query("
+            SELECT p.type_contrat, COUNT(e.id) as count 
+            FROM employes e 
+            JOIN postes p ON e.poste_id = p.id 
+            WHERE e.statut = 'actif' 
+            GROUP BY p.type_contrat
+        ");
+        $stats['par_contrat'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        return $stats;
+    }
+    
+    /**
+     * Ajoute un nouvel employé
+     */
+    public function addEmployee(array $data): array {
+        try {
+            // Validation des champs requis
+            $this->validateRequiredFields($data, ['nom', 'prenom', 'email', 'date_embauche']);
+            
+            // Vérifier l'unicité de l'email
+            $this->checkEmailUniqueness($data['email']);
+            
+            // Gestion de l'upload de photo
+            $photo_filename = $this->handlePhotoUpload();
+            
+            // Insertion de l'employé
+            $employee_id = $this->insertEmployee($data, $photo_filename);
+            
+            // Génération du QR Code
+            $numeric_code = $this->generateAndSaveQRCode($employee_id, $data);
+            
+            // Log de l'activité
+            $this->logActivity('CREATE_EMPLOYEE', 'employes', $employee_id, [
+                'nom' => $data['nom'], 
+                'prenom' => $data['prenom'],
+                'code_numerique' => $numeric_code
+            ]);
+            
+            return [
+                'success' => true,
+                'message' => 'Employé ajouté avec succès',
+                'employee_id' => $employee_id,
+                'numeric_code' => $numeric_code
+            ];
+            
+        } catch (Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+    
+    /**
+     * Met à jour un employé existant
+     */
+    public function updateEmployee(array $data): array {
+        try {
+            if (empty($data['id'])) {
+                throw new Exception('ID employé requis');
+            }
+            
+            $employee_id = $data['id'];
+            $current_employee = $this->getEmployeeById($employee_id);
+            
+            if (!$current_employee) {
+                throw new Exception('Employé non trouvé');
+            }
+            
+            // Vérifier l'unicité de l'email (sauf pour l'employé actuel)
+            $this->checkEmailUniqueness($data['email'], $employee_id);
+            
+            // Gestion de l'upload de photo
+            $photo_filename = $this->handlePhotoUpload($current_employee['photo']);
+            
+            // Mise à jour
+            $this->updateEmployeeData($employee_id, $data, $photo_filename);
+            
+            // Log de l'activité
+            $this->logActivity('UPDATE_EMPLOYEE', 'employes', $employee_id, [
+                'nom' => $data['nom'], 
+                'prenom' => $data['prenom']
+            ]);
+            
+            return ['success' => true, 'message' => 'Employé modifié avec succès'];
+            
+        } catch (Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+    
+    /**
+     * Désactive un employé
+     */
+    public function deactivateEmployee(int $employee_id): array {
+        try {
+            $stmt = $this->conn->prepare("UPDATE employes SET statut = 'inactif' WHERE id = ?");
+            $stmt->execute([$employee_id]);
+            
+            if ($stmt->rowCount() === 0) {
+                throw new Exception('Employé non trouvé');
+            }
+            
+            $this->logActivity('DEACTIVATE_EMPLOYEE', 'employes', $employee_id, ['statut' => 'inactif']);
+            
+            return ['success' => true, 'message' => 'Employé désactivé avec succès'];
+            
+        } catch (Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+    
+    // Méthodes privées utilitaires
+    private function validateRequiredFields(array $data, array $required_fields): void {
+        foreach ($required_fields as $field) {
+            if (empty($data[$field])) {
+                throw new Exception("Le champ $field est requis");
+            }
+        }
+    }
+    
+    private function checkEmailUniqueness(string $email, int $exclude_id = null): void {
+        $sql = "SELECT id FROM employes WHERE email = ? AND statut != 'inactif'";
+        $params = [$email];
+        
+        if ($exclude_id) {
+            $sql .= " AND id != ?";
+            $params[] = $exclude_id;
         }
         
-        $attempt++;
-    } while ($attempt < $max_attempts);
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($params);
+        
+        if ($stmt->fetch()) {
+            throw new Exception('Cet email est déjà utilisé par un autre employé actif');
+        }
+    }
     
-    // Fallback si aucun code unique trouvé (très improbable)
-    return $date_prefix . $id_part . str_pad(rand(100, 999), 3, '0', STR_PAD_LEFT);
+    private function handlePhotoUpload(string $current_photo = 'default-avatar.png'): string {
+        if (!isset($_FILES['photo']) || $_FILES['photo']['error'] !== UPLOAD_ERR_OK) {
+            return $current_photo;
+        }
+        
+        $upload_dir = 'uploads/photos/';
+        if (!is_dir($upload_dir)) {
+            mkdir($upload_dir, 0755, true);
+        }
+        
+        $file_ext = strtolower(pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION));
+        $allowed_exts = ['jpg', 'jpeg', 'png', 'gif'];
+        
+        if (!in_array($file_ext, $allowed_exts) || $_FILES['photo']['size'] > 5000000) {
+            throw new Exception('Format de photo non valide ou taille trop importante');
+        }
+        
+        $photo_filename = uniqid() . '.' . $file_ext;
+        $upload_path = $upload_dir . $photo_filename;
+        
+        if (!move_uploaded_file($_FILES['photo']['tmp_name'], $upload_path)) {
+            throw new Exception('Erreur lors de l\'upload de la photo');
+        }
+        
+        // Supprimer l'ancienne photo si ce n'est pas la photo par défaut
+        if ($current_photo !== 'default-avatar.png') {
+            $old_photo = $upload_dir . $current_photo;
+            if (file_exists($old_photo)) {
+                unlink($old_photo);
+            }
+        }
+        
+        return $photo_filename;
+    }
+    
+    private function insertEmployee(array $data, string $photo_filename): int {
+        $salaire = !empty($data['salaire']) ? (int) $data['salaire'] : null;
+        
+        $stmt = $this->conn->prepare("
+            INSERT INTO employes (nom, prenom, email, telephone, poste_id, salaire, date_embauche, 
+                                  heure_debut, heure_fin, photo, is_admin, statut) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        
+        $stmt->execute([
+            $data['nom'],
+            $data['prenom'],
+            $data['email'],
+            $data['telephone'] ?? null,
+            $data['poste_id'] ?? null,
+            $salaire,
+            $data['date_embauche'],
+            $data['heure_debut'] ?? '08:00:00',
+            $data['heure_fin'] ?? '17:00:00',
+            $photo_filename,
+            isset($data['is_admin']) ? 1 : 0,
+            $data['statut'] ?? 'actif'
+        ]);
+        
+        return $this->conn->lastInsertId();
+    }
+    
+    private function updateEmployeeData(int $employee_id, array $data, string $photo_filename): void {
+        $salaire = !empty($data['salaire']) ? (int) $data['salaire'] : null;
+        
+        $stmt = $this->conn->prepare("
+            UPDATE employes 
+            SET nom = ?, prenom = ?, email = ?, telephone = ?, poste_id = ?, salaire = ?, 
+                date_embauche = ?, heure_debut = ?, heure_fin = ?, photo = ?, 
+                is_admin = ?, statut = ?
+            WHERE id = ?
+        ");
+        
+        $stmt->execute([
+            $data['nom'],
+            $data['prenom'],
+            $data['email'],
+            $data['telephone'] ?? null,
+            $data['poste_id'] ?? null,
+            $salaire,
+            $data['date_embauche'],
+            $data['heure_debut'] ?? '08:00:00',
+            $data['heure_fin'] ?? '17:00:00',
+            $photo_filename,
+            isset($data['is_admin']) ? 1 : 0,
+            $data['statut'] ?? 'actif',
+            $employee_id
+        ]);
+    }
+    
+    private function generateAndSaveQRCode(int $employee_id, array $data): string {
+        $numeric_code = QRCodeGenerator::generateNumericCode($employee_id, $this->conn);
+        
+        $qr_data = json_encode([
+            'type' => 'employee_badge',
+            'id' => (int)$employee_id,
+            'code' => $numeric_code,
+            'nom' => trim($data['nom']),
+            'prenom' => trim($data['prenom']),
+            'email' => $data['email'],
+            'poste_id' => $data['poste_id'] ?? null,
+            'timestamp' => time(),
+            'version' => '1.0'
+        ], JSON_UNESCAPED_UNICODE);
+        
+        $qr_filename = QRCodeGenerator::generateQRCode($employee_id, $numeric_code, $qr_data);
+        
+        // Mise à jour avec le QR Code ET le code numérique
+        $stmt = $this->conn->prepare("UPDATE employes SET qr_code = ?, qr_data = ?, code_numerique = ? WHERE id = ?");
+        $stmt->execute([$qr_filename, $qr_data, $numeric_code, $employee_id]);
+        
+        return $numeric_code;
+    }
+    
+    private function logActivity(string $action, string $table, int $record_id, array $details): void {
+        $stmt = $this->conn->prepare("
+            INSERT INTO logs_activite (action, table_concernee, id_enregistrement, details) 
+            VALUES (?, ?, ?, ?)
+        ");
+        $stmt->execute([$action, $table, $record_id, json_encode($details)]);
+    }
 }
 
-function optimizeQRImage($source_path, $destination_path) {
-    if (!extension_loaded('gd')) {
-        return false;
+// =============================================================================
+// GESTIONNAIRE DE QR CODES
+// =============================================================================
+
+class QRCodeGenerator {
+    public static function generateNumericCode(int $employee_id, PDO $conn): string {
+        $max_attempts = 10;
+        $attempt = 0;
+        
+        do {
+            $date_prefix = date('Ymd');
+            $id_part = str_pad($employee_id, 4, '0', STR_PAD_LEFT);
+            $random_part = str_pad(rand(10, 99), 2, '0', STR_PAD_LEFT);
+            $numeric_code = $date_prefix . $id_part . $random_part;
+            
+            // Vérifier l'unicité
+            $stmt = $conn->prepare("SELECT id FROM employes WHERE code_numerique = ?");
+            $stmt->execute([$numeric_code]);
+            
+            if (!$stmt->fetch()) {
+                return $numeric_code;
+            }
+            
+            $attempt++;
+        } while ($attempt < $max_attempts);
+        
+        // Fallback
+        return $date_prefix . $id_part . str_pad(rand(100, 999), 3, '0', STR_PAD_LEFT);
     }
     
-    try {
-        // Charger l'image source
-        $source = imagecreatefrompng($source_path);
-        if (!$source) return false;
+    public static function generateQRCode(int $employee_id, string $numeric_code, string $qr_data): string {
+        $qr_dir = 'qrcodes/';
+        if (!is_dir($qr_dir)) {
+            mkdir($qr_dir, 0755, true);
+        }
         
-        $width = imagesx($source);
-        $height = imagesy($source);
+        $qr_filename = 'employee_' . $employee_id . '_' . $numeric_code . '.png';
+        $qr_path = $qr_dir . $qr_filename;
         
-        // Créer une nouvelle image avec une résolution plus élevée
-        $target_size = 400; // Taille cible en pixels
-        $new_image = imagecreatetruecolor($target_size, $target_size);
+        try {
+            QRcode::png($qr_data, $qr_path, QR_ECLEVEL_H, 10, 2);
+            
+            // Optimisation de l'image si GD est disponible
+            if (extension_loaded('gd')) {
+                self::optimizeQRImage($qr_path);
+            }
+            
+        } catch (Exception $e) {
+            error_log("Erreur génération QR: " . $e->getMessage());
+            QRcode::png($numeric_code, $qr_path, QR_ECLEVEL_M, 8, 2);
+        }
         
-        // Fond blanc
-        $white = imagecolorallocate($new_image, 255, 255, 255);
-        imagefill($new_image, 0, 0, $white);
-        
-        // Redimensionner avec une interpolation de haute qualité
-        imagecopyresampled(
-            $new_image, $source,
-            0, 0, 0, 0,
-            $target_size, $target_size,
-            $width, $height
-        );
-        
-        // Sauvegarder avec la meilleure qualité PNG
-        imagesavealpha($new_image, true);
-        imagepng($new_image, $destination_path, 0); // 0 = pas de compression
-        
-        // Libérer la mémoire
-        imagedestroy($source);
-        imagedestroy($new_image);
-        
-        return true;
-        
-    } catch (Exception $e) {
-        error_log("Erreur optimisation QR: " . $e->getMessage());
-        return false;
+        return $qr_filename;
+    }
+    
+    private static function optimizeQRImage(string $qr_path): void {
+        try {
+            $source = imagecreatefrompng($qr_path);
+            if (!$source) return;
+            
+            $width = imagesx($source);
+            $height = imagesy($source);
+            $target_size = 400;
+            
+            $new_image = imagecreatetruecolor($target_size, $target_size);
+            $white = imagecolorallocate($new_image, 255, 255, 255);
+            imagefill($new_image, 0, 0, $white);
+            
+            imagecopyresampled(
+                $new_image, $source,
+                0, 0, 0, 0,
+                $target_size, $target_size,
+                $width, $height
+            );
+            
+            imagesavealpha($new_image, true);
+            imagepng($new_image, $qr_path, 0);
+            
+            imagedestroy($source);
+            imagedestroy($new_image);
+            
+        } catch (Exception $e) {
+            error_log("Erreur optimisation QR: " . $e->getMessage());
+        }
     }
 }
+
+// =============================================================================
+// GESTIONNAIRE DE BULLETINS DE PAIE
+// =============================================================================
+
+class PayrollManager {
+    private $conn;
+    
+    public function __construct(PDO $connection) {
+        $this->conn = $connection;
+    }
+    
+    /**
+     * Calcule le salaire net d'un employé pour un mois donné
+     */
+    public function calculerSalaireNet(int $employe_id, string $mois_annee): array {
+        // Récupérer les données de l'employé et de son poste
+        $stmt = $this->conn->prepare("
+            SELECT e.*, p.salaire AS salaire_poste, p.taux_cotisation, p.categorie_paie, p.regime_social
+            FROM employes e
+            JOIN postes p ON e.poste_id = p.id
+            WHERE e.id = ?
+        ");
+        $stmt->execute([$employe_id]);
+        $data = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$data) {
+            throw new Exception("Employé ou poste non trouvé.");
+        }
+        
+        // Calculs de paie
+        $salaire_brut = $data['salaire_individuel'] ?? $data['salaire_poste'];
+        $salaire_brut += $data['primes_individuelles'];
+        
+        $retenues_absences = ($data['absences'] * $salaire_brut) / 30;
+        $salaire_brut_apres_absences = $salaire_brut - $retenues_absences;
+        
+        $taux_cotisations = $data['taux_cotisation'] + $data['cotisations_supplementaires'];
+        $cotisations = $salaire_brut_apres_absences * ($taux_cotisations / 100);
+        
+        $salaire_net = $salaire_brut_apres_absences - $cotisations - $data['retenues'];
+        
+        return [
+            'salaire_brut' => $salaire_brut,
+            'salaire_brut_apres_absences' => $salaire_brut_apres_absences,
+            'primes' => $data['primes_individuelles'],
+            'retenues_absences' => $retenues_absences,
+            'cotisations' => $cotisations,
+            'retenues_diverses' => $data['retenues'],
+            'salaire_net' => $salaire_net,
+            'mois_annee' => $mois_annee,
+            'employe_id' => $employe_id,
+            'poste_id' => $data['poste_id'],
+            'categorie_paie' => $data['categorie_paie'],
+            'regime_social' => $data['regime_social']
+        ];
+    }
+    
+    /**
+     * Génère un bulletin de paie en PDF
+     */
+    public function genererBulletinPaie(array $details): string {
+        require_once '../vendor/autoload.php';
+        
+        // Récupérer les données de l'employé
+        $stmt = $this->conn->prepare("
+            SELECT e.nom, e.prenom, p.nom AS poste_nom
+            FROM employes e
+            JOIN postes p ON e.poste_id = p.id
+            WHERE e.id = ?
+        ");
+        $stmt->execute([$details['employe_id']]);
+        $employe = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        // Créer le PDF
+        $pdf = new TCPDF();
+        $pdf->SetCreator('Système de Gestion RH');
+        $pdf->SetAuthor('Restaurant Management System');
+        $pdf->SetTitle('Bulletin de Paie - ' . $employe['nom'] . ' ' . $employe['prenom']);
+        $pdf->AddPage();
+        
+        // En-tête
+        $pdf->SetFont('helvetica', 'B', 16);
+        $pdf->Cell(0, 10, 'BULLETIN DE PAIE', 0, 1, 'C');
+        $pdf->Cell(0, 10, strtoupper($employe['nom'] . ' ' . $employe['prenom']), 0, 1, 'C');
+        $pdf->Cell(0, 10, 'Poste: ' . $employe['poste_nom'], 0, 1, 'C');
+        $pdf->Cell(0, 10, 'Mois: ' . date('F Y', strtotime($details['mois_annee'] . '-01')), 0, 1, 'C');
+        $pdf->Ln(10);
+        
+        // Détails du salaire
+        $pdf->SetFont('helvetica', 'B', 12);
+        $pdf->Cell(0, 8, 'DETAILS DU SALAIRE', 0, 1, 'L');
+        $pdf->SetFont('helvetica', '', 10);
+        
+        $lignes = [
+            ['Salaire brut de base:', $details['salaire_brut_apres_absences'] - $details['primes']],
+            ['Primes individuelles:', $details['primes']],
+            ['Retenues pour absences:', -$details['retenues_absences']],
+            ['Cotisations sociales:', -$details['cotisations']],
+            ['Autres retenues:', -$details['retenues_diverses']]
+        ];
+        
+        foreach ($lignes as $ligne) {
+            $pdf->Cell(100, 6, $ligne[0], 0, 0, 'L');
+            $montant = ($ligne[1] < 0 ? '-' : '') . number_format(abs($ligne[1]), 0, ',', ' ') . ' FCFA';
+            $pdf->Cell(0, 6, $montant, 0, 1, 'R');
+        }
+        
+        $pdf->Ln(5);
+        $pdf->SetFont('helvetica', 'B', 12);
+        $pdf->Cell(100, 8, 'SALAIRE NET A PAYER:', 0, 0, 'L');
+        $pdf->SetFont('helvetica', 'B', 14);
+        $pdf->SetTextColor(0, 128, 0);
+        $pdf->Cell(0, 8, number_format($details['salaire_net'], 0, ',', ' ') . ' FCFA', 0, 1, 'R');
+        $pdf->SetTextColor(0, 0, 0);
+        
+        return $pdf->Output('bulletin_' . $employe['nom'] . '_' . $details['mois_annee'] . '.pdf', 'S');
+    }
+    
+    /**
+     * Enregistre un bulletin de paie dans la base de données
+     */
+    public function enregistrerBulletinPaie(array $details): int {
+        $stmt = $this->conn->prepare("
+            INSERT INTO bulletins_paie
+            (employe_id, poste_id, mois_annee, salaire_brut, cotisations, salaire_net, primes, retenues, statut)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'valide')
+        ");
+        $stmt->execute([
+            $details['employe_id'],
+            $details['poste_id'],
+            $details['mois_annee'] . '-01',
+            $details['salaire_brut_apres_absences'],
+            $details['cotisations'],
+            $details['salaire_net'],
+            $details['primes'],
+            $details['retenues_absences'] + $details['retenues_diverses']
+        ]);
+        return $this->conn->lastInsertId();
+    }
+    
+    /**
+     * Génère les bulletins pour tous les employés actifs
+     */
+    public function genererBulletinsPourTous(string $mois_annee): array {
+        $resultats = [];
+        $stmt = $this->conn->prepare("SELECT id FROM employes WHERE statut = 'actif'");
+        $stmt->execute();
+        $employes = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        
+        foreach ($employes as $employe_id) {
+            try {
+                $details = $this->calculerSalaireNet($employe_id, $mois_annee);
+                $bulletin_id = $this->enregistrerBulletinPaie($details);
+                $resultats[$employe_id] = [
+                    'success' => true,
+                    'bulletin_id' => $bulletin_id,
+                    'salaire_net' => $details['salaire_net']
+                ];
+            } catch (Exception $e) {
+                $resultats[$employe_id] = [
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ];
+            }
+        }
+        
+        return $resultats;
+    }
+}
+
+// =============================================================================
+// GESTIONNAIRE DE POSTES - AMÉLIORÉ
+// =============================================================================
+
+class PosteManager {
+    private $conn;
+    
+    public function __construct(PDO $connection) {
+        $this->conn = $connection;
+    }
+    
+    /**
+     * Récupère tous les postes avec toutes leurs informations
+     */
+    public function getAllPostes(): array {
+        $stmt = $this->conn->query("
+            SELECT p.*, 
+                   ps.nom as poste_superieur_nom
+            FROM postes p 
+            LEFT JOIN postes ps ON p.poste_superieur_id = ps.id 
+            WHERE p.actif = 1 
+            ORDER BY p.niveau_hierarchique ASC, p.nom
+        ");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    
+    /**
+     * Récupère un poste par son ID avec toutes ses informations
+     */
+    public function getPosteById(int $id): ?array {
+        $stmt = $this->conn->prepare("
+            SELECT p.*, 
+                   ps.nom as poste_superieur_nom
+            FROM postes p 
+            LEFT JOIN postes ps ON p.poste_superieur_id = ps.id 
+            WHERE p.id = ? AND p.actif = 1
+        ");
+        $stmt->execute([$id]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ?: null;
+    }
+    
+    /**
+     * Récupère les types de contrat disponibles
+     */
+    public function getTypesContrat(): array {
+        return [
+            'CDI' => 'Contrat à Durée Indéterminée',
+            'CDD' => 'Contrat à Durée Déterminée',
+            'Stage' => 'Stage',
+            'Apprentissage' => 'Contrat d\'Apprentissage',
+            'Freelance' => 'Freelance/Consultant',
+            'Temps_partiel' => 'Temps Partiel'
+        ];
+    }
+}
+
+// =============================================================================
+// GESTIONNAIRE D'API - AMÉLIORÉ
+// =============================================================================
+
+class APIHandler {
+    private $employeeManager;
+    private $posteManager;
+    private $payrollManager;
+    
+    public function __construct(PDO $conn) {
+        $this->employeeManager = new EmployeeManager($conn);
+        $this->posteManager = new PosteManager($conn);
+        $this->payrollManager = new PayrollManager($conn);
+    }
+    
+    public function handleRequest(): void {
+        header('Content-Type: application/json');
+        
+        $action = $_GET['action'] ?? $_POST['ajax_action'] ?? '';
+        
+        switch ($action) {
+            case 'get_employees':
+                $this->getEmployees();
+                break;
+            case 'get_statistics':
+                $this->getStatistics();
+                break;
+            case 'get_postes':
+                $this->getPostes();
+                break;
+            case 'get_poste_details':
+                $this->getPosteDetails();
+                break;
+            case 'add_employee':
+                $this->addEmployee();
+                break;
+            case 'update_employee':
+                $this->updateEmployee();
+                break;
+            case 'delete_employee':
+                $this->deleteEmployee();
+                break;
+            default:
+                echo json_encode(['success' => false, 'message' => 'Action non reconnue']);
+        }
+        exit;
+        
+    }
+    
+    private function getEmployees(): void {
+        try {
+            $employees = $this->employeeManager->getAllEmployees();
+            echo json_encode(['success' => true, 'employees' => $employees]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'Erreur lors du chargement des employés']);
+        }
+    }
+    
+    private function getStatistics(): void {
+        try {
+            $statistics = $this->employeeManager->getStatistics();
+            echo json_encode(['success' => true, 'statistics' => $statistics]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'Erreur lors du chargement des statistiques']);
+        }
+    }
+    
+    private function getPostes(): void {
+        try {
+            $postes = $this->posteManager->getAllPostes();
+            echo json_encode(['success' => true, 'postes' => $postes]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'Erreur lors du chargement des postes']);
+        }
+    }
+    
+    private function getPosteDetails(): void {
+        try {
+            $poste_id = $_GET['id'] ?? null;
+            if (!$poste_id) {
+                echo json_encode(['success' => false, 'message' => 'ID poste requis']);
+                return;
+            }
+            
+            $poste = $this->posteManager->getPosteById($poste_id);
+            if (!$poste) {
+                echo json_encode(['success' => false, 'message' => 'Poste non trouvé']);
+                return;
+            }
+            
+            echo json_encode(['success' => true, 'poste' => $poste]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'Erreur lors du chargement du poste']);
+        }
+    }
+    
+    private function addEmployee(): void {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
+            return;
+        }
+        
+        $result = $this->employeeManager->addEmployee($_POST);
+        echo json_encode($result);
+    }
+    
+    private function updateEmployee(): void {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
+            return;
+        }
+        
+        $result = $this->employeeManager->updateEmployee($_POST);
+        echo json_encode($result);
+    }
+    
+    private function deleteEmployee(): void {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
+            return;
+        }
+        
+        $input = json_decode(file_get_contents('php://input'), true);
+        
+        if (empty($input['id'])) {
+            echo json_encode(['success' => false, 'message' => 'ID employé requis']);
+            return;
+        }
+        
+        $result = $this->employeeManager->deactivateEmployee($input['id']);
+        echo json_encode($result);
+    }
+    
+}
+
+// =============================================================================
+// TRAITEMENT DES REQUÊTES API
+// =============================================================================
 
 if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action']))) {
-    require_once '../config.php';
-    require_once 'phpqrcode/qrlib.php';
-    
-    header('Content-Type: application/json');
-    
-    $action = $_GET['action'] ?? $_POST['ajax_action'] ?? '';
-    
-    switch ($action) {
-        case 'get_employees':
-            try {
-                $stmt = $conn->query("SELECT * FROM vue_employes_complet ORDER BY nom, prenom");
-                $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                
-                echo json_encode([
-                    'success' => true,
-                    'employees' => $employees
-                ]);
-            } catch (Exception $e) {
-                echo json_encode([
-                    'success' => false,
-                    'message' => 'Erreur lors du chargement des employés'
-                ]);
-            }
-            exit;
-            
-        case 'get_statistics':
-            try {
-                // Total employés actifs
-                $stmt = $conn->query("SELECT COUNT(*) as total FROM employes WHERE statut = 'actif'");
-                $total_actifs = $stmt->fetch()['total'];
-                
-                // Présents aujourd'hui (statut actif, pas en congé ou absent)
-                $stmt = $conn->query("SELECT COUNT(*) as total FROM employes WHERE statut = 'actif'");
-                $presents_aujourd_hui = $stmt->fetch()['total'];
-                
-                // Nouveaux ce mois
-                $stmt = $conn->query("SELECT COUNT(*) as total FROM employes WHERE DATE_FORMAT(date_embauche, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')");
-                $nouveaux_ce_mois = $stmt->fetch()['total'];
-                
-                // Total administrateurs
-                $stmt = $conn->query("SELECT COUNT(*) as total FROM employes WHERE is_admin = 1 AND statut != 'inactif'");
-                $total_admins = $stmt->fetch()['total'];
-                
-                echo json_encode([
-                    'success' => true,
-                    'statistics' => [
-                        'total_actifs' => $total_actifs,
-                        'presents_aujourd_hui' => $presents_aujourd_hui,
-                        'nouveaux_ce_mois' => $nouveaux_ce_mois,
-                        'total_admins' => $total_admins
-                    ]
-                ]);
-            } catch (Exception $e) {
-                echo json_encode([
-                    'success' => false,
-                    'message' => 'Erreur lors du chargement des statistiques'
-                ]);
-            }
-            exit;
-            
-        case 'get_postes':
-            try {
-                $stmt = $conn->query("SELECT * FROM postes ORDER BY nom");
-                $postes = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                
-                echo json_encode([
-                    'success' => true,
-                    'postes' => $postes
-                ]);
-            } catch (Exception $e) {
-                echo json_encode([
-                    'success' => false,
-                    'message' => 'Erreur lors du chargement des postes'
-                ]);
-            }
-            exit;
-            
-        case 'add_employee':
-            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-                echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
-                exit;
-            }
-            
-            try {
-                // Validation des champs requis
-                $required_fields = ['nom', 'prenom', 'email', 'date_embauche'];
-                foreach ($required_fields as $field) {
-                    if (empty($_POST[$field])) {
-                        throw new Exception("Le champ $field est requis");
-                    }
-                }
-                
-                // Vérifier si l'email existe déjà
-                $stmt = $conn->prepare("SELECT id FROM employes WHERE email = ? AND statut != 'inactif'");
-                $stmt->execute([$_POST['email']]);
-                if ($stmt->fetch()) {
-                    throw new Exception('Cet email est déjà utilisé par un autre employé actif');
-                }
-                
-                // Gestion de l'upload de photo
-                $photo_filename = 'default-avatar.png';
-                if (isset($_FILES['photo']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
-                    $upload_dir = 'uploads/photos/';
-                    if (!is_dir($upload_dir)) {
-                        mkdir($upload_dir, 0755, true);
-                    }
-                    
-                    $file_ext = strtolower(pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION));
-                    $allowed_exts = ['jpg', 'jpeg', 'png', 'gif'];
-                    
-                    if (in_array($file_ext, $allowed_exts) && $_FILES['photo']['size'] <= 5000000) {
-                        $photo_filename = uniqid() . '.' . $file_ext;
-                        $upload_path = $upload_dir . $photo_filename;
-                        
-                        if (!move_uploaded_file($_FILES['photo']['tmp_name'], $upload_path)) {
-                            throw new Exception('Erreur lors de l\'upload de la photo');
-                        }
-                    } else {
-                        throw new Exception('Format de photo non valide ou taille trop importante');
-                    }
-                }
-                
-                // Convertir le salaire en entier si fourni
-                $salaire = null;
-                if (!empty($_POST['salaire'])) {
-                    $salaire = (int) $_POST['salaire'];
-                }
-                
-                // Insertion de l'employé
-                $stmt = $conn->prepare("
-    INSERT INTO employes (nom, prenom, email, telephone, poste_id, salaire, date_embauche, 
-                          heure_debut, heure_fin, photo, is_admin, statut) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-");
-$stmt->execute([
-    $_POST['nom'],
-    $_POST['prenom'],
-    $_POST['email'],
-    $_POST['telephone'] ?? null,
-    $_POST['poste_id'] ?? null,
-    $salaire,
-    $_POST['date_embauche'],
-    $_POST['heure_debut'] ?? '08:00:00',
-    $_POST['heure_fin'] ?? '17:00:00',
-    $photo_filename,
-    isset($_POST['is_admin']) ? 1 : 0,
-    $_POST['statut'] ?? 'actif'
-]);
-
-$employee_id = $conn->lastInsertId();
-// NOUVEAU : Si l'employé est admin, créer le compte admin
-if (isset($_POST['is_admin']) && $_POST['is_admin'] == 1) {
-    try {
-        // Vérifier si le compte admin existe déjà
-        $stmt = $conn->prepare("SELECT id FROM admin WHERE email = ?");
-        $stmt->execute([$_POST['email']]);
-        
-        if (!$stmt->fetch()) {
-            // Générer un mot de passe temporaire
-            $temp_password = generateTempPassword();
-            $hashed_password = password_hash($temp_password, PASSWORD_DEFAULT);
-            
-            // Créer le username à partir du prénom et nom
-            $username = strtolower($_POST['prenom'] . '.' . $_POST['nom']);
-            $username = removeAccents($username); // Fonction pour supprimer les accents
-            
-            // Vérifier l'unicité du username
-            $original_username = $username;
-            $counter = 1;
-            while (true) {
-                $stmt = $conn->prepare("SELECT id FROM admin WHERE username = ?");
-                $stmt->execute([$username]);
-                if (!$stmt->fetch()) break;
-                $username = $original_username . $counter;
-                $counter++;
-            }
-            
-            // Insérer dans la table admin
-            $stmt = $conn->prepare("
-                INSERT INTO admin (username, email, password, role, status, employee_id, created_at) 
-                VALUES (?, ?, ?, ?, ?, ?, NOW())
-            ");
-            $stmt->execute([
-                $username,
-                $_POST['email'],
-                $hashed_password,
-                'admin', // ou 'super_admin' selon vos besoins
-                1, // actif
-                $employee_id
-            ]);
-      // Log du mot de passe temporaire (à envoyer par email en production)
-            error_log("Compte admin créé - Username: $username, Password: $temp_password, Email: " . $_POST['email']);
-            
-            // Ajouter les infos dans la réponse JSON
-            $response_data = [
-                'success' => true,
-                'message' => 'Employé ajouté avec succès. Compte administrateur créé.',
-                'employee_id' => $employee_id,
-                'numeric_code' => $numeric_code,
-                'admin_created' => true,
-                'admin_username' => $username,
-                'temp_password' => $temp_password // À supprimer en production
-            ];
-        }
-    } catch (Exception $e) {
-        error_log("Erreur création compte admin: " . $e->getMessage());
-        // Ne pas faire échouer l'ajout de l'employé pour autant
-    }
+    $apiHandler = new APIHandler($conn);
+    $apiHandler->handleRequest();
 }
 
-// Fonctions utilitaires à ajouter
-function generateTempPassword($length = 12) {
-    $characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
-    $password = '';
-    for ($i = 0; $i < $length; $i++) {
-        $password .= $characters[rand(0, strlen($characters) - 1)];
-    }
-    return $password;
+// =============================================================================
+// CHARGEMENT DES DONNÉES POUR LA VUE
+// =============================================================================
+
+try {
+    $posteManager = new PosteManager($conn);
+    $postes = $posteManager->getAllPostes();
+    
+    $employeeManager = new EmployeeManager($conn);
+    $employes = $employeeManager->getAllEmployees();
+} catch (Exception $e) {
+    $postes = [];
+    $employes = [];
+    error_log("Erreur lors du chargement des données: " . $e->getMessage());
 }
 
-function removeAccents($str) {
-    $accents = array(
-        'À' => 'A', 'Á' => 'A', 'Â' => 'A', 'Ã' => 'A', 'Ä' => 'A', 'Å' => 'A',
-        'à' => 'a', 'á' => 'a', 'â' => 'a', 'ã' => 'a', 'ä' => 'a', 'å' => 'a',
-        'È' => 'E', 'É' => 'E', 'Ê' => 'E', 'Ë' => 'E',
-        'è' => 'e', 'é' => 'e', 'ê' => 'e', 'ë' => 'e',
-        'Ì' => 'I', 'Í' => 'I', 'Î' => 'I', 'Ï' => 'I',
-        'ì' => 'i', 'í' => 'i', 'î' => 'i', 'ï' => 'i',
-        'Ò' => 'O', 'Ó' => 'O', 'Ô' => 'O', 'Õ' => 'O', 'Ö' => 'O',
-        'ò' => 'o', 'ó' => 'o', 'ô' => 'o', 'õ' => 'o', 'ö' => 'o',
-        'Ù' => 'U', 'Ú' => 'U', 'Û' => 'U', 'Ü' => 'U',
-        'ù' => 'u', 'ú' => 'u', 'û' => 'u', 'ü' => 'u',
-        'Ç' => 'C', 'ç' => 'c'
-    );
-    return strtr($str, $accents);
-}
-                
-                // ============= GÉNÉRATION DU QR CODE HAUTE QUALITÉ =============
-                $numeric_code = generateNumericCode($employee_id, $conn);
-                
-                // Données optimisées pour le QR code
-                $qr_data = json_encode([
-                    'type' => 'employee_badge',
-                    'id' => (int)$employee_id,
-                    'code' => $numeric_code,
-                    'nom' => trim($_POST['nom']),
-                    'prenom' => trim($_POST['prenom']),
-                    'email' => $_POST['email'],
-                    'poste_id' => $_POST['poste_id'] ?? null,
-                    'timestamp' => time(),
-                    'version' => '1.0'
-                ], JSON_UNESCAPED_UNICODE);
-                
-                $qr_dir = 'qrcodes/';
-                if (!is_dir($qr_dir)) {
-                    mkdir($qr_dir, 0755, true);
-                }
-                
-                $qr_filename = 'employee_' . $employee_id . '_' . $numeric_code . '.png';
-                $qr_path = $qr_dir . $qr_filename;
-                
-                // Paramètres optimisés pour une haute qualité
-                // QR_ECLEVEL_H = Correction d'erreur élevée (30% de récupération)
-                // Size 10 = Taille de pixel importante pour une meilleure résolution
-                // Border 2 = Bordure minimale mais suffisante
-                try {
-                    QRcode::png($qr_data, $qr_path, QR_ECLEVEL_H, 10, 2);
-                    
-                    // Amélioration supplémentaire : redimensionner pour une qualité optimale
-                    if (extension_loaded('gd')) {
-                        $qr_optimized_path = $qr_dir . 'hq_' . $qr_filename;
-                        optimizeQRImage($qr_path, $qr_optimized_path);
-                        
-                        // Remplacer l'original par la version optimisée
-                        if (file_exists($qr_optimized_path)) {
-                            unlink($qr_path);
-                            rename($qr_optimized_path, $qr_path);
-                        }
-                    }
-                    
-                } catch (Exception $e) {
-                    error_log("Erreur génération QR: " . $e->getMessage());
-                    // QR code par défaut en cas d'erreur
-                    QRcode::png($numeric_code, $qr_path, QR_ECLEVEL_M, 8, 2);
-                }
-                
-                // Mise à jour avec le QR Code ET le code numérique
-                $stmt = $conn->prepare("UPDATE employes SET qr_code = ?, qr_data = ?, code_numerique = ? WHERE id = ?");
-                $stmt->execute([$qr_filename, $qr_data, $numeric_code, $employee_id]);
-                
-                // Log de l'activité
-                $stmt = $conn->prepare("
-                    INSERT INTO logs_activite (action, table_concernee, id_enregistrement, details) 
-                    VALUES (?, ?, ?, ?)
-                ");
-                $stmt->execute([
-                    'CREATE_EMPLOYEE',
-                    'employes',
-                    $employee_id,
-                    json_encode([
-                        'nom' => $_POST['nom'], 
-                        'prenom' => $_POST['prenom'],
-                        'code_numerique' => $numeric_code
-                    ])
-                ]);
-                
-                echo json_encode([
-                    'success' => true,
-                    'message' => 'Employé ajouté avec succès',
-                    'employee_id' => $employee_id,
-                    'numeric_code' => $numeric_code // Retourner le code pour affichage
-                ]);
-                
-            } catch (Exception $e) {
-                echo json_encode([
-                    'success' => false,
-                    'message' => $e->getMessage()
-                ]);
-            }
-            exit;
-            
-        case 'update_employee':
-            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-                echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
-                exit;
-            }
-            
-            try {
-                if (empty($_POST['id'])) {
-                    throw new Exception('ID employé requis');
-                }
-                
-                $employee_id = $_POST['id'];
-                
-                // Vérifier si l'employé existe
-                $stmt = $conn->prepare("SELECT * FROM employes WHERE id = ?");
-                $stmt->execute([$employee_id]);
-                $current_employee = $stmt->fetch(PDO::FETCH_ASSOC);
-                
-                if (!$current_employee) {
-                    throw new Exception('Employé non trouvé');
-                }
-                
-                // Vérifier l'email unique (sauf pour l'employé actuel)
-                $stmt = $conn->prepare("SELECT id FROM employes WHERE email = ? AND id != ? AND statut != 'inactif'");
-                $stmt->execute([$_POST['email'], $employee_id]);
-                if ($stmt->fetch()) {
-                    throw new Exception('Cet email est déjà utilisé par un autre employé actif');
-                }
-                
-                $photo_filename = $current_employee['photo'];
-                
-                // Gestion de l'upload de photo
-                if (isset($_FILES['photo']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
-                    $upload_dir = 'uploads/photos/';
-                    
-                    $file_ext = strtolower(pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION));
-                    $allowed_exts = ['jpg', 'jpeg', 'png', 'gif'];
-                    
-                    if (in_array($file_ext, $allowed_exts) && $_FILES['photo']['size'] <= 5000000) {
-                        $photo_filename = uniqid() . '.' . $file_ext;
-                        $upload_path = $upload_dir . $photo_filename;
-                        
-                        if (move_uploaded_file($_FILES['photo']['tmp_name'], $upload_path)) {
-                            // Supprimer l'ancienne photo (sauf default)
-                            if ($current_employee['photo'] !== 'default-avatar.png') {
-                                $old_photo = $upload_dir . $current_employee['photo'];
-                                if (file_exists($old_photo)) {
-                                    unlink($old_photo);
-                                }
-                            }
-                        } else {
-                            throw new Exception('Erreur lors de l\'upload de la photo');
-                        }
-                    } else {
-                        throw new Exception('Format de photo non valide ou taille trop importante');
-                    }
-                }
-                
-                // Convertir le salaire en entier si fourni
-                $salaire = null;
-                if (!empty($_POST['salaire'])) {
-                    $salaire = (int) $_POST['salaire'];
-                }
-                
-                // Mise à jour de l'employé
-                $stmt = $conn->prepare("
-                    UPDATE employes 
-                    SET nom = ?, prenom = ?, email = ?, telephone = ?, poste_id = ?, salaire = ?, 
-                        date_embauche = ?, heure_debut = ?, heure_fin = ?, photo = ?, 
-                        is_admin = ?, statut = ?
-                    WHERE id = ?
-                ");
-                
-                $stmt->execute([
-                    $_POST['nom'],
-                    $_POST['prenom'],
-                    $_POST['email'],
-                    $_POST['telephone'] ?? null,
-                    $_POST['poste_id'] ?? null,
-                    $salaire,
-                    $_POST['date_embauche'],
-                    $_POST['heure_debut'] ?? '08:00:00',
-                    $_POST['heure_fin'] ?? '17:00:00',
-                    $photo_filename,
-                    isset($_POST['is_admin']) ? 1 : 0,
-                    $_POST['statut'] ?? 'actif',
-                    $employee_id
-                ]);
-                
-                // Log de l'activité
-                $stmt = $conn->prepare("
-                    INSERT INTO logs_activite (action, table_concernee, id_enregistrement, details) 
-                    VALUES (?, ?, ?, ?)
-                ");
-                $stmt->execute([
-                    'UPDATE_EMPLOYEE',
-                    'employes',
-                    $employee_id,
-                    json_encode(['nom' => $_POST['nom'], 'prenom' => $_POST['prenom']])
-                ]);
-                
-                echo json_encode([
-                    'success' => true,
-                    'message' => 'Employé modifié avec succès'
-                ]);
-                
-            } catch (Exception $e) {
-                echo json_encode([
-                    'success' => false,
-                    'message' => $e->getMessage()
-                ]);
-            }
-            exit;
-            
-        case 'delete_employee':
-            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-                echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
-                exit;
-            }
-            
-            $input = json_decode(file_get_contents('php://input'), true);
-            
-            try {
-                if (empty($input['id'])) {
-                    throw new Exception('ID employé requis');
-                }
-                
-                $employee_id = $input['id'];
-                
-                // Désactivation logique (pas de suppression physique)
-                $stmt = $conn->prepare("UPDATE employes SET statut = 'inactif' WHERE id = ?");
-                $stmt->execute([$employee_id]);
-                
-                if ($stmt->rowCount() === 0) {
-                    throw new Exception('Employé non trouvé');
-                }
-                
-                // Log de l'activité
-                $stmt = $conn->prepare("
-                    INSERT INTO logs_activite (action, table_concernee, id_enregistrement, details) 
-                    VALUES (?, ?, ?, ?)
-                ");
-                $stmt->execute([
-                    'DEACTIVATE_EMPLOYEE',
-                    'employes',
-                    $employee_id,
-                    json_encode(['statut' => 'inactif'])
-                ]);
-                
-                echo json_encode([
-                    'success' => true,
-                    'message' => 'Employé désactivé avec succès'
-                ]);
-                
-            } catch (Exception $e) {
-                echo json_encode([
-                    'success' => false,
-                    'message' => $e->getMessage()
-                ]);
-            }
-            exit;
-            
-        default:
-            echo json_encode(['success' => false, 'message' => 'Action non reconnue']);
-            exit;
-    }
-}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -578,6 +852,13 @@ function removeAccents($str) {
         .hover-scale:hover { transform: scale(1.05); }
         .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
         .notification { position: fixed; top: 20px; right: 20px; z-index: 1000; }
+        .contract-badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+        .contract-cdi { background-color: #dcfce7; color: #166534; }
+        .contract-cdd { background-color: #fef3c7; color: #92400e; }
+        .contract-stage { background-color: #dbeafe; color: #1e40af; }
+        .contract-apprentissage { background-color: #fce7f3; color: #be185d; }
+        .contract-freelance { background-color: #f3e8ff; color: #7c3aed; }
+        .contract-temps_partiel { background-color: #e0f2fe; color: #0277bd; }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
@@ -656,7 +937,7 @@ function removeAccents($str) {
 
         <!-- Filtres et Recherche -->
         <div class="bg-white rounded-lg shadow-md p-6 mb-6 card-shadow">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div>
                     <input type="text" id="searchInput" placeholder="Rechercher par nom, email..." 
                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
@@ -664,6 +945,17 @@ function removeAccents($str) {
                 <div>
                     <select id="filterPoste" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         <option value="">Tous les postes</option>
+                    </select>
+                </div>
+                <div>
+                    <select id="filterContrat" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Tous les contrats</option>
+                        <option value="CDI">CDI</option>
+                        <option value="CDD">CDD</option>
+                        <option value="Stage">Stage</option>
+                        <option value="Apprentissage">Apprentissage</option>
+                        <option value="Freelance">Freelance</option>
+                        <option value="Temps_partiel">Temps Partiel</option>
                     </select>
                 </div>
                 <div>
@@ -683,6 +975,45 @@ function removeAccents($str) {
             </div>
         </div>
 
+        <!-- Section Génération des Bulletins de Paie -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6 card-shadow">
+            <h2 class="text-xl font-semibold mb-6">Génération des Bulletins de Paie</h2>
+            <form id="genererBulletinForm" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label for="employe_id" class="block text-sm font-medium text-gray-700 mb-2">Employé</label>
+                        <select id="employe_id" name="employe_id" required
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                            <option value="">Sélectionnez un employé</option>
+                            <?php foreach ($employes as $employe): ?>
+                                <option value="<?php echo $employe['id']; ?>">
+                                    <?php echo htmlspecialchars($employe['nom'] . ' ' . $employe['prenom'] . ' (' . ($employe['poste_nom'] ?? 'Aucun poste') . ')'); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="mois_annee" class="block text-sm font-medium text-gray-700 mb-2">Mois</label>
+                        <input type="month" id="mois_annee" name="mois_annee" required
+                               value="<?php echo date('Y-m'); ?>"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="flex items-end">
+                        <button type="button" onclick="genererBulletin()"
+                                class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors">
+                            <i class="fas fa-file-pdf mr-2"></i>Générer Bulletin
+                        </button>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <button type="button" onclick="genererTousBulletins()"
+                            class="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition-colors">
+                        <i class="fas fa-file-pdf mr-2"></i>Générer pour tous les employés actifs
+                    </button>
+                </div>
+            </form>
+        </div>
+
         <!-- Vue Tableau -->
         <div id="tableView" class="bg-white rounded-lg shadow-md overflow-hidden card-shadow">
             <div class="overflow-x-auto">
@@ -692,6 +1023,7 @@ function removeAccents($str) {
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Photo</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employé</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Poste</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contrat</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salaire</th>
@@ -714,7 +1046,7 @@ function removeAccents($str) {
     <!-- Modal Ajouter/Modifier Employé -->
     <div id="employeeModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
         <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="bg-white rounded-lg max-w-2xl w-full max-h-screen overflow-y-auto">
+            <div class="bg-white rounded-lg max-w-4xl w-full max-h-screen overflow-y-auto">
                 <div class="px-6 py-4 border-b border-gray-200">
                     <h3 id="modalTitle" class="text-lg font-semibold text-gray-900">Ajouter un employé</h3>
                 </div>
@@ -735,7 +1067,8 @@ function removeAccents($str) {
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Informations personnelles -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                         <div>
                             <label for="nom" class="block text-sm font-medium text-gray-700 mb-2">Nom *</label>
                             <input type="text" id="nom" name="nom" required 
@@ -759,36 +1092,49 @@ function removeAccents($str) {
                             <input type="tel" id="telephone" name="telephone" 
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
-                        
+                    </div>
+
+                    <!-- Informations professionnelles -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                         <div>
                             <label for="poste" class="block text-sm font-medium text-gray-700 mb-2">Poste *</label>
-                            <select id="poste" name="poste_id" required 
+                            <select id="poste" name="poste_id" required onchange="updatePosteInfo()"
                                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                                 <option value="">Sélectionner un poste</option>
                             </select>
                         </div>
                         
                         <div>
-                            <label for="salaire" class="block text-sm font-medium text-gray-700 mb-2">Salaire (FCFA)</label>
+                            <label for="salaire" class="block text-sm font-medium text-gray-700 mb-2">
+                                Salaire (FCFA)
+                                <span id="salaireRange" class="text-xs text-gray-500"></span>
+                            </label>
                             <input type="number" id="salaire" name="salaire" min="0" step="1" 
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
+                    </div>
+
+                    <!-- Informations contrat -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label for="typeContrat" class="block text-sm font-medium text-gray-700 mb-2">Type de contrat</label>
+                            <input type="text" id="typeContrat" name="type_contrat" readonly
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700">
+                        </div>
                         
+                        <div>
+                            <label for="dureeContrat" class="block text-sm font-medium text-gray-700 mb-2">Durée du contrat</label>
+                            <input type="text" id="dureeContrat" name="duree_contrat" readonly
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700">
+                        </div>
+                    </div>
+
+                    <!-- Dates et horaires -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                         <div>
                             <label for="dateEmbauche" class="block text-sm font-medium text-gray-700 mb-2">Date d'embauche *</label>
                             <input type="date" id="dateEmbauche" name="date_embauche" required 
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                        </div>
-                        
-                        <div>
-                            <label for="statut" class="block text-sm font-medium text-gray-700 mb-2">Statut</label>
-                            <select id="statut" name="statut" 
-                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                                <option value="actif">Actif</option>
-                                <option value="en_conge">En congé</option>
-                                <option value="absent">Absent</option>
-                                <option value="inactif">Inactif</option>
-                            </select>
                         </div>
                         
                         <div>
@@ -803,16 +1149,61 @@ function removeAccents($str) {
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
                     </div>
-                    
-                    <div class="mt-4">
-                        <label class="flex items-center">
-                            <input type="checkbox" id="isAdmin" name="is_admin" value="1" 
-                                   class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                            <span class="ml-2 text-sm text-gray-700">
-                                <i class="fas fa-crown text-yellow-500 mr-1"></i>
-                                Administrateur
-                            </span>
-                        </label>
+
+                    <!-- Statut et options -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label for="statut" class="block text-sm font-medium text-gray-700 mb-2">Statut</label>
+                            <select id="statut" name="statut" 
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="actif">Actif</option>
+                                <option value="en_conge">En congé</option>
+                                <option value="absent">Absent</option>
+                                <option value="inactif">Inactif</option>
+                            </select>
+                        </div>
+                        
+                        <div class="flex items-end">
+                            <label class="flex items-center">
+                                <input type="checkbox" id="isAdmin" name="is_admin" value="1" 
+                                       class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                <span class="ml-2 text-sm text-gray-700">
+                                    <i class="fas fa-crown text-yellow-500 mr-1"></i>
+                                    Administrateur
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Informations du poste (affichage uniquement) -->
+                    <div id="posteInfo" class="bg-gray-50 rounded-lg p-4 mb-6 hidden">
+                        <h4 class="text-md font-semibold text-gray-800 mb-3">Informations du poste</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span class="font-medium text-gray-600">Niveau hiérarchique:</span>
+                                <span id="niveauHierarchique" class="ml-2 text-gray-800"></span>
+                            </div>
+                            <div>
+                                <span class="font-medium text-gray-600">Code paie:</span>
+                                <span id="codePaie" class="ml-2 text-gray-800"></span>
+                            </div>
+                            <div>
+                                <span class="font-medium text-gray-600">Catégorie paie:</span>
+                                <span id="categoriePaie" class="ml-2 text-gray-800"></span>
+                            </div>
+                            <div>
+                                <span class="font-medium text-gray-600">Régime social:</span>
+                                <span id="regimeSocial" class="ml-2 text-gray-800"></span>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <span class="font-medium text-gray-600">Compétences requises:</span>
+                            <div id="competencesRequises" class="mt-1 text-gray-800"></div>
+                        </div>
+                        <div class="mt-3">
+                            <span class="font-medium text-gray-600">Avantages:</span>
+                            <div id="avantages" class="mt-1 text-gray-800"></div>
+                        </div>
                     </div>
 
                     <div class="mt-6 flex justify-end space-x-3">
@@ -834,7 +1225,6 @@ function removeAccents($str) {
     <div id="notification" class="notification hidden"></div>
 
     <script>
-        
         let currentView = localStorage.getItem('preferredView') || 'table';
         let employees = [];
         let postes = [];
@@ -852,6 +1242,7 @@ function removeAccents($str) {
             // Événements
             document.getElementById('searchInput').addEventListener('input', filterEmployees);
             document.getElementById('filterPoste').addEventListener('change', filterEmployees);
+            document.getElementById('filterContrat').addEventListener('change', filterEmployees);
             document.getElementById('filterStatut').addEventListener('change', filterEmployees);
             document.getElementById('photo').addEventListener('change', previewPhoto);
             document.getElementById('employeeForm').addEventListener('submit', saveEmployee);
@@ -882,7 +1273,6 @@ function removeAccents($str) {
             }
         }
 
-        
         function loadStatistics() {
             fetch('?action=get_statistics')
                 .then(response => response.json())
@@ -913,14 +1303,60 @@ function removeAccents($str) {
             const filterPoste = document.getElementById('filterPoste');
             const modalPoste = document.getElementById('poste');
             
-            // Effacer les options existantes (sauf la première)
             filterPoste.innerHTML = '<option value="">Tous les postes</option>';
             modalPoste.innerHTML = '<option value="">Sélectionner un poste</option>';
             
             postes.forEach(poste => {
                 filterPoste.innerHTML += `<option value="${poste.id}">${poste.nom}</option>`;
-                modalPoste.innerHTML += `<option value="${poste.id}">${poste.nom}</option>`;
+                modalPoste.innerHTML += `<option value="${poste.id}">${poste.nom} - ${poste.type_contrat || 'Non défini'}</option>`;
             });
+        }
+
+        function updatePosteInfo() {
+            const posteId = document.getElementById('poste').value;
+            const posteInfo = document.getElementById('posteInfo');
+            
+            if (!posteId) {
+                posteInfo.classList.add('hidden');
+                document.getElementById('typeContrat').value = '';
+                document.getElementById('dureeContrat').value = '';
+                document.getElementById('salaire').value = '';
+                document.getElementById('salaireRange').textContent = '';
+                return;
+            }
+
+            fetch(`?action=get_poste_details&id=${posteId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.poste) {
+                        const poste = data.poste;
+                        
+                        // Remplir les champs automatiquement
+                        document.getElementById('typeContrat').value = poste.type_contrat || '';
+                        document.getElementById('dureeContrat').value = poste.duree_contrat || '';
+                        document.getElementById('salaire').value = poste.salaire || '';
+                        
+                        // Afficher la fourchette de salaire
+                        if (poste.salaire_min && poste.salaire_max) {
+                            document.getElementById('salaireRange').textContent = 
+                                `(${formatSalaire(poste.salaire_min)} - ${formatSalaire(poste.salaire_max)} FCFA)`;
+                        }
+                        
+                        // Afficher les informations du poste
+                        document.getElementById('niveauHierarchique').textContent = poste.niveau_hierarchique || 'Non défini';
+                        document.getElementById('codePaie').textContent = poste.code_paie || 'Non défini';
+                        document.getElementById('categoriePaie').textContent = poste.categorie_paie || 'Non définie';
+                        document.getElementById('regimeSocial').textContent = poste.regime_social || 'Non défini';
+                        document.getElementById('competencesRequises').textContent = poste.competences_requises || 'Aucune spécifiée';
+                        document.getElementById('avantages').textContent = poste.avantages || 'Aucun spécifié';
+                        
+                        posteInfo.classList.remove('hidden');
+                    }
+                })
+                .catch(error => {
+                    console.error('Erreur:', error);
+                    posteInfo.classList.add('hidden');
+                });
         }
 
         function loadEmployees() {
@@ -975,6 +1411,15 @@ function removeAccents($str) {
                               style="background-color: ${employee.poste_couleur || '#6B7280'}20; color: ${employee.poste_couleur || '#6B7280'};">
                             ${employee.poste_nom || 'Non défini'}
                         </span>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1">Niveau: ${employee.niveau_hierarchique || 'N/A'}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex flex-col space-y-1">
+                        <span class="contract-badge contract-${(employee.type_contrat || '').toLowerCase().replace(' ', '_')}">
+                            ${employee.type_contrat || 'Non défini'}
+                        </span>
+                        <div class="text-xs text-gray-500">${employee.duree_contrat || 'Non spécifiée'}</div>
                     </div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -1035,12 +1480,15 @@ function removeAccents($str) {
                                 ${employee.prenom} ${employee.nom}
                                 ${employee.is_admin ? '<i class="fas fa-crown text-yellow-500 ml-1" title="Administrateur"></i>' : ''}
                             </h3>
-                            <div class="flex items-center mt-1">
+                            <div class="flex items-center mt-1 flex-wrap gap-1">
                                 <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" 
                                       style="background-color: ${employee.poste_couleur || '#6B7280'}20; color: ${employee.poste_couleur || '#6B7280'};">
                                     ${employee.poste_nom || 'Non défini'}
                                 </span>
-                                <span class="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusClass(employee.statut)}">
+                                <span class="contract-badge contract-${(employee.type_contrat || '').toLowerCase().replace(' ', '_')}">
+                                    ${employee.type_contrat || 'Non défini'}
+                                </span>
+                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusClass(employee.statut)}">
                                     ${getStatusText(employee.statut)}
                                 </span>
                             </div>
@@ -1070,6 +1518,18 @@ function removeAccents($str) {
                             <div class="flex items-center">
                                 <i class="fas fa-money-bill w-4 mr-2"></i>
                                 ${formatSalaire(employee.salaire)} FCFA
+                            </div>
+                        ` : ''}
+                        ${employee.duree_contrat ? `
+                            <div class="flex items-center">
+                                <i class="fas fa-contract w-4 mr-2"></i>
+                                ${employee.duree_contrat}
+                            </div>
+                        ` : ''}
+                        ${employee.niveau_hierarchique ? `
+                            <div class="flex items-center">
+                                <i class="fas fa-layer-group w-4 mr-2"></i>
+                                Niveau ${employee.niveau_hierarchique}
                             </div>
                         ` : ''}
                     </div>
@@ -1122,13 +1582,13 @@ function removeAccents($str) {
 
         function formatSalaire(salaire) {
             if (!salaire) return '';
-            // Formater le salaire en entier avec des espaces comme séparateurs de milliers
             return parseInt(salaire).toLocaleString('fr-FR');
         }
 
         function filterEmployees() {
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
             const posteFilter = document.getElementById('filterPoste').value;
+            const contratFilter = document.getElementById('filterContrat').value;
             const statutFilter = document.getElementById('filterStatut').value;
             
             const filtered = employees.filter(employee => {
@@ -1138,9 +1598,10 @@ function removeAccents($str) {
                     employee.email.toLowerCase().includes(searchTerm);
                 
                 const matchesPoste = !posteFilter || employee.poste_id == posteFilter;
+                const matchesContrat = !contratFilter || employee.type_contrat === contratFilter;
                 const matchesStatut = !statutFilter || employee.statut === statutFilter;
                 
-                return matchesSearch && matchesPoste && matchesStatut;
+                return matchesSearch && matchesPoste && matchesContrat && matchesStatut;
             });
             
             displayEmployees(filtered);
@@ -1149,15 +1610,18 @@ function removeAccents($str) {
         function resetFilters() {
             document.getElementById('searchInput').value = '';
             document.getElementById('filterPoste').value = '';
+            document.getElementById('filterContrat').value = '';
             document.getElementById('filterStatut').value = '';
             displayEmployees(employees);
         }
+
         function openAddModal() {
             document.getElementById('modalTitle').textContent = 'Ajouter un employé';
             document.getElementById('employeeForm').reset();
             document.getElementById('employeeId').value = '';
             document.getElementById('ajaxAction').value = 'add_employee';
             document.getElementById('photoPreview').src = 'uploads/photos/default-avatar.png';
+            document.getElementById('posteInfo').classList.add('hidden');
             document.getElementById('employeeModal').classList.remove('hidden');
         }
 
@@ -1179,7 +1643,14 @@ function removeAccents($str) {
             document.getElementById('heureDebut').value = employee.heure_debut;
             document.getElementById('heureFin').value = employee.heure_fin;
             document.getElementById('isAdmin').checked = employee.is_admin == 1;
+            document.getElementById('typeContrat').value = employee.type_contrat || '';
+            document.getElementById('dureeContrat').value = employee.duree_contrat || '';
             document.getElementById('photoPreview').src = `uploads/photos/${employee.photo || 'default-avatar.png'}`;
+            
+            // Afficher les informations du poste si un poste est sélectionné
+            if (employee.poste_id) {
+                updatePosteInfo();
+            }
             
             document.getElementById('employeeModal').classList.remove('hidden');
         }
@@ -1224,8 +1695,8 @@ function removeAccents($str) {
                 showNotification('Erreur lors de la sauvegarde', 'error');
             });
         }
+
         function viewEmployee(id) {
-            // Ouvrir une modal de détails ou rediriger vers une page de détails
             window.open(`employee_details.php?id=${id}`, '_blank');
         }
 
@@ -1258,6 +1729,76 @@ function removeAccents($str) {
                 });
             }
         }
+
+        function genererBulletin() {
+            const employe_id = document.getElementById('employe_id').value;
+            const mois_annee = document.getElementById('mois_annee').value;
+
+            if (!employe_id || !mois_annee) {
+                showNotification('Veuillez sélectionner un employé et un mois.', 'error');
+                return;
+            }
+
+            showLoading();
+            fetch('generer_bulletin.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `employe_id=${employe_id}&mois_annee=${mois_annee}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.success) {
+                    const link = document.createElement('a');
+                    link.href = 'data:application/pdf;base64,' + data.pdf;
+                    link.download = `bulletin_${mois_annee}_${employe_id}.pdf`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    showNotification('Bulletin généré avec succès !', 'success');
+                } else {
+                    showNotification(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                showNotification('Erreur: ' + error.message, 'error');
+            });
+        }
+
+        function genererTousBulletins() {
+            const mois_annee = document.getElementById('mois_annee').value;
+
+            if (!mois_annee) {
+                showNotification('Veuillez sélectionner un mois.', 'error');
+                return;
+            }
+
+            if (!confirm('Voulez-vous vraiment générer les bulletins pour tous les employés actifs?')) {
+                return;
+            }
+
+            showLoading();
+            fetch('generer_tous_bulletins.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `mois_annee=${mois_annee}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.success) {
+                    showNotification(`Bulletins générés avec succès ! ${data.count} bulletins créés.`, 'success');
+                } else {
+                    showNotification(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                showNotification('Erreur: ' + error.message, 'error');
+            });
+        }
+
         function showNotification(message, type = 'info') {
             const notification = document.getElementById('notification');
             const colors = {
@@ -1287,7 +1828,16 @@ function removeAccents($str) {
         function hideNotification() {
             document.getElementById('notification').classList.add('hidden');
         }
+
+        function showLoading() {
+            showNotification('Traitement en cours...', 'info');
+        }
+
+        function hideLoading() {
+            hideNotification();
+        }
         
+        // Fermer la modal en cliquant à l'extérieur
         document.getElementById('employeeModal').addEventListener('click', function(e) {
             if (e.target === this) {
                 closeModal();

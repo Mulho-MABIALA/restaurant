@@ -161,6 +161,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
   <div class="flex h-screen overflow-hidden">
     
     <?php include 'sidebar.php'; ?>
+    
 
     <div class="flex-1 overflow-y-auto">
       
@@ -367,13 +368,12 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
                 </svg>
                 Nouvelle réservation
               </button>
-              
-              <a href="export_reservations.php?format=pdf" class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-medium rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl">
-                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clip-rule="evenodd"/>
-                </svg>
-                Exporter PDF
-              </a>
+              <button type="button" onclick="exportToPDFAsync()" class="group inline-flex items-center px-6 py-3 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-medium rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl">
+    <svg class="w-4 h-4 mr-2 group-hover:animate-bounce" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/>
+    </svg>
+    Exporter PDF
+</button>
             </div>
           </form>
         </div>
@@ -1201,6 +1201,242 @@ function formatDateTime(dateString) {
     // Vérifier toutes les 2 minutes
     setInterval(checkNewReservations, 120000);
     document.addEventListener('DOMContentLoaded', checkNewReservations);
+// Version alternative plus robuste de l'export PDF
+async function exportToPDFAsync() {
+    try {
+        showLoadingIndicator();
+        
+        // Construire l'URL avec les paramètres de filtrage actuels
+        const urlParams = new URLSearchParams();
+        
+        // Récupérer les valeurs des filtres
+        const search = document.querySelector('input[name="search"]')?.value || '';
+        const dateFilter = document.querySelector('input[name="date_filter"]')?.value || '';
+        const personnesFilter = document.querySelector('select[name="personnes_filter"]')?.value || '';
+        
+        // Ajouter les paramètres non vides
+        if (search) urlParams.append('search', search);
+        if (dateFilter) urlParams.append('date_filter', dateFilter);
+        if (personnesFilter) urlParams.append('personnes_filter', personnesFilter);
+        urlParams.append('format', 'pdf');
+        
+        const exportUrl = 'export_reservations.php?' + urlParams.toString();
+        
+        // Première méthode : Fetch API
+        try {
+            const response = await fetch(exportUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/pdf'
+                }
+            });
+            
+            if (!response.ok) {
+                // Lire la réponse d'erreur
+                const errorText = await response.text();
+                console.error('Erreur serveur:', errorText);
+                
+                // Essayer de parser en JSON si possible
+                try {
+                    const errorJson = JSON.parse(errorText);
+                    throw new Error(errorJson.message || `Erreur HTTP: ${response.status}`);
+                } catch {
+                    throw new Error(`Erreur HTTP: ${response.status} - ${errorText}`);
+                }
+            }
+            
+            // Vérifier le type de contenu
+            const contentType = response.headers.get('content-type');
+            console.log('Content-Type reçu:', contentType);
+            
+            if (!contentType || !contentType.includes('application/pdf')) {
+                const errorText = await response.text();
+                console.error('Réponse non-PDF:', errorText);
+                throw new Error('Le serveur n\'a pas retourné un PDF valide');
+            }
+            
+            const blob = await response.blob();
+            
+            // Vérifier que le blob n'est pas vide
+            if (blob.size === 0) {
+                throw new Error('Le fichier PDF généré est vide');
+            }
+            
+            // Créer le lien de téléchargement
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `reservations_${new Date().toISOString().split('T')[0]}.pdf`;
+            link.style.display = 'none';
+            
+            // Déclencher le téléchargement
+            document.body.appendChild(link);
+            link.click();
+            
+            // Nettoyer
+            setTimeout(() => {
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+            }, 100);
+            
+            hideLoadingIndicator();
+            showSuccessMessage('PDF exporté avec succès !');
+            
+        } catch (fetchError) {
+            console.error('Erreur fetch:', fetchError);
+            
+            // Méthode de fallback : ouverture directe
+            console.log('Tentative de fallback avec ouverture directe...');
+            fallbackDownload(exportUrl);
+            
+            hideLoadingIndicator();
+            showSuccessMessage('Téléchargement lancé (méthode alternative)');
+        }
+        
+    } catch (error) {
+        console.error('Erreur générale lors de l\'export:', error);
+        hideLoadingIndicator();
+        showErrorMessage(`Erreur lors de l'export du PDF: ${error.message}`);
+    }
+}
+
+// Méthode de fallback
+function fallbackDownload(url) {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `reservations_${new Date().toISOString().split('T')[0]}.pdf`;
+    link.target = '_blank';
+    link.style.display = 'none';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Version encore plus simple pour test
+function exportToPDFSimple() {
+    showLoadingIndicator();
+    
+    // Construire l'URL avec les filtres actuels
+    const urlParams = new URLSearchParams(window.location.search);
+    urlParams.append('format', 'pdf');
+    
+    // Créer un iframe caché pour le téléchargement
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = 'export_reservations.php?' + urlParams.toString();
+    
+    document.body.appendChild(iframe);
+    
+    // Nettoyer après un délai
+    setTimeout(() => {
+        document.body.removeChild(iframe);
+        hideLoadingIndicator();
+        showSuccessMessage('Téléchargement du PDF lancé...');
+    }, 2000);
+}
+
+// Fonction de diagnostic
+async function debugExport() {
+    try {
+        // Test 1: Connectivité
+        console.log('=== Test de connectivité ===');
+        const testResponse = await fetch('export_reservations.php?test=1');
+        const testResult = await testResponse.text();
+        console.log('Test endpoint:', testResult);
+        
+        // Test 2: Headers de la page actuelle
+        console.log('=== Headers de la page ===');
+        console.log('URL actuelle:', window.location.href);
+        console.log('Paramètres URL:', new URLSearchParams(window.location.search).toString());
+        
+        // Test 3: Valeurs des filtres
+        console.log('=== Valeurs des filtres ===');
+        console.log('Search:', document.querySelector('input[name="search"]')?.value);
+        console.log('Date:', document.querySelector('input[name="date_filter"]')?.value);
+        console.log('Personnes:', document.querySelector('select[name="personnes_filter"]')?.value);
+        
+        // Test 4: Tentative d'export minimal
+        console.log('=== Test export minimal ===');
+        const minimalUrl = 'export_reservations.php?format=pdf';
+        const minimalResponse = await fetch(minimalUrl);
+        console.log('Status:', minimalResponse.status);
+        console.log('Content-Type:', minimalResponse.headers.get('content-type'));
+        
+        if (!minimalResponse.ok) {
+            const errorText = await minimalResponse.text();
+            console.error('Erreur export minimal:', errorText);
+        }
+        
+    } catch (error) {
+        console.error('Erreur diagnostic:', error);
+    }
+}
+
+// Fonctions utilitaires (à ajouter si manquantes)
+function showLoadingIndicator() {
+    if (document.getElementById('loadingIndicator')) return;
+    
+    const indicator = document.createElement('div');
+    indicator.id = 'loadingIndicator';
+    indicator.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    indicator.innerHTML = `
+        <div class="bg-white rounded-xl p-6 shadow-2xl">
+            <div class="flex items-center">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-4"></div>
+                <span class="text-lg font-medium text-gray-700">Export en cours...</span>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(indicator);
+}
+
+function hideLoadingIndicator() {
+    const indicator = document.getElementById('loadingIndicator');
+    if (indicator) {
+        indicator.remove();
+    }
+}
+
+function showSuccessMessage(message) {
+    showMessage(message, 'success');
+}
+
+function showErrorMessage(message) {
+    showMessage(message, 'error');
+}
+
+function showMessage(message, type) {
+    const toast = document.createElement('div');
+    const bgColor = type === 'success' ? 'from-green-600 to-emerald-600' : 'from-red-600 to-rose-600';
+    const icon = type === 'success' ? 
+        `<svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+        </svg>` :
+        `<svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+        </svg>`;
+    
+    toast.className = `fixed bottom-4 right-4 bg-gradient-to-r ${bgColor} text-white px-6 py-4 rounded-xl shadow-2xl transform transition-all duration-300 animate-slide-up z-50`;
+    toast.innerHTML = `
+        <div class="flex items-center">
+            ${icon}
+            <span class="font-medium">${message}</span>
+        </div>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.remove();
+            }
+        }, 300);
+    }, 5000);
+}
+
   </script>
 
 </body>
