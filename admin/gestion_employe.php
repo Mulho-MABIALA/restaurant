@@ -1,19 +1,9 @@
 <?php
-/**
- * Système de Gestion des Employés - Restaurant
- * Version: 2.1 - Améliorée avec intégration complète des postes
- * Auteur: Restaurant Management System
- * Description: Interface complète de gestion des employés avec génération de bulletins de paie
- */
-
-// =============================================================================
-// CONFIGURATION ET INCLUDES
-// =============================================================================
 require_once '../config.php';
 require_once 'phpqrcode/qrlib.php';
 
 // =============================================================================
-// CLASSES UTILITAIRES
+// GESTIONNAIRE D'EMPLOYÉS
 // =============================================================================
 
 class EmployeeManager {
@@ -24,7 +14,7 @@ class EmployeeManager {
     }
     
     /**
-     * Récupère tous les employés avec leurs informations complètes incluant les détails du poste
+     * Récupère tous les employés avec leurs informations complètes
      */
     public function getAllEmployees(): array {
         $stmt = $this->conn->query("
@@ -46,7 +36,8 @@ class EmployeeManager {
                    ps.nom as poste_superieur_nom
             FROM employes e 
             LEFT JOIN postes p ON e.poste_id = p.id 
-            LEFT JOIN postes ps ON p.poste_superieur_id = ps.id
+            LEFT JOIN postes ps ON p.poste_superieur_id = ps.id 
+            WHERE e.statut = 'actif'
             ORDER BY e.nom, e.prenom
         ");
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -213,7 +204,24 @@ class EmployeeManager {
         }
     }
     
-    // Méthodes privées utilitaires
+    /**
+     * Récupère les types de contrat disponibles
+     */
+    public function getTypesContrat(): array {
+        return [
+            'CDI' => 'Contrat à Durée Indéterminée',
+            'CDD' => 'Contrat à Durée Déterminée',
+            'Stage' => 'Stage',
+            'Apprentissage' => 'Contrat d\'Apprentissage',
+            'Freelance' => 'Freelance/Consultant',
+            'Temps_partiel' => 'Temps Partiel'
+        ];
+    }
+    
+    // =============================================================================
+    // MÉTHODES PRIVÉES UTILITAIRES
+    // =============================================================================
+    
     private function validateRequiredFields(array $data, array $required_fields): void {
         foreach ($required_fields as $field) {
             if (empty($data[$field])) {
@@ -363,7 +371,7 @@ class EmployeeManager {
 }
 
 // =============================================================================
-// GESTIONNAIRE DE QR CODES
+// GÉNÉRATEUR DE QR CODE
 // =============================================================================
 
 class QRCodeGenerator {
@@ -450,7 +458,7 @@ class QRCodeGenerator {
 }
 
 // =============================================================================
-// GESTIONNAIRE DE BULLETINS DE PAIE
+// GESTIONNAIRE DE PAIE
 // =============================================================================
 
 class PayrollManager {
@@ -466,74 +474,85 @@ class PayrollManager {
     public function calculerSalaireNet(int $employe_id, string $mois_annee): array {
         // Récupérer les données de l'employé et de son poste
         $stmt = $this->conn->prepare("
-            SELECT e.*, p.salaire AS salaire_poste, p.taux_cotisation, p.categorie_paie, p.regime_social
+            SELECT e.*, 
+                   p.salaire AS salaire_poste, 
+                   p.taux_cotisation, 
+                   p.categorie_paie, 
+                   p.regime_social,
+                   p.nom as poste_nom
             FROM employes e
-            JOIN postes p ON e.poste_id = p.id
+            LEFT JOIN postes p ON e.poste_id = p.id
             WHERE e.id = ?
         ");
         $stmt->execute([$employe_id]);
         $data = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if (!$data) {
-            throw new Exception("Employé ou poste non trouvé.");
+            throw new Exception("Employé non trouvé.");
         }
         
-        // Calculs de paie
-        $salaire_brut = $data['salaire_individuel'] ?? $data['salaire_poste'];
-        $salaire_brut += $data['primes_individuelles'];
+        // Utiliser le salaire de l'employé s'il existe, sinon celui du poste
+        $salaire_brut = $data['salaire'] ?: ($data['salaire_poste'] ?: 0);
         
-        $retenues_absences = ($data['absences'] * $salaire_brut) / 30;
-        $salaire_brut_apres_absences = $salaire_brut - $retenues_absences;
+        // Pour la démonstration, nous utilisons des valeurs par défaut
+        // Dans un vrai système, ces données viendraient d'autres tables
+        $primes_individuelles = 0; // À récupérer depuis une table de primes
+        $absences_jours = 0; // À récupérer depuis une table de présences
+        $retenues_diverses = 0; // À récupérer depuis une table de retenues
+        $cotisations_supplementaires = 0; // À récupérer depuis configuration
         
-        $taux_cotisations = $data['taux_cotisation'] + $data['cotisations_supplementaires'];
+        // Calculs
+        $retenues_absences = ($absences_jours * $salaire_brut) / 30;
+        $salaire_brut_apres_absences = $salaire_brut - $retenues_absences + $primes_individuelles;
+        
+        $taux_cotisations = ($data['taux_cotisation'] ?: 0) + $cotisations_supplementaires;
         $cotisations = $salaire_brut_apres_absences * ($taux_cotisations / 100);
         
-        $salaire_net = $salaire_brut_apres_absences - $cotisations - $data['retenues'];
+        $salaire_net = $salaire_brut_apres_absences - $cotisations - $retenues_diverses;
         
         return [
             'salaire_brut' => $salaire_brut,
             'salaire_brut_apres_absences' => $salaire_brut_apres_absences,
-            'primes' => $data['primes_individuelles'],
+            'primes' => $primes_individuelles,
             'retenues_absences' => $retenues_absences,
             'cotisations' => $cotisations,
-            'retenues_diverses' => $data['retenues'],
+            'retenues_diverses' => $retenues_diverses,
             'salaire_net' => $salaire_net,
             'mois_annee' => $mois_annee,
             'employe_id' => $employe_id,
             'poste_id' => $data['poste_id'],
             'categorie_paie' => $data['categorie_paie'],
-            'regime_social' => $data['regime_social']
+            'regime_social' => $data['regime_social'],
+            'nom' => $data['nom'],
+            'prenom' => $data['prenom'],
+            'poste_nom' => $data['poste_nom']
         ];
     }
-    
+
     /**
      * Génère un bulletin de paie en PDF
      */
     public function genererBulletinPaie(array $details): string {
-        require_once '../vendor/autoload.php';
+        // Vérifier si TCPDF est disponible
+        if (!class_exists('TCPDF')) {
+            // Version simple sans TCPDF
+            return $this->genererBulletinHTML($details);
+        }
         
-        // Récupérer les données de l'employé
-        $stmt = $this->conn->prepare("
-            SELECT e.nom, e.prenom, p.nom AS poste_nom
-            FROM employes e
-            JOIN postes p ON e.poste_id = p.id
-            WHERE e.id = ?
-        ");
-        $stmt->execute([$details['employe_id']]);
-        $employe = $stmt->fetch(PDO::FETCH_ASSOC);
+        require_once '../vendor/autoload.php';
         
         // Créer le PDF
         $pdf = new TCPDF();
         $pdf->SetCreator('Système de Gestion RH');
         $pdf->SetAuthor('Restaurant Management System');
-        $pdf->SetTitle('Bulletin de Paie - ' . $employe['nom'] . ' ' . $employe['prenom']);
+        $pdf->SetTitle('Bulletin de Paie - ' . $details['nom'] . ' ' . $details['prenom']);
         $pdf->AddPage();
         
         // En-tête
         $pdf->SetFont('helvetica', 'B', 16);
         $pdf->Cell(0, 10, 'BULLETIN DE PAIE', 0, 1, 'C');
-        $pdf->Cell(0, 10, strtoupper($employe['nom'] . ' ' . $employe['prenom']), 0, 1, 'C');
-        $pdf->Cell(0, 10, 'Poste: ' . $employe['poste_nom'], 0, 1, 'C');
+        $pdf->Cell(0, 10, strtoupper($details['nom'] . ' ' . $details['prenom']), 0, 1, 'C');
+        $pdf->Cell(0, 10, 'Poste: ' . ($details['poste_nom'] ?: 'Non défini'), 0, 1, 'C');
         $pdf->Cell(0, 10, 'Mois: ' . date('F Y', strtotime($details['mois_annee'] . '-01')), 0, 1, 'C');
         $pdf->Ln(10);
         
@@ -543,7 +562,7 @@ class PayrollManager {
         $pdf->SetFont('helvetica', '', 10);
         
         $lignes = [
-            ['Salaire brut de base:', $details['salaire_brut_apres_absences'] - $details['primes']],
+            ['Salaire brut de base:', $details['salaire_brut']],
             ['Primes individuelles:', $details['primes']],
             ['Retenues pour absences:', -$details['retenues_absences']],
             ['Cotisations sociales:', -$details['cotisations']],
@@ -564,12 +583,71 @@ class PayrollManager {
         $pdf->Cell(0, 8, number_format($details['salaire_net'], 0, ',', ' ') . ' FCFA', 0, 1, 'R');
         $pdf->SetTextColor(0, 0, 0);
         
-        return $pdf->Output('bulletin_' . $employe['nom'] . '_' . $details['mois_annee'] . '.pdf', 'S');
+        return $pdf->Output('', 'S'); // Retourner le contenu du PDF
+    }
+
+    /**
+     * Version alternative sans TCPDF (génère du HTML)
+     */
+    private function genererBulletinHTML(array $details): string {
+        $html = "
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset='UTF-8'>
+            <title>Bulletin de Paie</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                .header { text-align: center; margin-bottom: 30px; }
+                .details { margin: 20px 0; }
+                .line { display: flex; justify-content: space-between; padding: 5px 0; }
+                .total { font-weight: bold; color: green; font-size: 18px; border-top: 2px solid #000; padding-top: 10px; }
+            </style>
+        </head>
+        <body>
+            <div class='header'>
+                <h1>BULLETIN DE PAIE</h1>
+                <h2>" . strtoupper($details['nom'] . ' ' . $details['prenom']) . "</h2>
+                <p>Poste: " . ($details['poste_nom'] ?: 'Non défini') . "</p>
+                <p>Mois: " . date('F Y', strtotime($details['mois_annee'] . '-01')) . "</p>
+            </div>
+            
+            <div class='details'>
+                <h3>DETAILS DU SALAIRE</h3>
+                <div class='line'>
+                    <span>Salaire brut de base:</span>
+                    <span>" . number_format($details['salaire_brut'], 0, ',', ' ') . " FCFA</span>
+                </div>
+                <div class='line'>
+                    <span>Primes individuelles:</span>
+                    <span>" . number_format($details['primes'], 0, ',', ' ') . " FCFA</span>
+                </div>
+                <div class='line'>
+                    <span>Retenues pour absences:</span>
+                    <span>-" . number_format($details['retenues_absences'], 0, ',', ' ') . " FCFA</span>
+                </div>
+                <div class='line'>
+                    <span>Cotisations sociales:</span>
+                    <span>-" . number_format($details['cotisations'], 0, ',', ' ') . " FCFA</span>
+                </div>
+                <div class='line'>
+                    <span>Autres retenues:</span>
+                    <span>-" . number_format($details['retenues_diverses'], 0, ',', ' ') . " FCFA</span>
+                </div>
+                <div class='line total'>
+                    <span>SALAIRE NET A PAYER:</span>
+                    <span>" . number_format($details['salaire_net'], 0, ',', ' ') . " FCFA</span>
+                </div>
+            </div>
+        </body>
+        </html>";
+        
+        return $html;
     }
     
     /**
      * Enregistre un bulletin de paie dans la base de données
-     */
+     */   
     public function enregistrerBulletinPaie(array $details): int {
         $stmt = $this->conn->prepare("
             INSERT INTO bulletins_paie
@@ -588,7 +666,7 @@ class PayrollManager {
         ]);
         return $this->conn->lastInsertId();
     }
-    
+  
     /**
      * Génère les bulletins pour tous les employés actifs
      */
@@ -676,10 +754,6 @@ class PosteManager {
     }
 }
 
-// =============================================================================
-// GESTIONNAIRE D'API - AMÉLIORÉ
-// =============================================================================
-
 class APIHandler {
     private $employeeManager;
     private $posteManager;
@@ -692,9 +766,14 @@ class APIHandler {
     }
     
     public function handleRequest(): void {
-        header('Content-Type: application/json');
-        
         $action = $_GET['action'] ?? $_POST['ajax_action'] ?? '';
+        
+        // Pour les actions de génération de bulletins, on ne force pas le JSON
+        if (in_array($action, ['generer_bulletin'])) {
+            // Ces actions peuvent retourner du PDF
+        } else {
+            header('Content-Type: application/json');
+        }
         
         switch ($action) {
             case 'get_employees':
@@ -718,11 +797,17 @@ class APIHandler {
             case 'delete_employee':
                 $this->deleteEmployee();
                 break;
+            case 'generer_bulletin':
+                $this->genererBulletin();
+                break;
+            case 'generer_tous_bulletins':
+                $this->genererTousBulletins();
+                break;
             default:
+                header('Content-Type: application/json');
                 echo json_encode(['success' => false, 'message' => 'Action non reconnue']);
         }
         exit;
-        
     }
     
     private function getEmployees(): void {
@@ -809,20 +894,99 @@ class APIHandler {
         echo json_encode($result);
     }
     
-}
+    private function genererBulletin(): void {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
+            return;
+        }
 
-// =============================================================================
-// TRAITEMENT DES REQUÊTES API
-// =============================================================================
+        try {
+            $employe_id = $_POST['employe_id'] ?? null;
+            $mois_annee = $_POST['mois_annee'] ?? null;
+
+            if (!$employe_id || !$mois_annee) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => 'Employé et mois requis']);
+                return;
+            }
+
+            // Vérifier que l'employé existe
+            $employee = $this->employeeManager->getEmployeeById($employe_id);
+            if (!$employee) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => 'Employé non trouvé']);
+                return;
+            }
+
+            // Calculer le salaire et générer le bulletin
+            $details = $this->payrollManager->calculerSalaireNet($employe_id, $mois_annee);
+            $pdf_content = $this->payrollManager->genererBulletinPaie($details);
+            
+            // Enregistrer le bulletin dans la base de données
+            $bulletin_id = $this->payrollManager->enregistrerBulletinPaie($details);
+
+            // Vérifier si c'est du PDF ou du HTML
+            if (strpos($pdf_content, '<!DOCTYPE html') !== false) {
+                // C'est du HTML, on le convertit pour le téléchargement
+                header('Content-Type: text/html; charset=UTF-8');
+                header('Content-Disposition: attachment; filename="bulletin_' . $employee['nom'] . '_' . $mois_annee . '.html"');
+            } else {
+                // C'est du PDF
+                header('Content-Type: application/pdf');
+                header('Content-Disposition: attachment; filename="bulletin_' . $employee['nom'] . '_' . $mois_annee . '.pdf"');
+            }
+            
+            header('Content-Length: ' . strlen($pdf_content));
+            echo $pdf_content;
+
+        } catch (Exception $e) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
+    private function genererTousBulletins(): void {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
+            return;
+        }
+
+        try {
+            $mois_annee = $_POST['mois_annee'] ?? null;
+
+            if (!$mois_annee) {
+                echo json_encode(['success' => false, 'message' => 'Mois requis']);
+                return;
+            }
+
+            $resultats = $this->payrollManager->genererBulletinsPourTous($mois_annee);
+            
+            $count_success = count(array_filter($resultats, function($r) { return $r['success']; }));
+            $count_total = count($resultats);
+
+            if ($count_success > 0) {
+                echo json_encode([
+                    'success' => true, 
+                    'message' => "Bulletins générés avec succès",
+                    'count' => $count_success,
+                    'total' => $count_total,
+                    'details' => $resultats
+                ]);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Aucun bulletin généré']);
+            }
+
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+}
 
 if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action']))) {
     $apiHandler = new APIHandler($conn);
     $apiHandler->handleRequest();
 }
-
-// =============================================================================
-// CHARGEMENT DES DONNÉES POUR LA VUE
-// =============================================================================
 
 try {
     $posteManager = new PosteManager($conn);
@@ -1730,74 +1894,88 @@ try {
             }
         }
 
-        function genererBulletin() {
-            const employe_id = document.getElementById('employe_id').value;
-            const mois_annee = document.getElementById('mois_annee').value;
+     function genererBulletin() {
+    const employe_id = document.getElementById('employe_id').value;
+    const mois_annee = document.getElementById('mois_annee').value;
 
-            if (!employe_id || !mois_annee) {
-                showNotification('Veuillez sélectionner un employé et un mois.', 'error');
-                return;
-            }
+    if (!employe_id || !mois_annee) {
+        showNotification('Veuillez sélectionner un employé et un mois.', 'error');
+        return;
+    }
 
-            showLoading();
-            fetch('generer_bulletin.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `employe_id=${employe_id}&mois_annee=${mois_annee}`
-            })
-            .then(response => response.json())
-            .then(data => {
-                hideLoading();
-                if (data.success) {
-                    const link = document.createElement('a');
-                    link.href = 'data:application/pdf;base64,' + data.pdf;
-                    link.download = `bulletin_${mois_annee}_${employe_id}.pdf`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    showNotification('Bulletin généré avec succès !', 'success');
-                } else {
-                    showNotification(data.message, 'error');
-                }
-            })
-            .catch(error => {
-                hideLoading();
-                showNotification('Erreur: ' + error.message, 'error');
-            });
+    showLoading();
+    
+    fetch('generer_bulletin.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `employe_id=${employe_id}&mois_annee=${mois_annee}`
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
-
-        function genererTousBulletins() {
-            const mois_annee = document.getElementById('mois_annee').value;
-
-            if (!mois_annee) {
-                showNotification('Veuillez sélectionner un mois.', 'error');
-                return;
-            }
-
-            if (!confirm('Voulez-vous vraiment générer les bulletins pour tous les employés actifs?')) {
-                return;
-            }
-
-            showLoading();
-            fetch('generer_tous_bulletins.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `mois_annee=${mois_annee}`
-            })
-            .then(response => response.json())
-            .then(data => {
-                hideLoading();
-                if (data.success) {
-                    showNotification(`Bulletins générés avec succès ! ${data.count} bulletins créés.`, 'success');
-                } else {
-                    showNotification(data.message, 'error');
+        return response.json();
+    })
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            try {
+                // Décoder le contenu base64
+                const byteCharacters = atob(data.pdf);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
                 }
-            })
-            .catch(error => {
-                hideLoading();
-                showNotification('Erreur: ' + error.message, 'error');
-            });
+                const byteArray = new Uint8Array(byteNumbers);
+                
+                // Déterminer le type MIME
+                let mimeType, extension;
+                if (data.type === 'html') {
+                    mimeType = 'text/html';
+                    extension = 'html';
+                } else {
+                    mimeType = 'application/pdf';
+                    extension = 'pdf';
+                }
+                
+                const blob = new Blob([byteArray], { type: mimeType });
+                
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                
+                // Récupérer le nom de l'employé pour le nom du fichier
+                const employeSelect = document.getElementById('employe_id');
+                const employeText = employeSelect.options[employeSelect.selectedIndex].text;
+                const employeName = employeText.split(' (')[0].replace(/\s+/g, '_');
+                
+                link.download = `bulletin_${employeName}_${mois_annee}.${extension}`;
+                
+                // Forcer le téléchargement
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                // Libérer la mémoire
+                window.URL.revokeObjectURL(url);
+                
+                showNotification('Bulletin généré et téléchargé avec succès !', 'success');
+                
+            } catch (error) {
+                console.error('Erreur lors du traitement du fichier:', error);
+                showNotification('Erreur lors du traitement du fichier téléchargé', 'error');
+            }
+        } else {
+            showNotification(data.message || 'Erreur lors de la génération', 'error');
         }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Erreur:', error);
+        showNotification('Erreur lors de la génération du bulletin: ' + error.message, 'error');
+    });
+}
+
 
         function showNotification(message, type = 'info') {
             const notification = document.getElementById('notification');
@@ -1835,7 +2013,7 @@ try {
 
         function hideLoading() {
             hideNotification();
-        }
+        }                            
         
         // Fermer la modal en cliquant à l'extérieur
         document.getElementById('employeeModal').addEventListener('click', function(e) {

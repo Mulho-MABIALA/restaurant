@@ -6,6 +6,353 @@ if (!isset($_SESSION['admin_logged_in'])) {
 }
 require_once '../config.php';
 
+// Fonction pour enregistrer les logs d'activité
+function logActivity($conn, $admin_id, $admin_username, $action, $target = null, $details = null) {
+    try {
+        $stmt = $conn->prepare("INSERT INTO admin_logs (admin_id, admin_username, action, target, details, ip_address, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+        $stmt->execute([$admin_id, $admin_username, $action, $target, $details, $_SERVER['REMOTE_ADDR'] ?? '']);
+    } catch (Exception $e) {
+        error_log("Erreur log d'activité: " . $e->getMessage());
+    }
+}
+
+// Gestion des actions AJAX
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    header('Content-Type: application/json');
+    
+    switch ($_POST['action']) {
+        case 'add_admin':
+            try {
+                $username = trim($_POST['username']);
+                $email = trim($_POST['email']);
+                $password = $_POST['password'];
+                $role = $_POST['role'];
+                
+                // Vérification unicité
+                $stmt = $conn->prepare("SELECT COUNT(*) FROM admin WHERE username = ? OR email = ?");
+                $stmt->execute([$username, $email]);
+                if ($stmt->fetchColumn() > 0) {
+                    echo json_encode(['success' => false, 'message' => 'Nom d\'utilisateur ou email déjà existant']);
+                    exit;
+                }
+                
+                $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+                $stmt = $conn->prepare("INSERT INTO admin (username, email, password, role, status, created_at) VALUES (?, ?, ?, ?, 1, NOW())");
+                $result = $stmt->execute([$username, $email, $hashedPassword, $role]);
+                
+                if ($result) {
+                    logActivity($conn, $_SESSION['admin_id'] ?? 0, $_SESSION['admin_username'], 'CREATE_ADMIN', $username, "Création d'un nouveau compte administrateur");
+                }
+                
+                echo json_encode(['success' => $result, 'message' => $result ? 'Administrateur ajouté avec succès' : 'Erreur lors de l\'ajout']);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()]);
+            }
+            exit;
+            
+        case 'edit_admin':
+            try {
+                $id = $_POST['id'];
+                $username = trim($_POST['username']);
+                $email = trim($_POST['email']);
+                $role = $_POST['role'];
+                
+                // Vérification unicité (exclure l'admin actuel)
+                $stmt = $conn->prepare("SELECT COUNT(*) FROM admin WHERE (username = ? OR email = ?) AND id != ?");
+                $stmt->execute([$username, $email, $id]);
+                if ($stmt->fetchColumn() > 0) {
+                    echo json_encode(['success' => false, 'message' => 'Nom d\'utilisateur ou email déjà existant']);
+                    exit;
+                }
+                
+                $params = [$username, $email, $role, $id];
+                $sql = "UPDATE admin SET username = ?, email = ?, role = ?";
+                
+                if (!empty($_POST['password'])) {
+                    $hashedPassword = password_hash($_POST['password'], PASSWORD_DEFAULT);
+                    $sql .= ", password = ?";
+                    $params = [$username, $email, $role, $hashedPassword, $id];
+                }
+                
+                $sql .= " WHERE id = ?";
+                $stmt = $conn->prepare($sql);
+                $result = $stmt->execute($params);
+                
+                if ($result) {
+                    logActivity($conn, $_SESSION['admin_id'] ?? 0, $_SESSION['admin_username'], 'UPDATE_ADMIN', $username, "Modification du compte administrateur ID: $id");
+                }
+                
+                echo json_encode(['success' => $result, 'message' => $result ? 'Administrateur modifié avec succès' : 'Erreur lors de la modification']);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()]);
+            }
+            exit;
+            
+        case 'bulk_delete':
+            $ids = json_decode($_POST['ids']);
+            $placeholders = str_repeat('?,', count($ids) - 1) . '?';
+            
+            // Récupérer les noms des admins à supprimer
+            $stmt = $conn->prepare("SELECT username FROM admin WHERE id IN ($placeholders)");
+            $stmt->execute($ids);
+            $usernames = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            
+            $stmt = $conn->prepare("DELETE FROM admin WHERE id IN ($placeholders) AND username != ?");
+            $params = array_merge($ids, [$_SESSION['admin_username']]);
+            $result = $stmt->execute($params);
+            
+            if ($result) {
+                logActivity($conn, $_SESSION['admin_id'] ?? 0, $_SESSION['admin_username'], 'BULK_DELETE_ADMIN', implode(', ', $usernames), 'Suppression en lot de ' . count($usernames) . ' administrateur(s)');
+            }
+            
+            echo json_encode(['success' => $result]);
+            exit;
+            
+        case 'bulk_role_change':
+            $ids = json_decode($_POST['ids']);
+            $role = $_POST['role'];
+            $placeholders = str_repeat('?,', count($ids) - 1) . '?';
+            
+            // Récupérer les noms des admins concernés
+            $stmt = $conn->prepare("SELECT username FROM admin WHERE id IN ($placeholders)");
+            $stmt->execute($ids);
+            $usernames = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            
+            $stmt = $conn->prepare("UPDATE admin SET role = ? WHERE id IN ($placeholders)");
+            $params = array_merge([$role], $ids);
+            $result = $stmt->execute($params);
+            
+            if ($result) {
+                logActivity($conn, $_SESSION['admin_id'] ?? 0, $_SESSION['admin_username'], 'BULK_ROLE_CHANGE', implode(', ', $usernames), "Changement de rôle en lot vers: $role");
+            }
+            
+            echo json_encode(['success' => $result]);
+            exit;
+            
+        case 'bulk_status_change':
+            $ids = json_decode($_POST['ids']);
+            $status = $_POST['status'];
+            $placeholders = str_repeat('?,', count($ids) - 1) . '?';
+            
+            $stmt = $conn->prepare("SELECT username FROM admin WHERE id IN ($placeholders)");
+            $stmt->execute($ids);
+            $usernames = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            
+            $stmt = $conn->prepare("UPDATE admin SET status = ? WHERE id IN ($placeholders)");
+            $params = array_merge([$status], $ids);
+            $result = $stmt->execute($params);
+            
+            if ($result) {
+                $statusText = $status ? 'activation' : 'désactivation';
+                logActivity($conn, $_SESSION['admin_id'] ?? 0, $_SESSION['admin_username'], 'BULK_STATUS_CHANGE', implode(', ', $usernames), "Changement de statut en lot: $statusText");
+            }
+            
+            echo json_encode(['success' => $result]);
+            exit;
+            
+        case 'toggle_status':
+            $id = $_POST['id'];
+            
+            // Récupérer le nom et le statut actuel
+            $stmt = $conn->prepare("SELECT username, status FROM admin WHERE id = ?");
+            $stmt->execute([$id]);
+            $admin = $stmt->fetch();
+            
+            $stmt = $conn->prepare("UPDATE admin SET status = CASE WHEN status = 1 THEN 0 ELSE 1 END WHERE id = ?");
+            $result = $stmt->execute([$id]);
+            
+            if ($result && $admin) {
+                $newStatus = $admin['status'] ? 'désactivé' : 'activé';
+                logActivity($conn, $_SESSION['admin_id'] ?? 0, $_SESSION['admin_username'], 'TOGGLE_STATUS', $admin['username'], "Compte $newStatus");
+            }
+            
+            echo json_encode(['success' => $result]);
+            exit;
+
+        case 'force_logout':
+            try {
+                $adminId = $_POST['admin_id'];
+                
+                // Récupérer les infos de l'admin
+                $stmt = $conn->prepare("SELECT username FROM admin WHERE id = ?");
+                $stmt->execute([$adminId]);
+                $targetAdmin = $stmt->fetch();
+                
+                // Marquer la session comme expirée
+                $stmt = $conn->prepare("UPDATE admin_sessions SET is_active = 0, logged_out_at = NOW() WHERE admin_id = ? AND is_active = 1");
+                $result = $stmt->execute([$adminId]);
+                
+                if ($result && $targetAdmin) {
+                    logActivity($conn, $_SESSION['admin_id'] ?? 0, $_SESSION['admin_username'], 'FORCE_LOGOUT', $targetAdmin['username'], 'Déconnexion forcée');
+                }
+                
+                echo json_encode(['success' => $result]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()]);
+            }
+            exit;
+
+        case 'get_admin_details':
+            try {
+                $adminId = $_POST['admin_id'];
+                
+                // Informations de base de l'admin
+                $stmt = $conn->prepare("
+                    SELECT a.*, 
+                           COALESCE(DATE_FORMAT(a.last_login, '%d/%m/%Y %H:%i:%s'), 'Jamais') as last_login_display,
+                           CASE WHEN a.status = 1 THEN 'Actif' ELSE 'Inactif' END as status_display
+                    FROM admin a 
+                    WHERE a.id = ?
+                ");
+                $stmt->execute([$adminId]);
+                $admin = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$admin) {
+                    echo json_encode(['success' => false, 'message' => 'Administrateur non trouvé']);
+                    exit;
+                }
+                
+                // Sessions actives
+                $stmt = $conn->prepare("
+                    SELECT * FROM admin_sessions 
+                    WHERE admin_id = ? AND is_active = 1 
+                    ORDER BY last_activity DESC
+                ");
+                $stmt->execute([$adminId]);
+                $activeSessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                // Historique des connexions (10 dernières)
+                $stmt = $conn->prepare("
+                    SELECT * FROM admin_sessions 
+                    WHERE admin_id = ? 
+                    ORDER BY logged_in_at DESC 
+                    LIMIT 10
+                ");
+                $stmt->execute([$adminId]);
+                $loginHistory = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                // Journal d'activité (20 dernières actions)
+                $stmt = $conn->prepare("
+                    SELECT * FROM admin_logs 
+                    WHERE admin_id = ? 
+                    ORDER BY created_at DESC 
+                    LIMIT 20
+                ");
+                $stmt->execute([$adminId]);
+                $activityLog = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                echo json_encode([
+                    'success' => true,
+                    'admin' => $admin,
+                    'active_sessions' => $activeSessions,
+                    'login_history' => $loginHistory,
+                    'activity_log' => $activityLog
+                ]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()]);
+            }
+            exit;
+
+        case 'get_activity_logs':
+            try {
+                $page = max(1, intval($_POST['page'] ?? 1));
+                $limit = 20;
+                $offset = ($page - 1) * $limit;
+                
+                $whereClause = "WHERE 1=1";
+                $params = [];
+                
+                if (!empty($_POST['admin_filter'])) {
+                    $whereClause .= " AND admin_username LIKE ?";
+                    $params[] = '%' . $_POST['admin_filter'] . '%';
+                }
+                
+                if (!empty($_POST['action_filter'])) {
+                    $whereClause .= " AND action = ?";
+                    $params[] = $_POST['action_filter'];
+                }
+                
+                if (!empty($_POST['date_filter'])) {
+                    $whereClause .= " AND DATE(created_at) = ?";
+                    $params[] = $_POST['date_filter'];
+                }
+                
+                // Compter le total
+                $stmt = $conn->prepare("SELECT COUNT(*) FROM admin_logs $whereClause");
+                $stmt->execute($params);
+                $total = $stmt->fetchColumn();
+                
+                // Récupérer les logs
+                $stmt = $conn->prepare("
+                    SELECT * FROM admin_logs 
+                    $whereClause 
+                    ORDER BY created_at DESC 
+                    LIMIT $limit OFFSET $offset
+                ");
+                $stmt->execute($params);
+                $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                echo json_encode([
+                    'success' => true,
+                    'logs' => $logs,
+                    'total' => $total,
+                    'page' => $page,
+                    'total_pages' => ceil($total / $limit)
+                ]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()]);
+            }
+            exit;
+            
+        case 'get_employee_email':
+            try {
+                $username = trim($_POST['username']);
+                
+                // Rechercher l'email de l'employé par nom, prénom, matricule ou code_numerique
+                $stmt = $conn->prepare("
+                    SELECT email, nom, prenom, matricule 
+                    FROM employes 
+                    WHERE LOWER(nom) LIKE LOWER(?) 
+                       OR LOWER(prenom) LIKE LOWER(?) 
+                       OR LOWER(matricule) LIKE LOWER(?)
+                       OR LOWER(code_numerique) LIKE LOWER(?)
+                       OR LOWER(CONCAT(nom, ' ', prenom)) LIKE LOWER(?)
+                       OR LOWER(CONCAT(prenom, ' ', nom)) LIKE LOWER(?)
+                    LIMIT 1
+                ");
+                
+                $searchTerm = "%{$username}%";
+                $fullName = "%{$username}%";
+                
+                $stmt->execute([
+                    $searchTerm, // nom
+                    $searchTerm, // prenom  
+                    $username,   // matricule (exact)
+                    $username,   // code_numerique (exact)
+                    $fullName,   // nom + prenom
+                    $fullName    // prenom + nom
+                ]);
+                
+                $employee = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($employee) {
+                    echo json_encode([
+                        'success' => true, 
+                        'email' => $employee['email'],
+                        'nom' => $employee['nom'],
+                        'prenom' => $employee['prenom'],
+                        'matricule' => $employee['matricule']
+                    ]);
+                } else {
+                    echo json_encode(['success' => false, 'message' => 'Employé non trouvé']);
+                }
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()]);
+            }
+            exit;
+    }
+}
+
 // Récupération des données avec dernière connexion et statistiques
 $stmt = $conn->query("
     SELECT 
@@ -17,72 +364,38 @@ $stmt = $conn->query("
         a.last_login,
         a.created_at,
         'admin_table' as source,
-        NULL as employee_id,
-        COALESCE(a.last_login, 'Jamais') as last_login_display,
-        CASE WHEN a.status = 1 THEN 'Actif' ELSE 'Inactif' END as status_display
+        a.employee_id,
+        COALESCE(DATE_FORMAT(a.last_login, '%d/%m/%Y %H:%i'), 'Jamais') as last_login_display,
+        CASE WHEN a.status = 1 THEN 'Actif' ELSE 'Inactif' END as status_display,
+        CASE WHEN EXISTS(SELECT 1 FROM admin_sessions s WHERE s.admin_id = a.id AND s.is_active = 1) THEN 1 ELSE 0 END as is_online
     FROM admin a
     ORDER BY created_at DESC
 ");
 $admins = $stmt->fetchAll();
 
-// Adapter les statistiques
+// Statistiques
 $stats = [
     'total' => count($admins),
-    'super_admin' => count(array_filter($admins, fn($a) => $a['role'] === 'super_admin')),
+    'super_admin' => count(array_filter($admins, fn($a) => $a['role'] === 'superadmin')),
     'admin' => count(array_filter($admins, fn($a) => $a['role'] === 'admin')),
     'active' => count(array_filter($admins, fn($a) => $a['status'] == 1)),
-    'inactive' => count(array_filter($admins, fn($a) => $a['status'] != 1))
+    'inactive' => count(array_filter($admins, fn($a) => $a['status'] != 1)),
+    'online' => count(array_filter($admins, fn($a) => $a['is_online'] == 1))
 ];
 
-// Gestion des actions AJAX
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    header('Content-Type: application/json');
-    
-    switch ($_POST['action']) {
-        case 'bulk_delete':
-            $ids = json_decode($_POST['ids']);
-            $placeholders = str_repeat('?,', count($ids) - 1) . '?';
-            $stmt = $conn->prepare("DELETE FROM admin WHERE id IN ($placeholders) AND username != ?");
-            $params = array_merge($ids, [$_SESSION['admin_username']]);
-            $result = $stmt->execute($params);
-            echo json_encode(['success' => $result]);
-            exit;
-            
-        case 'bulk_role_change':
-            $ids = json_decode($_POST['ids']);
-            $role = $_POST['role'];
-            $placeholders = str_repeat('?,', count($ids) - 1) . '?';
-            $stmt = $conn->prepare("UPDATE admin SET role = ? WHERE id IN ($placeholders)");
-            $params = array_merge([$role], $ids);
-            $result = $stmt->execute($params);
-            echo json_encode(['success' => $result]);
-            exit;
-            
-        case 'toggle_status':
-            $id = $_POST['id'];
-            $stmt = $conn->prepare("UPDATE admin SET status = CASE WHEN status = 1 THEN 0 ELSE 1 END WHERE id = ?");
-            $result = $stmt->execute([$id]);
-            echo json_encode(['success' => $result]);
-            exit;
-            
-        case 'export_csv':
-            header('Content-Type: text/csv');
-            header('Content-Disposition: attachment; filename="admins_' . date('Y-m-d') . '.csv"');
-            $output = fopen('php://output', 'w');
-            fputcsv($output, ['ID', 'Username', 'Email', 'Role', 'Status', 'Last Login']);
-            foreach ($admins as $admin) {
-                fputcsv($output, [
-                    $admin['id'],
-                    $admin['username'],
-                    $admin['email'],
-                    $admin['role'],
-                    $admin['status_display'],
-                    $admin['last_login_display']
-                ]);
-            }
-            fclose($output);
-            exit;
-    }
+// Récupération des logs d'activité récents
+$recentLogs = [];
+try {
+    $stmt = $conn->prepare("
+        SELECT admin_username, action, target, created_at, details 
+        FROM admin_logs 
+        ORDER BY created_at DESC 
+        LIMIT 10
+    ");
+    $stmt->execute();
+    $recentLogs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    // Table admin_logs n'existe peut-être pas encore
 }
 ?>
 
@@ -95,18 +408,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#2563eb',
-                        secondary: '#64748b'
-                    }
-                }
-            }
-        }
-    </script>
     <style>
         .toast {
             transform: translateX(100%);
@@ -123,6 +424,76 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         .dark .text-slate-800 { color: #f1f5f9 !important; }
         .dark .text-slate-600 { color: #cbd5e1 !important; }
         .dark .border-slate-200 { border-color: #334155 !important; }
+        
+        .stat-card {
+            transition: all 0.3s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .glass-effect {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        
+        .floating-icon {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        .modal {
+            backdrop-filter: blur(4px);
+        }
+
+        .grid-view {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+
+        .admin-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .admin-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .online-indicator {
+            width: 8px;
+            height: 8px;
+            background: #10b981;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .bulk-actions {
+            transform: translateY(-100%);
+            transition: transform 0.3s ease;
+        }
+
+        .bulk-actions.show {
+            transform: translateY(0);
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen transition-all duration-300" id="body">
@@ -134,9 +505,269 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             <div class="bg-white border-b border-slate-200 px-6 py-4">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center space-x-3">
-                        <div class="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+                        <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
                             <i class="fas fa-users-cog text-white text-lg"></i>
                         </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="fixed top-4 right-4 space-y-4 z-50"></div>
+
+    <!-- Modal d'ajout -->
+    <div id="addModal" class="fixed inset-0 bg-black bg-opacity-50 modal hidden z-40 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full">
+            <div class="bg-gradient-to-r from-blue-500 to-blue-600 p-6 rounded-t-2xl">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-user-plus text-white"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-white">Nouvel administrateur</h3>
+                            <p class="text-blue-100 text-sm">Ajouter un nouveau compte</p>
+                        </div>
+                    </div>
+                    <button onclick="closeAddModal()" class="text-white hover:text-blue-200 transition-colors">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            
+            
+            <form id="editForm" class="p-6 space-y-4">
+                <input type="hidden" id="editAdminId" name="id">
+                
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Nom d'utilisateur</label>
+                    <input type="text" name="username" id="editUsername" required
+                           class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Email</label>
+                    <input type="email" name="email" id="editEmail" required
+                           class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Rôle</label>
+                    <select name="role" id="editRole" required
+                            class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+                        <option value="admin">Administrateur</option>
+                        <option value="superadmin">Super Administrateur</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Nouveau mot de passe (optionnel)</label>
+                    <input type="password" name="password" id="editPassword"
+                           class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                           placeholder="Laisser vide pour conserver l'actuel">
+                </div>
+                
+                <div class="flex space-x-3 pt-4">
+                    <button type="button" onclick="closeEditModal()" 
+                            class="flex-1 px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors">
+                        Annuler
+                    </button>
+                    <button type="submit" 
+                            class="flex-1 px-4 py-3 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors">
+                        Modifier
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de confirmation de suppression -->
+    <div id="deleteModal" class="fixed inset-0 bg-black bg-opacity-50 modal hidden z-40 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full">
+            <div class="bg-gradient-to-r from-red-500 to-red-600 p-6 rounded-t-2xl">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-exclamation-triangle text-white"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-white">Confirmer la suppression</h3>
+                            <p class="text-red-100 text-sm">Cette action est irréversible</p>
+                        </div>
+                    </div>
+                    <button onclick="closeDeleteModal()" class="text-white hover:text-red-200 transition-colors">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="p-6">
+                <div class="text-center mb-6">
+                    <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-user-times text-red-500 text-2xl"></i>
+                    </div>
+                    <h4 class="text-lg font-semibold text-slate-800 mb-2">Supprimer l'administrateur</h4>
+                    <p class="text-slate-600">
+                        Êtes-vous sûr de vouloir supprimer l'administrateur 
+                        <span class="font-semibold text-red-600" id="deleteAdminName"></span> ?
+                    </p>
+                    <p class="text-sm text-slate-500 mt-2">Cette action ne peut pas être annulée.</p>
+                </div>
+                
+                <div class="flex space-x-3">
+                    <button type="button" onclick="closeDeleteModal()" 
+                            class="flex-1 px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors">
+                        Annuler
+                    </button>
+                    <button onclick="executeDelete()" 
+                            class="flex-1 px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">
+                        Supprimer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de détails d'un administrateur -->
+    <div id="adminDetailsModal" class="fixed inset-0 bg-black bg-opacity-50 modal hidden z-40 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <div class="bg-gradient-to-r from-indigo-500 to-indigo-600 p-6 rounded-t-2xl">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-user-circle text-white text-2xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-white" id="modalAdminName">Détails Administrateur</h3>
+                            <p class="text-indigo-100 text-sm">Informations complètes et historique</p>
+                        </div>
+                    </div>
+                    <button onclick="closeAdminDetailsModal()" class="text-white hover:text-indigo-200 transition-colors">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="p-6 max-h-[calc(90vh-120px)] overflow-y-auto">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Informations générales -->
+                    <div class="bg-slate-50 rounded-xl p-6">
+                        <h4 class="font-bold text-slate-800 mb-4 flex items-center">
+                            <i class="fas fa-info-circle text-blue-500 mr-2"></i>
+                            Informations générales
+                        </h4>
+                        <div id="adminGeneralInfo" class="space-y-3">
+                            <!-- Contenu rempli par JavaScript -->
+                        </div>
+                    </div>
+                    
+                    <!-- Sessions actives -->
+                    <div class="bg-slate-50 rounded-xl p-6">
+                        <h4 class="font-bold text-slate-800 mb-4 flex items-center">
+                            <i class="fas fa-wifi text-green-500 mr-2"></i>
+                            Sessions actives
+                        </h4>
+                        <div id="adminActiveSessions" class="space-y-3 max-h-40 overflow-y-auto">
+                            <!-- Contenu rempli par JavaScript -->
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Historique des connexions -->
+                    <div class="bg-slate-50 rounded-xl p-6">
+                        <h4 class="font-bold text-slate-800 mb-4 flex items-center">
+                            <i class="fas fa-history text-amber-500 mr-2"></i>
+                            Historique des connexions
+                        </h4>
+                        <div id="adminLoginHistory" class="space-y-3 max-h-60 overflow-y-auto">
+                            <!-- Contenu rempli par JavaScript -->
+                        </div>
+                    </div>
+                    
+                    <!-- Journal d'activité -->
+                    <div class="bg-slate-50 rounded-xl p-6">
+                        <h4 class="font-bold text-slate-800 mb-4 flex items-center">
+                            <i class="fas fa-clipboard-list text-purple-500 mr-2"></i>
+                            Journal d'activité
+                        </h4>
+                        <div id="adminActivityLog" class="space-y-3 max-h-60 overflow-y-auto">
+                            <!-- Contenu rempli par JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Journal d'activité -->
+    <div id="activityLogModal" class="fixed inset-0 bg-black bg-opacity-50 modal hidden z-40 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
+            <div class="bg-gradient-to-r from-purple-500 to-purple-600 p-6 rounded-t-2xl">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-clipboard-list text-white text-2xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-white">Journal d'activité</h3>
+                            <p class="text-purple-100 text-sm">Historique complet des actions</p>
+                        </div>
+                    </div>
+                    <button onclick="closeActivityLogModal()" class="text-white hover:text-purple-200 transition-colors">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="p-6">
+                <!-- Filtres du journal -->
+                <div class="bg-slate-50 rounded-xl p-4 mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Administrateur</label>
+                            <input type="text" id="logAdminFilter" placeholder="Nom d'utilisateur..."
+                                   class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Action</label>
+                            <select id="logActionFilter" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm">
+                                <option value="">Toutes les actions</option>
+                                <option value="CREATE_ADMIN">Création admin</option>
+                                <option value="UPDATE_ADMIN">Modification admin</option>
+                                <option value="DELETE_ADMIN">Suppression admin</option>
+                                <option value="TOGGLE_STATUS">Changement statut</option>
+                                <option value="FORCE_LOGOUT">Déconnexion forcée</option>
+                                <option value="BULK_DELETE_ADMIN">Suppression en lot</option>
+                                <option value="BULK_ROLE_CHANGE">Changement rôle en lot</option>
+                                <option value="BULK_STATUS_CHANGE">Changement statut en lot</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Date</label>
+                            <input type="date" id="logDateFilter"
+                                   class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm">
+                        </div>
+                        <div class="flex items-end">
+                            <button onclick="filterActivityLogs()" class="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm">
+                                <i class="fas fa-filter mr-1"></i>Filtrer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Liste des logs -->
+                <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                    <div id="activityLogsContent" class="max-h-96 overflow-y-auto">
+                        <!-- Contenu rempli par JavaScript -->
+                    </div>
+                </div>
+                
+                <!-- Pagination -->
+                <div id="logsPagination" class="flex items-center justify-between mt-4">
+                    <!-- Contenu rempli par JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+            
                         <div>
                             <h1 class="text-2xl font-bold text-slate-800">Gestion des administrateurs</h1>
                             <p class="text-sm text-slate-500">Gérez les comptes administrateurs du système</p>
@@ -148,7 +779,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                             <i class="fas fa-moon text-slate-600" id="darkModeIcon"></i>
                         </button>
                         <nav class="flex items-center space-x-2 text-sm text-slate-500">
-                            <a href="dashboard.php" class="hover:text-primary transition-colors">Dashboard</a>
+                            <a href="dashboard.php" class="hover:text-blue-600 transition-colors">Dashboard</a>
                             <i class="fas fa-chevron-right text-xs"></i>
                             <span class="text-slate-800">Administrateurs</span>
                         </nav>
@@ -160,437 +791,327 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             <div class="p-6">
                 <div class="max-w-7xl mx-auto">
                     <!-- Statistiques -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                        <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl shadow-lg border border-blue-200 p-6 text-white transform hover:scale-105 transition-all duration-300">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-blue-100 text-sm font-medium">Total Administrateurs</p>
-                                    <p class="text-3xl font-bold mt-1"><?= $stats['total'] ?></p>
-                                    <p class="text-blue-200 text-xs mt-1">
-                                        <i class="fas fa-trending-up mr-1"></i>
-                                        Système actuel
-                                    </p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
+                        <div class="stat-card glass-effect rounded-2xl shadow-lg p-4 relative overflow-hidden border-2 border-blue-100">
+                            <div class="absolute top-0 right-0 w-20 h-20 bg-blue-500 rounded-full -translate-y-10 translate-x-10 opacity-10"></div>
+                            <div class="relative z-10">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                                        <i class="fas fa-users text-white text-sm"></i>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-xl font-bold text-blue-600"><?= $stats['total'] ?></div>
+                                        <div class="text-xs text-blue-500 font-medium">TOTAL</div>
+                                    </div>
                                 </div>
-                                <div class="bg-white bg-opacity-20 rounded-full p-4">
-                                    <i class="fas fa-users text-2xl"></i>
-                                </div>
+                                <h3 class="font-semibold text-slate-800 text-sm">Total</h3>
                             </div>
                         </div>
                         
-                        <div class="bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl shadow-lg border border-purple-200 p-6 text-white transform hover:scale-105 transition-all duration-300">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-purple-100 text-sm font-medium">Super Administrateurs</p>
-                                    <p class="text-3xl font-bold mt-1"><?= $stats['super_admin'] ?></p>
-                                    <p class="text-purple-200 text-xs mt-1">
-                                        <i class="fas fa-shield-alt mr-1"></i>
-                                        Accès complet
-                                    </p>
+                        <div class="stat-card glass-effect rounded-2xl shadow-lg p-4 relative overflow-hidden border-2 border-purple-100">
+                            <div class="absolute top-0 right-0 w-20 h-20 bg-purple-500 rounded-full -translate-y-10 translate-x-10 opacity-10"></div>
+                            <div class="relative z-10">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
+                                        <i class="fas fa-crown text-white text-sm"></i>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-xl font-bold text-purple-600"><?= $stats['super_admin'] ?></div>
+                                        <div class="text-xs text-purple-500 font-medium">SUPER</div>
+                                    </div>
                                 </div>
-                                <div class="bg-white bg-opacity-20 rounded-full p-4">
-                                    <i class="fas fa-crown text-2xl"></i>
-                                </div>
+                                <h3 class="font-semibold text-slate-800 text-sm">Super Admin</h3>
                             </div>
                         </div>
                         
-                        <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-xl shadow-lg border border-green-200 p-6 text-white transform hover:scale-105 transition-all duration-300">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-green-100 text-sm font-medium">Administrateurs</p>
-                                    <p class="text-3xl font-bold mt-1"><?= $stats['admin'] ?></p>
-                                    <p class="text-green-200 text-xs mt-1">
-                                        <i class="fas fa-user-check mr-1"></i>
-                                        Accès standard
-                                    </p>
+                        <div class="stat-card glass-effect rounded-2xl shadow-lg p-4 relative overflow-hidden border-2 border-green-100">
+                            <div class="absolute top-0 right-0 w-20 h-20 bg-green-500 rounded-full -translate-y-10 translate-x-10 opacity-10"></div>
+                            <div class="relative z-10">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="w-8 h-8 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+                                        <i class="fas fa-user-tie text-white text-sm"></i>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-xl font-bold text-green-600"><?= $stats['admin'] ?></div>
+                                        <div class="text-xs text-green-500 font-medium">ADMIN</div>
+                                    </div>
                                 </div>
-                                <div class="bg-white bg-opacity-20 rounded-full p-4">
-                                    <i class="fas fa-user-tie text-2xl"></i>
-                                </div>
+                                <h3 class="font-semibold text-slate-800 text-sm">Admin</h3>
                             </div>
                         </div>
                         
-                        <div class="bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-xl shadow-lg border border-emerald-200 p-6 text-white transform hover:scale-105 transition-all duration-300">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-emerald-100 text-sm font-medium">Comptes Actifs</p>
-                                    <p class="text-3xl font-bold mt-1"><?= $stats['active'] ?></p>
-                                    <p class="text-emerald-200 text-xs mt-1">
-                                        <i class="fas fa-pulse mr-1"></i>
-                                        En ligne récemment
-                                    </p>
+                        <div class="stat-card glass-effect rounded-2xl shadow-lg p-4 relative overflow-hidden border-2 border-emerald-100">
+                            <div class="absolute top-0 right-0 w-20 h-20 bg-emerald-500 rounded-full -translate-y-10 translate-x-10 opacity-10"></div>
+                            <div class="relative z-10">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="w-8 h-8 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center">
+                                        <i class="fas fa-check-circle text-white text-sm"></i>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-xl font-bold text-emerald-600"><?= $stats['active'] ?></div>
+                                        <div class="text-xs text-emerald-500 font-medium">ACTIFS</div>
+                                    </div>
                                 </div>
-                                <div class="bg-white bg-opacity-20 rounded-full p-4">
-                                    <i class="fas fa-check-circle text-2xl"></i>
+                                <h3 class="font-semibold text-slate-800 text-sm">Actifs</h3>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card glass-effect rounded-2xl shadow-lg p-4 relative overflow-hidden border-2 border-red-100">
+                            <div class="absolute top-0 right-0 w-20 h-20 bg-red-500 rounded-full -translate-y-10 translate-x-10 opacity-10"></div>
+                            <div class="relative z-10">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="w-8 h-8 bg-gradient-to-r from-red-500 to-red-600 rounded-lg flex items-center justify-center">
+                                        <i class="fas fa-times-circle text-white text-sm"></i>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-xl font-bold text-red-600"><?= $stats['inactive'] ?></div>
+                                        <div class="text-xs text-red-500 font-medium">INACTIFS</div>
+                                    </div>
                                 </div>
+                                <h3 class="font-semibold text-slate-800 text-sm">Inactifs</h3>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card glass-effect rounded-2xl shadow-lg p-4 relative overflow-hidden border-2 border-indigo-100">
+                            <div class="absolute top-0 right-0 w-20 h-20 bg-indigo-500 rounded-full -translate-y-10 translate-x-10 opacity-10"></div>
+                            <div class="relative z-10">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="w-8 h-8 bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                                        <i class="fas fa-wifi text-white text-sm"></i>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-xl font-bold text-indigo-600"><?= $stats['online'] ?></div>
+                                        <div class="text-xs text-indigo-500 font-medium">EN LIGNE</div>
+                                    </div>
+                                </div>
+                                <h3 class="font-semibold text-slate-800 text-sm">En ligne</h3>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Graphique et Actions rapides -->
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                        <!-- Graphique -->
-                        <div class="lg:col-span-1 bg-white rounded-xl shadow-lg border border-slate-200 p-6">
-                            <div class="flex items-center justify-between mb-4">
-                                <h3 class="text-lg font-semibold text-slate-800">Répartition des rôles</h3>
-                                <div class="flex space-x-1">
-                                    <div class="w-3 h-3 bg-purple-500 rounded-full"></div>
-                                    <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
-                                </div>
+                    <!-- Actions en lot -->
+                    <div id="bulkActions" class="bulk-actions bg-blue-600 text-white rounded-xl shadow-lg p-4 mb-6 hidden">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-4">
+                                <span id="selectedCount" class="font-semibold">0 sélectionné(s)</span>
+                                <button onclick="selectAll()" class="text-blue-200 hover:text-white text-sm">
+                                    <i class="fas fa-check-double mr-1"></i>Tout sélectionner
+                                </button>
+                                <button onclick="clearSelection()" class="text-blue-200 hover:text-white text-sm">
+                                    <i class="fas fa-times mr-1"></i>Désélectionner tout
+                                </button>
                             </div>
-                            <div class="w-full max-w-xs mx-auto">
-                                <canvas id="roleChart" width="200" height="200"></canvas>
-                            </div>
-                        </div>
-                        
-                        <!-- Actions rapides -->
-                        <div class="lg:col-span-2 bg-white rounded-xl shadow-lg border border-slate-200 p-6">
-                            <h3 class="text-lg font-semibold text-slate-800 mb-4">Actions rapides</h3>
-                            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                <button onclick="openAddModal()" 
-                                        class="flex flex-col items-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg hover:from-blue-100 hover:to-blue-200 transition-all duration-200 group">
-                                    <div class="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                        <i class="fas fa-plus text-white text-lg"></i>
-                                    </div>
-                                    <span class="text-sm font-medium text-blue-700">Nouvel Admin</span>
+                            
+                            <div class="flex items-center space-x-2">
+                                <select id="bulkRoleSelect" class="px-3 py-1 rounded bg-white text-slate-800 text-sm">
+                                    <option value="">Changer le rôle</option>
+                                    <option value="admin">Admin</option>
+                                    <option value="superadmin">Super Admin</option>
+                                </select>
+                                
+                                <button onclick="bulkRoleChange()" class="px-3 py-1 bg-purple-500 hover:bg-purple-600 rounded text-sm transition-colors">
+                                    <i class="fas fa-user-tag mr-1"></i>Appliquer
                                 </button>
                                 
-                                <button onclick="exportCSV()" 
-                                        class="flex flex-col items-center p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg hover:from-green-100 hover:to-green-200 transition-all duration-200 group">
-                                    <div class="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                        <i class="fas fa-download text-white text-lg"></i>
-                                    </div>
-                                    <span class="text-sm font-medium text-green-700">Export CSV</span>
+                                <button onclick="bulkStatusChange(1)" class="px-3 py-1 bg-green-500 hover:bg-green-600 rounded text-sm transition-colors">
+                                    <i class="fas fa-check mr-1"></i>Activer
                                 </button>
                                 
-                                <button onclick="refreshStats()" 
-                                        class="flex flex-col items-center p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg hover:from-purple-100 hover:to-purple-200 transition-all duration-200 group">
-                                    <div class="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                        <i class="fas fa-sync-alt text-white text-lg"></i>
-                                    </div>
-                                    <span class="text-sm font-medium text-purple-700">Actualiser</span>
+                                <button onclick="bulkStatusChange(0)" class="px-3 py-1 bg-yellow-500 hover:bg-yellow-600 rounded text-sm transition-colors">
+                                    <i class="fas fa-pause mr-1"></i>Désactiver
                                 </button>
                                 
-                                <button onclick="showAuditLog()" 
-                                        class="flex flex-col items-center p-4 bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg hover:from-amber-100 hover:to-amber-200 transition-all duration-200 group">
-                                    <div class="w-12 h-12 bg-amber-500 rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                        <i class="fas fa-history text-white text-lg"></i>
-                                    </div>
-                                    <span class="text-sm font-medium text-amber-700">Historique</span>
-                                </button>
-                                
-                                <button onclick="showSecuritySettings()" 
-                                        class="flex flex-col items-center p-4 bg-gradient-to-br from-red-50 to-red-100 rounded-lg hover:from-red-100 hover:to-red-200 transition-all duration-200 group">
-                                    <div class="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                        <i class="fas fa-shield-alt text-white text-lg"></i>
-                                    </div>
-                                    <span class="text-sm font-medium text-red-700">Sécurité</span>
-                                </button>
-                                
-                                <button onclick="openBulkModal()" 
-                                        class="flex flex-col items-center p-4 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-lg hover:from-indigo-100 hover:to-indigo-200 transition-all duration-200 group">
-                                    <div class="w-12 h-12 bg-indigo-500 rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                        <i class="fas fa-tasks text-white text-lg"></i>
-                                    </div>
-                                    <span class="text-sm font-medium text-indigo-700">Actions Lot</span>
+                                <button onclick="bulkDelete()" class="px-3 py-1 bg-red-500 hover:bg-red-600 rounded text-sm transition-colors">
+                                    <i class="fas fa-trash mr-1"></i>Supprimer
                                 </button>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Barre d'outils améliorée -->
+                    <!-- Barre d'outils -->
                     <div class="bg-white rounded-xl shadow-lg border border-slate-200 p-6 mb-6">
-                        <div class="flex flex-col space-y-4">
-                            <!-- Titre et actions principales -->
-                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                                <div>
-                                    <h2 class="text-xl font-bold text-slate-800 flex items-center">
-                                        <i class="fas fa-filter mr-2 text-blue-500"></i>
-                                        Filtres et recherche
-                                    </h2>
-                                    <p class="text-sm text-slate-500 mt-1">Trouvez rapidement l'administrateur recherché</p>
-                                </div>
-                                <div class="flex items-center space-x-2 mt-3 sm:mt-0">
-                                    <button onclick="clearFilters()" 
-                                            class="px-3 py-2 text-slate-600 hover:text-slate-800 font-medium transition-colors text-sm border border-slate-300 rounded-lg hover:bg-slate-50">
-                                        <i class="fas fa-eraser mr-1"></i>
-                                        Effacer
-                                    </button>
-                                </div>
+                        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-4">
+                            <div>
+                                <h2 class="text-xl font-bold text-slate-800 flex items-center">
+                                    <i class="fas fa-filter mr-2 text-blue-500"></i>
+                                    Filtres et actions
+                                </h2>
                             </div>
-                            
-                            <!-- Filtres -->
-                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                <div class="relative">
-                                    <label class="block text-xs font-medium text-slate-600 mb-1">Recherche globale</label>
-                                    <div class="relative">
-                                        <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
-                                        <input type="text" id="searchInput" placeholder="Nom, email..."
-                                               class="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
-                                    </div>
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-xs font-medium text-slate-600 mb-1">Filtrer par rôle</label>
-                                    <select id="roleFilter" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
-                                        <option value="">🔍 Tous les rôles</option>
-                                        <option value="admin">👤 Admin</option>
-                                        <option value="super_admin">👑 Super Admin</option>
-                                    </select>
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-xs font-medium text-slate-600 mb-1">Filtrer par statut</label>
-                                    <select id="statusFilter" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
-                                        <option value="">🔍 Tous les statuts</option>
-                                        <option value="1">✅ Actif</option>
-                                        <option value="0">❌ Inactif</option>
-                                    </select>
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-xs font-medium text-slate-600 mb-1">Trier par</label>
-                                    <select id="sortSelect" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
-                                        <option value="id_desc">🆔 ID (récent → ancien)</option>
-                                        <option value="id_asc">🆔 ID (ancien → récent)</option>
-                                        <option value="username_asc">👤 Nom (A → Z)</option>
-                                        <option value="username_desc">👤 Nom (Z → A)</option>
-                                        <option value="email_asc">📧 Email (A → Z)</option>
-                                        <option value="email_desc">📧 Email (Z → A)</option>
-                                    </select>
-                                </div>
-                            </div>
-                            
-                            <!-- Résultats et actions en lot -->
-                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-4 border-t border-slate-200">
-                                <div class="flex items-center space-x-4">
-                                    <span id="resultCount" class="text-sm text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
-                                        Total: <?= count($admins) ?> administrateur(s)
-                                    </span>
-                                    <div id="selectedCount" class="hidden text-sm text-blue-600 bg-blue-100 px-3 py-1 rounded-full"></div>
-                                </div>
-                                
-                                <!-- Actions en lot -->
-                                <div id="bulkActions" class="hidden flex flex-wrap gap-2 mt-3 sm:mt-0">
-                                    <select id="bulkRoleSelect" class="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
-                                        <option value="">Changer le rôle...</option>
-                                        <option value="admin">👤 Admin</option>
-                                        <option value="super_admin">👑 Super Admin</option>
-                                    </select>
-                                    
-                                    <button onclick="bulkChangeRole()" 
-                                            class="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-all text-sm font-medium">
-                                        <i class="fas fa-edit mr-1"></i>
-                                        Appliquer
-                                    </button>
-                                    
-                                    <button onclick="bulkDelete()" 
-                                            class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all text-sm font-medium">
-                                        <i class="fas fa-trash-alt mr-1"></i>
-                                        Supprimer
-                                    </button>
-                                    
-                                    <button onclick="clearSelection()" 
-                                            class="px-4 py-2 bg-slate-500 text-white rounded-lg hover:bg-slate-600 transition-all text-sm font-medium">
-                                        <i class="fas fa-times mr-1"></i>
-                                        Annuler
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Table des administrateurs améliorée -->
-                    <div class="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
-                        <div class="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <h3 class="text-lg font-semibold text-slate-800 flex items-center">
-                                        <i class="fas fa-table mr-2 text-blue-500"></i>
-                                        Liste des administrateurs
-                                    </h3>
-                                    <p class="text-sm text-slate-500 mt-1">Gestion complète des comptes administrateurs</p>
-                                </div>
-                                <div class="flex items-center space-x-2">
-                                    <button onclick="toggleTableView()" id="viewToggle"
-                                            class="px-3 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-sm">
-                                        <i class="fas fa-th-large mr-1"></i>
-                                        Vue grille
-                                    </button>
-                                    <button onclick="exportCSV()" 
-                                            class="px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm">
-                                        <i class="fas fa-download mr-1"></i>
-                                        Export
-                                    </button>
-                                </div>
+                            <div class="flex items-center space-x-2 mt-3 lg:mt-0">
+                                <button onclick="openAddModal()" 
+                                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                                    <i class="fas fa-plus mr-1"></i>
+                                    Nouvel Admin
+                                </button>
+                                <button onclick="openActivityLogModal()" 
+                                        class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                                    <i class="fas fa-history mr-1"></i>
+                                    Journal
+                                </button>
+                                <button onclick="toggleTableView()" id="viewToggle"
+                                        class="px-3 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-sm">
+                                    <i class="fas fa-th-large mr-1"></i>
+                                    Vue grille
+                                </button>
                             </div>
                         </div>
                         
-                        <!-- Vue tableau (par défaut) -->
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div class="relative">
+                                <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
+                                <input type="text" id="searchInput" placeholder="Rechercher..."
+                                       class="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            </div>
+                            
+                            <select id="roleFilter" class="px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                <option value="">Tous les rôles</option>
+                                <option value="admin">Admin</option>
+                                <option value="superadmin">Super Admin</option>
+                            </select>
+                            
+                            <select id="statusFilter" class="px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                <option value="">Tous les statuts</option>
+                                <option value="1">Actif</option>
+                                <option value="0">Inactif</option>
+                            </select>
+                            
+                            <select id="onlineFilter" class="px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                <option value="">Tous</option>
+                                <option value="1">En ligne</option>
+                                <option value="0">Hors ligne</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Activité récente -->
+                    <?php if (!empty($recentLogs)): ?>
+                    <div class="bg-white rounded-xl shadow-lg border border-slate-200 p-6 mb-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-bold text-slate-800 flex items-center">
+                                <i class="fas fa-clock mr-2 text-green-500"></i>
+                                Activité récente
+                            </h3>
+                            <button onclick="openActivityLogModal()" class="text-blue-600 hover:text-blue-700 text-sm">
+                                Voir tout <i class="fas fa-arrow-right ml-1"></i>
+                            </button>
+                        </div>
+                        <div class="space-y-3 max-h-40 overflow-y-auto">
+                            <?php foreach (array_slice($recentLogs, 0, 5) as $log): ?>
+                                <div class="flex items-center space-x-3 py-2">
+                                    <div class="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                    <div class="flex-1">
+                                        <div class="text-sm text-slate-800">
+                                            <span class="font-medium"><?= htmlspecialchars($log['admin_username']) ?></span>
+                                            <?= getActionText($log['action']) ?>
+                                            <?php if ($log['target']): ?>
+                                                <span class="font-medium"><?= htmlspecialchars($log['target']) ?></span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="text-xs text-slate-500">
+                                            <?= date('d/m/Y H:i', strtotime($log['created_at'])) ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+
+                    <!-- Table des administrateurs -->
+                    <div class="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
+                        <!-- Vue tableau -->
                         <div id="tableView" class="overflow-x-auto">
                             <table class="w-full" id="adminTable">
                                 <thead>
                                     <tr class="bg-slate-50 border-b border-slate-200">
-                                        <th class="text-left py-4 px-6 w-12">
-                                            <div class="flex items-center">
-                                                <input type="checkbox" id="selectAll" class="rounded border-slate-300 text-blue-500 focus:ring-blue-500">
-                                                <span class="ml-2 text-xs text-slate-500">Tout</span>
-                                            </div>
+                                        <th class="text-left py-4 px-6">
+                                            <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()" 
+                                                   class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
                                         </th>
-                                        <th class="text-left py-4 px-6 font-semibold text-slate-700 text-sm cursor-pointer hover:bg-slate-100 transition-colors" onclick="sortTable('id')">
-                                            <div class="flex items-center space-x-2">
-                                                <i class="fas fa-hashtag text-slate-400 text-xs"></i>
-                                                <span>ID</span>
-                                                <i class="fas fa-sort text-slate-400 text-xs"></i>
-                                            </div>
-                                        </th>
-                                        <th class="text-left py-4 px-6 font-semibold text-slate-700 text-sm cursor-pointer hover:bg-slate-100 transition-colors" onclick="sortTable('username')">
-                                            <div class="flex items-center space-x-2">
-                                                <i class="fas fa-user text-slate-400 text-xs"></i>
-                                                <span>Administrateur</span>
-                                                <i class="fas fa-sort text-slate-400 text-xs"></i>
-                                            </div>
-                                        </th>
-                                        <th class="text-left py-4 px-6 font-semibold text-slate-700 text-sm cursor-pointer hover:bg-slate-100 transition-colors" onclick="sortTable('email')">
-                                            <div class="flex items-center space-x-2">
-                                                <i class="fas fa-envelope text-slate-400 text-xs"></i>
-                                                <span>Contact</span>
-                                                <i class="fas fa-sort text-slate-400 text-xs"></i>
-                                            </div>
-                                        </th>
-                                        <th class="text-left py-4 px-6 font-semibold text-slate-700 text-sm">
-                                            <div class="flex items-center space-x-2">
-                                                <i class="fas fa-shield-alt text-slate-400 text-xs"></i>
-                                                <span>Permissions</span>
-                                            </div>
-                                        </th>
-                                        <th class="text-left py-4 px-6 font-semibold text-slate-700 text-sm">
-                                            <div class="flex items-center space-x-2">
-                                                <i class="fas fa-activity text-slate-400 text-xs"></i>
-                                                <span>Activité</span>
-                                            </div>
-                                        </th>
-                                        <th class="text-center py-4 px-6 font-semibold text-slate-700 text-sm">
-                                            <div class="flex items-center justify-center space-x-2">
-                                                <i class="fas fa-cogs text-slate-400 text-xs"></i>
-                                                <span>Actions</span>
-                                            </div>
-                                        </th>
+                                        <th class="text-left py-4 px-6 font-semibold text-slate-700">ID</th>
+                                        <th class="text-left py-4 px-6 font-semibold text-slate-700">Administrateur</th>
+                                        <th class="text-left py-4 px-6 font-semibold text-slate-700">Email</th>
+                                        <th class="text-left py-4 px-6 font-semibold text-slate-700">Rôle</th>
+                                        <th class="text-left py-4 px-6 font-semibold text-slate-700">Statut</th>
+                                        <th class="text-left py-4 px-6 font-semibold text-slate-700">Dernière connexion</th>
+                                        <th class="text-center py-4 px-6 font-semibold text-slate-700">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-200" id="adminTableBody">
                                     <?php foreach ($admins as $admin): ?>
-                                        <tr class="hover:bg-gradient-to-r hover:from-blue-50 hover:to-transparent transition-all duration-200 admin-row group" 
+                                        <tr class="hover:bg-slate-50 transition-colors admin-row" 
                                             data-username="<?= strtolower(htmlspecialchars($admin['username'])) ?>"
                                             data-email="<?= strtolower(htmlspecialchars($admin['email'])) ?>"
                                             data-role="<?= $admin['role'] ?>"
-                                            data-status="<?= $admin['status'] ?>">
+                                            data-status="<?= $admin['status'] ?>"
+                                            data-online="<?= $admin['is_online'] ?>"
+                                            data-admin-id="<?= $admin['id'] ?>">
                                             <td class="py-4 px-6">
-                                                <input type="checkbox" class="admin-checkbox rounded border-slate-300 text-blue-500 focus:ring-blue-500" 
+                                                <input type="checkbox" class="admin-checkbox rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
                                                        value="<?= $admin['id'] ?>" onchange="updateBulkActions()">
                                             </td>
+                                            <td class="py-4 px-6 text-slate-800"><?= $admin['id'] ?></td>
                                             <td class="py-4 px-6">
-                                                <div class="flex items-center">
-                                                    <span class="inline-flex items-center justify-center w-8 h-8 bg-gradient-to-br from-slate-100 to-slate-200 text-slate-600 rounded-full text-sm font-medium border-2 border-slate-300">
-                                                        <?= $admin['id'] ?>
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td class="py-4 px-6">
-                                                <div class="flex items-center space-x-4">
+                                                <div class="flex items-center space-x-3">
                                                     <div class="relative">
-                                                        <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center ring-2 ring-blue-100">
-                                                            <span class="text-white font-bold text-sm">
-                                                                <?= strtoupper(substr(htmlspecialchars($admin['username']), 0, 1)) ?>
+                                                        <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+                                                            <span class="text-white font-medium">
+                                                                <?= strtoupper(substr($admin['username'], 0, 1)) ?>
                                                             </span>
                                                         </div>
+                                                        <?php if ($admin['is_online']): ?>
+                                                            <div class="absolute -top-1 -right-1 online-indicator border-2 border-white"></div>
+                                                        <?php endif; ?>
                                                     </div>
                                                     <div>
                                                         <div class="font-semibold text-slate-800 flex items-center">
                                                             <?= htmlspecialchars($admin['username']) ?>
-                                                        </div>
-                                                        <div class="text-sm text-slate-500">
-                                                            Admin ID: <?= $admin['id'] ?>
+                                                            <?php if ($admin['is_online']): ?>
+                                                                <span class="ml-2 text-xs text-green-600 font-medium">En ligne</span>
+                                                            <?php endif; ?>
                                                         </div>
                                                     </div>
                                                 </div>
+                                            </td>
+                                            <td class="py-4 px-6 text-slate-600"><?= htmlspecialchars($admin['email']) ?></td>
+                                            <td class="py-4 px-6">
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                                    <?= $admin['role'] === 'superadmin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800' ?>">
+                                                    <?= $admin['role'] === 'superadmin' ? 'Super Admin' : 'Admin' ?>
+                                                </span>
                                             </td>
                                             <td class="py-4 px-6">
-                                                <div class="flex items-center space-x-2">
-                                                    <i class="fas fa-envelope text-slate-400 text-sm"></i>
-                                                    <div>
-                                                        <div class="text-slate-800 font-medium">
-                                                            <?= htmlspecialchars($admin['email']) ?>
-                                                        </div>
-                                                        <div class="text-xs text-slate-500">
-                                                            <i class="fas fa-shield-check mr-1"></i>
-                                                            Email vérifié
-                                                        </div>
-                                                    </div>
-                                                </div>
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                                    <?= $admin['status'] ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' ?>">
+                                                    <?= $admin['status_display'] ?>
+                                                </span>
                                             </td>
-                                            <td class="py-4 px-6">
-                                                <div class="flex flex-col space-y-2">
-                                                    <span class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium 
-                                                        <?= $admin['role'] === 'super_admin' ? 'bg-gradient-to-r from-purple-100 to-purple-200 text-purple-800 border border-purple-300' : 'bg-gradient-to-r from-blue-100 to-blue-200 text-blue-800 border border-blue-300' ?>">
-                                                        <i class="fas fa-<?= $admin['role'] === 'super_admin' ? 'crown' : 'user-tie' ?> mr-1"></i>
-                                                        <?= $admin['role'] === 'super_admin' ? 'Super Admin' : 'Administrateur' ?>
-                                                    </span>
-                                                    <div class="text-xs text-slate-500">
-                                                        <?= $admin['role'] === 'super_admin' ? 'Accès complet' : 'Accès limité' ?>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td class="py-4 px-6">
-                                                <div class="flex flex-col space-y-2">
-                                                    <button onclick="toggleStatus(<?= $admin['id'] ?>)"
-                                                            class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 hover:scale-105
-                                                            <?= $admin['status'] ? 'bg-gradient-to-r from-green-100 to-green-200 text-green-800 border border-green-300 hover:from-green-200 hover:to-green-300' : 'bg-gradient-to-r from-red-100 to-red-200 text-red-800 border border-red-300 hover:from-red-200 hover:to-red-300' ?>">
-                                                        <div class="w-2 h-2 <?= $admin['status'] ? 'bg-green-500' : 'bg-red-500' ?> rounded-full mr-2 animate-pulse"></div>
-                                                        <?= $admin['status_display'] ?>
-                                                    </button>
-                                                    <div class="text-xs text-slate-500">
-                                                        <i class="fas fa-clock mr-1"></i>
-                                                        <?= $admin['last_login_display'] ?>
-                                                    </div>
-                                                </div>
-                                            </td>
+                                            <td class="py-4 px-6 text-slate-600"><?= $admin['last_login_display'] ?></td>
                                             <td class="py-4 px-6">
                                                 <div class="flex items-center justify-center space-x-2">
-                                                    <div class="opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex space-x-2">
-                                                        <button onclick="openEditModal(<?= $admin['id'] ?>, '<?= htmlspecialchars($admin['username']) ?>', '<?= htmlspecialchars($admin['email']) ?>', '<?= htmlspecialchars($admin['role']) ?>')"
-                                                               class="inline-flex items-center px-3 py-2 bg-gradient-to-r from-amber-100 to-amber-200 text-amber-700 rounded-lg hover:from-amber-200 hover:to-amber-300 transition-all duration-200 text-sm font-medium shadow-sm hover:shadow-md transform hover:scale-105">
-                                                            <i class="fas fa-edit mr-1"></i>
-                                                            Modifier
-                                                        </button>
-                                                        
-                                                        <?php if ($_SESSION['admin_username'] !== $admin['username']): ?>
-                                                            <button onclick="confirmDelete(<?= $admin['id'] ?>, '<?= htmlspecialchars($admin['username']) ?>')"
-                                                                   class="inline-flex items-center px-3 py-2 bg-gradient-to-r from-red-100 to-red-200 text-red-700 rounded-lg hover:from-red-200 hover:to-red-300 transition-all duration-200 text-sm font-medium shadow-sm hover:shadow-md transform hover:scale-105">
-                                                                <i class="fas fa-trash-alt mr-1"></i>
-                                                                Supprimer
-                                                            </button>
-                                                        <?php else: ?>
-                                                            <span class="inline-flex items-center px-3 py-2 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-500 rounded-lg text-sm font-medium cursor-not-allowed">
-                                                                <i class="fas fa-lock mr-1"></i>
-                                                                Protégé
-                                                            </span>
-                                                        <?php endif; ?>
-                                                    </div>
+                                                    <button onclick="viewAdminDetails(<?= $admin['id'] ?>)"
+                                                           class="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors text-sm">
+                                                        <i class="fas fa-eye mr-1"></i>Voir
+                                                    </button>
                                                     
-                                                    <!-- Actions toujours visibles sur mobile -->
-                                                    <div class="sm:hidden flex space-x-1">
-                                                        <button onclick="openEditModal(<?= $admin['id'] ?>, '<?= htmlspecialchars($admin['username']) ?>', '<?= htmlspecialchars($admin['email']) ?>', '<?= htmlspecialchars($admin['role']) ?>')"
-                                                               class="p-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors">
-                                                            <i class="fas fa-edit"></i>
+                                                    <button onclick="openEditModal(<?= $admin['id'] ?>, '<?= htmlspecialchars($admin['username']) ?>', '<?= htmlspecialchars($admin['email']) ?>', '<?= $admin['role'] ?>')"
+                                                           class="px-3 py-1 bg-amber-100 text-amber-700 rounded hover:bg-amber-200 transition-colors text-sm">
+                                                        <i class="fas fa-edit mr-1"></i>Modifier
+                                                    </button>
+                                                    
+                                                    <?php if ($admin['is_online'] && $_SESSION['admin_username'] !== $admin['username']): ?>
+                                                        <button onclick="forceLogout(<?= $admin['id'] ?>, '<?= htmlspecialchars($admin['username']) ?>')"
+                                                               class="px-3 py-1 bg-orange-100 text-orange-700 rounded hover:bg-orange-200 transition-colors text-sm">
+                                                            <i class="fas fa-sign-out-alt mr-1"></i>Déconnecter
                                                         </button>
-                                                        
-                                                        <?php if ($_SESSION['admin_username'] !== $admin['username']): ?>
-                                                            <button onclick="confirmDelete(<?= $admin['id'] ?>, '<?= htmlspecialchars($admin['username']) ?>')"
-                                                                   class="p-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors">
-                                                                <i class="fas fa-trash-alt"></i>
-                                                            </button>
-                                                        <?php endif; ?>
-                                                    </div>
+                                                    <?php endif; ?>
+                                                    
+                                                    <?php if ($_SESSION['admin_username'] !== $admin['username']): ?>
+                                                        <button onclick="confirmDelete(<?= $admin['id'] ?>, '<?= htmlspecialchars($admin['username']) ?>')"
+                                                               class="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors text-sm">
+                                                            <i class="fas fa-trash-alt mr-1"></i>Supprimer
+                                                        </button>
+                                                    <?php endif; ?>
                                                 </div>
                                             </td>
                                         </tr>
@@ -599,83 +1120,88 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                             </table>
                         </div>
                         
-                        <!-- Vue grille (cachée par défaut) -->
+                        <!-- Vue grille -->
                         <div id="gridView" class="hidden p-6">
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="adminGrid">
+                            <div class="grid-view" id="adminGrid">
                                 <?php foreach ($admins as $admin): ?>
-                                    <div class="admin-card bg-gradient-to-br from-white to-slate-50 rounded-xl shadow-lg border border-slate-200 p-6 hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                                    <div class="admin-card admin-row-grid relative" 
                                          data-username="<?= strtolower(htmlspecialchars($admin['username'])) ?>"
                                          data-email="<?= strtolower(htmlspecialchars($admin['email'])) ?>"
                                          data-role="<?= $admin['role'] ?>"
-                                         data-status="<?= $admin['status'] ?>">
+                                         data-status="<?= $admin['status'] ?>"
+                                         data-online="<?= $admin['is_online'] ?>"
+                                         data-admin-id="<?= $admin['id'] ?>">
                                         
-                                        <div class="flex items-center justify-between mb-4">
-                                            <div class="flex items-center space-x-3">
-                                                <div class="relative">
-                                                    <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center ring-2 ring-blue-100">
-                                                        <span class="text-white font-bold">
-                                                            <?= strtoupper(substr(htmlspecialchars($admin['username']), 0, 1)) ?>
-                                                        </span>
-                                                    </div>
-                                                    <?php if ($_SESSION['admin_username'] === $admin['username']): ?>
-                                                        <div class="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
-                                                            <i class="fas fa-check text-white text-xs"></i>
-                                                        </div>
-                                                    <?php endif; ?>
-                                                </div>
-                                                <div>
-                                                    <h4 class="font-semibold text-slate-800"><?= htmlspecialchars($admin['username']) ?></h4>
-                                                    <p class="text-sm text-slate-500">ID: <?= $admin['id'] ?></p>
-                                                </div>
-                                            </div>
-                                            <input type="checkbox" class="admin-checkbox rounded border-slate-300 text-blue-500 focus:ring-blue-500" 
+                                        <div class="absolute top-4 left-4">
+                                            <input type="checkbox" class="admin-checkbox rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
                                                    value="<?= $admin['id'] ?>" onchange="updateBulkActions()">
                                         </div>
                                         
-                                        <div class="space-y-3 mb-4">
-                                            <div class="flex items-center space-x-2">
-                                                <i class="fas fa-envelope text-slate-400 text-sm"></i>
-                                                <span class="text-sm text-slate-600"><?= htmlspecialchars($admin['email']) ?></span>
+                                        <div class="flex items-center space-x-4 mb-4 mt-6">
+                                            <div class="relative">
+                                                <div class="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center">
+                                                    <span class="text-white font-bold">
+                                                        <?= strtoupper(substr($admin['username'], 0, 1)) ?>
+                                                    </span>
+                                                </div>
+                                                <?php if ($admin['is_online']): ?>
+                                                    <div class="absolute -top-1 -right-1 online-indicator border-2 border-white"></div>
+                                                <?php endif; ?>
                                             </div>
-                                            
-                                            <div class="flex items-center justify-between">
-                                                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium 
-                                                    <?= $admin['role'] === 'super_admin' ? 'bg-gradient-to-r from-purple-100 to-purple-200 text-purple-800' : 'bg-gradient-to-r from-blue-100 to-blue-200 text-blue-800' ?>">
-                                                    <i class="fas fa-<?= $admin['role'] === 'super_admin' ? 'crown' : 'user-tie' ?> mr-1"></i>
-                                                    <?= $admin['role'] === 'super_admin' ? 'Super Admin' : 'Admin' ?>
-                                                </span>
-                                                
-                                                <button onclick="toggleStatus(<?= $admin['id'] ?>)"
-                                                        class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium transition-all
-                                                        <?= $admin['status'] ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'bg-red-100 text-red-800 hover:bg-red-200' ?>">
-                                                    <div class="w-2 h-2 <?= $admin['status'] ? 'bg-green-500' : 'bg-red-500' ?> rounded-full mr-1"></div>
-                                                    <?= $admin['status_display'] ?>
-                                                </button>
-                                            </div>
-                                            
-                                            <div class="text-xs text-slate-500">
-                                                <i class="fas fa-clock mr-1"></i>
-                                                Dernière connexion: <?= $admin['last_login_display'] ?>
+                                            <div>
+                                                <h3 class="font-semibold text-slate-800 flex items-center">
+                                                    <?= htmlspecialchars($admin['username']) ?>
+                                                    <?php if ($admin['is_online']): ?>
+                                                        <span class="ml-2 text-xs text-green-600 font-medium">En ligne</span>
+                                                    <?php endif; ?>
+                                                </h3>
+                                                <p class="text-sm text-slate-500">ID: <?= $admin['id'] ?></p>
                                             </div>
                                         </div>
                                         
-                                        <div class="flex space-x-2">
-                                            <button onclick="openEditModal(<?= $admin['id'] ?>, '<?= htmlspecialchars($admin['username']) ?>', '<?= htmlspecialchars($admin['email']) ?>', '<?= htmlspecialchars($admin['role']) ?>')"
-                                                   class="flex-1 inline-flex items-center justify-center px-3 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors text-sm font-medium">
-                                                <i class="fas fa-edit mr-1"></i>
-                                                Modifier
+                                        <div class="space-y-2 mb-4">
+                                            <p class="text-sm text-slate-600">
+                                                <i class="fas fa-envelope mr-2"></i>
+                                                <?= htmlspecialchars($admin['email']) ?>
+                                            </p>
+                                            <div class="flex items-center justify-between">
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                                    <?= $admin['role'] === 'superadmin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800' ?>">
+                                                    <?= $admin['role'] === 'superadmin' ? 'Super Admin' : 'Admin' ?>
+                                                </span>
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                                    <?= $admin['status'] ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' ?>">
+                                                    <?= $admin['status_display'] ?>
+                                                </span>
+                                            </div>
+                                            <p class="text-xs text-slate-500">
+                                                <i class="fas fa-clock mr-1"></i>
+                                                <?= $admin['last_login_display'] ?>
+                                            </p>
+                                        </div>
+                                        
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <button onclick="viewAdminDetails(<?= $admin['id'] ?>)"
+                                                   class="px-3 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors text-sm">
+                                                <i class="fas fa-eye mr-1"></i>Voir
                                             </button>
+                                            
+                                            <button onclick="openEditModal(<?= $admin['id'] ?>, '<?= htmlspecialchars($admin['username']) ?>', '<?= htmlspecialchars($admin['email']) ?>', '<?= $admin['role'] ?>')"
+                                                   class="px-3 py-2 bg-amber-100 text-amber-700 rounded hover:bg-amber-200 transition-colors text-sm">
+                                                <i class="fas fa-edit mr-1"></i>Modifier
+                                            </button>
+                                            
+                                            <?php if ($admin['is_online'] && $_SESSION['admin_username'] !== $admin['username']): ?>
+                                                <button onclick="forceLogout(<?= $admin['id'] ?>, '<?= htmlspecialchars($admin['username']) ?>')"
+                                                       class="px-3 py-2 bg-orange-100 text-orange-700 rounded hover:bg-orange-200 transition-colors text-sm">
+                                                    <i class="fas fa-sign-out-alt mr-1"></i>Déconnecter
+                                                </button>
+                                            <?php endif; ?>
                                             
                                             <?php if ($_SESSION['admin_username'] !== $admin['username']): ?>
                                                 <button onclick="confirmDelete(<?= $admin['id'] ?>, '<?= htmlspecialchars($admin['username']) ?>')"
-                                                       class="flex-1 inline-flex items-center justify-center px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium">
-                                                    <i class="fas fa-trash-alt mr-1"></i>
-                                                    Supprimer
-                                                </button>
-                                            <?php else: ?>
-                                                <button class="flex-1 inline-flex items-center justify-center px-3 py-2 bg-gray-100 text-gray-500 rounded-lg cursor-not-allowed text-sm font-medium">
-                                                    <i class="fas fa-lock mr-1"></i>
-                                                    Protégé
+                                                       class="px-3 py-2 bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors text-sm">
+                                                    <i class="fas fa-trash-alt mr-1"></i>Supprimer
                                                 </button>
                                             <?php endif; ?>
                                         </div>
@@ -683,277 +1209,211 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                                 <?php endforeach; ?>
                             </div>
                         </div>
-                        
-                        <?php if (empty($admins)): ?>
-                            <div class="text-center py-12">
-                                <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <i class="fas fa-users text-slate-400 text-2xl"></i>
-                                </div>
-                                <h3 class="text-lg font-medium text-slate-800 mb-2">Aucun administrateur</h3>
-                                <p class="text-slate-500 mb-6">Il n'y a actuellement aucun administrateur enregistré.</p>
-                                <button onclick="openAddModal()" 
-                                       class="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600 transition-colors">
-                                    <i class="fas fa-plus mr-2"></i>
-                                    Ajouter le premier administrateur
-                                </button>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-
-                    <!-- Footer -->
-                    <div class="mt-6 flex items-center justify-between">
-                        <a href="dashboard.php" 
-                           class="inline-flex items-center text-slate-600 hover:text-primary transition-colors duration-200">
-                            <i class="fas fa-arrow-left mr-2"></i>
-                            Retour au dashboard
-                        </a>
-                        
-                        <div class="text-sm text-slate-500">
-                            <i class="fas fa-info-circle mr-1"></i>
-                            <span id="footerResultCount">Total: <?= count($admins) ?> administrateur(s)</span>
-                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
-    <!-- Toast Notifications -->
-    <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
-
-    <!-- Modal d'ajout -->
-    <div id="addModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all duration-300 scale-95">
-            <div class="p-6">
-                <div class="flex items-center justify-between mb-6">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
-                            <i class="fas fa-plus text-white"></i>
-                        </div>
-                        <div>
-                            <h3 class="text-lg font-semibold text-slate-800">Ajouter un administrateur</h3>
-                            <p class="text-sm text-slate-500">Créez un nouveau compte administrateur</p>
-                        </div>
-                    </div>
-                    <button onclick="closeAddModal()" class="text-slate-400 hover:text-slate-600 transition-colors">
-                        <i class="fas fa-times text-xl"></i>
-                    </button>
-                </div>
-
-                <form id="addForm" method="POST" action="admin_ajouter.php" class="space-y-4">
-                    <div>
-                        <label for="addUsername" class="block text-sm font-medium text-slate-700 mb-2">
-                            <i class="fas fa-user mr-1"></i>
-                            Nom d'utilisateur
-                        </label>
-                        <input type="text" id="addUsername" name="username" required
-                               class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200"
-                               placeholder="Entrez le nom d'utilisateur">
-                    </div>
-
-                    <div>
-                        <label for="addEmail" class="block text-sm font-medium text-slate-700 mb-2">
-                            <i class="fas fa-envelope mr-1"></i>
-                            Email
-                        </label>
-                        <input type="email" id="addEmail" name="email" required
-                               class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200"
-                               placeholder="admin@exemple.com">
-                    </div>
-
-                    <div>
-                        <label for="addRole" class="block text-sm font-medium text-slate-700 mb-2">
-                            <i class="fas fa-shield-alt mr-1"></i>
-                            Rôle
-                        </label>
-                        <select id="addRole" name="role" required
-                                class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200">
-                            <option value="">Choisir un rôle</option>
-                            <option value="admin">Admin</option>
-                            <option value="super_admin">Super Admin</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label for="addPassword" class="block text-sm font-medium text-slate-700 mb-2">
-                            <i class="fas fa-lock mr-1"></i>
-                            Mot de passe
-                        </label>
-                        <input type="password" id="addPassword" name="password" required
-                               class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200"
-                               placeholder="Entrez un mot de passe sécurisé">
-                    </div>
-
-                    <div>
-                        <label for="addPasswordConfirm" class="block text-sm font-medium text-slate-700 mb-2">
-                            <i class="fas fa-lock mr-1"></i>
-                            Confirmer le mot de passe
-                        </label>
-                        <input type="password" id="addPasswordConfirm" name="password_confirm" required
-                               class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200"
-                               placeholder="Confirmez le mot de passe">
-                    </div>
-
-                    <div class="flex items-center justify-end space-x-3 pt-4 border-t border-slate-200">
-                        <button type="button" onclick="closeAddModal()"
-                                class="px-4 py-2 text-slate-600 hover:text-slate-800 font-medium transition-colors">
-                            Annuler
-                        </button>
-                        <button type="submit"
-                                class="inline-flex items-center px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-all duration-200">
-                            <i class="fas fa-plus mr-2"></i>
-                            Créer l'administrateur
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal de modification -->
-    <div id="editModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all duration-300 scale-95">
-            <div class="p-6">
-                <div class="flex items-center justify-between mb-6">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center">
-                            <i class="fas fa-edit text-white"></i>
-                        </div>
-                        <div>
-                            <h3 class="text-lg font-semibold text-slate-800">Modifier l'administrateur</h3>
-                            <p class="text-sm text-slate-500">Modifiez les informations de l'administrateur</p>
-                        </div>
-                    </div>
-                    <button onclick="closeEditModal()" class="text-slate-400 hover:text-slate-600 transition-colors">
-                        <i class="fas fa-times text-xl"></i>
-                    </button>
-                </div>
-
-                <form id="editForm" method="POST" action="admin_modifier.php" class="space-y-4">
-                    <input type="hidden" id="editAdminId" name="id">
-                    
-                    <div>
-                        <label for="editUsername" class="block text-sm font-medium text-slate-700 mb-2">
-                            <i class="fas fa-user mr-1"></i>
-                            Nom d'utilisateur
-                        </label>
-                        <input type="text" id="editUsername" name="username" required
-                               class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200">
-                    </div>
-
-                    <div>
-                        <label for="editEmail" class="block text-sm font-medium text-slate-700 mb-2">
-                            <i class="fas fa-envelope mr-1"></i>
-                            Email
-                        </label>
-                        <input type="email" id="editEmail" name="email" required
-                               class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200">
-                    </div>
-
-                    <div>
-                        <label for="editRole" class="block text-sm font-medium text-slate-700 mb-2">
-                            <i class="fas fa-shield-alt mr-1"></i>
-                            Rôle
-                        </label>
-                        <select id="editRole" name="role" required
-                                class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200">
-                            <option value="admin">Admin</option>
-                            <option value="super_admin">Super Admin</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label for="editPassword" class="block text-sm font-medium text-slate-700 mb-2">
-                            <i class="fas fa-lock mr-1"></i>
-                            Nouveau mot de passe (optionnel)
-                        </label>
-                        <input type="password" id="editPassword" name="password"
-                               class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200"
-                               placeholder="Laissez vide pour conserver l'actuel">
-                    </div>
-
-                    <div class="flex items-center justify-end space-x-3 pt-4 border-t border-slate-200">
-                        <button type="button" onclick="closeEditModal()"
-                                class="px-4 py-2 text-slate-600 hover:text-slate-800 font-medium transition-colors">
-                            Annuler
-                        </button>
-                        <button type="submit"
-                                class="inline-flex items-center px-4 py-2 bg-primary text-white font-medium rounded-lg hover:bg-blue-600 transition-all duration-200">
-                            <i class="fas fa-save mr-2"></i>
-                            Enregistrer
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal de confirmation de suppression -->
-    <div id="deleteModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all duration-300 scale-95">
-            <div class="p-6">
-                <div class="flex items-center space-x-3 mb-4">
-                    <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                        <i class="fas fa-exclamation-triangle text-red-600 text-xl"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-lg font-semibold text-slate-800">Confirmer la suppression</h3>
-                        <p class="text-sm text-slate-500">Cette action est irréversible</p>
-                    </div>
-                </div>
-                
-                <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-                    <p class="text-sm text-red-800">
-                        <i class="fas fa-warning mr-2"></i>
-                        Êtes-vous sûr de vouloir supprimer l'administrateur <strong id="deleteAdminName"></strong> ?
-                    </p>
-                    <p class="text-xs text-red-600 mt-2">
-                        Toutes les données associées à ce compte seront définitivement perdues.
-                    </p>
-                </div>
-                
-                <div class="flex items-center justify-end space-x-3">
-                    <button onclick="closeDeleteModal()"
-                            class="px-4 py-2 text-slate-600 hover:text-slate-800 font-medium transition-colors">
-                        Annuler
-                    </button>
-                    <button onclick="executeDelete()" id="confirmDeleteBtn"
-                            class="inline-flex items-center px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-all duration-200">
-                        <i class="fas fa-trash mr-2"></i>
-                        Supprimer définitivement
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
+        <script>
         // Variables globales
-        let currentSortColumn = 'id';
-        let currentSortDirection = 'desc';
         let deleteAdminId = null;
         let isDarkMode = localStorage.getItem('darkMode') === 'true';
+        let isGridView = false;
+        let selectedAdmins = [];
+        let currentActivityPage = 1;
 
         // Initialisation
         document.addEventListener('DOMContentLoaded', function() {
-            // Appliquer le mode sombre si activé
             if (isDarkMode) {
                 toggleDarkMode();
             }
-            
-            // Initialiser le graphique
-            initChart();
-            
-            // Animation d'entrée pour les lignes
-            animateTableRows();
-            
-            // Événements de recherche et filtrage
-            setupSearchAndFilters();
+            setupFormHandlers();
+            setupFilters();
+            updateBulkActions();
         });
 
+        // Fonction utilitaire pour obtenir le texte d'action
+        function getActionText(action) {
+            const actions = {
+                'CREATE_ADMIN': 'a créé l\'administrateur',
+                'UPDATE_ADMIN': 'a modifié l\'administrateur',
+                'DELETE_ADMIN': 'a supprimé l\'administrateur',
+                'BULK_DELETE_ADMIN': 'a supprimé en lot',
+                'BULK_ROLE_CHANGE': 'a changé le rôle en lot pour',
+                'BULK_STATUS_CHANGE': 'a changé le statut en lot pour',
+                'TOGGLE_STATUS': 'a changé le statut de',
+                'FORCE_LOGOUT': 'a forcé la déconnexion de'
+            };
+            return actions[action] || action;
+        }
+
+        // Configuration des gestionnaires de formulaires
+        function setupFormHandlers() {
+            // Gestionnaire pour l'auto-complétion de l'email
+            const addUsernameInput = document.querySelector('#addModal input[name="username"]');
+            const emailInput = document.querySelector('#addModal input[name="email"]');
+            const emailIndicator = document.getElementById('emailFoundIndicator');
+            let emailTimeout;
+            
+            if (addUsernameInput && emailInput) {
+                addUsernameInput.addEventListener('input', function(e) {
+                    const username = e.target.value.trim();
+                    
+                    clearTimeout(emailTimeout);
+                    emailInput.value = '';
+                    emailInput.removeAttribute('readonly');
+                    emailIndicator.style.display = 'none';
+                    
+                    if (username.length >= 2) {
+                        emailTimeout = setTimeout(() => {
+                            fetchEmployeeEmail(username, emailInput, emailIndicator);
+                        }, 500);
+                    }
+                });
+            }
+
+            // Formulaire d'ajout
+            document.getElementById('addForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const password = document.getElementById('addPassword').value;
+                const passwordConfirm = document.getElementById('addPasswordConfirm').value;
+                
+                if (password !== passwordConfirm) {
+                    showToast('Les mots de passe ne correspondent pas !', 'error');
+                    return;
+                }
+                
+                if (password.length < 6) {
+                    showToast('Le mot de passe doit contenir au moins 6 caractères !', 'error');
+                    return;
+                }
+                
+                const formData = new FormData(this);
+                formData.append('action', 'add_admin');
+                
+                submitForm(formData, 'Administrateur créé avec succès');
+            });
+
+            // Formulaire de modification
+            document.getElementById('editForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(this);
+                formData.append('action', 'edit_admin');
+                
+                submitForm(formData, 'Administrateur modifié avec succès');
+            });
+        }
+
+        // Récupération de l'email employé
+        function fetchEmployeeEmail(username, emailInput, emailIndicator) {
+            if (!username || username.length < 2) return;
+            
+            const formData = new FormData();
+            formData.append('action', 'get_employee_email');
+            formData.append('username', username);
+            
+            fetch(window.location.href, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    emailInput.value = data.email;
+                    emailInput.setAttribute('readonly', true);
+                    emailIndicator.style.display = 'inline';
+                    showToast('Email trouvé pour cet employé', 'success');
+                } else {
+                    emailInput.removeAttribute('readonly');
+                    emailInput.placeholder = 'Email non trouvé, saisissez manuellement';
+                }
+            })
+            .catch(error => {
+                console.error('Erreur lors de la récupération de l\'email:', error);
+                emailInput.removeAttribute('readonly');
+                emailInput.placeholder = 'Erreur, saisissez manuellement';
+            });
+        }
+
+        // Soumission AJAX des formulaires
+        function submitForm(formData, successMessage) {
+            const button = document.querySelector('form button[type="submit"]');
+            const originalText = button.innerHTML;
+            
+            button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>En cours...';
+            button.disabled = true;
+
+            fetch(window.location.href, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(data.message || successMessage, 'success');
+                    closeAllModals();
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showToast(data.message || 'Erreur lors de l\'opération', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+                showToast('Erreur de connexion', 'error');
+            })
+            .finally(() => {
+                button.innerHTML = originalText;
+                button.disabled = false;
+            });
+        }
+
+        // Configuration des filtres
+        function setupFilters() {
+            const searchInput = document.getElementById('searchInput');
+            const roleFilter = document.getElementById('roleFilter');
+            const statusFilter = document.getElementById('statusFilter');
+            const onlineFilter = document.getElementById('onlineFilter');
+            
+            if (searchInput) searchInput.addEventListener('input', filterTable);
+            if (roleFilter) roleFilter.addEventListener('change', filterTable);
+            if (statusFilter) statusFilter.addEventListener('change', filterTable);
+            if (onlineFilter) onlineFilter.addEventListener('change', filterTable);
+        }
+
+        // Filtrage des administrateurs
+        function filterTable() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const roleFilter = document.getElementById('roleFilter').value;
+            const statusFilter = document.getElementById('statusFilter').value;
+            const onlineFilter = document.getElementById('onlineFilter').value;
+            
+            const rows = document.querySelectorAll('.admin-row, .admin-row-grid');
+
+            rows.forEach(row => {
+                const username = row.dataset.username;
+                const email = row.dataset.email;
+                const role = row.dataset.role;
+                const status = row.dataset.status;
+                const online = row.dataset.online;
+
+                const matchesSearch = !searchTerm || 
+                    username.includes(searchTerm) || 
+                    email.includes(searchTerm);
+                const matchesRole = !roleFilter || role === roleFilter;
+                const matchesStatus = !statusFilter || status === statusFilter;
+                const matchesOnline = !onlineFilter || online === onlineFilter;
+
+                if (matchesSearch && matchesRole && matchesStatus && matchesOnline) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
         // Basculer entre vue tableau et grille
-        let isGridView = false;
-        
         function toggleTableView() {
             const tableView = document.getElementById('tableView');
             const gridView = document.getElementById('gridView');
@@ -972,114 +1432,433 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 toggleBtn.innerHTML = '<i class="fas fa-th-large mr-1"></i>Vue grille';
                 showToast('Vue tableau activée', 'info');
             }
-        }
-
-        // Filtrage amélioré pour supporter les deux vues
-        function filterTable() {
-            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-            const roleFilter = document.getElementById('roleFilter').value;
-            const statusFilter = document.getElementById('statusFilter').value;
             
-            // Filtrer la vue tableau
-            const tableRows = document.querySelectorAll('.admin-row');
-            let visibleTableCount = 0;
+            // Réinitialiser les sélections
+            clearSelection();
+        }
 
-            tableRows.forEach(row => {
-                const username = row.dataset.username;
-                const email = row.dataset.email;
-                const role = row.dataset.role;
-                const status = row.dataset.status;
-
-                const matchesSearch = !searchTerm || 
-                    username.includes(searchTerm) || 
-                    email.includes(searchTerm);
-                const matchesRole = !roleFilter || role === roleFilter;
-                const matchesStatus = !statusFilter || status === statusFilter;
-
-                if (matchesSearch && matchesRole && matchesStatus) {
-                    row.style.display = '';
-                    visibleTableCount++;
-                } else {
-                    row.style.display = 'none';
-                }
-            });
-
-            // Filtrer la vue grille
-            const gridCards = document.querySelectorAll('.admin-card');
-            let visibleGridCount = 0;
-
-            gridCards.forEach(card => {
-                const username = card.dataset.username;
-                const email = card.dataset.email;
-                const role = card.dataset.role;
-                const status = card.dataset.status;
-
-                const matchesSearch = !searchTerm || 
-                    username.includes(searchTerm) || 
-                    email.includes(searchTerm);
-                const matchesRole = !roleFilter || role === roleFilter;
-                const matchesStatus = !statusFilter || status === statusFilter;
-
-                if (matchesSearch && matchesRole && matchesStatus) {
-                    card.style.display = '';
-                    visibleGridCount++;
-                } else {
-                    card.style.display = 'none';
-                }
-            });
-
-            const visibleCount = isGridView ? visibleGridCount : visibleTableCount;
-            document.getElementById('resultCount').innerHTML = `
-                <i class="fas fa-search mr-1"></i>
-                Affichage: ${visibleCount} administrateur(s)
-            `;
+        // ===== FONCTIONNALITÉS D'ACTIONS EN LOT =====
+        
+        function updateBulkActions() {
+            const checkboxes = document.querySelectorAll('.admin-checkbox:checked');
+            const bulkActions = document.getElementById('bulkActions');
+            const selectedCount = document.getElementById('selectedCount');
             
-            document.getElementById('footerResultCount').textContent = `Total: ${visibleCount} administrateur(s)`;
+            selectedAdmins = Array.from(checkboxes).map(cb => parseInt(cb.value));
+            
+            if (selectedAdmins.length > 0) {
+                bulkActions.classList.remove('hidden');
+                bulkActions.classList.add('show');
+                selectedCount.textContent = `${selectedAdmins.length} sélectionné(s)`;
+            } else {
+                bulkActions.classList.add('hidden');
+                bulkActions.classList.remove('show');
+            }
         }
 
-        // Nouvelles fonctions ajoutées
-        function refreshStats() {
-            showToast('Actualisation des statistiques...', 'info');
-            setTimeout(() => {
-                location.reload();
-            }, 1000);
+        function toggleSelectAll() {
+            const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+            const checkboxes = document.querySelectorAll('.admin-checkbox');
+            
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = selectAllCheckbox.checked;
+            });
+            
+            updateBulkActions();
         }
 
-        function showAuditLog() {
-            showToast('Fonctionnalité en développement', 'info');
-        }
-
-        function showSecuritySettings() {
-            showToast('Paramètres de sécurité - Bientôt disponible', 'info');
-        }
-
-        function openBulkModal() {
-            showToast('Interface d\'actions en lot améliorée', 'info');
-        }
-
-        function clearFilters() {
-            document.getElementById('searchInput').value = '';
-            document.getElementById('roleFilter').value = '';
-            document.getElementById('statusFilter').value = '';
-            document.getElementById('sortSelect').value = 'id_desc';
-            filterTable();
-            showToast('Filtres effacés', 'success');
+        function selectAll() {
+            const checkboxes = document.querySelectorAll('.admin-checkbox');
+            const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+            
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = true;
+            });
+            
+            if (selectAllCheckbox) selectAllCheckbox.checked = true;
+            updateBulkActions();
         }
 
         function clearSelection() {
-            document.getElementById('selectAll').checked = false;
-            document.querySelectorAll('.admin-checkbox').forEach(cb => cb.checked = false);
+            const checkboxes = document.querySelectorAll('.admin-checkbox');
+            const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+            
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            
+            if (selectAllCheckbox) selectAllCheckbox.checked = false;
             updateBulkActions();
-            showToast('Sélection annulée', 'info');
         }
 
-        // Tri amélioré
-        document.getElementById('sortSelect').addEventListener('change', function() {
-            const [column, direction] = this.value.split('_');
-            currentSortColumn = column;
-            currentSortDirection = direction;
-            sortTable(column);
-        });
+        function bulkRoleChange() {
+            const roleSelect = document.getElementById('bulkRoleSelect');
+            const newRole = roleSelect.value;
+            
+            if (!newRole || selectedAdmins.length === 0) {
+                showToast('Veuillez sélectionner un rôle et des administrateurs', 'warning');
+                return;
+            }
+
+            if (confirm(`Changer le rôle de ${selectedAdmins.length} administrateur(s) vers "${newRole}" ?`)) {
+                const formData = new FormData();
+                formData.append('action', 'bulk_role_change');
+                formData.append('ids', JSON.stringify(selectedAdmins));
+                formData.append('role', newRole);
+                
+                submitBulkAction(formData, 'Rôles mis à jour avec succès');
+            }
+        }
+
+            const statusText = status ? 'activer' : 'désactiver';
+            
+            if (confirm(`${statusText.charAt(0).toUpperCase() + statusText.slice(1)} ${selectedAdmins.length} administrateur(s) ?`)) {
+                const formData = new FormData();
+                formData.append('action', 'bulk_status_change');
+                formData.append('ids', JSON.stringify(selectedAdmins));
+                formData.append('status', status);
+                
+                submitBulkAction(formData, `Administrateurs ${status ? 'activés' : 'désactivés'} avec succès`);
+            }
+        }
+
+        function bulkDelete() {
+            if (selectedAdmins.length === 0) {
+                showToast('Veuillez sélectionner des administrateurs', 'warning');
+                return;
+            }
+
+            if (confirm(`Supprimer définitivement ${selectedAdmins.length} administrateur(s) ? Cette action est irréversible.`)) {
+                const formData = new FormData();
+                formData.append('action', 'bulk_delete');
+                formData.append('ids', JSON.stringify(selectedAdmins));
+                
+                submitBulkAction(formData, 'Administrateurs supprimés avec succès');
+            }
+        }
+
+        function submitBulkAction(formData, successMessage) {
+            fetch(window.location.href, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(successMessage, 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showToast('Erreur lors de l\'opération groupée', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+                showToast('Erreur de connexion', 'error');
+            });
+        }
+
+        // ===== FONCTIONNALITÉS DE SESSIONS =====
+        
+        function forceLogout(adminId, adminName) {
+            if (confirm(`Forcer la déconnexion de ${adminName} ? Cela fermera toutes ses sessions actives.`)) {
+                const formData = new FormData();
+                formData.append('action', 'force_logout');
+                formData.append('admin_id', adminId);
+                
+                fetch(window.location.href, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showToast(`${adminName} a été déconnecté`, 'success');
+                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        showToast('Erreur lors de la déconnexion', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Erreur:', error);
+                    showToast('Erreur de connexion', 'error');
+                });
+            }
+        }
+
+        // ===== MODAL DE DÉTAILS ADMINISTRATEUR =====
+        
+        function viewAdminDetails(adminId) {
+            const formData = new FormData();
+            formData.append('action', 'get_admin_details');
+            formData.append('admin_id', adminId);
+            
+            fetch(window.location.href, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    populateAdminDetailsModal(data);
+                    showModal('adminDetailsModal');
+                } else {
+                    showToast('Erreur lors du chargement des détails', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+                showToast('Erreur de connexion', 'error');
+            });
+        }
+
+        function populateAdminDetailsModal(data) {
+            const { admin, active_sessions, login_history, activity_log } = data;
+            
+            // Nom dans le header
+            document.getElementById('modalAdminName').textContent = `${admin.username} - Détails`;
+            
+            // Informations générales
+            const generalInfo = document.getElementById('adminGeneralInfo');
+            generalInfo.innerHTML = `
+                <div class="flex justify-between items-center py-2 border-b border-slate-200">
+                    <span class="font-medium text-slate-600">ID:</span>
+                    <span class="text-slate-800">${admin.id}</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-slate-200">
+                    <span class="font-medium text-slate-600">Nom d'utilisateur:</span>
+                    <span class="text-slate-800">${admin.username}</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-slate-200">
+                    <span class="font-medium text-slate-600">Email:</span>
+                    <span class="text-slate-800">${admin.email}</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-slate-200">
+                    <span class="font-medium text-slate-600">Rôle:</span>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${admin.role === 'superadmin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}">
+                        ${admin.role === 'superadmin' ? 'Super Admin' : 'Admin'}
+                    </span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-slate-200">
+                    <span class="font-medium text-slate-600">Statut:</span>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${admin.status ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                        ${admin.status_display}
+                    </span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-slate-200">
+                    <span class="font-medium text-slate-600">Créé le:</span>
+                    <span class="text-slate-800">${new Date(admin.created_at).toLocaleDateString('fr-FR')}</span>
+                </div>
+                <div class="flex justify-between items-center py-2">
+                    <span class="font-medium text-slate-600">Dernière connexion:</span>
+                    <span class="text-slate-800">${admin.last_login_display}</span>
+                </div>
+            `;
+            
+            // Sessions actives
+            const activeSessions = document.getElementById('adminActiveSessions');
+            if (active_sessions.length > 0) {
+                activeSessions.innerHTML = active_sessions.map(session => `
+                    <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200">
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <div class="online-indicator"></div>
+                                <span class="font-medium text-slate-800">Session active</span>
+                            </div>
+                            <div class="text-sm text-slate-500">IP: ${session.ip_address || 'N/A'}</div>
+                            <div class="text-sm text-slate-500">Depuis: ${new Date(session.logged_in_at).toLocaleDateString('fr-FR')} ${new Date(session.logged_in_at).toLocaleTimeString('fr-FR')}</div>
+                        </div>
+                        <button onclick="forceLogout(${admin.id}, '${admin.username}')" class="px-2 py-1 bg-red-100 text-red-700 rounded text-sm hover:bg-red-200">
+                            Déconnecter
+                        </button>
+                    </div>
+                `).join('');
+            } else {
+                activeSessions.innerHTML = '<p class="text-slate-500 text-center py-4">Aucune session active</p>';
+            }
+            
+            // Historique des connexions
+            const loginHistory = document.getElementById('adminLoginHistory');
+            if (login_history.length > 0) {
+                loginHistory.innerHTML = login_history.map(login => `
+                    <div class="p-3 bg-white rounded-lg border border-slate-200">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <i class="fas fa-sign-in-alt text-green-500"></i>
+                                <span class="font-medium text-slate-800">Connexion</span>
+                            </div>
+                            <span class="text-sm text-slate-500">${new Date(login.logged_in_at).toLocaleDateString('fr-FR')} ${new Date(login.logged_in_at).toLocaleTimeString('fr-FR')}</span>
+                        </div>
+                        <div class="mt-1 text-sm text-slate-600">
+                            IP: ${login.ip_address || 'N/A'}
+                            ${login.logged_out_at ? `<span class="ml-2 text-red-600">• Déconnecté le ${new Date(login.logged_out_at).toLocaleDateString('fr-FR')} ${new Date(login.logged_out_at).toLocaleTimeString('fr-FR')}</span>` : '<span class="ml-2 text-green-600">• Session active</span>'}
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                loginHistory.innerHTML = '<p class="text-slate-500 text-center py-4">Aucun historique de connexion</p>';
+            }
+            
+            // Journal d'activité
+            const activityLogEl = document.getElementById('adminActivityLog');
+            if (activity_log.length > 0) {
+                activityLogEl.innerHTML = activity_log.map(log => `
+                    <div class="p-3 bg-white rounded-lg border border-slate-200">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="font-medium text-slate-800">${getActionText(log.action)}</span>
+                            <span class="text-sm text-slate-500">${new Date(log.created_at).toLocaleDateString('fr-FR')} ${new Date(log.created_at).toLocaleTimeString('fr-FR')}</span>
+                        </div>
+                        ${log.target ? `<div class="text-sm text-slate-600">Cible: ${log.target}</div>` : ''}
+                        ${log.details ? `<div class="text-sm text-slate-500">${log.details}</div>` : ''}
+                        <div class="text-xs text-slate-400 mt-1">IP: ${log.ip_address || 'N/A'}</div>
+                    </div>
+                `).join('');
+            } else {
+                activityLogEl.innerHTML = '<p class="text-slate-500 text-center py-4">Aucune activité enregistrée</p>';
+            }
+        }
+
+        function closeAdminDetailsModal() {
+            hideModal('adminDetailsModal');
+        }
+
+        // ===== MODAL JOURNAL D'ACTIVITÉ =====
+        
+        function openActivityLogModal() {
+            showModal('activityLogModal');
+            loadActivityLogs(1);
+        }
+
+        function closeActivityLogModal() {
+            hideModal('activityLogModal');
+        }
+
+        function filterActivityLogs() {
+            loadActivityLogs(1);
+        }
+
+        function loadActivityLogs(page = 1) {
+            currentActivityPage = page;
+            
+            const formData = new FormData();
+            formData.append('action', 'get_activity_logs');
+            formData.append('page', page);
+            
+            const adminFilter = document.getElementById('logAdminFilter')?.value || '';
+            const actionFilter = document.getElementById('logActionFilter')?.value || '';
+            const dateFilter = document.getElementById('logDateFilter')?.value || '';
+            
+            if (adminFilter) formData.append('admin_filter', adminFilter);
+            if (actionFilter) formData.append('action_filter', actionFilter);
+            if (dateFilter) formData.append('date_filter', dateFilter);
+            
+            fetch(window.location.href, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displayActivityLogs(data.logs);
+                    updateLogsPagination(data.page, data.total_pages, data.total);
+                } else {
+                    showToast('Erreur lors du chargement des logs', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+                showToast('Erreur de connexion', 'error');
+            });
+        }
+
+        function displayActivityLogs(logs) {
+            const container = document.getElementById('activityLogsContent');
+            
+            if (logs.length === 0) {
+                container.innerHTML = '<div class="p-8 text-center text-slate-500">Aucune activité trouvée</div>';
+                return;
+            }
+            
+            container.innerHTML = `
+                <div class="divide-y divide-slate-200">
+                    ${logs.map(log => `
+                        <div class="p-4 hover:bg-slate-50 transition-colors">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-center space-x-3 mb-2">
+                                        <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                            <span class="text-blue-600 font-medium text-sm">${log.admin_username.charAt(0).toUpperCase()}</span>
+                                        </div>
+                                        <div>
+                                            <div class="font-medium text-slate-800">${log.admin_username}</div>
+                                            <div class="text-sm text-slate-500">${new Date(log.created_at).toLocaleDateString('fr-FR')} ${new Date(log.created_at).toLocaleTimeString('fr-FR')}</div>
+                                        </div>
+                                    </div>
+                                    <div class="ml-11">
+                                        <div class="text-sm text-slate-800 mb-1">
+                                            ${getActionText(log.action)}
+                                            ${log.target ? `<span class="font-medium">${log.target}</span>` : ''}
+                                        </div>
+                                        ${log.details ? `<div class="text-sm text-slate-600 mb-1">${log.details}</div>` : ''}
+                                        <div class="text-xs text-slate-400">IP: ${log.ip_address || 'N/A'}</div>
+                                    </div>
+                                </div>
+                                <div class="ml-4">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getActionColor(log.action)}">
+                                        ${log.action.replace(/_/g, ' ')}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function getActionColor(action) {
+            const colors = {
+                'CREATE_ADMIN': 'bg-green-100 text-green-800',
+                'UPDATE_ADMIN': 'bg-blue-100 text-blue-800',
+                'DELETE_ADMIN': 'bg-red-100 text-red-800',
+                'BULK_DELETE_ADMIN': 'bg-red-100 text-red-800',
+                'BULK_ROLE_CHANGE': 'bg-purple-100 text-purple-800',
+                'BULK_STATUS_CHANGE': 'bg-amber-100 text-amber-800',
+                'TOGGLE_STATUS': 'bg-amber-100 text-amber-800',
+                'FORCE_LOGOUT': 'bg-orange-100 text-orange-800'
+            };
+            return colors[action] || 'bg-slate-100 text-slate-800';
+        }
+
+        function updateLogsPagination(currentPage, totalPages, total) {
+            const container = document.getElementById('logsPagination');
+            
+            if (totalPages <= 1) {
+                container.innerHTML = `<div class="text-sm text-slate-500">Total: ${total} entrée(s)</div>`;
+                return;
+            }
+            
+            const prevDisabled = currentPage <= 1;
+            const nextDisabled = currentPage >= totalPages;
+            
+            container.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <div class="text-sm text-slate-500">
+                        Page ${currentPage} sur ${totalPages} (${total} entrée(s))
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="loadActivityLogs(${currentPage - 1})" 
+                                ${prevDisabled ? 'disabled' : ''} 
+                                class="px-3 py-1 border border-slate-300 rounded text-sm ${prevDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-50'}">
+                            <i class="fas fa-chevron-left mr-1"></i>Précédent
+                        </button>
+                        <button onclick="loadActivityLogs(${currentPage + 1})" 
+                                ${nextDisabled ? 'disabled' : ''} 
+                                class="px-3 py-1 border border-slate-300 rounded text-sm ${nextDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-50'}">
+                            Suivant<i class="fas fa-chevron-right ml-1"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
 
         // Mode sombre
         function toggleDarkMode() {
@@ -1100,336 +1879,90 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
         }
 
-        // Graphique des rôles
-        function initChart() {
-            const ctx = document.getElementById('roleChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Super Admin', 'Admin'],
-                    datasets: [{
-                        data: [<?= $stats['super_admin'] ?>, <?= $stats['admin'] ?>],
-                        backgroundColor: ['#8b5cf6', '#3b82f6'],
-                        borderWidth: 2,
-                        borderColor: '#ffffff'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                padding: 20,
-                                usePointStyle: true
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        // Animation des lignes du tableau
-        function animateTableRows() {
-            const rows = document.querySelectorAll('tbody tr');
-            rows.forEach((row, index) => {
-                row.style.opacity = '0';
-                row.style.transform = 'translateY(10px)';
-                setTimeout(() => {
-                    row.style.transition = 'all 0.3s ease';
-                    row.style.opacity = '1';
-                    row.style.transform = 'translateY(0)';
-                }, index * 50);
-            });
-        }
-
-        // Configuration recherche et filtres
-        function setupSearchAndFilters() {
-            const searchInput = document.getElementById('searchInput');
-            const roleFilter = document.getElementById('roleFilter');
-            const statusFilter = document.getElementById('statusFilter');
-            
-            searchInput.addEventListener('input', filterTable);
-            roleFilter.addEventListener('change', filterTable);
-            statusFilter.addEventListener('change', filterTable);
-        }
-
-        // Tri du tableau
-        function sortTable(column) {
-            const tbody = document.getElementById('adminTableBody');
-            const rows = Array.from(tbody.querySelectorAll('tr'));
-
-            if (currentSortColumn === column) {
-                currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
-            } else {
-                currentSortColumn = column;
-                currentSortDirection = 'asc';
-            }
-
-            rows.sort((a, b) => {
-                let aVal, bVal;
-                
-                switch (column) {
-                    case 'id':
-                        aVal = parseInt(a.children[1].textContent.trim());
-                        bVal = parseInt(b.children[1].textContent.trim());
-                        break;
-                    case 'username':
-                        aVal = a.dataset.username;
-                        bVal = b.dataset.username;
-                        break;
-                    case 'email':
-                        aVal = a.dataset.email;
-                        bVal = b.dataset.email;
-                        break;
-                    default:
-                        return 0;
-                }
-
-                if (currentSortDirection === 'asc') {
-                    return aVal > bVal ? 1 : -1;
-                } else {
-                    return aVal < bVal ? 1 : -1;
-                }
-            });
-
-            // Réinsérer les lignes triées
-            rows.forEach(row => tbody.appendChild(row));
-        }
-
-        // Gestion des sélections multiples
-        function updateBulkActions() {
-            const checkboxes = document.querySelectorAll('.admin-checkbox:checked');
-            const bulkActions = document.getElementById('bulkActions');
-            const selectedCount = document.getElementById('selectedCount');
-            
-            if (checkboxes.length > 0) {
-                bulkActions.classList.remove('hidden');
-                bulkActions.classList.add('flex');
-                selectedCount.classList.remove('hidden');
-                selectedCount.textContent = `${checkboxes.length} administrateur(s) sélectionné(s)`;
-            } else {
-                bulkActions.classList.add('hidden');
-                bulkActions.classList.remove('flex');
-                selectedCount.classList.add('hidden');
-            }
-        }
-
-        // Sélectionner tout
-        document.getElementById('selectAll').addEventListener('change', function() {
-            const checkboxes = document.querySelectorAll('.admin-checkbox');
-            checkboxes.forEach(cb => {
-                cb.checked = this.checked;
-            });
-            updateBulkActions();
-        });
-
-        // Actions en lot
-        function bulkChangeRole() {
-            const selectedIds = Array.from(document.querySelectorAll('.admin-checkbox:checked')).map(cb => cb.value);
-            const newRole = document.getElementById('bulkRoleSelect').value;
-            
-            if (!newRole) {
-                showToast('Veuillez sélectionner un rôle', 'warning');
-                return;
-            }
-            
-            if (selectedIds.length === 0) {
-                showToast('Aucun administrateur sélectionné', 'warning');
-                return;
-            }
-
-            fetch(window.location.href, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `action=bulk_role_change&ids=${JSON.stringify(selectedIds)}&role=${newRole}`
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showToast(`Rôle modifié pour ${selectedIds.length} administrateur(s)`, 'success');
-                    setTimeout(() => location.reload(), 1500);
-                } else {
-                    showToast('Erreur lors de la modification', 'error');
-                }
-            });
-        }
-
-        function bulkDelete() {
-            const selectedIds = Array.from(document.querySelectorAll('.admin-checkbox:checked')).map(cb => cb.value);
-            
-            if (selectedIds.length === 0) {
-                showToast('Aucun administrateur sélectionné', 'warning');
-                return;
-            }
-
-            if (confirm(`Êtes-vous sûr de vouloir supprimer ${selectedIds.length} administrateur(s) ?`)) {
-                fetch(window.location.href, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: `action=bulk_delete&ids=${JSON.stringify(selectedIds)}`
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        showToast(`${selectedIds.length} administrateur(s) supprimé(s)`, 'success');
-                        setTimeout(() => location.reload(), 1500);
-                    } else {
-                        showToast('Erreur lors de la suppression', 'error');
-                    }
-                });
-            }
-        }
-
-        // Basculer le statut
-        function toggleStatus(id) {
-            fetch(window.location.href, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `action=toggle_status&id=${id}`
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showToast('Statut modifié avec succès', 'success');
-                    setTimeout(() => location.reload(), 1000);
-                } else {
-                    showToast('Erreur lors de la modification du statut', 'error');
-                }
-            });
-        }
-
-        // Export CSV
-        function exportCSV() {
-            window.location.href = window.location.href + '?action=export_csv';
-            showToast('Export CSV en cours...', 'info');
-        }
-
-        // Modals - Ajout
+        // Gestion des modals
         function openAddModal() {
-            document.getElementById('addForm').reset();
-            const modal = document.getElementById('addModal');
-            modal.classList.remove('hidden');
-            setTimeout(() => {
-                modal.querySelector('.transform').classList.remove('scale-95');
-                modal.querySelector('.transform').classList.add('scale-100');
-            }, 10);
+            const form = document.getElementById('addForm');
+            form.reset();
+            
+            const emailInput = document.querySelector('#addModal input[name="email"]');
+            const emailIndicator = document.getElementById('emailFoundIndicator');
+            
+            emailInput.removeAttribute('readonly');
+            emailInput.placeholder = 'Email sera rempli automatiquement...';
+            emailIndicator.style.display = 'none';
+            
+            showModal('addModal');
         }
 
         function closeAddModal() {
-            const modal = document.getElementById('addModal');
-            const modalContent = modal.querySelector('.transform');
-            
-            modalContent.classList.remove('scale-100');
-            modalContent.classList.add('scale-95');
-            
-            setTimeout(() => {
-                modal.classList.add('hidden');
-            }, 200);
+            hideModal('addModal');
         }
 
-        // Modals - Modification
         function openEditModal(id, username, email, role) {
             document.getElementById('editAdminId').value = id;
             document.getElementById('editUsername').value = username;
             document.getElementById('editEmail').value = email;
             document.getElementById('editRole').value = role;
             document.getElementById('editPassword').value = '';
-
-            const modal = document.getElementById('editModal');
-            modal.classList.remove('hidden');
-            setTimeout(() => {
-                modal.querySelector('.transform').classList.remove('scale-95');
-                modal.querySelector('.transform').classList.add('scale-100');
-            }, 10);
+            showModal('editModal');
         }
 
         function closeEditModal() {
-            const modal = document.getElementById('editModal');
-            const modalContent = modal.querySelector('.transform');
-            
-            modalContent.classList.remove('scale-100');
-            modalContent.classList.add('scale-95');
-            
-            setTimeout(() => {
-                modal.classList.add('hidden');
-            }, 200);
+            hideModal('editModal');
         }
 
-        // Modals - Suppression
         function confirmDelete(id, username) {
             deleteAdminId = id;
             document.getElementById('deleteAdminName').textContent = username;
-            
-            const modal = document.getElementById('deleteModal');
-            modal.classList.remove('hidden');
-            setTimeout(() => {
-                modal.querySelector('.transform').classList.remove('scale-95');
-                modal.querySelector('.transform').classList.add('scale-100');
-            }, 10);
+            showModal('deleteModal');
         }
 
         function closeDeleteModal() {
-            const modal = document.getElementById('deleteModal');
-            const modalContent = modal.querySelector('.transform');
-            
-            modalContent.classList.remove('scale-100');
-            modalContent.classList.add('scale-95');
-            
-            setTimeout(() => {
-                modal.classList.add('hidden');
-                deleteAdminId = null;
-            }, 200);
+            hideModal('deleteModal');
+            deleteAdminId = null;
         }
 
         function executeDelete() {
             if (!deleteAdminId) return;
             
-            window.location.href = `admin_supprimer.php?id=${deleteAdminId}`;
+            const formData = new FormData();
+            formData.append('action', 'bulk_delete');
+            formData.append('ids', JSON.stringify([deleteAdminId]));
+            
+            submitForm(formData, 'Administrateur supprimé avec succès');
         }
 
-        // Fermeture des modals
+        // Fonctions utilitaires pour les modals
+        function showModal(modalId) {
+            const modal = document.getElementById(modalId);
+            modal.classList.remove('hidden');
+        }
+
+        function hideModal(modalId) {
+            const modal = document.getElementById(modalId);
+            modal.classList.add('hidden');
+        }
+
+        function closeAllModals() {
+            ['addModal', 'editModal', 'deleteModal', 'adminDetailsModal', 'activityLogModal'].forEach(modalId => {
+                hideModal(modalId);
+            });
+        }
+
+        // Fermeture des modals par Escape
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
-                const modals = ['addModal', 'editModal', 'deleteModal'];
-                modals.forEach(modalId => {
-                    const modal = document.getElementById(modalId);
-                    if (!modal.classList.contains('hidden')) {
-                        if (modalId === 'addModal') closeAddModal();
-                        else if (modalId === 'editModal') closeEditModal();
-                        else if (modalId === 'deleteModal') closeDeleteModal();
-                    }
-                });
+                closeAllModals();
             }
         });
 
-        ['addModal', 'editModal', 'deleteModal'].forEach(modalId => {
+        // Clic à l'extérieur pour fermer les modals
+        ['addModal', 'editModal', 'deleteModal', 'adminDetailsModal', 'activityLogModal'].forEach(modalId => {
             document.getElementById(modalId).addEventListener('click', function(e) {
                 if (e.target === this) {
-                    if (modalId === 'addModal') closeAddModal();
-                    else if (modalId === 'editModal') closeEditModal();
-                    else if (modalId === 'deleteModal') closeDeleteModal();
+                    hideModal(modalId);
                 }
             });
-        });
-
-        // Validation du formulaire d'ajout
-        document.getElementById('addForm').addEventListener('submit', function(e) {
-            const password = document.getElementById('addPassword').value;
-            const passwordConfirm = document.getElementById('addPasswordConfirm').value;
-            
-            if (password !== passwordConfirm) {
-                e.preventDefault();
-                showToast('Les mots de passe ne correspondent pas !', 'error');
-                return false;
-            }
-            
-            if (password.length < 6) {
-                e.preventDefault();
-                showToast('Le mot de passe doit contenir au moins 6 caractères !', 'error');
-                return false;
-            }
         });
 
         // Système de notifications toast
@@ -1451,7 +1984,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 info: 'fa-info-circle'
             };
             
-            toast.className = `toast ${colors[type]} text-white px-6 py-4 rounded-lg shadow-lg flex items-center space-x-3 max-w-sm`;
+            toast.className = `toast ${colors[type]} text-white px-6 py-4 rounded-lg shadow-lg flex items-center space-x-3 max-w-sm mb-4`;
             toast.innerHTML = `
                 <i class="fas ${icons[type]}"></i>
                 <span>${message}</span>
@@ -1462,10 +1995,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             
             container.appendChild(toast);
             
-            // Animation d'entrée
             setTimeout(() => toast.classList.add('show'), 100);
-            
-            // Suppression automatique après 5 secondes
             setTimeout(() => {
                 toast.classList.remove('show');
                 setTimeout(() => toast.remove(), 300);
@@ -1473,4 +2003,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     </script>
 </body>
-</html> 
+</html>
