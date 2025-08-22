@@ -16,6 +16,21 @@ function logActivity($conn, $admin_id, $admin_username, $action, $target = null,
     }
 }
 
+// Fonction pour obtenir le texte d'action
+function getActionText($action) {
+    $actions = [
+        'CREATE_ADMIN' => 'a créé l\'administrateur',
+        'UPDATE_ADMIN' => 'a modifié l\'administrateur',
+        'DELETE_ADMIN' => 'a supprimé l\'administrateur',
+        'BULK_DELETE_ADMIN' => 'a supprimé en lot',
+        'BULK_ROLE_CHANGE' => 'a changé le rôle en lot pour',
+        'BULK_STATUS_CHANGE' => 'a changé le statut en lot pour',
+        'TOGGLE_STATUS' => 'a changé le statut de',
+        'FORCE_LOGOUT' => 'a forcé la déconnexion de'
+    ];
+    return $actions[$action] ?? $action;
+}
+
 // Gestion des actions AJAX
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     header('Content-Type: application/json');
@@ -196,11 +211,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             try {
                 $adminId = $_POST['admin_id'];
                 
-                // Informations de base de l'admin
+                // Informations de base de l'admin avec mot de passe
                 $stmt = $conn->prepare("
                     SELECT a.*, 
                            COALESCE(DATE_FORMAT(a.last_login, '%d/%m/%Y %H:%i:%s'), 'Jamais') as last_login_display,
-                           CASE WHEN a.status = 1 THEN 'Actif' ELSE 'Inactif' END as status_display
+                           CASE WHEN a.status = 1 THEN 'Actif' ELSE 'Inactif' END as status_display,
+                           LEFT(a.password, 20) as password_preview
                     FROM admin a 
                     WHERE a.id = ?
                 ");
@@ -212,9 +228,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     exit;
                 }
                 
-                // Sessions actives
+                // Sessions actives - Correction de la requête
                 $stmt = $conn->prepare("
-                    SELECT * FROM admin_sessions 
+                    SELECT session_id, ip_address, user_agent, logged_in_at, last_activity
+                    FROM admin_sessions 
                     WHERE admin_id = ? AND is_active = 1 
                     ORDER BY last_activity DESC
                 ");
@@ -223,7 +240,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 
                 // Historique des connexions (10 dernières)
                 $stmt = $conn->prepare("
-                    SELECT * FROM admin_sessions 
+                    SELECT session_id, ip_address, user_agent, logged_in_at, logged_out_at, is_active
+                    FROM admin_sessions 
                     WHERE admin_id = ? 
                     ORDER BY logged_in_at DESC 
                     LIMIT 10
@@ -353,7 +371,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 }
 
-// Récupération des données avec dernière connexion et statistiques
+// Récupération des données avec dernière connexion et sessions actives corrigée
 $stmt = $conn->query("
     SELECT 
         a.id,
@@ -367,7 +385,15 @@ $stmt = $conn->query("
         a.employee_id,
         COALESCE(DATE_FORMAT(a.last_login, '%d/%m/%Y %H:%i'), 'Jamais') as last_login_display,
         CASE WHEN a.status = 1 THEN 'Actif' ELSE 'Inactif' END as status_display,
-        CASE WHEN EXISTS(SELECT 1 FROM admin_sessions s WHERE s.admin_id = a.id AND s.is_active = 1) THEN 1 ELSE 0 END as is_online
+        CASE 
+            WHEN EXISTS(
+                SELECT 1 FROM admin_sessions s 
+                WHERE s.admin_id = a.id 
+                AND s.is_active = 1 
+                AND s.last_activity > DATE_SUB(NOW(), INTERVAL 15 MINUTE)
+            ) THEN 1 
+            ELSE 0 
+        END as is_online
     FROM admin a
     ORDER BY created_at DESC
 ");
@@ -407,7 +433,6 @@ try {
     <title>Gestion des administrateurs</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         .toast {
             transform: translateX(100%);
@@ -449,8 +474,9 @@ try {
             animation: float 3s ease-in-out infinite;
         }
 
-        .modal {
+        .modal-overlay {
             backdrop-filter: blur(4px);
+            background: rgba(0, 0, 0, 0.3);
         }
 
         .grid-view {
@@ -494,6 +520,92 @@ try {
         .bulk-actions.show {
             transform: translateY(0);
         }
+
+        /* Styles pour les modals carrés simples */
+        .modal-simple {
+            background: white;
+            border-radius: 8px;
+            width: 100%;
+            max-width: 500px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+
+        .modal-header {
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #374151;
+            font-size: 0.875rem;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-weight: 500;
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2563eb;
+        }
+
+        .btn-secondary {
+            background: #f8fafc;
+            color: #64748b;
+            border: 1px solid #d1d5db;
+        }
+
+        .btn-secondary:hover {
+            background: #f1f5f9;
+            border-color: #9ca3af;
+        }
+
+        .password-display {
+            font-family: 'Courier New', monospace;
+            background: #f3f4f6;
+            padding: 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            color: #6b7280;
+            word-break: break-all;
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen transition-all duration-300" id="body">
@@ -508,266 +620,6 @@ try {
                         <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
                             <i class="fas fa-users-cog text-white text-lg"></i>
                         </div>
-
-    <!-- Toast Container -->
-    <div id="toastContainer" class="fixed top-4 right-4 space-y-4 z-50"></div>
-
-    <!-- Modal d'ajout -->
-    <div id="addModal" class="fixed inset-0 bg-black bg-opacity-50 modal hidden z-40 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl max-w-md w-full">
-            <div class="bg-gradient-to-r from-blue-500 to-blue-600 p-6 rounded-t-2xl">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-10 h-10 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
-                            <i class="fas fa-user-plus text-white"></i>
-                        </div>
-                        <div>
-                            <h3 class="text-xl font-bold text-white">Nouvel administrateur</h3>
-                            <p class="text-blue-100 text-sm">Ajouter un nouveau compte</p>
-                        </div>
-                    </div>
-                    <button onclick="closeAddModal()" class="text-white hover:text-blue-200 transition-colors">
-                        <i class="fas fa-times text-xl"></i>
-                    </button>
-                </div>
-            </div>
-            
-            
-            <form id="editForm" class="p-6 space-y-4">
-                <input type="hidden" id="editAdminId" name="id">
-                
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">Nom d'utilisateur</label>
-                    <input type="text" name="username" id="editUsername" required
-                           class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent">
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">Email</label>
-                    <input type="email" name="email" id="editEmail" required
-                           class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent">
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">Rôle</label>
-                    <select name="role" id="editRole" required
-                            class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent">
-                        <option value="admin">Administrateur</option>
-                        <option value="superadmin">Super Administrateur</option>
-                    </select>
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">Nouveau mot de passe (optionnel)</label>
-                    <input type="password" name="password" id="editPassword"
-                           class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                           placeholder="Laisser vide pour conserver l'actuel">
-                </div>
-                
-                <div class="flex space-x-3 pt-4">
-                    <button type="button" onclick="closeEditModal()" 
-                            class="flex-1 px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors">
-                        Annuler
-                    </button>
-                    <button type="submit" 
-                            class="flex-1 px-4 py-3 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors">
-                        Modifier
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal de confirmation de suppression -->
-    <div id="deleteModal" class="fixed inset-0 bg-black bg-opacity-50 modal hidden z-40 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl max-w-md w-full">
-            <div class="bg-gradient-to-r from-red-500 to-red-600 p-6 rounded-t-2xl">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-10 h-10 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
-                            <i class="fas fa-exclamation-triangle text-white"></i>
-                        </div>
-                        <div>
-                            <h3 class="text-xl font-bold text-white">Confirmer la suppression</h3>
-                            <p class="text-red-100 text-sm">Cette action est irréversible</p>
-                        </div>
-                    </div>
-                    <button onclick="closeDeleteModal()" class="text-white hover:text-red-200 transition-colors">
-                        <i class="fas fa-times text-xl"></i>
-                    </button>
-                </div>
-            </div>
-            
-            <div class="p-6">
-                <div class="text-center mb-6">
-                    <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <i class="fas fa-user-times text-red-500 text-2xl"></i>
-                    </div>
-                    <h4 class="text-lg font-semibold text-slate-800 mb-2">Supprimer l'administrateur</h4>
-                    <p class="text-slate-600">
-                        Êtes-vous sûr de vouloir supprimer l'administrateur 
-                        <span class="font-semibold text-red-600" id="deleteAdminName"></span> ?
-                    </p>
-                    <p class="text-sm text-slate-500 mt-2">Cette action ne peut pas être annulée.</p>
-                </div>
-                
-                <div class="flex space-x-3">
-                    <button type="button" onclick="closeDeleteModal()" 
-                            class="flex-1 px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors">
-                        Annuler
-                    </button>
-                    <button onclick="executeDelete()" 
-                            class="flex-1 px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">
-                        Supprimer
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal de détails d'un administrateur -->
-    <div id="adminDetailsModal" class="fixed inset-0 bg-black bg-opacity-50 modal hidden z-40 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
-            <div class="bg-gradient-to-r from-indigo-500 to-indigo-600 p-6 rounded-t-2xl">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
-                            <i class="fas fa-user-circle text-white text-2xl"></i>
-                        </div>
-                        <div>
-                            <h3 class="text-xl font-bold text-white" id="modalAdminName">Détails Administrateur</h3>
-                            <p class="text-indigo-100 text-sm">Informations complètes et historique</p>
-                        </div>
-                    </div>
-                    <button onclick="closeAdminDetailsModal()" class="text-white hover:text-indigo-200 transition-colors">
-                        <i class="fas fa-times text-xl"></i>
-                    </button>
-                </div>
-            </div>
-            
-            <div class="p-6 max-h-[calc(90vh-120px)] overflow-y-auto">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- Informations générales -->
-                    <div class="bg-slate-50 rounded-xl p-6">
-                        <h4 class="font-bold text-slate-800 mb-4 flex items-center">
-                            <i class="fas fa-info-circle text-blue-500 mr-2"></i>
-                            Informations générales
-                        </h4>
-                        <div id="adminGeneralInfo" class="space-y-3">
-                            <!-- Contenu rempli par JavaScript -->
-                        </div>
-                    </div>
-                    
-                    <!-- Sessions actives -->
-                    <div class="bg-slate-50 rounded-xl p-6">
-                        <h4 class="font-bold text-slate-800 mb-4 flex items-center">
-                            <i class="fas fa-wifi text-green-500 mr-2"></i>
-                            Sessions actives
-                        </h4>
-                        <div id="adminActiveSessions" class="space-y-3 max-h-40 overflow-y-auto">
-                            <!-- Contenu rempli par JavaScript -->
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- Historique des connexions -->
-                    <div class="bg-slate-50 rounded-xl p-6">
-                        <h4 class="font-bold text-slate-800 mb-4 flex items-center">
-                            <i class="fas fa-history text-amber-500 mr-2"></i>
-                            Historique des connexions
-                        </h4>
-                        <div id="adminLoginHistory" class="space-y-3 max-h-60 overflow-y-auto">
-                            <!-- Contenu rempli par JavaScript -->
-                        </div>
-                    </div>
-                    
-                    <!-- Journal d'activité -->
-                    <div class="bg-slate-50 rounded-xl p-6">
-                        <h4 class="font-bold text-slate-800 mb-4 flex items-center">
-                            <i class="fas fa-clipboard-list text-purple-500 mr-2"></i>
-                            Journal d'activité
-                        </h4>
-                        <div id="adminActivityLog" class="space-y-3 max-h-60 overflow-y-auto">
-                            <!-- Contenu rempli par JavaScript -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Journal d'activité -->
-    <div id="activityLogModal" class="fixed inset-0 bg-black bg-opacity-50 modal hidden z-40 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
-            <div class="bg-gradient-to-r from-purple-500 to-purple-600 p-6 rounded-t-2xl">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
-                            <i class="fas fa-clipboard-list text-white text-2xl"></i>
-                        </div>
-                        <div>
-                            <h3 class="text-xl font-bold text-white">Journal d'activité</h3>
-                            <p class="text-purple-100 text-sm">Historique complet des actions</p>
-                        </div>
-                    </div>
-                    <button onclick="closeActivityLogModal()" class="text-white hover:text-purple-200 transition-colors">
-                        <i class="fas fa-times text-xl"></i>
-                    </button>
-                </div>
-            </div>
-            
-            <div class="p-6">
-                <!-- Filtres du journal -->
-                <div class="bg-slate-50 rounded-xl p-4 mb-6">
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Administrateur</label>
-                            <input type="text" id="logAdminFilter" placeholder="Nom d'utilisateur..."
-                                   class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Action</label>
-                            <select id="logActionFilter" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm">
-                                <option value="">Toutes les actions</option>
-                                <option value="CREATE_ADMIN">Création admin</option>
-                                <option value="UPDATE_ADMIN">Modification admin</option>
-                                <option value="DELETE_ADMIN">Suppression admin</option>
-                                <option value="TOGGLE_STATUS">Changement statut</option>
-                                <option value="FORCE_LOGOUT">Déconnexion forcée</option>
-                                <option value="BULK_DELETE_ADMIN">Suppression en lot</option>
-                                <option value="BULK_ROLE_CHANGE">Changement rôle en lot</option>
-                                <option value="BULK_STATUS_CHANGE">Changement statut en lot</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Date</label>
-                            <input type="date" id="logDateFilter"
-                                   class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm">
-                        </div>
-                        <div class="flex items-end">
-                            <button onclick="filterActivityLogs()" class="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm">
-                                <i class="fas fa-filter mr-1"></i>Filtrer
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Liste des logs -->
-                <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                    <div id="activityLogsContent" class="max-h-96 overflow-y-auto">
-                        <!-- Contenu rempli par JavaScript -->
-                    </div>
-                </div>
-                
-                <!-- Pagination -->
-                <div id="logsPagination" class="flex items-center justify-between mt-4">
-                    <!-- Contenu rempli par JavaScript -->
-                </div>
-            </div>
-        </div>
-    </div>
-            
                         <div>
                             <h1 class="text-2xl font-bold text-slate-800">Gestion des administrateurs</h1>
                             <p class="text-sm text-slate-500">Gérez les comptes administrateurs du système</p>
@@ -1214,7 +1066,294 @@ try {
             </div>
         </div>
     </div>
-        <script>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="fixed top-4 right-4 space-y-4 z-50"></div>
+
+    <!-- Modal d'ajout - Design carré simple -->
+    <div id="addModal" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center p-4">
+    <div class="modal-simple">
+        <div class="modal-header">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-slate-800">Nouvel administrateur</h3>
+                <button onclick="closeAddModal()" class="text-slate-400 hover:text-slate-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        
+        <form id="addForm" class="p-6">
+            <div class="form-group">
+                <label class="form-label">Nom d'utilisateur</label>
+                <input type="text" name="username" required class="form-input">
+                <div id="emailFoundIndicator" style="display: none;" class="text-xs text-green-600 mt-1">
+                    <i class="fas fa-check-circle mr-1"></i>Email trouvé automatiquement
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Email</label>
+                <input type="email" name="email" required class="form-input" placeholder="Email sera rempli automatiquement...">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Rôle</label>
+                <select name="role" required class="form-input">
+                    <option value="admin">Administrateur</option>
+                    <option value="superadmin">Super Administrateur</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Mot de passe</label>
+                <input type="password" name="password" id="addPassword" required class="form-input" minlength="6">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Confirmer le mot de passe</label>
+                <input type="password" id="addPasswordConfirm" required class="form-input" minlength="6">
+            </div>
+            
+            <div class="flex space-x-3 pt-4">
+                <button type="button" onclick="closeAddModal()" class="btn btn-secondary flex-1">
+                    Annuler
+                </button>
+                <button type="submit" class="btn btn-primary flex-1">
+                    <i class="fas fa-plus mr-2"></i>Créer
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal de modification - Design carré simple -->
+<div id="editModal" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center p-4">
+    <div class="modal-simple">
+        <div class="modal-header">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-slate-800">Modifier l'administrateur</h3>
+                <button onclick="closeEditModal()" class="text-slate-400 hover:text-slate-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        
+        <form id="editForm" class="p-6">
+            <input type="hidden" id="editAdminId" name="id">
+            
+            <div class="form-group">
+                <label class="form-label">Nom d'utilisateur</label>
+                <input type="text" name="username" id="editUsername" required class="form-input">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Email</label>
+                <input type="email" name="email" id="editEmail" required class="form-input">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Rôle</label>
+                <select name="role" id="editRole" required class="form-input">
+                    <option value="admin">Administrateur</option>
+                    <option value="superadmin">Super Administrateur</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Nouveau mot de passe (optionnel)</label>
+                <input type="password" name="password" id="editPassword" class="form-input" placeholder="Laisser vide pour conserver l'actuel">
+            </div>
+            
+            <div class="flex space-x-3 pt-4">
+                <button type="button" onclick="closeEditModal()" class="btn btn-secondary flex-1">
+                    Annuler
+                </button>
+                <button type="submit" class="btn btn-primary flex-1">
+                    <i class="fas fa-save mr-2"></i>Modifier
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+    <!-- Modal de confirmation de suppression -->
+    <div id="deleteModal" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center p-4">
+        <div class="modal-simple">
+            <div class="modal-header">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-red-600">Confirmer la suppression</h3>
+                    <button onclick="closeDeleteModal()" class="text-slate-400 hover:text-slate-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="p-6 text-center">
+                <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-user-times text-red-500 text-2xl"></i>
+                </div>
+                <h4 class="text-lg font-semibold text-slate-800 mb-2">Supprimer l'administrateur</h4>
+                <p class="text-slate-600 mb-6">
+                    Êtes-vous sûr de vouloir supprimer l'administrateur 
+                    <span class="font-semibold text-red-600" id="deleteAdminName"></span> ?
+                </p>
+                <p class="text-sm text-slate-500 mb-6">Cette action ne peut pas être annulée.</p>
+                
+                <div class="flex space-x-3">
+                    <button type="button" onclick="closeDeleteModal()" class="btn btn-secondary flex-1">
+                        Annuler
+                    </button>
+                    <button onclick="executeDelete()" class="btn flex-1" style="background: #ef4444; color: white;">
+                        <i class="fas fa-trash mr-2"></i>Supprimer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de détails d'un administrateur -->
+    <div id="adminDetailsModal" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
+            <div class="bg-gradient-to-r from-indigo-500 to-indigo-600 p-6 rounded-t-xl">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-user-circle text-white text-2xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-white" id="modalAdminName">Détails Administrateur</h3>
+                            <p class="text-indigo-100 text-sm">Informations complètes et historique</p>
+                        </div>
+                    </div>
+                    <button onclick="closeAdminDetailsModal()" class="text-white hover:text-indigo-200 transition-colors">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="p-6 max-h-[calc(90vh-120px)] overflow-y-auto">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Informations générales -->
+                    <div class="bg-slate-50 rounded-xl p-6">
+                        <h4 class="font-bold text-slate-800 mb-4 flex items-center">
+                            <i class="fas fa-info-circle text-blue-500 mr-2"></i>
+                            Informations générales
+                        </h4>
+                        <div id="adminGeneralInfo" class="space-y-3">
+                            <!-- Contenu rempli par JavaScript -->
+                        </div>
+                    </div>
+                    
+                    <!-- Sessions actives -->
+                    <div class="bg-slate-50 rounded-xl p-6">
+                        <h4 class="font-bold text-slate-800 mb-4 flex items-center">
+                            <i class="fas fa-wifi text-green-500 mr-2"></i>
+                            Sessions actives
+                        </h4>
+                        <div id="adminActiveSessions" class="space-y-3 max-h-40 overflow-y-auto">
+                            <!-- Contenu rempli par JavaScript -->
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Historique des connexions -->
+                    <div class="bg-slate-50 rounded-xl p-6">
+                        <h4 class="font-bold text-slate-800 mb-4 flex items-center">
+                            <i class="fas fa-history text-amber-500 mr-2"></i>
+                            Historique des connexions
+                        </h4>
+                        <div id="adminLoginHistory" class="space-y-3 max-h-60 overflow-y-auto">
+                            <!-- Contenu rempli par JavaScript -->
+                        </div>
+                    </div>
+                    
+                    <!-- Journal d'activité -->
+                    <div class="bg-slate-50 rounded-xl p-6">
+                        <h4 class="font-bold text-slate-800 mb-4 flex items-center">
+                            <i class="fas fa-clipboard-list text-purple-500 mr-2"></i>
+                            Journal d'activité
+                        </h4>
+                        <div id="adminActivityLog" class="space-y-3 max-h-60 overflow-y-auto">
+                            <!-- Contenu rempli par JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Journal d'activité -->
+    <div id="activityLogModal" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl max-w-6xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
+            <div class="bg-gradient-to-r from-purple-500 to-purple-600 p-6 rounded-t-xl">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-clipboard-list text-white text-2xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-white">Journal d'activité</h3>
+                            <p class="text-purple-100 text-sm">Historique complet des actions</p>
+                        </div>
+                    </div>
+                    <button onclick="closeActivityLogModal()" class="text-white hover:text-purple-200 transition-colors">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="p-6">
+                <!-- Filtres du journal -->
+                <div class="bg-slate-50 rounded-xl p-4 mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Administrateur</label>
+                            <input type="text" id="logAdminFilter" placeholder="Nom d'utilisateur..." class="form-input">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Action</label>
+                            <select id="logActionFilter" class="form-input">
+                                <option value="">Toutes les actions</option>
+                                <option value="CREATE_ADMIN">Création admin</option>
+                                <option value="UPDATE_ADMIN">Modification admin</option>
+                                <option value="DELETE_ADMIN">Suppression admin</option>
+                                <option value="TOGGLE_STATUS">Changement statut</option>
+                                <option value="FORCE_LOGOUT">Déconnexion forcée</option>
+                                <option value="BULK_DELETE_ADMIN">Suppression en lot</option>
+                                <option value="BULK_ROLE_CHANGE">Changement rôle en lot</option>
+                                <option value="BULK_STATUS_CHANGE">Changement statut en lot</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Date</label>
+                            <input type="date" id="logDateFilter" class="form-input">
+                        </div>
+                        <div class="flex items-end">
+                            <button onclick="filterActivityLogs()" class="btn btn-primary w-full">
+                                <i class="fas fa-filter mr-1"></i>Filtrer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Liste des logs -->
+                <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                    <div id="activityLogsContent" class="max-h-96 overflow-y-auto">
+                        <!-- Contenu rempli par JavaScript -->
+                    </div>
+                </div>
+                
+                <!-- Pagination -->
+                <div id="logsPagination" class="flex items-center justify-between mt-4">
+                    <!-- Contenu rempli par JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
         // Variables globales
         let deleteAdminId = null;
         let isDarkMode = localStorage.getItem('darkMode') === 'true';
@@ -1231,21 +1370,6 @@ try {
             setupFilters();
             updateBulkActions();
         });
-
-        // Fonction utilitaire pour obtenir le texte d'action
-        function getActionText(action) {
-            const actions = {
-                'CREATE_ADMIN': 'a créé l\'administrateur',
-                'UPDATE_ADMIN': 'a modifié l\'administrateur',
-                'DELETE_ADMIN': 'a supprimé l\'administrateur',
-                'BULK_DELETE_ADMIN': 'a supprimé en lot',
-                'BULK_ROLE_CHANGE': 'a changé le rôle en lot pour',
-                'BULK_STATUS_CHANGE': 'a changé le statut en lot pour',
-                'TOGGLE_STATUS': 'a changé le statut de',
-                'FORCE_LOGOUT': 'a forcé la déconnexion de'
-            };
-            return actions[action] || action;
-        }
 
         // Configuration des gestionnaires de formulaires
         function setupFormHandlers() {
@@ -1510,6 +1634,12 @@ try {
             }
         }
 
+        function bulkStatusChange(status) {
+            if (selectedAdmins.length === 0) {
+                showToast('Veuillez sélectionner des administrateurs', 'warning');
+                return;
+            }
+
             const statusText = status ? 'activer' : 'désactiver';
             
             if (confirm(`${statusText.charAt(0).toUpperCase() + statusText.slice(1)} ${selectedAdmins.length} administrateur(s) ?`)) {
@@ -1617,7 +1747,7 @@ try {
             // Nom dans le header
             document.getElementById('modalAdminName').textContent = `${admin.username} - Détails`;
             
-            // Informations générales
+            // Informations générales avec mot de passe
             const generalInfo = document.getElementById('adminGeneralInfo');
             generalInfo.innerHTML = `
                 <div class="flex justify-between items-center py-2 border-b border-slate-200">
@@ -1645,6 +1775,10 @@ try {
                     </span>
                 </div>
                 <div class="flex justify-between items-center py-2 border-b border-slate-200">
+                    <span class="font-medium text-slate-600">Mot de passe:</span>
+                    <div class="password-display">${admin.password_preview || 'N/A'}...</div>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-slate-200">
                     <span class="font-medium text-slate-600">Créé le:</span>
                     <span class="text-slate-800">${new Date(admin.created_at).toLocaleDateString('fr-FR')}</span>
                 </div>
@@ -1656,7 +1790,7 @@ try {
             
             // Sessions actives
             const activeSessions = document.getElementById('adminActiveSessions');
-            if (active_sessions.length > 0) {
+            if (active_sessions && active_sessions.length > 0) {
                 activeSessions.innerHTML = active_sessions.map(session => `
                     <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200">
                         <div>
@@ -1678,7 +1812,7 @@ try {
             
             // Historique des connexions
             const loginHistory = document.getElementById('adminLoginHistory');
-            if (login_history.length > 0) {
+            if (login_history && login_history.length > 0) {
                 loginHistory.innerHTML = login_history.map(login => `
                     <div class="p-3 bg-white rounded-lg border border-slate-200">
                         <div class="flex items-center justify-between">
@@ -1700,7 +1834,7 @@ try {
             
             // Journal d'activité
             const activityLogEl = document.getElementById('adminActivityLog');
-            if (activity_log.length > 0) {
+            if (activity_log && activity_log.length > 0) {
                 activityLogEl.innerHTML = activity_log.map(log => `
                     <div class="p-3 bg-white rounded-lg border border-slate-200">
                         <div class="flex items-center justify-between mb-1">
@@ -1814,6 +1948,20 @@ try {
             `;
         }
 
+        function getActionText(action) {
+            const actions = {
+                'CREATE_ADMIN': 'a créé l\'administrateur',
+                'UPDATE_ADMIN': 'a modifié l\'administrateur',
+                'DELETE_ADMIN': 'a supprimé l\'administrateur',
+                'BULK_DELETE_ADMIN': 'a supprimé en lot',
+                'BULK_ROLE_CHANGE': 'a changé le rôle en lot pour',
+                'BULK_STATUS_CHANGE': 'a changé le statut en lot pour',
+                'TOGGLE_STATUS': 'a changé le statut de',
+                'FORCE_LOGOUT': 'a forcé la déconnexion de'
+            };
+            return actions[action] || action;
+        }
+
         function getActionColor(action) {
             const colors = {
                 'CREATE_ADMIN': 'bg-green-100 text-green-800',
@@ -1887,9 +2035,13 @@ try {
             const emailInput = document.querySelector('#addModal input[name="email"]');
             const emailIndicator = document.getElementById('emailFoundIndicator');
             
-            emailInput.removeAttribute('readonly');
-            emailInput.placeholder = 'Email sera rempli automatiquement...';
-            emailIndicator.style.display = 'none';
+            if (emailInput) {
+                emailInput.removeAttribute('readonly');
+                emailInput.placeholder = 'Email sera rempli automatiquement...';
+            }
+            if (emailIndicator) {
+                emailIndicator.style.display = 'none';
+            }
             
             showModal('addModal');
         }
@@ -1935,12 +2087,18 @@ try {
         // Fonctions utilitaires pour les modals
         function showModal(modalId) {
             const modal = document.getElementById(modalId);
-            modal.classList.remove('hidden');
+            if (modal) {
+                modal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+            }
         }
 
         function hideModal(modalId) {
             const modal = document.getElementById(modalId);
-            modal.classList.add('hidden');
+            if (modal) {
+                modal.classList.add('hidden');
+                document.body.style.overflow = '';
+            }
         }
 
         function closeAllModals() {
@@ -1958,11 +2116,14 @@ try {
 
         // Clic à l'extérieur pour fermer les modals
         ['addModal', 'editModal', 'deleteModal', 'adminDetailsModal', 'activityLogModal'].forEach(modalId => {
-            document.getElementById(modalId).addEventListener('click', function(e) {
-                if (e.target === this) {
-                    hideModal(modalId);
-                }
-            });
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        hideModal(modalId);
+                    }
+                });
+            }
         });
 
         // Système de notifications toast
@@ -1988,7 +2149,7 @@ try {
             toast.innerHTML = `
                 <i class="fas ${icons[type]}"></i>
                 <span>${message}</span>
-                <button onclick="this.parentElement.remove()" class="ml-auto">
+                <button onclick="this.parentElement.remove()" class="ml-auto text-white hover:text-gray-200">
                     <i class="fas fa-times"></i>
                 </button>
             `;

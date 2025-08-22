@@ -124,21 +124,22 @@ class EmployeeManager {
             $employee_id = $this->insertEmployee($data, $photo_filename);
             
             // Génération du QR Code
-            $numeric_code = $this->generateAndSaveQRCode($employee_id, $data);
-            
-            // Log de l'activité
-            $this->logActivity('CREATE_EMPLOYEE', 'employes', $employee_id, [
-                'nom' => $data['nom'], 
-                'prenom' => $data['prenom'],
-                'code_numerique' => $numeric_code
-            ]);
-            
-            return [
-                'success' => true,
-                'message' => 'Employé ajouté avec succès',
-                'employee_id' => $employee_id,
-                'numeric_code' => $numeric_code
-            ];
+          // Génération du QR Code
+$numeric_code = $this->generateAndSaveQRCode($employee_id, $data);
+
+// Log de l'activité
+$this->logActivity('CREATE_EMPLOYEE', 'employes', $employee_id, [
+    'nom' => $data['nom'], 
+    'prenom' => $data['prenom'],
+    'code_numerique' => $numeric_code  // Le code est bien récupéré ici
+]);
+
+return [
+    'success' => true,
+    'message' => 'Employé ajouté avec succès',
+    'employee_id' => $employee_id,
+    'numeric_code' => $numeric_code    // Et retourné ici
+];
             
         } catch (Exception $e) {
             return ['success' => false, 'message' => $e->getMessage()];
