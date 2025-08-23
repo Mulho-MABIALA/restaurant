@@ -13,9 +13,9 @@ class EmployeeManager {
         $this->conn = $connection;
     }
     
-    /**
-     * Récupère tous les employés avec leurs informations complètes
-     */
+    
+    //   Récupère tous les employés avec leurs informations complètes
+   
     public function getAllEmployees(): array {
         $stmt = $this->conn->query("
             SELECT e.*, 
@@ -43,9 +43,9 @@ class EmployeeManager {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
     
-    /**
-     * Récupère un employé par son ID avec toutes ses informations
-     */
+   
+    //  Récupère un employé par son ID avec toutes ses informations
+   
     public function getEmployeeById(int $id): ?array {
         $stmt = $this->conn->prepare("
             SELECT e.*, 
@@ -106,9 +106,9 @@ class EmployeeManager {
         return $stats;
     }
     
-    /**
-     * Ajoute un nouvel employé
-     */
+    
+    //  Ajoute un nouvel employé
+   
     public function addEmployee(array $data): array {
         try {
             // Validation des champs requis
@@ -469,9 +469,8 @@ class PayrollManager {
         $this->conn = $connection;
     }
     
-    /**
-     * Calcule le salaire net d'un employé pour un mois donné
-     */
+//    Calcule le salaire net d'un employé pour un mois donné
+   
     public function calculerSalaireNet(int $employe_id, string $mois_annee): array {
         // Récupérer les données de l'employé et de son poste
         $stmt = $this->conn->prepare("
@@ -586,10 +585,8 @@ class PayrollManager {
         
         return $pdf->Output('', 'S'); // Retourner le contenu du PDF
     }
-
-    /**
-     * Version alternative sans TCPDF (génère du HTML)
-     */
+// Version alternative sans TCPDF (génère du HTML)
+  
     private function genererBulletinHTML(array $details): string {
         $html = "
         <!DOCTYPE html>
@@ -645,10 +642,8 @@ class PayrollManager {
         
         return $html;
     }
-    
-    /**
-     * Enregistre un bulletin de paie dans la base de données
-     */   
+// Enregistre un bulletin de paie dans la base de données
+
     public function enregistrerBulletinPaie(array $details): int {
         $stmt = $this->conn->prepare("
             INSERT INTO bulletins_paie
@@ -668,9 +663,8 @@ class PayrollManager {
         return $this->conn->lastInsertId();
     }
   
-    /**
-     * Génère les bulletins pour tous les employés actifs
-     */
+// Génère les bulletins pour tous les employés actifs
+   
     public function genererBulletinsPourTous(string $mois_annee): array {
         $resultats = [];
         $stmt = $this->conn->prepare("SELECT id FROM employes WHERE statut = 'actif'");
@@ -698,10 +692,7 @@ class PayrollManager {
     }
 }
 
-// =============================================================================
 // GESTIONNAIRE DE POSTES - AMÉLIORÉ
-// =============================================================================
-
 class PosteManager {
     private $conn;
     
@@ -739,10 +730,8 @@ class PosteManager {
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         return $result ?: null;
     }
+    //  Récupère les types de contrat disponibles
     
-    /**
-     * Récupère les types de contrat disponibles
-     */
     public function getTypesContrat(): array {
         return [
             'CDI' => 'Contrat à Durée Indéterminée',
@@ -1005,7 +994,8 @@ try {
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
+    <!-- gère l'encodage des caractères -->
+    <meta charset="UTF-8"> 
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestion des Employés - Restaurant</title>
     <script src="https://cdn.tailwindcss.com"></script>

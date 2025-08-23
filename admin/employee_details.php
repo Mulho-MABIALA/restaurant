@@ -738,7 +738,7 @@ try {
 
         function planifierHoraires() {
             if (confirm('Rediriger vers la page de planification des horaires ?')) {
-                window.open(`schedule_planning.php?employee=${employeeId}`, '_blank');
+                window.open(`planification_horaires.php?employee=${employeeId}`, '_blank');
             }
         }
 
