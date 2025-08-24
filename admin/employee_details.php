@@ -38,41 +38,64 @@ class EmployeeManager {
         ");
         $stmt->execute([$id]);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $result ?: null; // Convert false to null
+        return $result ?: null;
     }
     
     /**
      * Récupère les horaires de la semaine pour un employé
-     * FIXED: Now properly returns null instead of false
      */
     public function getWeeklySchedule(int $employee_id): ?array {
         $start_of_week = date('Y-m-d', strtotime('monday this week'));
         $stmt = $this->conn->prepare("SELECT * FROM horaires WHERE employe_id = ? AND semaine_debut = ?");
         $stmt->execute([$employee_id, $start_of_week]);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $result ?: null; // Convert false to null to match return type
+        return $result ?: null;
     }
     
     /**
-     * Récupère les présences récentes d'un employé
+     * Récupère les présences récentes depuis la table pointages (comme dans presence.php)
      */
     public function getRecentAttendances(int $employee_id, int $limit = 10): array {
-        // Validate and sanitize limit to prevent SQL injection
-        $limit = max(1, min(100, (int)$limit)); // Limit between 1 and 100
+        $limit = max(1, min(100, (int)$limit));
         
+        // Récupération des pointages comme dans presence.php
         $stmt = $this->conn->prepare("
-            SELECT * FROM presences 
+            SELECT 
+                DATE(created_at) as date_presence,
+                MIN(CASE WHEN type = 'entree' THEN TIME(created_at) END) as heure_arrivee,
+                MAX(CASE WHEN type = 'sortie' THEN TIME(created_at) END) as heure_depart,
+                COUNT(*) as nb_pointages,
+                CASE 
+                    WHEN MIN(CASE WHEN type = 'entree' THEN TIME(created_at) END) IS NULL THEN 'absent'
+                    WHEN MIN(CASE WHEN type = 'entree' THEN TIME(created_at) END) > '09:00:00' THEN 'retard'
+                    ELSE 'present'
+                END as statut
+            FROM pointages 
             WHERE employe_id = ? 
-            ORDER BY date_presence DESC 
+            GROUP BY DATE(created_at)
+            ORDER BY DATE(created_at) DESC 
             LIMIT " . $limit
         );
         $stmt->execute([$employee_id]);
         $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        return $result ?: []; // Ensure we always return an array
+        
+        // Calculer la durée pour chaque jour
+        foreach ($result as &$day) {
+            if ($day['heure_arrivee'] && $day['heure_depart']) {
+                $start = strtotime($day['heure_arrivee']);
+                $end = strtotime($day['heure_depart']);
+                $duration = ($end - $start) / 3600; // en heures
+                $day['duree_heures'] = round($duration, 2);
+            } else {
+                $day['duree_heures'] = 0;
+            }
+        }
+        
+        return $result;
     }
     
     /**
-     * Récupère les statistiques d'un employé
+     * Récupère les statistiques d'un employé basées sur les pointages
      */
     public function getEmployeeStatistics(int $employee_id): array {
         $stats = [];
@@ -89,66 +112,80 @@ class EmployeeManager {
             $stats['anciennete'] = 'N/A';
         }
         
-        // Présences ce mois
+        // Présences ce mois (jours où il y a eu au moins une entrée)
         $stmt = $this->conn->prepare("
-            SELECT COUNT(*) FROM presences 
+            SELECT COUNT(DISTINCT DATE(created_at)) 
+            FROM pointages 
             WHERE employe_id = ? 
-            AND MONTH(date_presence) = MONTH(CURDATE()) 
-            AND YEAR(date_presence) = YEAR(CURDATE()) 
-            AND statut = 'present'
+            AND MONTH(created_at) = MONTH(CURDATE()) 
+            AND YEAR(created_at) = YEAR(CURDATE()) 
+            AND type = 'entree'
         ");
         $stmt->execute([$employee_id]);
         $stats['presences_ce_mois'] = $stmt->fetchColumn() ?: 0;
         
-        // Taux de présence (30 derniers jours)
+        // Retards ce mois (entrées après 9h)
         $stmt = $this->conn->prepare("
-            SELECT 
-                (COUNT(CASE WHEN statut = 'present' THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0)) as taux
-            FROM presences 
-            WHERE employe_id = ? AND date_presence >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-        ");
-        $stmt->execute([$employee_id]);
-        $taux = $stmt->fetchColumn();
-        $stats['taux_presence'] = $taux ? number_format($taux, 1) . '%' : 'N/A';
-        
-        // Retards ce mois
-        $stmt = $this->conn->prepare("
-            SELECT COUNT(*) FROM presences 
+            SELECT COUNT(DISTINCT DATE(created_at))
+            FROM pointages 
             WHERE employe_id = ? 
-            AND MONTH(date_presence) = MONTH(CURDATE()) 
-            AND YEAR(date_presence) = YEAR(CURDATE()) 
-            AND statut = 'retard'
+            AND MONTH(created_at) = MONTH(CURDATE()) 
+            AND YEAR(created_at) = YEAR(CURDATE()) 
+            AND type = 'entree'
+            AND TIME(created_at) > '09:00:00'
         ");
         $stmt->execute([$employee_id]);
         $stats['retards_ce_mois'] = $stmt->fetchColumn() ?: 0;
         
-        // Absences ce mois
+        // Calcul du taux de présence (30 derniers jours)
         $stmt = $this->conn->prepare("
-            SELECT COUNT(*) FROM presences 
+            SELECT COUNT(DISTINCT DATE(created_at)) as jours_presence
+            FROM pointages 
             WHERE employe_id = ? 
-            AND MONTH(date_presence) = MONTH(CURDATE()) 
-            AND YEAR(date_presence) = YEAR(CURDATE()) 
-            AND statut = 'absent'
+            AND created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+            AND type = 'entree'
         ");
         $stmt->execute([$employee_id]);
-        $stats['absences_ce_mois'] = $stmt->fetchColumn() ?: 0;
+        $jours_presence = $stmt->fetchColumn() ?: 0;
         
-        // Heures travaillées ce mois
+        // Calculer les jours ouvrables sur 30 jours (approximation)
+        $jours_ouvrables = 22; // approximation pour un mois
+        $stats['taux_presence'] = $jours_ouvrables > 0 ? 
+            number_format(($jours_presence / $jours_ouvrables) * 100, 1) . '%' : 'N/A';
+        
+        // Absences ce mois (jours sans pointage d'entrée)
+        $stats['absences_ce_mois'] = max(0, $jours_ouvrables - $stats['presences_ce_mois']);
+        
+        // Heures travaillées ce mois (basé sur les pointages)
         $stmt = $this->conn->prepare("
-            SELECT SUM(
-                CASE 
-                    WHEN heure_depart IS NOT NULL AND heure_arrivee IS NOT NULL
-                    THEN TIME_TO_SEC(TIMEDIFF(heure_depart, heure_arrivee)) / 3600
-                    ELSE 0
-                END
-            ) as total_heures
-            FROM presences 
-            WHERE employe_id = ? 
-            AND MONTH(date_presence) = MONTH(CURDATE()) 
-            AND YEAR(date_presence) = YEAR(CURDATE())
-            AND statut IN ('present', 'retard')
+            SELECT 
+                SUM(
+                    CASE 
+                        WHEN sortie.created_at IS NOT NULL AND entree.created_at IS NOT NULL
+                        THEN TIMESTAMPDIFF(SECOND, entree.created_at, sortie.created_at) / 3600
+                        ELSE 0
+                    END
+                ) as total_heures
+            FROM (
+                SELECT DATE(created_at) as jour, MIN(created_at) as created_at
+                FROM pointages 
+                WHERE employe_id = ? 
+                AND MONTH(created_at) = MONTH(CURDATE()) 
+                AND YEAR(created_at) = YEAR(CURDATE())
+                AND type = 'entree'
+                GROUP BY DATE(created_at)
+            ) entree
+            LEFT JOIN (
+                SELECT DATE(created_at) as jour, MAX(created_at) as created_at
+                FROM pointages 
+                WHERE employe_id = ? 
+                AND MONTH(created_at) = MONTH(CURDATE()) 
+                AND YEAR(created_at) = YEAR(CURDATE())
+                AND type = 'sortie'
+                GROUP BY DATE(created_at)
+            ) sortie ON entree.jour = sortie.jour
         ");
-        $stmt->execute([$employee_id]);
+        $stmt->execute([$employee_id, $employee_id]);
         $heures = $stmt->fetchColumn() ?: 0;
         $stats['heures_ce_mois'] = $heures ? number_format($heures, 1) . 'h' : '0h';
         
@@ -156,35 +193,43 @@ class EmployeeManager {
     }
     
     /**
-     * Marque la présence d'un employé
+     * Marque la présence d'un employé via pointages
      */
-    public function markAttendance(int $employee_id, string $status = 'present'): array {
+    public function markAttendance(int $employee_id, string $status = 'entree'): array {
         try {
             $today = date('Y-m-d');
             
-            // Vérifier si une présence existe déjà pour aujourd'hui
-            $stmt = $this->conn->prepare("SELECT id FROM presences WHERE employe_id = ? AND date_presence = ?");
+            // Vérifier le dernier pointage du jour
+            $stmt = $this->conn->prepare("
+                SELECT type, created_at 
+                FROM pointages 
+                WHERE employe_id = ? AND DATE(created_at) = ? 
+                ORDER BY created_at DESC 
+                LIMIT 1
+            ");
             $stmt->execute([$employee_id, $today]);
-            $existing = $stmt->fetch();
+            $last_pointage = $stmt->fetch();
             
-            if ($existing) {
-                // Mettre à jour
-                $stmt = $this->conn->prepare("
-                    UPDATE presences 
-                    SET statut = ?, heure_arrivee = CASE WHEN heure_arrivee IS NULL THEN CURTIME() ELSE heure_arrivee END
-                    WHERE employe_id = ? AND date_presence = ?
-                ");
-                $stmt->execute([$status, $employee_id, $today]);
+            // Déterminer le type de pointage à effectuer
+            if (!$last_pointage) {
+                $type = 'entree';
             } else {
-                // Insérer
-                $stmt = $this->conn->prepare("
-                    INSERT INTO presences (employe_id, date_presence, statut, heure_arrivee) 
-                    VALUES (?, ?, ?, CURTIME())
-                ");
-                $stmt->execute([$employee_id, $today, $status]);
+                $type = ($last_pointage['type'] === 'entree') ? 'sortie' : 'entree';
             }
             
-            return ['success' => true, 'message' => 'Présence marquée avec succès'];
+            // Si on force un status spécifique
+            if ($status !== 'entree') {
+                $type = $status;
+            }
+            
+            // Insérer le nouveau pointage
+            $stmt = $this->conn->prepare("
+                INSERT INTO pointages (employe_id, type, created_at) 
+                VALUES (?, ?, NOW())
+            ");
+            $stmt->execute([$employee_id, $type]);
+            
+            return ['success' => true, 'message' => ucfirst($type) . ' enregistrée avec succès'];
         } catch (Exception $e) {
             return ['success' => false, 'message' => $e->getMessage()];
         }
@@ -207,7 +252,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     switch ($action) {
         case 'mark_attendance':
-            $status = $_POST['status'] ?? 'present';
+            $status = $_POST['status'] ?? 'entree';
             $result = $employeeManager->markAttendance($employee_id, $status);
             echo json_encode($result);
             break;
@@ -407,8 +452,14 @@ try {
                             <label class="block text-sm font-medium text-gray-700">Taux cotisation</label>
                             <p class="mt-1 text-sm text-gray-900"><?php echo ($employee['taux_cotisation'] ?? 0) . '%'; ?></p>
                         </div>
+                        <?php if ($employee['poste_superieur_nom']): ?>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Poste supérieur</label>
+                            <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['poste_superieur_nom']); ?></p>
+                        </div>
+                        <?php endif; ?>
                         <?php if ($employee['salaire_min'] && $employee['salaire_max']): ?>
-                        <div class="md:col-span-2">
+                        <div class="<?php echo $employee['poste_superieur_nom'] ? '' : 'md:col-span-2'; ?>">
                             <label class="block text-sm font-medium text-gray-700">Fourchette salariale</label>
                             <p class="mt-1 text-sm text-gray-900">
                                 <?php echo number_format($employee['salaire_min'], 0, ',', ' '); ?> - 
@@ -482,7 +533,7 @@ try {
                 <!-- Présences récentes -->
                 <div class="bg-white rounded-lg shadow-md p-6 card-shadow fade-in">
                     <h2 class="text-xl font-semibold text-gray-900 mb-4">
-                        <i class="fas fa-clock mr-2 text-purple-600"></i>Présences récentes
+                        <i class="fas fa-clock mr-2 text-purple-600"></i>Présences récentes (basées sur les pointages)
                     </h2>
                     <?php if ($presences): ?>
                         <div class="overflow-x-auto">
@@ -502,20 +553,23 @@ try {
                                             <td class="py-3 text-sm text-gray-900">
                                                 <?php echo date('d/m/Y', strtotime($presence['date_presence'])); ?>
                                                 <div class="text-xs text-gray-500">
-                                                    <?php echo date('l', strtotime($presence['date_presence'])); ?>
+                                                    <?php 
+                                                    $dayName = ['Monday' => 'Lundi', 'Tuesday' => 'Mardi', 'Wednesday' => 'Mercredi', 
+                                                               'Thursday' => 'Jeudi', 'Friday' => 'Vendredi', 'Saturday' => 'Samedi', 'Sunday' => 'Dimanche'];
+                                                    echo $dayName[date('l', strtotime($presence['date_presence']))] ?? date('l', strtotime($presence['date_presence']));
+                                                    ?>
                                                 </div>
                                             </td>
                                             <td class="py-3 text-sm text-gray-600">
-                                                <?php echo $presence['heure_arrivee'] ? date('H:i', strtotime($presence['heure_arrivee'])) : '-'; ?>
+                                                <?php echo $presence['heure_arrivee'] ?: '-'; ?>
                                             </td>
                                             <td class="py-3 text-sm text-gray-600">
-                                                <?php echo $presence['heure_depart'] ? date('H:i', strtotime($presence['heure_depart'])) : '-'; ?>
+                                                <?php echo $presence['heure_depart'] ?: '-'; ?>
                                             </td>
                                             <td class="py-3 text-sm text-gray-600">
                                                 <?php 
-                                                if ($presence['heure_arrivee'] && $presence['heure_depart']) {
-                                                    $duree = strtotime($presence['heure_depart']) - strtotime($presence['heure_arrivee']);
-                                                    echo floor($duree / 3600) . 'h' . str_pad(floor(($duree % 3600) / 60), 2, '0', STR_PAD_LEFT);
+                                                if ($presence['duree_heures'] > 0) {
+                                                    echo number_format($presence['duree_heures'], 1) . 'h';
                                                 } else {
                                                     echo '-';
                                                 }
@@ -550,7 +604,9 @@ try {
                     <div class="bg-white rounded-lg shadow-md p-6 text-center card-shadow fade-in">
                         <h3 class="text-lg font-semibold text-gray-900 mb-4">QR Code Badge</h3>
                         <img src="qrcodes/<?php echo htmlspecialchars($employee['qr_code']); ?>" 
-                             class="w-40 h-40 mx-auto border border-gray-200 rounded-lg mb-4">
+                             class="w-40 h-40 mx-auto border border-gray-200 rounded-lg mb-4"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <div style="display:none;" class="text-gray-500 text-sm">QR Code non disponible</div>
                         <div class="space-y-2">
                             <button onclick="downloadQR()" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
                                 <i class="fas fa-download mr-2"></i>Télécharger QR
@@ -560,23 +616,34 @@ try {
                             </button>
                         </div>
                     </div>
+                <?php else: ?>
+                    <div class="bg-white rounded-lg shadow-md p-6 text-center card-shadow fade-in">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">QR Code Badge</h3>
+                        <div class="w-40 h-40 mx-auto border border-gray-200 rounded-lg mb-4 flex items-center justify-center bg-gray-50">
+                            <i class="fas fa-qrcode text-4xl text-gray-300"></i>
+                        </div>
+                        <p class="text-sm text-gray-500 mb-4">Aucun QR Code généré</p>
+                        <button onclick="generateQRCode()" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
+                            <i class="fas fa-plus mr-2"></i>Générer QR Code
+                        </button>
+                    </div>
                 <?php endif; ?>
 
                 <!-- Actions rapides -->
                 <div class="bg-white rounded-lg shadow-md p-6 card-shadow fade-in">
                     <h3 class="text-lg font-semibold text-gray-900 mb-4">Actions rapides</h3>
                     <div class="space-y-2">
-                        <button onclick="planifierHoraires()" class="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
-                            <i class="fas fa-calendar-plus mr-2"></i>Planifier horaires
+                        <button onclick="marquerPresence('entree')" class="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
+                            <i class="fas fa-sign-in-alt mr-2"></i>Marquer entrée
                         </button>
-                        <button onclick="marquerPresence('present')" class="w-full bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
-                            <i class="fas fa-check-circle mr-2"></i>Marquer présent
-                        </button>
-                        <button onclick="marquerPresence('retard')" class="w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
-                            <i class="fas fa-clock mr-2"></i>Marquer en retard
+                        <button onclick="marquerPresence('sortie')" class="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
+                            <i class="fas fa-sign-out-alt mr-2"></i>Marquer sortie
                         </button>
                         <button onclick="envoyerEmail()" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
                             <i class="fas fa-envelope mr-2"></i>Envoyer email
+                        </button>
+                        <button onclick="voirPointages()" class="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
+                            <i class="fas fa-chart-line mr-2"></i>Voir dashboard
                         </button>
                     </div>
                 </div>
@@ -723,6 +790,26 @@ try {
             }
         }
 
+        function generateQRCode() {
+            if (confirm('Générer un QR Code pour cet employé ?')) {
+                showLoading();
+                
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = 'generate_qr.php';
+                
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'employee_id';
+                input.value = employeeId;
+                
+                form.appendChild(input);
+                document.body.appendChild(form);
+                form.submit();
+                document.body.removeChild(form);
+            }
+        }
+
         function downloadQR() {
             const link = document.createElement('a');
             link.download = 'qr_<?php echo $employee['nom']; ?>_<?php echo $employee['prenom']; ?>.png';
@@ -736,20 +823,15 @@ try {
             window.open(`generate_badge.php?id=${employeeId}&print=1`, '_blank');
         }
 
-        function planifierHoraires() {
-            if (confirm('Rediriger vers la page de planification des horaires ?')) {
-                window.open(`planification_horaires.php?employee=${employeeId}`, '_blank');
-            }
-        }
-
-        function marquerPresence(status = 'present') {
-            if (confirm(`Marquer cet employé comme "${status}" aujourd'hui ?`)) {
+        function marquerPresence(type = 'entree') {
+            const actionText = type === 'entree' ? 'une entrée' : 'une sortie';
+            if (confirm(`Enregistrer ${actionText} pour cet employé ?`)) {
                 showLoading();
                 
                 const formData = new FormData();
                 formData.append('action', 'mark_attendance');
                 formData.append('employee_id', employeeId);
-                formData.append('status', status);
+                formData.append('status', type);
                 
                 fetch(window.location.href, {
                     method: 'POST',
@@ -759,16 +841,16 @@ try {
                 .then(data => {
                     hideLoading();
                     if (data.success) {
-                        showNotification('Présence marquée avec succès!', 'success');
+                        showNotification(data.message, 'success');
                         setTimeout(() => location.reload(), 1500);
                     } else {
-                        showNotification(data.message || 'Erreur lors du marquage', 'error');
+                        showNotification(data.message || 'Erreur lors du pointage', 'error');
                     }
                 })
                 .catch(error => {
                     hideLoading();
                     console.error('Erreur:', error);
-                    showNotification('Erreur lors du marquage de la présence', 'error');
+                    showNotification('Erreur lors du pointage', 'error');
                 });
             }
         }
@@ -777,6 +859,10 @@ try {
             const email = '<?php echo $employee['email']; ?>';
             const subject = encodeURIComponent('Message concernant votre travail');
             window.location.href = `mailto:${email}?subject=${subject}`;
+        }
+
+        function voirPointages() {
+            window.open(`presence.php?employe_id=${employeeId}`, '_blank');
         }
 
         function refreshStatistics() {
@@ -808,8 +894,7 @@ try {
         }
 
         function updateStatisticsDisplay(stats) {
-            // Cette fonction pourrait être utilisée pour mettre à jour l'affichage des stats en temps réel
-            // Pour l'instant, on recharge simplement la page
+            // Mettre à jour l'affichage des statistiques
             setTimeout(() => location.reload(), 1000);
         }
 
@@ -860,9 +945,13 @@ try {
                         e.preventDefault();
                         editEmployee();
                         break;
-                    case 'p':
+                    case 'i':
                         e.preventDefault();
-                        marquerPresence('present');
+                        marquerPresence('entree');
+                        break;
+                    case 'o':
+                        e.preventDefault();
+                        marquerPresence('sortie');
                         break;
                     case 'b':
                         e.preventDefault();

@@ -600,7 +600,6 @@ try {
     die("Erreur: " . $e->getMessage());
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -718,31 +717,8 @@ try {
                     </button>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <!-- Modal de confirmation de suppression -->
-    <div id="confirmModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="bg-white rounded-lg max-w-md w-full">
-                <div class="px-6 py-4 border-b border-gray-200">
-                    <h3 class="text-lg font-semibold text-gray-900">Confirmation</h3>
-                </div>
-                <div class="p-6">
-                    <p id="confirmMessage" class="text-gray-700 mb-6"></p>
-                    <div class="flex justify-end space-x-3">
-                        <button onclick="closeConfirmModal()" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors">
-                            Annuler
-                        </button>
-                        <button id="confirmButton" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors">
-                            Confirmer
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-<!-- Grille des postes -->
+            
+            <!-- Grille des postes -->
             <div id="postesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <?php foreach ($postes as $poste): ?>
                     <div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow niveau-<?php echo $poste['niveau_hierarchique'] ?? 5; ?>">
@@ -787,7 +763,7 @@ try {
                             <?php endif; ?>
                             <div class="text-xs text-gray-500">
                                 <i class="fas fa-clock mr-1"></i>
-                                Heures/semaine: <?php echo $poste['heures_travail'] ?? '35'; ?>h
+                                Heures/mois: <?php echo $poste['heures_travail'] ?? '35'; ?>h
                             </div>
                         </div>
                         
@@ -862,6 +838,28 @@ try {
                             <div id="coutDifference" class="text-2xl font-bold text-orange-600">-</div>
                             <div class="text-gray-600">Différence</div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de confirmation de suppression -->
+    <div id="confirmModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg max-w-md w-full">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-900">Confirmation</h3>
+                </div>
+                <div class="p-6">
+                    <p id="confirmMessage" class="text-gray-700 mb-6"></p>
+                    <div class="flex justify-end space-x-3">
+                        <button onclick="closeConfirmModal()" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors">
+                            Annuler
+                        </button>
+                        <button id="confirmButton" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors">
+                            Confirmer
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1054,7 +1052,7 @@ try {
                             </div>
                         </form>
                     </div>
-                    
+                     
                     <!-- Liste des niveaux existants -->
                     <div>
                         <h4 class="font-medium text-gray-900 mb-4">Niveaux existants</h4>
@@ -1063,6 +1061,9 @@ try {
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
     <!-- ====================================================================== -->
     <!-- 6. JAVASCRIPT ORGANISÉ PAR MODULES                                    -->
     <!-- ====================================================================== -->
@@ -1148,7 +1149,7 @@ try {
                     return false;
                 }
                 if (heuresTravail < 1 || heuresTravail > 80) {
-                    Utils.showNotification('Le nombre d\'heures de travail doit être compris entre 1 et 80 heures par semaine', 'error');
+                    Utils.showNotification('Le nombre d\'heures de travail doit être compris entre 1 et 80 heures par mois', 'error');
                     return false;
                 }
                 return true;
@@ -1248,238 +1249,241 @@ try {
         // ============================================================
         // MODULE GESTION DES NIVEAUX HIÉRARCHIQUES
         // ============================================================
-        const NiveauManager = {
-            load: function() {
-                Utils.showLoading();
-                fetch('?action=get_niveaux', { method: 'POST' })
-                    .then(response => response.json())
-                    .then(data => {
-                        Utils.hideLoading();
-                        if (data.success) {
-                            niveauxHierarchiques = data.niveaux;
-                            this.render(data.niveaux);
-                            this.updateSelects(data.niveaux);
-                        } else {
-                            Utils.showNotification(data.message, 'error');
-                        }
-                    })
-                    .catch(error => {
-                        Utils.hideLoading();
-                        Utils.showNotification('Erreur de connexion: ' + error.message, 'error');
-                    });
-            },
-
-            render: function(niveaux) {
-                const container = document.getElementById('niveauxList');
-                container.innerHTML = '';
-                
-                if (niveaux.length === 0) {
-                    container.innerHTML = `
-                        <div class="text-center text-gray-500 py-4">
-                            <i class="fas fa-layer-group text-2xl mb-2"></i>
-                            <p>Aucun niveau hiérarchique défini.</p>
-                        </div>
-                    `;
-                    return;
+     const NiveauManager = {  
+    load: function() {
+        Utils.showLoading();
+        fetch('?action=get_niveaux', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                Utils.hideLoading();
+                if (data.success) {
+                    niveauxHierarchiques = data.niveaux;
+                    this.render(data.niveaux);
+                    this.updateSelects(data.niveaux);
+                } else {
+                    Utils.showNotification(data.message, 'error');
                 }
+            })
+            .catch(error => {
+                Utils.hideLoading();
+                Utils.showNotification('Erreur de connexion: ' + error.message, 'error');
+            });
+    },
 
+    render: function(niveaux) {
+        const container = document.getElementById('niveauxList');
+        container.innerHTML = '';
+        
+        if (niveaux.length === 0) {
+            container.innerHTML = `
+                <div class="text-center text-gray-500 py-4">
+                    <i class="fas fa-layer-group text-2xl mb-2"></i>
+                    <p>Aucun niveau hiérarchique défini.</p>
+                </div>
+            `;
+            return;
+        }
+
+        niveaux.forEach(niveau => {
+            const item = document.createElement('div');
+            item.className = 'flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50';
+            item.innerHTML = `
+                <div class="flex items-center">
+                    <div class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium mr-3">
+                        ${niveau.niveau}
+                    </div>
+                    <div>
+                        <div class="font-medium text-gray-900">${Utils.escapeHtml(niveau.libelle)}</div>
+                        ${niveau.description ? `<div class="text-sm text-gray-500">${Utils.escapeHtml(niveau.description)}</div>` : ''}
+                    </div>
+                </div>
+                <div class="flex space-x-2">
+                    <button onclick="NiveauManager.edit(${niveau.id})" class="text-blue-600 hover:text-blue-800" title="Modifier">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="NiveauManager.delete(${niveau.id})" class="text-red-600 hover:text-red-800" title="Supprimer">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `;
+            container.appendChild(item);
+        });
+    },
+
+    updateSelects: function(niveaux) {
+        const selects = ['niveau_hierarchique', 'niveauFilter'];
+        
+        selects.forEach(selectId => {
+            const select = document.getElementById(selectId);
+            if (select) {
+                const currentValue = select.value;
+                const options = select.querySelectorAll('option:not(:first-child)');
+                options.forEach(option => option.remove());
+                
                 niveaux.forEach(niveau => {
-                    const item = document.createElement('div');
-                    item.className = 'flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50';
-                    item.innerHTML = `
-                        <div class="flex items-center">
-                            <div class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium mr-3">
-                                ${niveau.niveau}
-                            </div>
-                            <div>
-                                <div class="font-medium text-gray-900">${Utils.escapeHtml(niveau.libelle)}</div>
-                                ${niveau.description ? `<div class="text-sm text-gray-500">${Utils.escapeHtml(niveau.description)}</div>` : ''}
-                            </div>
-                        </div>
-                        <div class="flex space-x-2">
-                            <button onclick="NiveauManager.edit(${niveau.id})" class="text-blue-600 hover:text-blue-800" title="Modifier">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button onclick="NiveauManager.delete(${niveau.id})" class="text-red-600 hover:text-red-800" title="Supprimer">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    `;
-                    container.appendChild(item);
+                    const option = document.createElement('option');
+                    option.value = niveau.niveau;
+                    option.textContent = `${niveau.niveau} - ${niveau.libelle}`;
+                    select.appendChild(option);
                 });
-            },
-
-            updateSelects: function(niveaux) {
-                const selects = ['niveau_hierarchique', 'niveauFilter'];
                 
-                selects.forEach(selectId => {
-                    const select = document.getElementById(selectId);
-                    if (select) {
-                        const currentValue = select.value;
-                        const options = select.querySelectorAll('option:not(:first-child)');
-                        options.forEach(option => option.remove());
-                        
-                        niveaux.forEach(niveau => {
-                            const option = document.createElement('option');
-                            option.value = niveau.niveau;
-                            option.textContent = `${niveau.niveau} - ${niveau.libelle}`;
-                            select.appendChild(option);
-                        });
-                        
-                        if (currentValue) {
-                            select.value = currentValue;
-                        }
-                    }
-                });
-            },
-
-            clearForm: function() {
-                document.getElementById('niveauForm').reset();
-                document.getElementById('niveauId').value = '';
-            },
-
-            edit: function(id) {
-                const niveau = niveauxHierarchiques.find(n => n.id == id);
-                if (!niveau) {
-                    Utils.showNotification('Niveau non trouvé', 'error');
-                    return;
+                if (currentValue) {
+                    select.value = currentValue;
                 }
-                
-                document.getElementById('niveauId').value = niveau.id;
-                document.getElementById('niveauNum').value = niveau.niveau;
-                document.getElementById('niveauLibelle').value = niveau.libelle;
-                document.getElementById('niveauDescription').value = niveau.description || '';
-            },
-
-            delete: function(id) {
-                const niveau = niveauxHierarchiques.find(n => n.id == id);
-                if (!niveau) return;
-                
-                ModalManager.openConfirmModal(
-                    `Êtes-vous sûr de vouloir supprimer le niveau "${niveau.libelle}" ?`,
-                    () => {
-                        Utils.showLoading();
-                        fetch('?action=delete_niveau', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({id: id})
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                            Utils.hideLoading();
-                            if (data.success) {
-                                Utils.showNotification(data.message);
-                                NiveauManager.load();
-                            } else {
-                                Utils.showNotification(data.message, 'error');
-                            }
-                        })
-                        .catch(error => {
-                            Utils.hideLoading();
-                            Utils.showNotification('Erreur de connexion: ' + error.message, 'error');
-                        });
-                        ModalManager.closeConfirmModal();
-                    }
-                );
             }
-        };
+        });
+    },
+
+    clearForm: function() {
+        document.getElementById('niveauForm').reset();
+        document.getElementById('niveauId').value = '';
+    },
+
+    edit: function(id) {
+        const niveau = niveauxHierarchiques.find(n => n.id == id);
+        if (!niveau) {
+            Utils.showNotification('Niveau non trouvé', 'error');
+            return;
+        }
+        
+        document.getElementById('niveauId').value = niveau.id;
+        document.getElementById('niveauNum').value = niveau.niveau;
+        document.getElementById('niveauLibelle').value = niveau.libelle;
+        document.getElementById('niveauDescription').value = niveau.description || '';
+    },
+
+    delete: function(id) {
+        const niveau = niveauxHierarchiques.find(n => n.id == id);
+        if (!niveau) return;
+        
+        ModalManager.openConfirmModal(
+            `Êtes-vous sûr de vouloir supprimer le niveau "${niveau.libelle}" ?`,
+            () => {
+                Utils.showLoading();
+                fetch('?action=delete_niveau', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({id: id})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    Utils.hideLoading();
+                    ModalManager.closeConfirmModal();
+                    if (data.success) {
+                        Utils.showNotification(data.message);
+                        NiveauManager.load();
+                    } else {
+                        Utils.showNotification(data.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    Utils.hideLoading();
+                    ModalManager.closeConfirmModal();
+                    Utils.showNotification('Erreur de connexion: ' + error.message, 'error');
+                });
+            }
+        );
+    }
+};
 
         // ============================================================
         // MODULE GESTION DES POSTES
         // ============================================================
-        const PosteManager = {
-            edit: function(id) {
-                const poste = postes.find(p => p.id == id);
-                if (!poste) {
-                    Utils.showNotification('Poste non trouvé', 'error');
-                    return;
-                }
-                
-                document.getElementById('modalTitle').textContent = 'Modifier le poste';
-                document.getElementById('posteId').value = poste.id;
-                document.getElementById('nom').value = poste.nom;
-                document.getElementById('description').value = poste.description || '';
-                document.getElementById('salaire').value = poste.salaire || '';
-                document.getElementById('couleur').value = poste.couleur;
-                document.getElementById('type_contrat').value = poste.type_contrat || 'CDI';
-                document.getElementById('niveau_hierarchique').value = poste.niveau_hierarchique || '';
-                document.getElementById('poste_superieur_id').value = poste.poste_superieur_id || '';
-                document.getElementById('competences_requises').value = poste.competences_requises || '';
-                document.getElementById('nombre_postes_prevus').value = poste.nombre_postes_prevus || '1';
-                document.getElementById('duree_contrat').value = poste.duree_contrat || '';
-                document.getElementById('heures_travail').value = poste.heures_travail || '35';
-                document.getElementById('avantages').value = poste.avantages || '';
-                document.getElementById('code_paie').value = poste.code_paie || '';
-                document.getElementById('categorie_paie').value = poste.categorie_paie || '';
-                document.getElementById('regime_social').value = poste.regime_social || '';
-                document.getElementById('taux_cotisation').value = poste.taux_cotisation || '';
-                document.getElementById('posteModal').classList.remove('hidden');
-                document.getElementById('nom').focus();
-            },
+       const PosteManager = {
+    edit: function(id) {
+        const poste = postes.find(p => p.id == id);
+        if (!poste) {
+            Utils.showNotification('Poste non trouvé', 'error');
+            return;
+        }
+        
+        document.getElementById('modalTitle').textContent = 'Modifier le poste';
+        document.getElementById('posteId').value = poste.id;
+        document.getElementById('nom').value = poste.nom;
+        document.getElementById('description').value = poste.description || '';
+        document.getElementById('salaire').value = poste.salaire || '';
+        document.getElementById('couleur').value = poste.couleur;
+        document.getElementById('type_contrat').value = poste.type_contrat || 'CDI';
+        document.getElementById('niveau_hierarchique').value = poste.niveau_hierarchique || '';
+        document.getElementById('poste_superieur_id').value = poste.poste_superieur_id || '';
+        document.getElementById('competences_requises').value = poste.competences_requises || '';
+        document.getElementById('nombre_postes_prevus').value = poste.nombre_postes_prevus || '1';
+        document.getElementById('duree_contrat').value = poste.duree_contrat || '';
+        document.getElementById('heures_travail').value = poste.heures_travail || '35';
+        document.getElementById('avantages').value = poste.avantages || '';
+        document.getElementById('code_paie').value = poste.code_paie || '';
+        document.getElementById('categorie_paie').value = poste.categorie_paie || '';
+        document.getElementById('regime_social').value = poste.regime_social || '';
+        document.getElementById('taux_cotisation').value = poste.taux_cotisation || '';
+        document.getElementById('posteModal').classList.remove('hidden');
+        document.getElementById('nom').focus();
+    },
 
-            delete: function(id) {
-                const poste = postes.find(p => p.id == id);
-                if (!poste) return;
-                
-                ModalManager.openConfirmModal(
-                    `Êtes-vous sûr de vouloir supprimer le poste "${poste.nom}" ?`,
-                    () => {
-                        Utils.showLoading();
-                        fetch('?action=delete_poste', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({id: id})
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                            Utils.hideLoading();
-                            if (data.success) {
-                                Utils.showNotification(data.message);
-                                setTimeout(() => location.reload(), 1000);
-                            } else {
-                                Utils.showNotification(data.message, 'error');
-                            }
-                        })
-                        .catch(error => {
-                            Utils.hideLoading();
-                            Utils.showNotification('Erreur de connexion: ' + error.message, 'error');
-                        });
-                        ModalManager.closeConfirmModal();
+    delete: function(id) {
+        const poste = postes.find(p => p.id == id);
+        if (!poste) return;
+        
+        ModalManager.openConfirmModal(
+            `Êtes-vous sûr de vouloir supprimer le poste "${poste.nom}" ?`,
+            () => {
+                Utils.showLoading();
+                fetch('?action=delete_poste', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({id: id})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    Utils.hideLoading();
+                    ModalManager.closeConfirmModal(); // CORRECTION: Fermer immédiatement le modal de confirmation
+                    if (data.success) {
+                        Utils.showNotification(data.message);
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        Utils.showNotification(data.message, 'error');
                     }
-                );
-            },
+                })
+                .catch(error => {
+                    Utils.hideLoading();
+                    ModalManager.closeConfirmModal(); // CORRECTION: Fermer même en cas d'erreur
+                    Utils.showNotification('Erreur de connexion: ' + error.message, 'error');
+                });
+            }
+        );
+    },
 
-            duplicate: function(id) {
-                const poste = postes.find(p => p.id == id);
-                if (!poste) return;
-                
-                ModalManager.openConfirmModal(
-                    `Voulez-vous dupliquer le poste "${poste.nom}" ?`,
-                    () => {
-                        Utils.showLoading();
-                        fetch('?action=duplicate_poste', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({id: id})
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                            Utils.hideLoading();
-                            if (data.success) {
-                                Utils.showNotification(data.message);
-                                setTimeout(() => location.reload(), 1000);
-                            } else {
-                                Utils.showNotification(data.message, 'error');
-                            }
-                        })
-                        .catch(error => {
-                            Utils.hideLoading();
-                            Utils.showNotification('Erreur de connexion: ' + error.message, 'error');
-                        });
-                        ModalManager.closeConfirmModal();
+    duplicate: function(id) {
+        const poste = postes.find(p => p.id == id);
+        if (!poste) return;
+        
+        ModalManager.openConfirmModal(
+            `Voulez-vous dupliquer le poste "${poste.nom}" ?`,
+            () => {
+                Utils.showLoading();
+                fetch('?action=duplicate_poste', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({id: id})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    Utils.hideLoading();
+                    ModalManager.closeConfirmModal(); // CORRECTION: Fermer immédiatement le modal de confirmation
+                    if (data.success) {
+                        Utils.showNotification(data.message);
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        Utils.showNotification(data.message, 'error');
                     }
-                );
-            },
+                })
+                .catch(error => {
+                    Utils.hideLoading();
+                    ModalManager.closeConfirmModal(); // CORRECTION: Fermer même en cas d'erreur
+                    Utils.showNotification('Erreur de connexion: ' + error.message, 'error');
+                });
+            }
+        );
+    },
 
             applyFilters: function() {
                 const search = document.getElementById('searchInput').value.trim();
@@ -1934,7 +1938,7 @@ try {
                 document.getElementById('heures_travail').addEventListener('blur', function() {
                     const heures = parseInt(this.value) || 35;
                     if (heures < 1 || heures > 80) {
-                        Utils.showNotification('Le nombre d\'heures doit être compris entre 1 et 80 heures par semaine', 'error');
+                        Utils.showNotification('Le nombre d\'heures doit être compris entre 1 et 80 heures par mois', 'error');
                         this.value = 35;
                     }
                 });

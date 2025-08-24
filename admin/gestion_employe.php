@@ -6,71 +6,86 @@ require_once 'phpqrcode/qrlib.php';
 // GESTIONNAIRE D'EMPLOYÉS
 // =============================================================================
 
-class EmployeeManager {
+class EmployeeManager  // Correction: Ajout du mot-clé 'class'
+{
     private $conn;
     
     public function __construct(PDO $connection) {
         $this->conn = $connection;
     }
     
-    
-    //   Récupère tous les employés avec leurs informations complètes
-   
+    // Version corrigée de getAllEmployees
     public function getAllEmployees(): array {
-        $stmt = $this->conn->query("
-            SELECT e.*, 
-                   p.nom as poste_nom,
-                   p.couleur as poste_couleur,
-                   p.salaire as poste_salaire,
-                   p.type_contrat,
-                   p.duree_contrat,
-                   p.niveau_hierarchique,
-                   p.competences_requises,
-                   p.avantages,
-                   p.code_paie,
-                   p.categorie_paie,
-                   p.regime_social,
-                   p.taux_cotisation,
-                   p.salaire_min,
-                   p.salaire_max,
-                   ps.nom as poste_superieur_nom
-            FROM employes e 
-            LEFT JOIN postes p ON e.poste_id = p.id 
-            LEFT JOIN postes ps ON p.poste_superieur_id = ps.id 
-            WHERE e.statut = 'actif'
-            ORDER BY e.nom, e.prenom
-        ");
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        try {
+            $stmt = $this->conn->query("
+                SELECT e.*, 
+                       p.nom as poste_nom,
+                       p.couleur as poste_couleur,
+                       p.salaire as poste_salaire,
+                       p.type_contrat,
+                       p.duree_contrat,
+                       p.niveau_hierarchique,
+                       p.competences_requises,
+                       p.avantages,
+                       p.code_paie,
+                       p.categorie_paie,
+                       p.regime_social,
+                       p.taux_cotisation,
+                       p.salaire_min,
+                       p.salaire_max,
+                       p.heures_travail as heures_par_mois,  -- CORRECTION: depuis table postes
+                       ps.nom as poste_superieur_nom
+                FROM employes e 
+                LEFT JOIN postes p ON e.poste_id = p.id 
+                LEFT JOIN postes ps ON p.poste_superieur_id = ps.id 
+                WHERE e.statut = 'actif'
+                ORDER BY e.nom, e.prenom
+            ");
+            
+            $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            error_log("Employés trouvés: " . count($result)); // Debug
+            return $result;
+            
+        } catch (PDOException $e) {
+            error_log("Erreur SQL getAllEmployees: " . $e->getMessage());
+            return [];
+        }
     }
-    
    
     //  Récupère un employé par son ID avec toutes ses informations
-   
-    public function getEmployeeById(int $id): ?array {
-        $stmt = $this->conn->prepare("
-            SELECT e.*, 
-                   p.nom as poste_nom,
-                   p.couleur as poste_couleur,
-                   p.salaire as poste_salaire,
-                   p.type_contrat,
-                   p.duree_contrat,
-                   p.niveau_hierarchique,
-                   p.competences_requises,
-                   p.avantages,
-                   p.code_paie,
-                   p.categorie_paie,
-                   p.regime_social,
-                   p.taux_cotisation,
-                   p.salaire_min,
-                   p.salaire_max
-            FROM employes e 
-            LEFT JOIN postes p ON e.poste_id = p.id 
-            WHERE e.id = ?
-        ");
-        $stmt->execute([$id]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $result ?: null;
+    public function getEmployeeById(int $id): ?array {  // Correction: Ajout de 'public function'
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT e.*, 
+                       p.nom as poste_nom,
+                       p.couleur as poste_couleur,
+                       p.salaire as poste_salaire,
+                       p.type_contrat,
+                       p.duree_contrat,
+                       p.niveau_hierarchique,
+                       p.competences_requises,
+                       p.avantages,
+                       p.code_paie,
+                       p.categorie_paie,
+                       p.regime_social,
+                       p.taux_cotisation,
+                       p.salaire_min,
+                       p.salaire_max,
+                       p.heures_travail as heures_par_mois  -- CORRECTION: depuis table postes
+                FROM employes e 
+                LEFT JOIN postes p ON e.poste_id = p.id 
+                WHERE e.id = ?
+            ");
+            $stmt->execute([$id]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $result ?: null;
+            
+        } catch (PDOException $e) {
+            error_log("Erreur SQL getEmployeeById: " . $e->getMessage());
+            return null;
+        }
     }
+
     
     /**
      * Récupère les statistiques des employés
@@ -1174,17 +1189,18 @@ try {
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Photo</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employé</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Poste</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contrat</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salaire</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                        </tr>
-                    </thead>
+    <tr>
+        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Photo</th>
+        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employé</th>
+        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Poste</th>
+        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contrat</th>
+        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
+        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salaire</th>
+        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Heures/Mois</th>
+        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+    </tr>
+</thead>
                     <tbody id="employeesTableBody" class="bg-white divide-y divide-gray-200">
                         <!-- Les employés seront chargés ici -->
                     </tbody>
@@ -1544,72 +1560,80 @@ try {
             });
         }
 
-        function createEmployeeRow(employee) {
-            const row = document.createElement('tr');
-            row.className = 'hover:bg-gray-50 fade-in';
-            
-            row.innerHTML = `
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <img src="uploads/photos/${employee.photo || 'default-avatar.png'}" 
-                         class="h-10 w-10 rounded-full object-cover">
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm font-medium text-gray-900">
-                        ${employee.prenom} ${employee.nom}
-                        ${employee.is_admin ? '<i class="fas fa-crown text-yellow-500 ml-1" title="Administrateur"></i>' : ''}
-                    </div>
-                    <div class="text-sm text-gray-500">ID: ${employee.id}</div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="flex items-center">
-                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" 
-                              style="background-color: ${employee.poste_couleur || '#6B7280'}20; color: ${employee.poste_couleur || '#6B7280'};">
-                            ${employee.poste_nom || 'Non défini'}
-                        </span>
-                    </div>
-                    <div class="text-xs text-gray-500 mt-1">Niveau: ${employee.niveau_hierarchique || 'N/A'}</div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="flex flex-col space-y-1">
-                        <span class="contract-badge contract-${(employee.type_contrat || '').toLowerCase().replace(' ', '_')}">
-                            ${employee.type_contrat || 'Non défini'}
-                        </span>
-                        <div class="text-xs text-gray-500">${employee.duree_contrat || 'Non spécifiée'}</div>
-                    </div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div>${employee.email}</div>
-                    <div class="text-gray-500">${employee.telephone || 'N/A'}</div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusClass(employee.statut)}">
-                        ${getStatusText(employee.statut)}
-                    </span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ${employee.salaire ? formatSalaire(employee.salaire) + ' FCFA' : 'Non défini'}
-                    <div class="text-xs text-gray-500">${employee.heure_debut} - ${employee.heure_fin}</div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div class="flex space-x-2">
-                        <button onclick="viewEmployee(${employee.id})" class="text-blue-600 hover:text-blue-900" title="Voir détails">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                        <button onclick="editEmployee(${employee.id})" class="text-green-600 hover:text-green-900" title="Modifier">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button onclick="generateBadge(${employee.id})" class="text-purple-600 hover:text-purple-900" title="Badge">
-                            <i class="fas fa-qrcode"></i>
-                        </button>
-                        <button onclick="deleteEmployee(${employee.id})" class="text-red-600 hover:text-red-900" title="Désactiver">
-                            <i class="fas fa-user-slash"></i>
-                        </button>
-                    </div>
-                </td>
-            `;
-            
-            return row;
-        }
+       function createEmployeeRow(employee) {
+    const row = document.createElement('tr');
+    row.className = 'hover:bg-gray-50 fade-in';
+    
+    row.innerHTML = `
+        <td class="px-6 py-4 whitespace-nowrap">
+            <img src="uploads/photos/${employee.photo || 'default-avatar.png'}" 
+                 class="h-10 w-10 rounded-full object-cover">
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap">
+            <div class="text-sm font-medium text-gray-900">
+                ${employee.prenom} ${employee.nom}
+                ${employee.is_admin ? '<i class="fas fa-crown text-yellow-500 ml-1" title="Administrateur"></i>' : ''}
+            </div>
+            <div class="text-sm text-gray-500">ID: ${employee.id}</div>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap">
+            <div class="flex items-center">
+                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" 
+                      style="background-color: ${employee.poste_couleur || '#6B7280'}20; color: ${employee.poste_couleur || '#6B7280'};">
+                    ${employee.poste_nom || 'Non défini'}
+                </span>
+            </div>
+            <div class="text-xs text-gray-500 mt-1">Niveau: ${employee.niveau_hierarchique || 'N/A'}</div>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap">
+            <div class="flex flex-col space-y-1">
+                <span class="contract-badge contract-${(employee.type_contrat || '').toLowerCase().replace(' ', '_')}">
+                    ${employee.type_contrat || 'Non défini'}
+                </span>
+                <div class="text-xs text-gray-500">${employee.duree_contrat || 'Non spécifiée'}</div>
+            </div>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+            <div>${employee.email}</div>
+            <div class="text-gray-500">${employee.telephone || 'N/A'}</div>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap">
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusClass(employee.statut)}">
+                ${getStatusText(employee.statut)}
+            </span>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+            ${employee.salaire ? formatSalaire(employee.salaire) + ' FCFA' : 'Non défini'}
+            <div class="text-xs text-gray-500">${employee.heure_debut} - ${employee.heure_fin}</div>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+            <!-- COLONNE HEURES depuis table heures_travail -->
+            <div class="flex items-center">
+                <i class="fas fa-clock text-blue-500 mr-1"></i>
+                <span class="font-medium text-blue-600">${employee.heures_par_mois || '0'}h</span>
+            </div>
+            <div class="text-xs text-gray-500">par mois</div>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+            <div class="flex space-x-2">
+                <button onclick="viewEmployee(${employee.id})" class="text-blue-600 hover:text-blue-900" title="Voir détails">
+                    <i class="fas fa-eye"></i>
+                </button>
+                <button onclick="editEmployee(${employee.id})" class="text-green-600 hover:text-green-900" title="Modifier">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button onclick="generateBadge(${employee.id})" class="text-purple-600 hover:text-purple-900" title="Badge">
+                    <i class="fas fa-qrcode"></i>
+                </button>
+                <button onclick="deleteEmployee(${employee.id})" class="text-red-600 hover:text-red-900" title="Désactiver">
+                    <i class="fas fa-user-slash"></i>
+                </button>
+            </div>
+        </td>
+    `;
+    
+    return row;
+}
 
         function displayCardView(employeesList) {
             const cardView = document.getElementById('cardView');
