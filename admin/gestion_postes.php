@@ -1,27 +1,6 @@
 <?php
-/**
- * SYSTÈME DE GESTION DES POSTES - VERSION ORGANISÉE
- * ===================================================
- * 
- * Fonctionnalités principales :
- * - Gestion des postes (CRUD)
- * - Gestion des niveaux hiérarchiques
- * - Organigramme dynamique
- * - Prévisions et statistiques
- * - Export PDF
- * 
- * Structure du code :
- * 1. Configuration et imports
- * 2. Classes et fonctions utilitaires  
- * 3. Gestionnaires de requêtes AJAX
- * 4. Chargement des données
- * 5. Interface HTML
- * 6. JavaScript
- */
+//SYSTÈME DE GESTION DES POSTES - VERSION ORGANISÉE
 
-// ====================================================================
-// 1. CONFIGURATION ET IMPORTS
-// ====================================================================
 require_once '../config.php';
 require_once '../vendor/autoload.php'; // Pour TCPDF
 
