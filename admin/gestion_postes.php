@@ -261,11 +261,11 @@ class PosteSuperieurManager {
      * Vérifie si l'utilisateur est admin
      */
     private function checkAdminAccess() {
-        if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
-            throw new Exception('Accès refusé. Seuls les administrateurs peuvent gérer les postes supérieurs.');
-        }
+    if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+        throw new Exception('Accès refusé. Seuls les administrateurs peuvent gérer les postes supérieurs.');
     }
-    
+}
+
     /**
      * Récupère tous les postes supérieurs possibles
      */
@@ -967,6 +967,67 @@ try {
 .modal-priority {
     z-index: 70;
 }
+/* Configuration des z-index pour les modals */
+
+/* Modal de base - niveau le plus bas */
+#posteModal,
+#departementsModal,
+#niveauxModal {
+    z-index: 50 !important;
+}
+
+/* Modal de gestion hiérarchie - niveau intermédiaire */
+#hierarchieModal {
+    z-index: 55 !important;
+}
+
+/* Modal de modification hiérarchie - niveau supérieur */
+#modifierHierarchieModal {
+    z-index: 60 !important;
+}
+
+/* Modal de confirmation - niveau le plus élevé */
+#confirmModal {
+    z-index: 65 !important;
+}
+
+/* Classes génériques pour organiser la hiérarchie */
+.modal-base {
+    z-index: 50 !important;
+}
+
+.modal-secondary {
+    z-index: 55 !important;
+}
+
+.modal-tertiary {
+    z-index: 60 !important;
+}
+
+.modal-confirmation {
+    z-index: 65 !important;
+}
+
+.modal-priority {
+    z-index: 70 !important;
+}
+
+/* Assurer que les overlays respectent aussi la hiérarchie */
+.modal-overlay-base {
+    z-index: 49;
+}
+
+.modal-overlay-secondary {
+    z-index: 54;
+}
+
+.modal-overlay-tertiary {
+    z-index: 59;
+}
+
+.modal-overlay-confirmation {
+    z-index: 64;
+}
     </style>
 </head>
 <body class="bg-gray-50">
@@ -989,26 +1050,7 @@ try {
             <h1 class="text-3xl font-bold text-gray-900">
                 <i class="fas fa-briefcase mr-3 text-blue-600"></i>Gestion des Postes
             </h1>
-          
-        </div>
-        
-        <!-- Onglets de navigation -->
-        <div class="mb-6">
-            <div class="border-b border-gray-200">
-                <nav class="-mb-px flex space-x-8">
-                    <button onclick="showTab('postes')" id="tab-postes" class="tab-active py-2 px-1 border-b-2 border-transparent font-medium text-sm">
-                        <i class="fas fa-list mr-2"></i>Liste des Postes
-                    </button>
-                    <button onclick="showTab('organigramme')" id="tab-organigramme" class="tab-inactive py-2 px-1 border-b-2 border-transparent font-medium text-sm">
-                        <i class="fas fa-sitemap mr-2"></i>Organigramme
-                    </button>
-                    <button onclick="showTab('previsions')" id="tab-previsions" class="tab-inactive py-2 px-1 border-b-2 border-transparent font-medium text-sm">
-                        <i class="fas fa-chart-line mr-2"></i>Prévisions
-                    </button>
-                </nav>
-            </div>
-        </div>
-  <div class="flex space-x-3">
+            <div class="flex space-x-3">
     <button onclick="exportPostesPDF()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg">
         <i class="fas fa-file-pdf mr-2"></i>Export PDF
     </button>
@@ -1027,6 +1069,25 @@ try {
         <i class="fas fa-plus mr-2"></i>Nouveau Poste
     </button>
 </div>
+        </div>
+        
+        <!-- Onglets de navigation -->
+        <div class="mb-6">
+            <div class="border-b border-gray-200">
+                <nav class="-mb-px flex space-x-8">
+                    <button onclick="showTab('postes')" id="tab-postes" class="tab-active py-2 px-1 border-b-2 border-transparent font-medium text-sm">
+                        <i class="fas fa-list mr-2"></i>Liste des Postes
+                    </button>
+                    <button onclick="showTab('organigramme')" id="tab-organigramme" class="tab-inactive py-2 px-1 border-b-2 border-transparent font-medium text-sm">
+                        <i class="fas fa-sitemap mr-2"></i>Organigramme
+                    </button>
+                    <button onclick="showTab('previsions')" id="tab-previsions" class="tab-inactive py-2 px-1 border-b-2 border-transparent font-medium text-sm">
+                        <i class="fas fa-chart-line mr-2"></i>Prévisions
+                    </button>
+                </nav>
+            </div>
+        </div>
+
         <!-- Contenu de l'onglet Liste des Postes -->
         <div id="content-postes">
             <!-- Barre de recherche et filtres -->

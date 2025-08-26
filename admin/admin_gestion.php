@@ -834,7 +834,6 @@ try {
                             </select>
                         </div>
                     </div>
-
                     <!-- Activité récente -->
                     <?php if (!empty($recentLogs)): ?>
                     <div class="bg-white rounded-xl shadow-lg border border-slate-200 p-6 mb-6">

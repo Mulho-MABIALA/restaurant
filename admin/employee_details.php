@@ -62,35 +62,38 @@ class EmployeeManager {
         return json_encode($qrData);
     }
 
-    //  Récupère un employé par son ID avec toutes ses informations
     public function getEmployeeById(int $id): ?array {
-        $stmt = $this->conn->prepare("
-            SELECT e.*, 
-                   p.nom as poste_nom,
-                   p.couleur as poste_couleur,
-                   p.salaire as poste_salaire,
-                   p.type_contrat,
-                   p.duree_contrat,
-                   p.niveau_hierarchique,
-                   p.competences_requises,
-                   p.avantages,
-                   p.code_paie,
-                   p.categorie_paie,
-                   p.regime_social,
-                   p.taux_cotisation,
-                   p.salaire_min,
-                   p.salaire_max,
-                   p.heures_travail,
-                   ps.nom as poste_superieur_nom
-            FROM employes e 
-            LEFT JOIN postes p ON e.poste_id = p.id 
-            LEFT JOIN postes ps ON p.poste_superieur_id = ps.id 
-            WHERE e.id = ?
-        ");
-        $stmt->execute([$id]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $result ?: null;
-    }
+    $stmt = $this->conn->prepare("
+        SELECT e.*, 
+               p.nom as poste_nom,
+               p.couleur as poste_couleur,
+               p.salaire as poste_salaire,
+               p.type_contrat,
+               p.duree_contrat,
+               p.niveau_hierarchique,
+               p.competences_requises,
+               p.avantages,
+               p.code_paie,
+               p.categorie_paie,
+               p.regime_social,
+               p.taux_cotisation,
+               p.salaire_min,
+               p.salaire_max,
+               p.heures_travail,
+               p.departement_id,
+               ps.nom as poste_superieur_nom,
+               d.nom as departement_nom,
+               d.description as departement_description
+        FROM employes e 
+        LEFT JOIN postes p ON e.poste_id = p.id 
+        LEFT JOIN postes ps ON p.poste_superieur_id = ps.id
+        LEFT JOIN departements d ON p.departement_id = d.id 
+        WHERE e.id = ?
+    ");
+    $stmt->execute([$id]);
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+    return $result ?: null;
+}
     
     /**
      * Récupère les horaires de la semaine pour un employé
@@ -490,13 +493,37 @@ try {
                         </div>
                     </div>
                 </div>
-
-               <!-- Informations professionnelles détaillées -->
+<!-- Correction dans la section HTML - Informations du poste -->
 <?php if ($employee['poste_id']): ?>
 <div class="bg-white rounded-lg shadow-md p-6 card-shadow fade-in">
     <h2 class="text-xl font-semibold text-gray-900 mb-4">
         <i class="fas fa-briefcase mr-2 text-green-600"></i>Informations du poste
     </h2>
+    
+    <!-- Section département corrigée -->
+    <?php if ($employee['departement_nom']): ?>
+    <div class="mb-4 p-4 rounded-lg border-l-4 border-gray-300 bg-gray-50">
+        <div class="flex items-center justify-between">
+            <div>
+                <h3 class="font-semibold text-gray-900">
+                    <i class="fas fa-building mr-2 text-gray-600"></i>
+                    Département: <?php echo htmlspecialchars($employee['departement_nom']); ?>
+                </h3>
+                <?php if ($employee['departement_description']): ?>
+                    <p class="text-sm text-gray-600 mt-1"><?php echo htmlspecialchars($employee['departement_description']); ?></p>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    <?php else: ?>
+    <div class="mb-4 p-4 rounded-lg border-l-4 border-yellow-300 bg-yellow-50">
+        <p class="text-sm text-yellow-800">
+            <i class="fas fa-exclamation-triangle mr-2"></i>
+            Aucun département assigné à ce poste
+        </p>
+    </div>
+    <?php endif; ?>
+    
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
             <label class="block text-sm font-medium text-gray-700">Niveau hiérarchique</label>
@@ -557,7 +584,6 @@ try {
     <?php endif; ?>
 </div>
 <?php endif; ?>
-
                 <!-- Horaires de la semaine -->
                 <div class="bg-white rounded-lg shadow-md p-6 card-shadow fade-in">
                     <h2 class="text-xl font-semibold text-gray-900 mb-4">

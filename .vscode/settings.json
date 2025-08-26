@@ -1,13 +1,26 @@
 {
-    "files.exclude": {
-        "**/node_modules": true
-    },
-    "intelephense.files.exclude": [
-        "**/node_modules/**",
-        "**/vendor/**",
-        "**/.vscode/**"
-    ],
-    "intelephense.environment.includePaths": [
-        "${workspaceFolder}"
-    ]
+  "workbench.colorTheme": "GitHub Dark",
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "files.autoSave": "afterDelay",
+  "editor.formatOnSave": true,
+  "workbench.editor.limit.enabled": true,
+  "workbench.editor.limit.value": 6,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "always",
+    "source.organizeImports": "explicit"
+  },
+  "typescript.inlayHints.variableTypes.enabled": true,
+  "typescript.inlayHints.parameterNames.enabled": "all",
+  "editor.tabSize": 2,
+  "editor.fontFamily": "CommitMonoV138",
+
+  "files.exclude": {
+    "**/node_modules": true
+  },
+  "intelephense.files.exclude": [
+    "**/node_modules/**",
+    "**/vendor/**",
+    "**/.vscode/**"
+  ],
+  "intelephense.environment.includePaths": ["${workspaceFolder}"]
 }

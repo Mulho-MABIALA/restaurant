@@ -669,6 +669,7 @@ try {
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-user-shield nav-icon text-lg"></i>
                     </div>
+                    
                     <div class="flex-1">
                         <span class="font-medium text-base">Gestion des Droits</span>
                         <p class="nav-description text-sm text-gray-400 opacity-80">Gestion des accès et permissions</p>

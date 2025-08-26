@@ -1,0 +1,22 @@
+[
+  {
+    "key": "shift+cmd+i",
+    "command": "editor.action.sourceAction",
+    "args": {
+      "kind": "source.addMissingImports",
+      "apply": "first"
+    }
+  },
+  {
+    "key": "shift+cmd+l",
+    "command": "workbench.action.focusNextGroup"
+  },
+  {
+    "key": "shift+cmd+o",
+    "command": "editor.action.organizeImports"
+    "args": {
+      "kind": "source.addMissingImports",
+      "apply": "first"
+    }
+  }
+]

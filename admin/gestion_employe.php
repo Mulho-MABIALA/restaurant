@@ -12,43 +12,80 @@ class EmployeeManager  // Correction: Ajout du mot-clé 'class'
     }
     
     // Version corrigée de getAllEmployees
-    public function getAllEmployees(): array {
-        try {
-            $stmt = $this->conn->query("
-                SELECT e.*, 
-                       p.nom as poste_nom,
-                       p.couleur as poste_couleur,
-                       p.salaire as poste_salaire,
-                       p.type_contrat,
-                       p.duree_contrat,
-                       p.niveau_hierarchique,
-                       p.competences_requises,
-                       p.avantages,
-                       p.code_paie,
-                       p.categorie_paie,
-                       p.regime_social,
-                       p.taux_cotisation,
-                       p.salaire_min,
-                       p.salaire_max,
-                       p.heures_travail as heures_par_mois,  -- CORRECTION: depuis table postes
-                       ps.nom as poste_superieur_nom
-                FROM employes e 
-                LEFT JOIN postes p ON e.poste_id = p.id 
-                LEFT JOIN postes ps ON p.poste_superieur_id = ps.id 
-                WHERE e.statut = 'actif'
-                ORDER BY e.nom, e.prenom
-            ");
-            
-            $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            error_log("Employés trouvés: " . count($result)); // Debug
-            return $result;
-            
-        } catch (PDOException $e) {
-            error_log("Erreur SQL getAllEmployees: " . $e->getMessage());
-            return [];
-        }
+  public function getAllEmployees(): array {
+    try {
+        $stmt = $this->conn->query("
+            SELECT e.*, 
+                   p.nom as poste_nom,
+                   p.couleur as poste_couleur,
+                   p.salaire as poste_salaire,
+                   p.type_contrat,
+                   p.duree_contrat,
+                   p.niveau_hierarchique,
+                   p.competences_requises,
+                   p.avantages,
+                   p.code_paie,
+                   p.categorie_paie,
+                   p.regime_social,
+                   p.taux_cotisation,
+                   p.salaire_min,
+                   p.salaire_max,
+                   p.heures_travail as heures_par_mois,
+                   ps.nom as poste_superieur_nom
+            FROM employes e 
+            LEFT JOIN postes p ON e.poste_id = p.id 
+            LEFT JOIN postes ps ON p.poste_superieur_id = ps.id 
+            ORDER BY e.statut DESC, e.nom, e.prenom
+        ");
+        
+        $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        error_log("Employés trouvés: " . count($result));
+        return $result;
+        
+    } catch (PDOException $e) {
+        error_log("Erreur SQL getAllEmployees: " . $e->getMessage());
+        return [];
     }
-   
+}
+   public function reactivateEmployee(int $employee_id): array {
+    try {
+        // Vérifier que l'employé existe et est bien inactif
+        $stmt = $this->conn->prepare("SELECT statut, nom, prenom FROM employes WHERE id = ?");
+        $stmt->execute([$employee_id]);
+        $employee = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$employee) {
+            throw new Exception('Employé non trouvé');
+        }
+        
+        if ($employee['statut'] !== 'inactif') {
+            throw new Exception('Cet employé est déjà actif');
+        }
+        
+        // Réactiver l'employé
+        $stmt = $this->conn->prepare("UPDATE employes SET statut = 'actif' WHERE id = ?");
+        $stmt->execute([$employee_id]);
+        
+        if ($stmt->rowCount() === 0) {
+            throw new Exception('Erreur lors de la réactivation');
+        }
+        
+        // Log de l'activité
+        $this->logActivity('REACTIVATE_EMPLOYEE', 'employes', $employee_id, [
+            'statut' => 'actif',
+            'nom' => $employee['nom'],
+            'prenom' => $employee['prenom']
+        ]);
+        
+        return [
+            'success' => true, 
+            'message' => 'Employé ' . $employee['prenom'] . ' ' . $employee['nom'] . ' réactivé avec succès'
+        ];
+        
+    } catch (Exception $e) {
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
     //  Récupère un employé par son ID avec toutes ses informations
     public function getEmployeeById(int $id): ?array {  // Correction: Ajout de 'public function'
         try {
@@ -84,17 +121,57 @@ class EmployeeManager  // Correction: Ajout du mot-clé 'class'
     }
 
     
+
+/**
+ * Supprime définitivement un employé (optionnel - à utiliser avec précaution)
+ */
+public function permanentDeleteEmployee(int $employee_id): array {
+    try {
+        $this->conn->beginTransaction();
+        
+        // Vérifier que l'employé est bien inactif
+        $stmt = $this->conn->prepare("SELECT statut FROM employes WHERE id = ?");
+        $stmt->execute([$employee_id]);
+        $employee = $stmt->fetch();
+        
+        if (!$employee) {
+            throw new Exception('Employé non trouvé');
+        }
+        
+        if ($employee['statut'] !== 'inactif') {
+            throw new Exception('Seuls les employés inactifs peuvent être supprimés définitivement');
+        }
+        
+        // Supprimer les données liées (dans l'ordre des contraintes)
+        $this->conn->prepare("DELETE FROM presences WHERE employe_id = ?")->execute([$employee_id]);
+        $this->conn->prepare("DELETE FROM bulletins_paie WHERE employe_id = ?")->execute([$employee_id]);
+        
+        // Supprimer l'employé
+        $stmt = $this->conn->prepare("DELETE FROM employes WHERE id = ?");
+        $stmt->execute([$employee_id]);
+        
+        $this->logActivity('PERMANENT_DELETE_EMPLOYEE', 'employes', $employee_id, ['action' => 'suppression_definitive']);
+        
+        $this->conn->commit();
+        return ['success' => true, 'message' => 'Employé supprimé définitivement'];
+        
+    } catch (Exception $e) {
+        $this->conn->rollBack();
+        return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
     /**
      * Récupère les statistiques des employés
      */
-    public function getStatistics(): array {
+   // Méthode corrigée pour getStatistics() dans EmployeeManager
+public function getStatistics(): array {
     $stats = [];
     
-    // Total employés actifs
+    // Total employés actifs (inchangé)
     $stmt = $this->conn->query("SELECT COUNT(*) as total FROM employes WHERE statut = 'actif'");
     $stats['total_actifs'] = $stmt->fetch()['total'];
     
-    // PRÉSENTS AUJOURD'HUI - VRAIES DONNÉES DE PRÉSENCE
+    // PRÉSENTS AUJOURD'HUI - CORRECTION: Vérifier les présences pour aujourd'hui
     $stmt = $this->conn->query("
         SELECT COUNT(DISTINCT p.employe_id) as presents 
         FROM presences p
@@ -103,27 +180,29 @@ class EmployeeManager  // Correction: Ajout du mot-clé 'class'
         AND p.heure_arrivee IS NOT NULL 
         AND e.statut = 'actif'
     ");
-    $stats['presents_aujourd_hui'] = $stmt->fetch()['presents'];
+    $result = $stmt->fetch();
+    $stats['presents_aujourd_hui'] = $result ? $result['presents'] : 0;
     
-    // Nouveaux ce mois
+    // Nouveaux ce mois (inchangé)
     $stmt = $this->conn->query("SELECT COUNT(*) as total FROM employes WHERE DATE_FORMAT(date_embauche, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')");
     $stats['nouveaux_ce_mois'] = $stmt->fetch()['total'];
     
-    // Total administrateurs
+    // Total administrateurs - Exclure les inactifs
     $stmt = $this->conn->query("SELECT COUNT(*) as total FROM employes WHERE is_admin = 1 AND statut != 'inactif'");
     $stats['total_admins'] = $stmt->fetch()['total'];
     
-    // ABSENTS AUJOURD'HUI (employés actifs qui ne sont pas présents)
+    // ABSENTS AUJOURD'HUI - CORRECTION: Employés actifs sans présence aujourd'hui
     $stmt = $this->conn->query("
         SELECT COUNT(*) as absents 
         FROM employes e
-        LEFT JOIN presences p ON e.id = p.employe_id AND DATE(p.heure_arrivee) = CURDATE()
+        LEFT JOIN presence p ON e.id = p.employe_id AND DATE(p.heure_arrivee) = CURDATE()
         WHERE e.statut = 'actif' 
         AND p.employe_id IS NULL
     ");
-    $stats['absents_aujourd_hui'] = $stmt->fetch()['absents'];
+    $result = $stmt->fetch();
+    $stats['absents_aujourd_hui'] = $result ? $result['absents'] : 0;
     
-    // EN RETARD AUJOURD'HUI (arrivés après leur heure prévue)
+    // EN RETARD AUJOURD'HUI - CORRECTION: Vérifier avec gestion d'erreur
     $stmt = $this->conn->query("
         SELECT COUNT(*) as retards
         FROM presences p
@@ -132,9 +211,10 @@ class EmployeeManager  // Correction: Ajout du mot-clé 'class'
         AND TIME(p.heure_arrivee) > e.heure_debut
         AND e.statut = 'actif'
     ");
-    $stats['retards_aujourd_hui'] = $stmt->fetch()['retards'];
+    $result = $stmt->fetch();
+    $stats['retards_aujourd_hui'] = $result ? $result['retards'] : 0;
     
-    // ENCORE AU TRAVAIL (présents mais pas encore partis)
+    // ENCORE AU TRAVAIL - CORRECTION: Employés présents mais pas encore partis
     $stmt = $this->conn->query("
         SELECT COUNT(*) as encore_au_travail
         FROM presences p
@@ -144,19 +224,70 @@ class EmployeeManager  // Correction: Ajout du mot-clé 'class'
         AND p.heure_depart IS NULL
         AND e.statut = 'actif'
     ");
-    $stats['encore_au_travail'] = $stmt->fetch()['encore_au_travail'];
+    $result = $stmt->fetch();
+    $stats['encore_au_travail'] = $result ? $result['encore_au_travail'] : 0;
     
-    // Statistiques par type de contrat
+    // Statistiques par type de contrat - Exclure les inactifs
     $stmt = $this->conn->query("
         SELECT p.type_contrat, COUNT(e.id) as count 
         FROM employes e 
         JOIN postes p ON e.poste_id = p.id 
-        WHERE e.statut = 'actif' 
+        WHERE e.statut != 'inactif' 
         GROUP BY p.type_contrat
     ");
     $stats['par_contrat'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
+    // Statistiques des employés inactifs
+    $stmt = $this->conn->query("SELECT COUNT(*) as total FROM employes WHERE statut = 'inactif'");
+    $stats['total_inactifs'] = $stmt->fetch()['total'];
+    
     return $stats;
+}
+
+// NOUVELLE MÉTHODE: Vérifier et initialiser les présences pour aujourd'hui
+public function initializeDailyAttendance(): array {
+    try {
+        $today = date('Y-m-d');
+        
+        // Récupérer tous les employés actifs
+        $stmt = $this->conn->query("
+            SELECT id, nom, prenom, heure_debut 
+            FROM employes 
+            WHERE statut = 'actif'
+        ");
+        $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        $initialized = 0;
+        
+        foreach ($employees as $employee) {
+            // Vérifier si une présence existe déjà pour aujourd'hui
+            $stmt = $this->conn->prepare("
+                SELECT id FROM presences 
+                WHERE employe_id = ? AND DATE(heure_arrivee) = ?
+            ");
+            $stmt->execute([$employee['id'], $today]);
+            
+            if (!$stmt->fetch()) {
+                // Pas de présence pour aujourd'hui, créer une entrée vide
+                $stmt = $this->conn->prepare("
+                    INSERT INTO presences (employe_id, date_presence, statut) 
+                    VALUES (?, ?, 'absent')
+                ");
+                $stmt->execute([$employee['id'], $today]);
+                $initialized++;
+            }
+        }
+        
+        return [
+            'success' => true, 
+            'message' => "Présences initialisées pour {$initialized} employés",
+            'initialized' => $initialized
+        ];
+        
+    } catch (PDOException $e) {
+        error_log("Erreur initializeDailyAttendance: " . $e->getMessage());
+        return ['success' => false, 'message' => 'Erreur lors de l\'initialisation'];
+    }
 }
     /**
  * Récupère les détails de présence pour un employé spécifique
@@ -209,6 +340,9 @@ public function getPresenceDetailsForEmployee(int $employee_id, string $date = n
  */
 public function getAllEmployeesWithPresenceStatus(): array {
     try {
+        // D'abord, initialiser les présences si nécessaire
+        $this->initializeDailyAttendance();
+        
         $stmt = $this->conn->query("
             SELECT e.*, 
                    p.nom as poste_nom,
@@ -226,9 +360,188 @@ public function getAllEmployeesWithPresenceStatus(): array {
                    p.salaire_min,
                    p.salaire_max,
                    p.heures_travail as heures_par_mois,
+                   p.departement_id,
+                   d.nom as departement_nom,
+                   d.couleur as departement_couleur,
                    ps.nom as poste_superieur_nom,
                    pr.heure_arrivee as presences_arrivee,
                    pr.heure_depart as presences_depart,
+                   pr.statut as statut_presence_db,
+                   CASE 
+                       WHEN e.statut = 'inactif' THEN 'inactif'
+                       WHEN pr.heure_arrivee IS NULL THEN 'absent'
+                       WHEN pr.heure_depart IS NOT NULL THEN 'parti'
+                       WHEN TIME(pr.heure_arrivee) > e.heure_debut THEN 'retard'
+                       ELSE 'present'
+                   END as statut_presences,
+                   CASE 
+                       WHEN pr.heure_arrivee IS NOT NULL AND TIME(pr.heure_arrivee) > e.heure_debut 
+                       THEN TIMESTAMPDIFF(MINUTE, 
+                            CONCAT(DATE(pr.heure_arrivee), ' ', e.heure_debut), 
+                            pr.heure_arrivee)
+                       ELSE 0
+                   END as retard_minutes,
+                   TIME(pr.heure_arrivee) as heure_arrivee_time
+            FROM employes e 
+            LEFT JOIN postes p ON e.poste_id = p.id 
+            LEFT JOIN departements d ON p.departement_id = d.id
+            LEFT JOIN postes ps ON p.poste_superieur_id = ps.id 
+            LEFT JOIN presences pr ON e.id = pr.employe_id AND DATE(pr.heure_arrivee) = CURDATE()
+            ORDER BY 
+                CASE 
+                    WHEN e.statut = 'actif' THEN 0
+                    WHEN e.statut = 'en_conge' THEN 1
+                    WHEN e.statut = 'absent' THEN 2
+                    WHEN e.statut = 'inactif' THEN 3
+                    ELSE 4
+                END,
+                d.nom, p.nom, e.nom, e.prenom
+        ");
+        
+        $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        error_log("Employés avec statut de présence trouvés: " . count($result));
+        return $result;
+        
+    } catch (PDOException $e) {
+        error_log("Erreur SQL getAllEmployeesWithPresenceStatus: " . $e->getMessage());
+        return [];
+    }
+}
+
+// NOUVELLE MÉTHODE: Marquer une présence (arrivée)
+public function markArrival(int $employee_id): array {
+    try {
+        $today = date('Y-m-d');
+        $now = date('Y-m-d H:i:s');
+        
+        // Vérifier que l'employé existe et est actif
+        $stmt = $this->conn->prepare("SELECT * FROM employes WHERE id = ? AND statut = 'actif'");
+        $stmt->execute([$employee_id]);
+        $employee = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$employee) {
+            return ['success' => false, 'message' => 'Employé non trouvé ou inactif'];
+        }
+        
+        // Vérifier s'il n'y a pas déjà une présence pour aujourd'hui
+        $stmt = $this->conn->prepare("
+            SELECT id, heure_arrivee FROM presences 
+            WHERE employe_id = ? AND DATE(heure_arrivee) = ?
+        ");
+        $stmt->execute([$employee_id, $today]);
+        $existing = $stmt->fetch();
+        
+        if ($existing && $existing['heure_arrivee']) {
+            return [
+                'success' => false, 
+                'message' => 'Présence déjà enregistrée pour aujourd\'hui à ' . 
+                           date('H:i', strtotime($existing['heure_arrivee']))
+            ];
+        }
+        
+        if ($existing) {
+            // Mettre à jour l'enregistrement existant
+            $stmt = $this->conn->prepare("
+                UPDATE presences 
+                SET heure_arrivee = ?, statut = 'present' 
+                WHERE id = ?
+            ");
+            $stmt->execute([$now, $existing['id']]);
+        } else {
+            // Créer un nouvel enregistrement
+            $stmt = $this->conn->prepare("
+                INSERT INTO presences (employe_id, heure_arrivee, date_presence, statut) 
+                VALUES (?, ?, ?, 'present')
+            ");
+            $stmt->execute([$employee_id, $now, $today]);
+        }
+        
+        // Calculer si en retard
+        $heure_prevue = new DateTime($today . ' ' . $employee['heure_debut']);
+        $heure_arrivee = new DateTime($now);
+        $retard_minutes = 0;
+        
+        if ($heure_arrivee > $heure_prevue) {
+            $diff = $heure_arrivee->diff($heure_prevue);
+            $retard_minutes = ($diff->h * 60) + $diff->i;
+        }
+        
+        return [
+            'success' => true,
+            'message' => 'Présence enregistrée avec succès',
+            'heure_arrivee' => date('H:i', strtotime($now)),
+            'retard_minutes' => $retard_minutes,
+            'employee' => $employee
+        ];
+        
+    } catch (Exception $e) {
+        error_log("Erreur markArrival: " . $e->getMessage());
+        return ['success' => false, 'message' => 'Erreur lors de l\'enregistrement'];
+    }
+}
+
+// NOUVELLE MÉTHODE: Marquer un départ
+public function markDeparture(int $employee_id): array {
+    try {
+        $today = date('Y-m-d');
+        $now = date('Y-m-d H:i:s');
+        
+        // Trouver la présence du jour
+        $stmt = $this->conn->prepare("
+            SELECT p.*, e.nom, e.prenom 
+            FROM presences p
+            INNER JOIN employes e ON p.employe_id = e.id
+            WHERE p.employe_id = ? AND DATE(p.heure_arrivee) = ? AND p.heure_arrivee IS NOT NULL
+        ");
+        $stmt->execute([$employee_id, $today]);
+        $presence = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$presence) {
+            return ['success' => false, 'message' => 'Aucune arrivée enregistrée pour aujourd\'hui'];
+        }
+        
+        if ($presence['heure_depart']) {
+            return [
+                'success' => false, 
+                'message' => 'Départ déjà enregistré à ' . date('H:i', strtotime($presence['heure_depart']))
+            ];
+        }
+        
+        // Enregistrer le départ
+        $stmt = $this->conn->prepare("
+            UPDATE presences 
+            SET heure_depart = ?, statut = 'parti' 
+            WHERE id = ?
+        ");
+        $stmt->execute([$now, $presence['id']]);
+        
+        // Calculer la durée travaillée
+        $arrivee = new DateTime($presence['heure_arrivee']);
+        $depart = new DateTime($now);
+        $duree = $arrivee->diff($depart);
+        $heures_travaillees = $duree->h + ($duree->i / 60);
+        
+        return [
+            'success' => true,
+            'message' => 'Départ enregistré avec succès',
+            'heure_depart' => date('H:i', strtotime($now)),
+            'duree_travaillee' => round($heures_travaillees, 2),
+            'employee' => ['nom' => $presence['nom'], 'prenom' => $presence['prenom']]
+        ];
+        
+    } catch (Exception $e) {
+        error_log("Erreur markDeparture: " . $e->getMessage());
+        return ['success' => false, 'message' => 'Erreur lors de l\'enregistrement du départ'];
+    }
+}
+
+// NOUVELLE MÉTHODE: Obtenir la liste des présences du jour
+public function getTodayAttendance(): array {
+    try {
+        $stmt = $this->conn->query("
+            SELECT e.id, e.nom, e.prenom, e.photo, e.heure_debut, e.heure_fin,
+                   p.nom as poste_nom, p.couleur as poste_couleur,
+                   pr.heure_arrivee, pr.heure_depart,
                    CASE 
                        WHEN pr.heure_arrivee IS NULL THEN 'absent'
                        WHEN pr.heure_depart IS NOT NULL THEN 'parti'
@@ -244,18 +557,21 @@ public function getAllEmployeesWithPresenceStatus(): array {
                    END as retard_minutes
             FROM employes e 
             LEFT JOIN postes p ON e.poste_id = p.id 
-            LEFT JOIN postes ps ON p.poste_superieur_id = ps.id 
             LEFT JOIN presences pr ON e.id = pr.employe_id AND DATE(pr.heure_arrivee) = CURDATE()
             WHERE e.statut = 'actif'
-            ORDER BY e.nom, e.prenom
+            ORDER BY 
+                CASE 
+                    WHEN pr.heure_arrivee IS NULL THEN 0
+                    WHEN pr.heure_depart IS NULL THEN 1
+                    ELSE 2
+                END,
+                pr.heure_arrivee ASC
         ");
         
-        $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        error_log("Employés avec statut de présence trouvés: " . count($result));
-        return $result;
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
         
     } catch (PDOException $e) {
-        error_log("Erreur SQL getAllEmployeesWithPresenceStatus: " . $e->getMessage());
+        error_log("Erreur getTodayAttendance: " . $e->getMessage());
         return [];
     }
 }
@@ -844,6 +1160,34 @@ class PayrollManager {
     }
 }
 
+class DepartementManager {
+    private $conn;
+    
+    public function __construct(PDO $connection) {
+        $this->conn = $connection;
+    }
+    
+    public function getAllDepartements(): array {
+        try {
+            $stmt = $this->conn->query("
+                SELECT d.*, 
+                       COUNT(p.id) as nombre_postes,
+                       COUNT(e.id) as nombre_employes
+                FROM departements d 
+                LEFT JOIN postes p ON d.id = p.departement_id AND p.actif = 1
+                LEFT JOIN employes e ON p.id = e.poste_id AND e.statut = 'actif'
+                WHERE d.actif = 1 
+                GROUP BY d.id
+                ORDER BY d.nom
+            ");
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Erreur SQL getAllDepartements: " . $e->getMessage());
+            return [];
+        }
+    }
+}
+
 // GESTIONNAIRE DE POSTES - AMÉLIORÉ
 class PosteManager {
     private $conn;
@@ -915,57 +1259,191 @@ class APIHandler {
     }
 }
 
+private function getDepartements(): void {
+    try {
+        $departementManager = new DepartementManager($this->conn);
+        $departements = $departementManager->getAllDepartements();
+        echo json_encode(['success' => true, 'departements' => $departements]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => 'Erreur lors du chargement des départements']);
+    }
+}
+private function reactivateEmployee(): void {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
+        return;
+    }
+    
+    $input = json_decode(file_get_contents('php://input'), true);
+    
+    if (empty($input['id'])) {
+        echo json_encode(['success' => false, 'message' => 'ID employé requis']);
+        return;
+    }
+    
+    try {
+        $stmt = $this->employeeManager->conn->prepare("UPDATE employes SET statut = 'actif' WHERE id = ?");
+        $stmt->execute([$input['id']]);
+        
+        if ($stmt->rowCount() === 0) {
+            echo json_encode(['success' => false, 'message' => 'Employé non trouvé']);
+            return;
+        }
+        
+        // Log de l'activité (si la méthode logActivity existe)
+        // $this->employeeManager->logActivity('REACTIVATE_EMPLOYEE', 'employes', $input['id'], ['statut' => 'actif']);
+        
+        echo json_encode(['success' => true, 'message' => 'Employé réactivé avec succès']);
+        
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => 'Erreur lors de la réactivation']);
+    }
+}
+
+private function permanentDeleteEmployee(): void {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
+        return;
+    }
+    
+    $input = json_decode(file_get_contents('php://input'), true);
+    
+    if (empty($input['id'])) {
+        echo json_encode(['success' => false, 'message' => 'ID employé requis']);
+        return;
+    }
+    
+    $result = $this->employeeManager->permanentDeleteEmployee($input['id']);
+    echo json_encode($result);
+}
 
 
     public function handleRequest(): void {
-        $action = $_GET['action'] ?? $_POST['ajax_action'] ?? '';
-        
-        // Pour les actions de génération de bulletins, on ne force pas le JSON
-        if (in_array($action, ['generer_bulletin'])) {
-            // Ces actions peuvent retourner du PDF
-        } else {
-            header('Content-Type: application/json');
-        }
-        
-        switch ($action) {
-            case 'get_employees':
-                $this->getEmployees();
-                break;
-            case 'get_statistics':
-                $this->getStatistics();
-                break;
-            case 'get_postes':
-                $this->getPostes();
-                break;
-            case 'get_poste_details':
-                $this->getPosteDetails();
-                break;
-            case 'add_employee':
-                $this->addEmployee();
-                break;
-            case 'update_employee':
-                $this->updateEmployee();
-                break;
-            case 'delete_employee':
-                $this->deleteEmployee();
-                break;
-            case 'generer_bulletin':
-                $this->genererBulletin();
-                break;
-                // Dans la fonction handleRequest, ajouter ce case
-case 'get_employees_with_presences':
-    $this->getEmployeesWithPresence();
-    break;
-            case 'generer_tous_bulletins':
-                $this->genererTousBulletins();
-                break;
-            default:
-                header('Content-Type: application/json');
-                echo json_encode(['success' => false, 'message' => 'Action non reconnue']);
-        }
-        exit;
+    $action = $_GET['action'] ?? $_POST['ajax_action'] ?? '';
+    
+    // Pour les actions de génération de bulletins, on ne force pas le JSON
+    if (in_array($action, ['generer_bulletin'])) {
+        // Ces actions peuvent retourner du PDF
+    } else {
+        header('Content-Type: application/json');
     }
     
+    switch ($action) {
+        case 'get_employees':
+            $this->getEmployees();
+            break;
+        case 'get_statistics':
+            $this->getStatistics();
+            break;
+        case 'get_postes':
+            $this->getPostes();
+            break;
+        case 'get_poste_details':
+            $this->getPosteDetails();
+            break;
+        case 'add_employee':
+            $this->addEmployee();
+            break;
+        case 'update_employee':
+            $this->updateEmployee();
+            break;
+        case 'delete_employee':
+            $this->deleteEmployee();
+            break;
+        case 'generer_bulletin':
+            $this->genererBulletin();
+            break;            
+        case 'get_employees_with_presences':
+            $this->getEmployeesWithPresence();
+            break;
+        case 'get_departements':
+            $this->getDepartements();
+            break;
+        case 'generer_tous_bulletins':
+            $this->genererTousBulletins();
+            break;
+        case 'reactivate_employee':
+            $this->reactivateEmployee();
+            break;
+        case 'permanent_delete_employee':
+            $this->permanentDeleteEmployee();
+            break;
+        // NOUVELLES ACTIONS POUR LES PRÉSENCES
+        case 'mark_arrival':
+            $this->markArrival();
+            break;
+        case 'mark_departure':
+            $this->markDeparture();
+            break;
+        case 'get_today_attendance':
+            $this->getTodayAttendance();
+            break;
+        case 'initialize_daily_attendance':
+            $this->initializeDailyAttendance();
+            break;
+        default:
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Action non reconnue']);
+    }
+    exit;
+    
+}
+
+    // NOUVELLES MÉTHODES PRIVÉES à ajouter dans APIHandler :
+
+private function markArrival(): void {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
+        return;
+    }
+    
+    $input = json_decode(file_get_contents('php://input'), true);
+    
+    if (empty($input['employee_id'])) {
+        echo json_encode(['success' => false, 'message' => 'ID employé requis']);
+        return;
+    }
+    
+    $result = $this->employeeManager->markArrival($input['employee_id']);
+    echo json_encode($result);
+}
+
+private function markDeparture(): void {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
+        return;
+    }
+    
+    $input = json_decode(file_get_contents('php://input'), true);
+    
+    if (empty($input['employee_id'])) {
+        echo json_encode(['success' => false, 'message' => 'ID employé requis']);
+        return;
+    }
+    
+    $result = $this->employeeManager->markDeparture($input['employee_id']);
+    echo json_encode($result);
+}
+
+private function getTodayAttendance(): void {
+    try {
+        $attendance = $this->employeeManager->getTodayAttendance();
+        echo json_encode(['success' => true, 'attendance' => $attendance]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => 'Erreur lors du chargement des présences']);
+    }
+}
+
+private function initializeDailyAttendance(): void {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
+        return;
+    }
+    
+    $result = $this->employeeManager->initializeDailyAttendance();
+    echo json_encode($result);
+}
+
     private function getEmployees(): void {
         try {
             $employees = $this->employeeManager->getAllEmployees();
@@ -1271,7 +1749,17 @@ try {
                 </div>
             </div>
         </div>
-        
+        <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale">
+    <div class="flex items-center">
+        <div class="p-3 rounded-full bg-gray-100 text-gray-600">
+            <i class="fas fa-user-slash text-xl"></i>
+        </div>
+        <div class="ml-4">
+            <p class="text-sm font-medium text-gray-600">Inactifs</p>
+            <p class="text-2xl font-bold text-gray-900" id="totalInactifs">0</p>
+        </div>
+    </div>
+</div>
         <!-- Administrateurs -->
         <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale">
             <div class="flex items-center">
@@ -1286,45 +1774,129 @@ try {
         </div>
     </div>
 
-        <!-- Filtres et Recherche -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6 card-shadow">
-            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+       <!-- Filtres et Recherche -->
+<div class="bg-white rounded-lg shadow-md p-6 mb-6 card-shadow">
+    <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
+        <!-- Champ de recherche -->
+        <div>
+            <input type="text" id="searchInput" placeholder="Rechercher par nom, email..." 
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+        </div>
+        
+        <!-- NOUVEAU FILTRE DÉPARTEMENT -->
+        <div>
+            <select id="filterDepartement" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <option value="">Tous les départements</option>
+            </select>
+        </div>
+        
+        <!-- Filtre poste -->
+        <div>
+            <select id="filterPoste" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <option value="">Tous les postes</option>
+            </select>
+        </div>
+        
+        <!-- Filtre contrat -->
+        <div>
+            <select id="filterContrat" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <option value="">Tous les contrats</option>
+                <option value="CDI">CDI</option>
+                <option value="CDD">CDD</option>
+                <option value="Stage">Stage</option>
+                <option value="Apprentissage">Apprentissage</option>
+                <option value="Freelance">Freelance</option>
+                <option value="Temps_partiel">Temps Partiel</option>
+            </select>
+        </div>
+        
+        <!-- Filtre statut -->
+        <div>
+            <select id="filterStatut" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <option value="">Tous les statuts</option>
+                <option value="actif">Actif</option>
+                <option value="en_conge">En congé</option>
+                <option value="absent">Absent</option>
+                <option value="inactif">Inactif</option>
+            </select>
+        </div>
+        
+        <!-- Bouton réinitialiser -->
+        <div>
+            <button onclick="resetFilters()" class="w-full px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition duration-200">
+                <i class="fas fa-undo mr-2"></i>Réinitialiser
+            </button>
+        </div>
+    </div>
+</div>
+<!-- Section Gestion Rapide des Présences -->
+<div class="bg-white rounded-lg shadow-md p-6 mb-6 card-shadow">
+    <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-semibold text-gray-900">Gestion Rapide des Présences</h2>
+        <div class="flex space-x-2">
+            <button onclick="initializeDailyAttendance()" 
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition duration-200">
+                <i class="fas fa-calendar-plus mr-2"></i>Initialiser la journée
+            </button>
+            <button onclick="refreshPresences()" 
+                    class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition duration-200">
+                <i class="fas fa-sync-alt mr-2"></i>Actualiser
+            </button>
+        </div>
+    </div>
+    
+    <!-- Résumé rapide du jour -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+        <div class="bg-green-50 rounded-lg p-4">
+            <div class="flex items-center">
+                <i class="fas fa-check-circle text-green-600 text-xl mr-3"></i>
                 <div>
-                    <input type="text" id="searchInput" placeholder="Rechercher par nom, email..." 
-                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                </div>
-                <div>
-                    <select id="filterPoste" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                        <option value="">Tous les postes</option>
-                    </select>
-                </div>
-                <div>
-                    <select id="filterContrat" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                        <option value="">Tous les contrats</option>
-                        <option value="CDI">CDI</option>
-                        <option value="CDD">CDD</option>
-                        <option value="Stage">Stage</option>
-                        <option value="Apprentissage">Apprentissage</option>
-                        <option value="Freelance">Freelance</option>
-                        <option value="Temps_partiel">Temps Partiel</option>
-                    </select>
-                </div>
-                <div>
-                    <select id="filterStatut" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                        <option value="">Tous les statuts</option>
-                        <option value="actif">Actif</option>
-                        <option value="en_conge">En congé</option>
-                        <option value="absent">Absent</option>
-                        <option value="inactif">Inactif</option>
-                    </select>
-                </div>
-                <div>
-                    <button onclick="resetFilters()" class="w-full px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition duration-200">
-                        <i class="fas fa-undo mr-2"></i>Réinitialiser
-                    </button>
+                    <p class="text-sm text-green-600">Présents</p>
+                    <p class="text-2xl font-bold text-green-800" id="quickPresents">0</p>
                 </div>
             </div>
         </div>
+        
+        <div class="bg-red-50 rounded-lg p-4">
+            <div class="flex items-center">
+                <i class="fas fa-times-circle text-red-600 text-xl mr-3"></i>
+                <div>
+                    <p class="text-sm text-red-600">Absents</p>
+                    <p class="text-2xl font-bold text-red-800" id="quickAbsents">0</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-yellow-50 rounded-lg p-4">
+            <div class="flex items-center">
+                <i class="fas fa-clock text-yellow-600 text-xl mr-3"></i>
+                <div>
+                    <p class="text-sm text-yellow-600">En Retard</p>
+                    <p class="text-2xl font-bold text-yellow-800" id="quickRetards">0</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-blue-50 rounded-lg p-4">
+            <div class="flex items-center">
+                <i class="fas fa-briefcase text-blue-600 text-xl mr-3"></i>
+                <div>
+                    <p class="text-sm text-blue-600">Au Travail</p>
+                    <p class="text-2xl font-bold text-blue-800" id="quickAuTravail">0</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Actions rapides pour les absents -->
+    <div class="border-t pt-4">
+        <h3 class="text-lg font-medium text-gray-900 mb-3">Actions Rapides</h3>
+        <div id="quickActions" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <!-- Les actions rapides seront chargées ici -->
+        </div>
+    </div>
+</div>
+
 
         <!-- Section Génération des Bulletins de Paie -->
         <div class="bg-white rounded-lg shadow-md p-6 mb-6 card-shadow">
@@ -1373,6 +1945,7 @@ try {
     <tr>
         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Photo</th>
         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employé</th>
+        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Département</th>
         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Poste</th>
         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contrat</th>
         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
@@ -1581,26 +2154,59 @@ try {
         let currentView = localStorage.getItem('preferredView') || 'table';
         let employees = [];
         let postes = [];
+        let departements = []; // AJOUT
 
-        // Initialisation
-        document.addEventListener('DOMContentLoaded', function() {
-            loadPostes();
-            loadEmployees();
-            loadStatistics();
-            setView();
-            
-            // Auto-refresh des statistiques toutes les 30 secondes
-            setInterval(loadStatistics, 30000);
-            
-            // Événements
-            document.getElementById('searchInput').addEventListener('input', filterEmployees);
-            document.getElementById('filterPoste').addEventListener('change', filterEmployees);
-            document.getElementById('filterContrat').addEventListener('change', filterEmployees);
-            document.getElementById('filterStatut').addEventListener('change', filterEmployees);
-            document.getElementById('photo').addEventListener('change', previewPhoto);
-            document.getElementById('employeeForm').addEventListener('submit', saveEmployee);
-        });
-        
+
+    // Modifier la fonction d'initialisation pour inclure les nouvelles fonctionnalités
+document.addEventListener('DOMContentLoaded', function() {
+    loadDepartements();
+    loadPostes();
+    loadEmployees();
+    loadStatistics();
+    setView();
+    
+    // Auto-refresh des statistiques et présences toutes les 30 secondes
+    setInterval(() => {
+        loadStatistics();
+        updateQuickStats();
+    }, 30000);
+    
+    // Événements existants
+    document.getElementById('searchInput').addEventListener('input', filterEmployees);
+    document.getElementById('filterDepartement').addEventListener('change', filterEmployees);
+    document.getElementById('filterPoste').addEventListener('change', filterEmployees);
+    document.getElementById('filterContrat').addEventListener('change', filterEmployees);
+    document.getElementById('filterStatut').addEventListener('change', filterEmployees);
+    document.getElementById('photo').addEventListener('change', previewPhoto);
+    document.getElementById('employeeForm').addEventListener('submit', saveEmployee);
+    
+    // Nouveau : Mettre à jour les stats rapides après le chargement
+    setTimeout(updateQuickStats, 1000);
+});
+        // NOUVELLE FONCTION pour charger les départements
+function loadDepartements() {
+    fetch('?action=get_departements')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                departements = data.departements;
+                updateDepartementsSelect();
+            }
+        })
+        .catch(error => console.error('Erreur:', error));
+}
+
+// NOUVELLE FONCTION pour mettre à jour le select des départements
+function updateDepartementsSelect() {
+    const filterDepartement = document.getElementById('filterDepartement');
+    
+    filterDepartement.innerHTML = '<option value="">Tous les départements</option>';
+    
+    departements.forEach(dept => {
+        filterDepartement.innerHTML += `<option value="${dept.id}">${dept.nom}</option>`;
+    });
+}
+
         function toggleView() {
             currentView = currentView === 'table' ? 'cards' : 'table';
             localStorage.setItem('preferredView', currentView);
@@ -1628,20 +2234,45 @@ try {
 
         function loadStatistics() {
     fetch('?action=get_statistics')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
-            if (data.success) {
-                document.getElementById('totalActifs').textContent = data.statistics.total_actifs;
-                document.getElementById('presentsAujourdhui').textContent = data.statistics.presents_aujourd_hui;
-                document.getElementById('absentsAujourdhui').textContent = data.statistics.absents_aujourd_hui || 0;
-                document.getElementById('retardsAujourdhui').textContent = data.statistics.retards_aujourd_hui || 0;
-                document.getElementById('encoreAuTravail').textContent = data.statistics.encore_au_travail || 0;
-                document.getElementById('totalAdmins').textContent = data.statistics.total_admins;
+            if (data.success && data.statistics) {
+                const stats = data.statistics;
+                
+                // Mise à jour sécurisée des éléments
+                updateElementText('totalActifs', stats.total_actifs || 0);
+                updateElementText('presentsAujourdhui', stats.presents_aujourd_hui || 0);
+                updateElementText('absentsAujourdhui', stats.absents_aujourd_hui || 0);
+                updateElementText('retardsAujourdhui', stats.retards_aujourd_hui || 0);
+                updateElementText('encoreAuTravail', stats.encore_au_travail || 0);
+                updateElementText('totalAdmins', stats.total_admins || 0);
+                updateElementText('totalInactifs', stats.total_inactifs || 0);
+                
+                console.log('Statistiques mises à jour:', stats);
+            } else {
+                console.error('Données statistiques invalides:', data);
             }
         })
-        .catch(error => console.error('Erreur:', error));
+        .catch(error => {
+            console.error('Erreur lors du chargement des statistiques:', error);
+            showNotification('Erreur lors du chargement des statistiques', 'warning');
+        });
 }
 
+// Fonction utilitaire pour mettre à jour un élément de façon sécurisée
+function updateElementText(elementId, value) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.textContent = value;
+    } else {
+        console.warn(`Élément ${elementId} non trouvé`);
+    }
+}
 
         function loadPostes() {
             fetch('?action=get_postes')
@@ -1715,22 +2346,77 @@ try {
                 });
         }
 
-     function loadEmployees() {
-    fetch('?action=get_employees_with_presences')  // ✅ URL corrigée
-        .then(response => response.json())
+    function loadEmployees() {
+    fetch('?action=get_employees_with_presences')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
-            if (data.success) {
+            if (data.success && Array.isArray(data.employees)) {
                 employees = data.employees;
                 displayEmployees(employees);
+                console.log(`${employees.length} employés chargés avec statut de présence`);
             } else {
-                console.error('Erreur serveur:', data.message);
-                showNotification('Erreur lors du chargement des employés', 'error');
+                console.error('Données employés invalides:', data);
+                showNotification(data.message || 'Erreur lors du chargement des employés', 'error');
+                employees = [];
+                displayEmployees([]);
             }
         })
         .catch(error => {
             console.error('Erreur:', error);
             showNotification('Erreur de connexion lors du chargement des employés', 'error');
+            employees = [];
+            displayEmployees([]);
         });
+}
+
+// NOUVELLE FONCTION : Voir l'historique des présences
+function viewPresenceHistory(employeeId) {
+    // Ouvrir une nouvelle fenêtre ou modal pour l'historique
+    window.open(`presence_history.php?employee_id=${employeeId}`, '_blank');
+}
+
+// AMÉLIORATION : Fonction de génération de tous les bulletins avec meilleur feedback
+function genererTousBulletins() {
+    const mois_annee = document.getElementById('mois_annee').value;
+    
+    if (!mois_annee) {
+        showNotification('Veuillez sélectionner un mois.', 'error');
+        return;
+    }
+    
+    if (!confirm(`Générer les bulletins de paie pour tous les employés actifs pour ${mois_annee} ?`)) {
+        return;
+    }
+    
+    showLoading();
+    
+    fetch('?action=generer_tous_bulletins', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `mois_annee=${mois_annee}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            showNotification(
+                `${data.count}/${data.total} bulletins générés avec succès pour ${mois_annee}`, 
+                'success'
+            );
+        } else {
+            showNotification(data.message || 'Erreur lors de la génération', 'error');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Erreur:', error);
+        showNotification('Erreur lors de la génération des bulletins', 'error');
+    });
 }
 
         function displayEmployees(employeesList) {
@@ -1751,56 +2437,91 @@ try {
             });
         }
 
-      function createEmployeeRow(employee) {
+     function createEmployeeRow(employee) {
     const row = document.createElement('tr');
-    row.className = 'hover:bg-gray-50 fade-in';
+    row.className = employee.statut === 'inactif' 
+        ? 'hover:bg-gray-50 fade-in opacity-60 bg-gray-25' 
+        : 'hover:bg-gray-50 fade-in';
     
-    // Déterminer la couleur du statut de présence
+    // Déterminer la couleur du statut de présence avec gestion sécurisée
     let presenceClass = '';
     let presenceText = '';
     let presenceIcon = '';
     
-    switch(employee.statut_presences) {
-        case 'present':
-            presenceClass = 'bg-green-100 text-green-800';
-            presenceText = 'Présent';
-            presenceIcon = 'fas fa-check-circle';
-            break;
-        case 'retard':
-            presenceClass = 'bg-yellow-100 text-yellow-800';
-            presenceText = `Retard (${employee.retard_minutes}min)`;
-            presenceIcon = 'fas fa-clock';
-            break;
-        case 'parti':
-            presenceClass = 'bg-blue-100 text-blue-800';
-            presenceText = 'Parti';
-            presenceIcon = 'fas fa-sign-out-alt';
-            break;
-        case 'absent':
-        default:
-            presenceClass = 'bg-red-100 text-red-800';
-            presenceText = 'Absent';
-            presenceIcon = 'fas fa-times-circle';
-            break;
+    if (employee.statut === 'inactif') {
+        presenceClass = 'bg-gray-100 text-gray-600';
+        presenceText = 'Inactif';
+        presenceIcon = 'fas fa-user-slash';
+    } else {
+        // Gestion sécurisée du statut de présence
+        const statutPresence = employee.statut_presences || 'absent';
+        
+        switch(statutPresence) {
+            case 'present':
+                presenceClass = 'bg-green-100 text-green-800';
+                presenceText = 'Présent';
+                presenceIcon = 'fas fa-check-circle';
+                break;
+            case 'retard':
+                presenceClass = 'bg-yellow-100 text-yellow-800';
+                presenceText = `Retard (${employee.retard_minutes || 0}min)`;
+                presenceIcon = 'fas fa-clock';
+                break;
+            case 'parti':
+                presenceClass = 'bg-blue-100 text-blue-800';
+                presenceText = 'Parti';
+                presenceIcon = 'fas fa-sign-out-alt';
+                break;
+            case 'absent':
+            default:
+                presenceClass = 'bg-red-100 text-red-800';
+                presenceText = 'Absent';
+                presenceIcon = 'fas fa-times-circle';
+                break;
+        }
+    }
+    
+    // Affichage de l'heure d'arrivée de façon sécurisée
+    let heureArriveeDisplay = '';
+    if (employee.presences_arrivee && employee.statut !== 'inactif') {
+        try {
+            const date = new Date(employee.presences_arrivee);
+            if (!isNaN(date.getTime())) {
+                heureArriveeDisplay = `<div class="text-xs text-gray-500 mt-1">Arrivé: ${date.toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})}</div>`;
+            }
+        } catch (e) {
+            console.warn('Erreur formatage heure arrivée:', e);
+        }
     }
     
     row.innerHTML = `
         <td class="px-6 py-4 whitespace-nowrap">
             <img src="uploads/photos/${employee.photo || 'default-avatar.png'}" 
-                 class="h-10 w-10 rounded-full object-cover">
+                 class="h-10 w-10 rounded-full object-cover ${employee.statut === 'inactif' ? 'grayscale' : ''}"
+                 onerror="this.src='uploads/photos/default-avatar.png'">
         </td>
         <td class="px-6 py-4 whitespace-nowrap">
-            <div class="text-sm font-medium text-gray-900">
-                ${employee.prenom} ${employee.nom}
-                ${employee.is_admin ? '<i class="fas fa-crown text-yellow-500 ml-1" title="Administrateur"></i>' : ''}
+            <div class="text-sm font-medium ${employee.statut === 'inactif' ? 'text-gray-500' : 'text-gray-900'}">
+                ${escapeHtml(employee.prenom)} ${escapeHtml(employee.nom)}
+                ${employee.is_admin == 1 ? '<i class="fas fa-crown text-yellow-500 ml-1" title="Administrateur"></i>' : ''}
+                ${employee.statut === 'inactif' ? '<i class="fas fa-user-slash text-red-500 ml-1" title="Employé inactif"></i>' : ''}
             </div>
             <div class="text-sm text-gray-500">ID: ${employee.id}</div>
         </td>
         <td class="px-6 py-4 whitespace-nowrap">
             <div class="flex items-center">
                 <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" 
+                      style="background-color: ${employee.departement_couleur || '#6B7280'}20; color: ${employee.departement_couleur || '#6B7280'};">
+                    <i class="fas fa-building mr-1"></i>
+                    ${escapeHtml(employee.departement_nom || 'Non défini')}
+                </span>
+            </div>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap">
+            <div class="flex items-center">
+                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" 
                       style="background-color: ${employee.poste_couleur || '#6B7280'}20; color: ${employee.poste_couleur || '#6B7280'};">
-                    ${employee.poste_nom || 'Non défini'}
+                    ${escapeHtml(employee.poste_nom || 'Non défini')}
                 </span>
             </div>
             <div class="text-xs text-gray-500 mt-1">Niveau: ${employee.niveau_hierarchique || 'N/A'}</div>
@@ -1808,14 +2529,14 @@ try {
         <td class="px-6 py-4 whitespace-nowrap">
             <div class="flex flex-col space-y-1">
                 <span class="contract-badge contract-${(employee.type_contrat || '').toLowerCase().replace(' ', '_')}">
-                    ${employee.type_contrat || 'Non défini'}
+                    ${escapeHtml(employee.type_contrat || 'Non défini')}
                 </span>
-                <div class="text-xs text-gray-500">${employee.duree_contrat || 'Non spécifiée'}</div>
+                <div class="text-xs text-gray-500">${escapeHtml(employee.duree_contrat || 'Non spécifiée')}</div>
             </div>
         </td>
-        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-            <div>${employee.email}</div>
-            <div class="text-gray-500">${employee.telephone || 'N/A'}</div>
+        <td class="px-6 py-4 whitespace-nowrap text-sm ${employee.statut === 'inactif' ? 'text-gray-500' : 'text-gray-900'}">
+            <div>${escapeHtml(employee.email)}</div>
+            <div class="text-gray-500">${escapeHtml(employee.telephone || 'N/A')}</div>
         </td>
         <td class="px-6 py-4 whitespace-nowrap">
             <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusClass(employee.statut)}">
@@ -1823,20 +2544,22 @@ try {
             </span>
         </td>
         <td class="px-6 py-4 whitespace-nowrap">
-            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${presenceClass}">
-                <i class="${presenceIcon} mr-1"></i>
-                ${presenceText}
-            </span>
-            ${employee.presences_arrivee ? `<div class="text-xs text-gray-500 mt-1">Arrivé: ${new Date(employee.presences_arrivee).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})}</div>` : ''}
+            <div class="flex flex-col space-y-1">
+                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${presenceClass}">
+                    <i class="${presenceIcon} mr-1"></i>
+                    ${presenceText}
+                </span>
+                ${heureArriveeDisplay}
+            </div>
         </td>
-        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        <td class="px-6 py-4 whitespace-nowrap text-sm ${employee.statut === 'inactif' ? 'text-gray-500' : 'text-gray-900'}">
             ${employee.salaire ? formatSalaire(employee.salaire) + ' FCFA' : 'Non défini'}
             <div class="text-xs text-gray-500">${employee.heure_debut} - ${employee.heure_fin}</div>
         </td>
-        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        <td class="px-6 py-4 whitespace-nowrap text-sm ${employee.statut === 'inactif' ? 'text-gray-500' : 'text-gray-900'}">
             <div class="flex items-center">
-                <i class="fas fa-clock text-blue-500 mr-1"></i>
-                <span class="font-medium text-blue-600">${employee.heures_par_mois || '0'}h</span>
+                <i class="fas fa-clock ${employee.statut === 'inactif' ? 'text-gray-400' : 'text-blue-500'} mr-1"></i>
+                <span class="font-medium ${employee.statut === 'inactif' ? 'text-gray-400' : 'text-blue-600'}">${employee.heures_par_mois || '0'}h</span>
             </div>
             <div class="text-xs text-gray-500">par mois</div>
         </td>
@@ -1845,23 +2568,199 @@ try {
                 <button onclick="viewEmployee(${employee.id})" class="text-blue-600 hover:text-blue-900" title="Voir détails">
                     <i class="fas fa-eye"></i>
                 </button>
-                <button onclick="editEmployee(${employee.id})" class="text-green-600 hover:text-green-900" title="Modifier">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button onclick="generateBadge(${employee.id})" class="text-purple-600 hover:text-purple-900" title="Badge">
-                    <i class="fas fa-qrcode"></i>
-                </button>
-                <button onclick="viewPresenceHistory(${employee.id})" class="text-orange-600 hover:text-orange-900" title="Historique présence">
-                    <i class="fas fa-calendar-check"></i>
-                </button>
-                <button onclick="deleteEmployee(${employee.id})" class="text-red-600 hover:text-red-900" title="Désactiver">
-                    <i class="fas fa-user-slash"></i>
-                </button>
+                ${employee.statut !== 'inactif' ? `
+                    <button onclick="editEmployee(${employee.id})" class="text-green-600 hover:text-green-900" title="Modifier">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="generateBadge(${employee.id})" class="text-purple-600 hover:text-purple-900" title="Badge">
+                        <i class="fas fa-qrcode"></i>
+                    </button>
+                    ${employee.statut_presences === 'absent' ? `
+                        <button onclick="markArrival(${employee.id})" class="text-green-600 hover:text-green-900" title="Marquer arrivée">
+                            <i class="fas fa-sign-in-alt"></i>
+                        </button>
+                    ` : ''}
+                    ${employee.statut_presences === 'present' || employee.statut_presences === 'retard' ? `
+                        <button onclick="markDeparture(${employee.id})" class="text-orange-600 hover:text-orange-900" title="Marquer départ">
+                            <i class="fas fa-sign-out-alt"></i>
+                        </button>
+                    ` : ''}
+                    <button onclick="viewPresenceHistory(${employee.id})" class="text-indigo-600 hover:text-indigo-900" title="Historique présence">
+                        <i class="fas fa-calendar-check"></i>
+                    </button>
+                    <button onclick="deleteEmployee(${employee.id})" class="text-red-600 hover:text-red-900" title="Désactiver">
+                        <i class="fas fa-user-slash"></i>
+                    </button>
+                ` : `
+                    <button onclick="reactivateEmployee(${employee.id})" class="text-green-600 hover:text-green-900" title="Réactiver">
+                        <i class="fas fa-user-check"></i>
+                    </button>
+                    <button onclick="permanentDeleteEmployee(${employee.id})" class="text-red-800 hover:text-red-900" title="Supprimer définitivement">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                `}
             </div>
         </td>
     `;
     
     return row;
+}
+
+// NOUVELLE FONCTION : Marquer une arrivée
+function markArrival(employeeId) {
+    const employee = employees.find(e => e.id == employeeId);
+    const employeeName = employee ? `${employee.prenom} ${employee.nom}` : 'l\'employé';
+    
+    if (confirm(`Marquer l'arrivée de ${employeeName} maintenant ?`)) {
+        fetch('?action=mark_arrival', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ employee_id: employeeId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const message = data.retard_minutes > 0 
+                    ? `Arrivée enregistrée (${data.retard_minutes}min de retard) à ${data.heure_arrivee}`
+                    : `Arrivée enregistrée à l'heure (${data.heure_arrivee})`;
+                    
+                showNotification(message, 'success');
+                loadEmployees();
+                loadStatistics();
+            } else {
+                showNotification(data.message || 'Erreur lors de l\'enregistrement', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            showNotification('Erreur lors de l\'enregistrement de l\'arrivée', 'error');
+        });
+    }
+}
+
+// NOUVELLE FONCTION : Marquer un départ
+function markDeparture(employeeId) {
+    const employee = employees.find(e => e.id == employeeId);
+    const employeeName = employee ? `${employee.prenom} ${employee.nom}` : 'l\'employé';
+    
+    if (confirm(`Marquer le départ de ${employeeName} maintenant ?`)) {
+        fetch('?action=mark_departure', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ employee_id: employeeId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification(
+                    `Départ enregistré à ${data.heure_depart} (${data.duree_travaillee}h travaillées)`, 
+                    'success'
+                );
+                loadEmployees();
+                loadStatistics();
+            } else {
+                showNotification(data.message || 'Erreur lors de l\'enregistrement du départ', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            showNotification('Erreur lors de l\'enregistrement du départ', 'error');
+        });
+    }
+}
+
+// NOUVELLE FONCTION : Initialiser les présences du jour
+function initializeDailyAttendance() {
+    if (confirm('Initialiser les présences pour tous les employés actifs d\'aujourd\'hui ?')) {
+        fetch('?action=initialize_daily_attendance', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification(data.message, 'success');
+                loadEmployees();
+                loadStatistics();
+            } else {
+                showNotification(data.message || 'Erreur lors de l\'initialisation', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            showNotification('Erreur lors de l\'initialisation', 'error');
+        });
+    }
+}
+
+// FONCTION UTILITAIRE : Échapper le HTML
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+
+function reactivateEmployee(id) {
+    if (confirm('Êtes-vous sûr de vouloir réactiver cet employé?')) {
+        fetch('?action=reactivate_employee', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ id: id })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('Employé réactivé avec succès!', 'success');
+                loadEmployees();
+                loadStatistics();
+            } else {
+                showNotification(data.message || 'Erreur lors de la réactivation', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            showNotification('Erreur lors de la réactivation', 'error');
+        });
+    }
+}
+
+// AJOUT: Fonction pour suppression définitive (optionnelle)
+function permanentDeleteEmployee(id) {
+    if (confirm('ATTENTION: Êtes-vous sûr de vouloir SUPPRIMER DÉFINITIVEMENT cet employé? Cette action est irréversible.')) {
+        if (confirm('Dernière confirmation: Cette action va supprimer définitivement toutes les données de cet employé (présences, paies, etc.).')) {
+            fetch('?action=permanent_delete_employee', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ id: id })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification('Employé supprimé définitivement', 'success');
+                    loadEmployees();
+                    loadStatistics();
+                } else {
+                    showNotification(data.message || 'Erreur lors de la suppression', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+                showNotification('Erreur lors de la suppression', 'error');
+            });
+        }
+    }
 }
 
         function displayCardView(employeesList) {
@@ -1874,103 +2773,112 @@ try {
             });
         }
 
-        function createEmployeeCard(employee) {
-            const card = document.createElement('div');
-            card.className = 'bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 fade-in';
-            
-            card.innerHTML = `
-                <div class="p-6">
-                    <div class="flex items-center mb-4">
-                        <img src="uploads/photos/${employee.photo || 'default-avatar.png'}" 
-                             class="h-16 w-16 rounded-full object-cover border-2 border-gray-200">
-                        <div class="ml-4 flex-1">
-                            <h3 class="text-lg font-semibold text-gray-900">
-                                ${employee.prenom} ${employee.nom}
-                                ${employee.is_admin ? '<i class="fas fa-crown text-yellow-500 ml-1" title="Administrateur"></i>' : ''}
-                            </h3>
-                            <div class="flex items-center mt-1 flex-wrap gap-1">
-                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" 
-                                      style="background-color: ${employee.poste_couleur || '#6B7280'}20; color: ${employee.poste_couleur || '#6B7280'};">
-                                    ${employee.poste_nom || 'Non défini'}
-                                </span>
-                                <span class="contract-badge contract-${(employee.type_contrat || '').toLowerCase().replace(' ', '_')}">
-                                    ${employee.type_contrat || 'Non défini'}
-                                </span>
-                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusClass(employee.statut)}">
-                                    ${getStatusText(employee.statut)}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="space-y-2 text-sm text-gray-600">
-                        <div class="flex items-center">
-                            <i class="fas fa-envelope w-4 mr-2"></i>
-                            ${employee.email}
-                        </div>
-                        ${employee.telephone ? `
-                            <div class="flex items-center">
-                                <i class="fas fa-phone w-4 mr-2"></i>
-                                ${employee.telephone}
-                            </div>
-                        ` : ''}
-                        <div class="flex items-center">
-                            <i class="fas fa-calendar w-4 mr-2"></i>
-                            Embauché le ${formatDate(employee.date_embauche)}
-                        </div>
-                        <div class="flex items-center">
-                            <i class="fas fa-clock w-4 mr-2"></i>
-                            ${employee.heure_debut} - ${employee.heure_fin}
-                        </div>
-                        ${employee.salaire ? `
-                            <div class="flex items-center">
-                                <i class="fas fa-money-bill w-4 mr-2"></i>
-                                ${formatSalaire(employee.salaire)} FCFA
-                            </div>
-                        ` : ''}
-                        ${employee.duree_contrat ? `
-                            <div class="flex items-center">
-                                <i class="fas fa-contract w-4 mr-2"></i>
-                                ${employee.duree_contrat}
-                            </div>
-                        ` : ''}
-                        ${employee.niveau_hierarchique ? `
-                            <div class="flex items-center">
-                                <i class="fas fa-layer-group w-4 mr-2"></i>
-                                Niveau ${employee.niveau_hierarchique}
-                            </div>
-                        ` : ''}
-                    </div>
-                    
-                    <div class="mt-4 flex justify-end space-x-2">
-                        <button onclick="viewEmployee(${employee.id})" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Voir détails">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                        <button onclick="editEmployee(${employee.id})" class="p-2 text-green-600 hover:bg-green-50 rounded-lg" title="Modifier">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button onclick="generateBadge(${employee.id})" class="p-2 text-purple-600 hover:bg-purple-50 rounded-lg" title="Badge">
-                            <i class="fas fa-qrcode"></i>
-                        </button>
-                        <button onclick="deleteEmployee(${employee.id})" class="p-2 text-red-600 hover:bg-red-50 rounded-lg" title="Désactiver">
-                            <i class="fas fa-user-slash"></i>
-                        </button>
+        // MODIFICATION DE LA FONCTION createEmployeeCard pour ajouter le département
+function createEmployeeCard(employee) {
+    const card = document.createElement('div');
+    card.className = 'bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 fade-in';
+    
+    card.innerHTML = `
+        <div class="p-6">
+            <div class="flex items-center mb-4">
+                <img src="uploads/photos/${employee.photo || 'default-avatar.png'}" 
+                     class="h-16 w-16 rounded-full object-cover border-2 border-gray-200">
+                <div class="ml-4 flex-1">
+                    <h3 class="text-lg font-semibold text-gray-900">
+                        ${employee.prenom} ${employee.nom}
+                        ${employee.is_admin ? '<i class="fas fa-crown text-yellow-500 ml-1" title="Administrateur"></i>' : ''}
+                    </h3>
+                    <div class="flex items-center mt-1 flex-wrap gap-1">
+                        <!-- AJOUT DU DÉPARTEMENT -->
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" 
+                              style="background-color: ${employee.departement_couleur || '#6B7280'}20; color: ${employee.departement_couleur || '#6B7280'};">
+                            <i class="fas fa-building mr-1"></i>
+                            ${employee.departement_nom || 'Non défini'}
+                        </span>
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" 
+                              style="background-color: ${employee.poste_couleur || '#6B7280'}20; color: ${employee.poste_couleur || '#6B7280'};">
+                            ${employee.poste_nom || 'Non défini'}
+                        </span>
+                        <span class="contract-badge contract-${(employee.type_contrat || '').toLowerCase().replace(' ', '_')}">
+                            ${employee.type_contrat || 'Non défini'}
+                        </span>
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusClass(employee.statut)}">
+                            ${getStatusText(employee.statut)}
+                        </span>
                     </div>
                 </div>
-            `;
+            </div>
             
-            return card;
-        }
+            <!-- Reste du contenu de la carte inchangé -->
+            <div class="space-y-2 text-sm text-gray-600">
+                <div class="flex items-center">
+                    <i class="fas fa-envelope w-4 mr-2"></i>
+                    ${employee.email}
+                </div>
+                ${employee.telephone ? `
+                    <div class="flex items-center">
+                        <i class="fas fa-phone w-4 mr-2"></i>
+                        ${employee.telephone}
+                    </div>
+                ` : ''}
+                <div class="flex items-center">
+                    <i class="fas fa-calendar w-4 mr-2"></i>
+                    Embauché le ${formatDate(employee.date_embauche)}
+                </div>
+                <div class="flex items-center">
+                    <i class="fas fa-clock w-4 mr-2"></i>
+                    ${employee.heure_debut} - ${employee.heure_fin}
+                </div>
+                ${employee.salaire ? `
+                    <div class="flex items-center">
+                        <i class="fas fa-money-bill w-4 mr-2"></i>
+                        ${formatSalaire(employee.salaire)} FCFA
+                    </div>
+                ` : ''}
+                ${employee.duree_contrat ? `
+                    <div class="flex items-center">
+                        <i class="fas fa-contract w-4 mr-2"></i>
+                        ${employee.duree_contrat}
+                    </div>
+                ` : ''}
+                ${employee.niveau_hierarchique ? `
+                    <div class="flex items-center">
+                        <i class="fas fa-layer-group w-4 mr-2"></i>
+                        Niveau ${employee.niveau_hierarchique}
+                    </div>
+                ` : ''}
+            </div>
+            
+            <div class="mt-4 flex justify-end space-x-2">
+                <button onclick="viewEmployee(${employee.id})" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Voir détails">
+                    <i class="fas fa-eye"></i>
+                </button>
+                <button onclick="editEmployee(${employee.id})" class="p-2 text-green-600 hover:bg-green-50 rounded-lg" title="Modifier">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button onclick="generateBadge(${employee.id})" class="p-2 text-purple-600 hover:bg-purple-50 rounded-lg" title="Badge">
+                    <i class="fas fa-qrcode"></i>
+                </button>
+                <button onclick="deleteEmployee(${employee.id})" class="p-2 text-red-600 hover:bg-red-50 rounded-lg" title="Désactiver">
+                    <i class="fas fa-user-slash"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    
+    return card;
+}
+
         
         function getStatusClass(statut) {
-            const classes = {
-                'actif': 'bg-green-100 text-green-800',
-                'en_conge': 'bg-yellow-100 text-yellow-800',
-                'absent': 'bg-red-100 text-red-800',
-                'inactif': 'bg-gray-100 text-gray-800'
-            };
-            return classes[statut] || 'bg-gray-100 text-gray-800';
-        }
+    const classes = {
+        'actif': 'bg-green-100 text-green-800',
+        'en_conge': 'bg-yellow-100 text-yellow-800',
+        'absent': 'bg-red-100 text-red-800',
+        'inactif': 'bg-gray-100 text-gray-800'
+    };
+    return classes[statut] || 'bg-gray-100 text-gray-800';
+}
 
         function getStatusText(statut) {
             const texts = {
@@ -1993,35 +2901,45 @@ try {
             return parseInt(salaire).toLocaleString('fr-FR');
         }
 
-        function filterEmployees() {
-            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-            const posteFilter = document.getElementById('filterPoste').value;
-            const contratFilter = document.getElementById('filterContrat').value;
-            const statutFilter = document.getElementById('filterStatut').value;
-            
-            const filtered = employees.filter(employee => {
-                const matchesSearch = !searchTerm || 
-                    employee.nom.toLowerCase().includes(searchTerm) ||
-                    employee.prenom.toLowerCase().includes(searchTerm) ||
-                    employee.email.toLowerCase().includes(searchTerm);
-                
-                const matchesPoste = !posteFilter || employee.poste_id == posteFilter;
-                const matchesContrat = !contratFilter || employee.type_contrat === contratFilter;
-                const matchesStatut = !statutFilter || employee.statut === statutFilter;
-                
-                return matchesSearch && matchesPoste && matchesContrat && matchesStatut;
-            });
-            
-            displayEmployees(filtered);
-        }
+       function filterEmployees() {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const departementFilter = document.getElementById('filterDepartement').value;
+    const posteFilter = document.getElementById('filterPoste').value;
+    const contratFilter = document.getElementById('filterContrat').value;
+    const statutFilter = document.getElementById('filterStatut').value;
+    
+    const filtered = employees.filter(employee => {
+        const matchesSearch = !searchTerm || 
+            employee.nom.toLowerCase().includes(searchTerm) ||
+            employee.prenom.toLowerCase().includes(searchTerm) ||
+            employee.email.toLowerCase().includes(searchTerm);
+        
+        const matchesDepartement = !departementFilter || employee.departement_id == departementFilter;
+        const matchesPoste = !posteFilter || employee.poste_id == posteFilter;
+        const matchesContrat = !contratFilter || employee.type_contrat === contratFilter;
+        const matchesStatut = !statutFilter || employee.statut === statutFilter;
+        
+        return matchesSearch && matchesDepartement && matchesPoste && matchesContrat && matchesStatut;
+    });
+    
+    displayEmployees(filtered);
+    
+    // Afficher un message si aucun résultat et si on filtre par statut inactif
+    if (filtered.length === 0 && statutFilter === 'inactif') {
+        showNotification('Aucun employé inactif trouvé', 'info');
+    }
+}
 
-        function resetFilters() {
-            document.getElementById('searchInput').value = '';
-            document.getElementById('filterPoste').value = '';
-            document.getElementById('filterContrat').value = '';
-            document.getElementById('filterStatut').value = '';
-            displayEmployees(employees);
-        }
+
+       function resetFilters() {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('filterDepartement').value = ''; // AJOUT
+    document.getElementById('filterPoste').value = '';
+    document.getElementById('filterContrat').value = '';
+    document.getElementById('filterStatut').value = '';
+    displayEmployees(employees);
+}
+
 
         function openAddModal() {
             document.getElementById('modalTitle').textContent = 'Ajouter un employé';
@@ -2112,31 +3030,31 @@ try {
             window.open(`generate_badge.php?id=${id}`, '_blank');
         }
 
-        function deleteEmployee(id) {
-            if (confirm('Êtes-vous sûr de vouloir désactiver cet employé?')) {
-                fetch('?action=delete_employee', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ id: id })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        showNotification('Employé désactivé avec succès!', 'success');
-                        loadEmployees();
-                        loadStatistics();
-                    } else {
-                        showNotification(data.message || 'Erreur lors de la désactivation', 'error');
-                    }
-                })
-                .catch(error => {
-                    console.error('Erreur:', error);
-                    showNotification('Erreur lors de la désactivation', 'error');
-                });
+      function deleteEmployee(id) {
+    if (confirm('Êtes-vous sûr de vouloir DÉSACTIVER cet employé? Il restera dans la base mais sera marqué comme inactif.')) {
+        fetch('?action=delete_employee', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ id: id })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('Employé désactivé avec succès! Il est maintenant inactif.', 'success');
+                loadEmployees();
+                loadStatistics();
+            } else {
+                showNotification(data.message || 'Erreur lors de la désactivation', 'error');
             }
-        }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            showNotification('Erreur lors de la désactivation', 'error');
+        });
+    }
+}
 
      function genererBulletin() {
     const employe_id = document.getElementById('employe_id').value;
@@ -2265,6 +3183,92 @@ try {
                 closeModal();
             }
         });
+        // Actualiser les présences
+function refreshPresences() {
+    loadEmployees();
+    loadStatistics();
+    updateQuickStats();
+    showNotification('Présences actualisées', 'info');
+}
+
+// Mettre à jour les statistiques rapides
+function updateQuickStats() {
+    if (!employees || employees.length === 0) return;
+    
+    const activeEmployees = employees.filter(e => e.statut === 'actif');
+    const presents = activeEmployees.filter(e => e.statut_presences === 'present' || e.statut_presences === 'retard').length;
+    const absents = activeEmployees.filter(e => e.statut_presences === 'absent').length;
+    const retards = activeEmployees.filter(e => e.statut_presences === 'retard').length;
+    const auTravail = activeEmployees.filter(e => e.statut_presences === 'present' || e.statut_presences === 'retard').length;
+    
+    updateElementText('quickPresents', presents);
+    updateElementText('quickAbsents', absents);
+    updateElementText('quickRetards', retards);
+    updateElementText('quickAuTravail', auTravail);
+    
+    // Mettre à jour les actions rapides
+    updateQuickActions(activeEmployees);
+}
+
+// Mettre à jour les actions rapides pour les employés absents
+function updateQuickActions(activeEmployees) {
+    const quickActionsDiv = document.getElementById('quickActions');
+    if (!quickActionsDiv) return;
+    
+    const absents = activeEmployees.filter(e => e.statut_presences === 'absent');
+    const presents = activeEmployees.filter(e => e.statut_presences === 'present' || e.statut_presences === 'retard');
+    
+    quickActionsDiv.innerHTML = '';
+    
+    if (absents.length === 0 && presents.length === 0) {
+        quickActionsDiv.innerHTML = '<p class="text-gray-500 col-span-full text-center">Aucune action rapide disponible</p>';
+        return;
+    }
+    
+    // Boutons pour marquer les arrivées (employés absents)
+    absents.slice(0, 6).forEach(employee => {
+        quickActionsDiv.innerHTML += `
+            <button onclick="markArrival(${employee.id})" 
+                    class="flex items-center justify-between p-3 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors">
+                <div class="flex items-center">
+                    <img src="uploads/photos/${employee.photo || 'default-avatar.png'}" 
+                         class="h-8 w-8 rounded-full object-cover mr-3"
+                         onerror="this.src='uploads/photos/default-avatar.png'">
+                    <span class="text-sm font-medium">${employee.prenom} ${employee.nom}</span>
+                </div>
+                <i class="fas fa-sign-in-alt text-green-600"></i>
+            </button>
+        `;
+    });
+    
+    // Boutons pour marquer les départs (employés présents)
+    presents.slice(0, 6).forEach(employee => {
+        quickActionsDiv.innerHTML += `
+            <button onclick="markDeparture(${employee.id})" 
+                    class="flex items-center justify-between p-3 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors">
+                <div class="flex items-center">
+                    <img src="uploads/photos/${employee.photo || 'default-avatar.png'}" 
+                         class="h-8 w-8 rounded-full object-cover mr-3"
+                         onerror="this.src='uploads/photos/default-avatar.png'">
+                    <span class="text-sm font-medium">${employee.prenom} ${employee.nom}</span>
+                    <span class="ml-2 text-xs text-green-600">
+                        ${employee.presences_arrivee ? new Date(employee.presences_arrivee).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'}) : ''}
+                    </span>
+                </div>
+                <i class="fas fa-sign-out-alt text-orange-600"></i>
+            </button>
+        `;
+    });
+    
+    if (absents.length > 6 || presents.length > 6) {
+        quickActionsDiv.innerHTML += `
+            <div class="col-span-full text-center text-gray-500 text-sm">
+                ... et ${(absents.length + presents.length) - 12} autres employés
+            </div>
+        `;
+    }
+}
+
     </script>
 </body>
 </html>
