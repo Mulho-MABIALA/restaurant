@@ -2,10 +2,7 @@
 require_once '../config.php';
 require_once 'phpqrcode/qrlib.php';
 
-// =============================================================================
 // GESTIONNAIRE D'EMPLOYÉS
-// =============================================================================
-
 class EmployeeManager  // Correction: Ajout du mot-clé 'class'
 {
     private $conn;
@@ -91,37 +88,177 @@ class EmployeeManager  // Correction: Ajout du mot-clé 'class'
      * Récupère les statistiques des employés
      */
     public function getStatistics(): array {
-        $stats = [];
-        
-        // Total employés actifs
-        $stmt = $this->conn->query("SELECT COUNT(*) as total FROM employes WHERE statut = 'actif'");
-        $stats['total_actifs'] = $stmt->fetch()['total'];
-        
-        // Présents aujourd'hui (employés actifs)
-        $stats['presents_aujourd_hui'] = $stats['total_actifs'];
-        
-        // Nouveaux ce mois
-        $stmt = $this->conn->query("SELECT COUNT(*) as total FROM employes WHERE DATE_FORMAT(date_embauche, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')");
-        $stats['nouveaux_ce_mois'] = $stmt->fetch()['total'];
-        
-        // Total administrateurs
-        $stmt = $this->conn->query("SELECT COUNT(*) as total FROM employes WHERE is_admin = 1 AND statut != 'inactif'");
-        $stats['total_admins'] = $stmt->fetch()['total'];
-        
-        // Statistiques par type de contrat
-        $stmt = $this->conn->query("
-            SELECT p.type_contrat, COUNT(e.id) as count 
-            FROM employes e 
-            JOIN postes p ON e.poste_id = p.id 
-            WHERE e.statut = 'actif' 
-            GROUP BY p.type_contrat
-        ");
-        $stats['par_contrat'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        return $stats;
+    $stats = [];
+    
+    // Total employés actifs
+    $stmt = $this->conn->query("SELECT COUNT(*) as total FROM employes WHERE statut = 'actif'");
+    $stats['total_actifs'] = $stmt->fetch()['total'];
+    
+    // PRÉSENTS AUJOURD'HUI - VRAIES DONNÉES DE PRÉSENCE
+    $stmt = $this->conn->query("
+        SELECT COUNT(DISTINCT p.employe_id) as presents 
+        FROM presences p
+        INNER JOIN employes e ON p.employe_id = e.id
+        WHERE DATE(p.heure_arrivee) = CURDATE() 
+        AND p.heure_arrivee IS NOT NULL 
+        AND e.statut = 'actif'
+    ");
+    $stats['presents_aujourd_hui'] = $stmt->fetch()['presents'];
+    
+    // Nouveaux ce mois
+    $stmt = $this->conn->query("SELECT COUNT(*) as total FROM employes WHERE DATE_FORMAT(date_embauche, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')");
+    $stats['nouveaux_ce_mois'] = $stmt->fetch()['total'];
+    
+    // Total administrateurs
+    $stmt = $this->conn->query("SELECT COUNT(*) as total FROM employes WHERE is_admin = 1 AND statut != 'inactif'");
+    $stats['total_admins'] = $stmt->fetch()['total'];
+    
+    // ABSENTS AUJOURD'HUI (employés actifs qui ne sont pas présents)
+    $stmt = $this->conn->query("
+        SELECT COUNT(*) as absents 
+        FROM employes e
+        LEFT JOIN presences p ON e.id = p.employe_id AND DATE(p.heure_arrivee) = CURDATE()
+        WHERE e.statut = 'actif' 
+        AND p.employe_id IS NULL
+    ");
+    $stats['absents_aujourd_hui'] = $stmt->fetch()['absents'];
+    
+    // EN RETARD AUJOURD'HUI (arrivés après leur heure prévue)
+    $stmt = $this->conn->query("
+        SELECT COUNT(*) as retards
+        FROM presences p
+        INNER JOIN employes e ON p.employe_id = e.id
+        WHERE DATE(p.heure_arrivee) = CURDATE() 
+        AND TIME(p.heure_arrivee) > e.heure_debut
+        AND e.statut = 'actif'
+    ");
+    $stats['retards_aujourd_hui'] = $stmt->fetch()['retards'];
+    
+    // ENCORE AU TRAVAIL (présents mais pas encore partis)
+    $stmt = $this->conn->query("
+        SELECT COUNT(*) as encore_au_travail
+        FROM presences p
+        INNER JOIN employes e ON p.employe_id = e.id
+        WHERE DATE(p.heure_arrivee) = CURDATE() 
+        AND p.heure_arrivee IS NOT NULL 
+        AND p.heure_depart IS NULL
+        AND e.statut = 'actif'
+    ");
+    $stats['encore_au_travail'] = $stmt->fetch()['encore_au_travail'];
+    
+    // Statistiques par type de contrat
+    $stmt = $this->conn->query("
+        SELECT p.type_contrat, COUNT(e.id) as count 
+        FROM employes e 
+        JOIN postes p ON e.poste_id = p.id 
+        WHERE e.statut = 'actif' 
+        GROUP BY p.type_contrat
+    ");
+    $stats['par_contrat'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    return $stats;
+}
+    /**
+ * Récupère les détails de présence pour un employé spécifique
+ */
+public function getPresenceDetailsForEmployee(int $employee_id, string $date = null): array {
+    if (!$date) {
+        $date = date('Y-m-d');
     }
     
+    $stmt = $this->conn->prepare("
+        SELECT p.*, e.nom, e.prenom, e.heure_debut as heure_prevue_debut, e.heure_fin as heure_prevue_fin
+        FROM presences p
+        INNER JOIN employes e ON p.employe_id = e.id
+        WHERE p.employe_id = ? AND DATE(p.heure_arrivee) = ?
+        ORDER BY p.heure_arrivee DESC
+        LIMIT 1
+    ");
+    $stmt->execute([$employee_id, $date]);
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
     
+    if (!$result) {
+        return ['status' => 'absent', 'message' => 'Aucune présence enregistrée'];
+    }
+    
+    // Calculer le statut de présence
+    $heure_arrivee = new DateTime($result['heure_arrivee']);
+    $heure_prevue = new DateTime($date . ' ' . $result['heure_prevue_debut']);
+    
+    if ($heure_arrivee > $heure_prevue) {
+        $retard = $heure_arrivee->diff($heure_prevue);
+        $result['status'] = 'retard';
+        $result['retard_minutes'] = ($retard->h * 60) + $retard->i;
+        $result['message'] = 'En retard de ' . $result['retard_minutes'] . ' minutes';
+    } else {
+        $result['status'] = 'a_temps';
+        $result['message'] = 'À l\'heure';
+    }
+    
+    if ($result['heure_depart']) {
+        $result['status'] .= '_parti';
+        $result['message'] .= ' - Parti à ' . date('H:i', strtotime($result['heure_depart']));
+    } else {
+        $result['message'] .= ' - Encore au travail';
+    }
+    
+    return $result;
+}
+/**
+ * Récupère tous les employés avec leur statut de présence du jour
+ */
+public function getAllEmployeesWithPresenceStatus(): array {
+    try {
+        $stmt = $this->conn->query("
+            SELECT e.*, 
+                   p.nom as poste_nom,
+                   p.couleur as poste_couleur,
+                   p.salaire as poste_salaire,
+                   p.type_contrat,
+                   p.duree_contrat,
+                   p.niveau_hierarchique,
+                   p.competences_requises,
+                   p.avantages,
+                   p.code_paie,
+                   p.categorie_paie,
+                   p.regime_social,
+                   p.taux_cotisation,
+                   p.salaire_min,
+                   p.salaire_max,
+                   p.heures_travail as heures_par_mois,
+                   ps.nom as poste_superieur_nom,
+                   pr.heure_arrivee as presences_arrivee,
+                   pr.heure_depart as presences_depart,
+                   CASE 
+                       WHEN pr.heure_arrivee IS NULL THEN 'absent'
+                       WHEN pr.heure_depart IS NOT NULL THEN 'parti'
+                       WHEN TIME(pr.heure_arrivee) > e.heure_debut THEN 'retard'
+                       ELSE 'present'
+                   END as statut_presences,
+                   CASE 
+                       WHEN pr.heure_arrivee IS NOT NULL AND TIME(pr.heure_arrivee) > e.heure_debut 
+                       THEN TIMESTAMPDIFF(MINUTE, 
+                            CONCAT(DATE(pr.heure_arrivee), ' ', e.heure_debut), 
+                            pr.heure_arrivee)
+                       ELSE 0
+                   END as retard_minutes
+            FROM employes e 
+            LEFT JOIN postes p ON e.poste_id = p.id 
+            LEFT JOIN postes ps ON p.poste_superieur_id = ps.id 
+            LEFT JOIN presences pr ON e.id = pr.employe_id AND DATE(pr.heure_arrivee) = CURDATE()
+            WHERE e.statut = 'actif'
+            ORDER BY e.nom, e.prenom
+        ");
+        
+        $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        error_log("Employés avec statut de présence trouvés: " . count($result));
+        return $result;
+        
+    } catch (PDOException $e) {
+        error_log("Erreur SQL getAllEmployeesWithPresenceStatus: " . $e->getMessage());
+        return [];
+    }
+}
     //  Ajoute un nouvel employé
    
     public function addEmployee(array $data): array {
@@ -769,7 +906,17 @@ class APIHandler {
         $this->posteManager = new PosteManager($conn);
         $this->payrollManager = new PayrollManager($conn);
     }
-    
+    private function getEmployeesWithPresence(): void {
+    try {
+        $employees = $this->employeeManager->getAllEmployeesWithPresenceStatus();
+        echo json_encode(['success' => true, 'employees' => $employees]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => 'Erreur lors du chargement des employés avec présence']);
+    }
+}
+
+
+
     public function handleRequest(): void {
         $action = $_GET['action'] ?? $_POST['ajax_action'] ?? '';
         
@@ -805,6 +952,10 @@ class APIHandler {
             case 'generer_bulletin':
                 $this->genererBulletin();
                 break;
+                // Dans la fonction handleRequest, ajouter ce case
+case 'get_employees_with_presences':
+    $this->getEmployeesWithPresence();
+    break;
             case 'generer_tous_bulletins':
                 $this->genererTousBulletins();
                 break;
@@ -1054,56 +1205,86 @@ try {
     </nav>
 
     <!-- Statistiques Dashboard -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale">
-                <div class="flex items-center">
-                    <div class="p-3 rounded-full bg-blue-100 text-blue-600">
-                        <i class="fas fa-users text-xl"></i>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">Employés Actifs</p>
-                        <p class="text-2xl font-bold text-gray-900" id="totalActifs">0</p>
-                    </div>
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
+        <!-- Employés Actifs -->
+        <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-blue-100 text-blue-600">
+                    <i class="fas fa-users text-xl"></i>
                 </div>
-            </div>
-            
-            <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale">
-                <div class="flex items-center">
-                    <div class="p-3 rounded-full bg-green-100 text-green-600">
-                        <i class="fas fa-check-circle text-xl"></i>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">Présents Aujourd'hui</p>
-                        <p class="text-2xl font-bold text-gray-900" id="presentsAujourdhui">0</p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale">
-                <div class="flex items-center">
-                    <div class="p-3 rounded-full bg-orange-100 text-orange-600">
-                        <i class="fas fa-user-plus text-xl"></i>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">Nouveaux ce mois</p>
-                        <p class="text-2xl font-bold text-gray-900" id="nouveauxCeMois">0</p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale">
-                <div class="flex items-center">
-                    <div class="p-3 rounded-full bg-purple-100 text-purple-600">
-                        <i class="fas fa-crown text-xl"></i>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">Administrateurs</p>
-                        <p class="text-2xl font-bold text-gray-900" id="totalAdmins">0</p>
-                    </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">Employés Actifs</p>
+                    <p class="text-2xl font-bold text-gray-900" id="totalActifs">0</p>
                 </div>
             </div>
         </div>
+        
+        <!-- Présents Aujourd'hui -->
+        <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-green-100 text-green-600">
+                    <i class="fas fa-check-circle text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">Présents</p>
+                    <p class="text-2xl font-bold text-gray-900" id="presentsAujourdhui">0</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Absents -->
+        <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-red-100 text-red-600">
+                    <i class="fas fa-times-circle text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">Absents</p>
+                    <p class="text-2xl font-bold text-gray-900" id="absentsAujourdhui">0</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- En Retard -->
+        <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
+                    <i class="fas fa-clock text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">En Retard</p>
+                    <p class="text-2xl font-bold text-gray-900" id="retardsAujourdhui">0</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Encore au Travail -->
+        <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-purple-100 text-purple-600">
+                    <i class="fas fa-briefcase text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">Au Travail</p>
+                    <p class="text-2xl font-bold text-gray-900" id="encoreAuTravail">0</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Administrateurs -->
+        <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-orange-100 text-orange-600">
+                    <i class="fas fa-crown text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">Admins</p>
+                    <p class="text-2xl font-bold text-gray-900" id="totalAdmins">0</p>
+                </div>
+            </div>
+        </div>
+    </div>
 
         <!-- Filtres et Recherche -->
         <div class="bg-white rounded-lg shadow-md p-6 mb-6 card-shadow">
@@ -1188,7 +1369,7 @@ try {
         <div id="tableView" class="bg-white rounded-lg shadow-md overflow-hidden card-shadow">
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+                  <thead class="bg-gray-50">
     <tr>
         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Photo</th>
         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employé</th>
@@ -1196,6 +1377,7 @@ try {
         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contrat</th>
         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
+        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Présence</th>
         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salaire</th>
         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Heures/Mois</th>
         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -1445,18 +1627,21 @@ try {
         }
 
         function loadStatistics() {
-            fetch('?action=get_statistics')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        document.getElementById('totalActifs').textContent = data.statistics.total_actifs;
-                        document.getElementById('presentsAujourdhui').textContent = data.statistics.presents_aujourd_hui;
-                        document.getElementById('nouveauxCeMois').textContent = data.statistics.nouveaux_ce_mois;
-                        document.getElementById('totalAdmins').textContent = data.statistics.total_admins;
-                    }
-                })
-                .catch(error => console.error('Erreur:', error));
-        }
+    fetch('?action=get_statistics')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('totalActifs').textContent = data.statistics.total_actifs;
+                document.getElementById('presentsAujourdhui').textContent = data.statistics.presents_aujourd_hui;
+                document.getElementById('absentsAujourdhui').textContent = data.statistics.absents_aujourd_hui || 0;
+                document.getElementById('retardsAujourdhui').textContent = data.statistics.retards_aujourd_hui || 0;
+                document.getElementById('encoreAuTravail').textContent = data.statistics.encore_au_travail || 0;
+                document.getElementById('totalAdmins').textContent = data.statistics.total_admins;
+            }
+        })
+        .catch(error => console.error('Erreur:', error));
+}
+
 
         function loadPostes() {
             fetch('?action=get_postes')
@@ -1530,18 +1715,24 @@ try {
                 });
         }
 
-        function loadEmployees() {
-            fetch('?action=get_employees')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        employees = data.employees;
-                        displayEmployees(employees);
-                    }
-                })
-                .catch(error => console.error('Erreur:', error));
-        }
-        
+     function loadEmployees() {
+    fetch('?action=get_employees_with_presences')  // ✅ URL corrigée
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                employees = data.employees;
+                displayEmployees(employees);
+            } else {
+                console.error('Erreur serveur:', data.message);
+                showNotification('Erreur lors du chargement des employés', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            showNotification('Erreur de connexion lors du chargement des employés', 'error');
+        });
+}
+
         function displayEmployees(employeesList) {
             if (currentView === 'table') {
                 displayTableView(employeesList);
@@ -1560,9 +1751,38 @@ try {
             });
         }
 
-       function createEmployeeRow(employee) {
+      function createEmployeeRow(employee) {
     const row = document.createElement('tr');
     row.className = 'hover:bg-gray-50 fade-in';
+    
+    // Déterminer la couleur du statut de présence
+    let presenceClass = '';
+    let presenceText = '';
+    let presenceIcon = '';
+    
+    switch(employee.statut_presences) {
+        case 'present':
+            presenceClass = 'bg-green-100 text-green-800';
+            presenceText = 'Présent';
+            presenceIcon = 'fas fa-check-circle';
+            break;
+        case 'retard':
+            presenceClass = 'bg-yellow-100 text-yellow-800';
+            presenceText = `Retard (${employee.retard_minutes}min)`;
+            presenceIcon = 'fas fa-clock';
+            break;
+        case 'parti':
+            presenceClass = 'bg-blue-100 text-blue-800';
+            presenceText = 'Parti';
+            presenceIcon = 'fas fa-sign-out-alt';
+            break;
+        case 'absent':
+        default:
+            presenceClass = 'bg-red-100 text-red-800';
+            presenceText = 'Absent';
+            presenceIcon = 'fas fa-times-circle';
+            break;
+    }
     
     row.innerHTML = `
         <td class="px-6 py-4 whitespace-nowrap">
@@ -1602,12 +1822,18 @@ try {
                 ${getStatusText(employee.statut)}
             </span>
         </td>
+        <td class="px-6 py-4 whitespace-nowrap">
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${presenceClass}">
+                <i class="${presenceIcon} mr-1"></i>
+                ${presenceText}
+            </span>
+            ${employee.presences_arrivee ? `<div class="text-xs text-gray-500 mt-1">Arrivé: ${new Date(employee.presences_arrivee).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})}</div>` : ''}
+        </td>
         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
             ${employee.salaire ? formatSalaire(employee.salaire) + ' FCFA' : 'Non défini'}
             <div class="text-xs text-gray-500">${employee.heure_debut} - ${employee.heure_fin}</div>
         </td>
         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-            <!-- COLONNE HEURES depuis table heures_travail -->
             <div class="flex items-center">
                 <i class="fas fa-clock text-blue-500 mr-1"></i>
                 <span class="font-medium text-blue-600">${employee.heures_par_mois || '0'}h</span>
@@ -1624,6 +1850,9 @@ try {
                 </button>
                 <button onclick="generateBadge(${employee.id})" class="text-purple-600 hover:text-purple-900" title="Badge">
                     <i class="fas fa-qrcode"></i>
+                </button>
+                <button onclick="viewPresenceHistory(${employee.id})" class="text-orange-600 hover:text-orange-900" title="Historique présence">
+                    <i class="fas fa-calendar-check"></i>
                 </button>
                 <button onclick="deleteEmployee(${employee.id})" class="text-red-600 hover:text-red-900" title="Désactiver">
                     <i class="fas fa-user-slash"></i>

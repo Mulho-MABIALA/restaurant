@@ -148,13 +148,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
     <title>Badgeuse QR Code</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Version plus récente et CDN de backup -->
-    
-            <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <!-- Version html5-qrcode stable -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <style>
         #qr-reader {
-            width: 100%;
-            max-width: 400px;
+            width: 100% !important;
+            max-width: 600px;
             margin: 0 auto;
         }
         #qr-reader__dashboard_section_csr button {
@@ -162,6 +161,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
             color: white !important;
             border-radius: 8px !important;
             margin: 4px !important;
+        }
+        #qr-reader__scan_region {
+            border: 2px solid #4F46E5 !important;
         }
         .loading-spinner {
             border: 4px solid #f3f4f6;
@@ -175,6 +177,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+        }
+        .scanner-debug {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            font-size: 12px;
+            font-family: monospace;
         }
     </style>
 </head>
@@ -221,6 +231,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
                 </div>
                 
                 <div id="qr-reader" class="border-2 border-dashed border-gray-300 rounded-lg p-4"></div>
+                
+                <!-- Zone de debug -->
+                <div id="scannerDebug" class="scanner-debug" style="display: none;">
+                    <strong>Debug Scanner:</strong>
+                    <div id="debugMessages"></div>
+                </div>
                 
                 <div class="mt-4 text-center">
                     <button id="startScan" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium">
@@ -320,39 +336,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
     </form>
 
     <script>
-    let html5QrcodeScanner;
+    let html5QrcodeScanner = null;
     let currentMode = 'entree';
     let isScanning = false;
     let libraryLoaded = false;
+    let scanAttempts = 0;
 
-    // Fonction pour charger une bibliothèque de backup
-    function loadBackupQRLibrary() {
-        console.log('Chargement de la bibliothèque de backup...');
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js';
-        script.onload = function() {
-            console.log('Bibliothèque de backup chargée');
-            checkLibraryStatus();
-        };
-        script.onerror = function() {
-            console.log('Échec du chargement de la bibliothèque de backup');
-            showLibraryError();
-        };
-        document.head.appendChild(script);
+    // Fonction de debug
+    function debugLog(message) {
+        console.log('[QR Scanner]', message);
+        const debugDiv = document.getElementById('debugMessages');
+        if (debugDiv) {
+            debugDiv.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${message}</div>`;
+        }
     }
+
+    // Fonction pour activer le debug
+    function toggleDebug() {
+        const debugSection = document.getElementById('scannerDebug');
+        if (debugSection) {
+            debugSection.style.display = debugSection.style.display === 'none' ? 'block' : 'none';
+        }
+    }
+
+    // Double-cliquez sur le titre pour activer le debug
+    document.querySelector('h1').addEventListener('dblclick', toggleDebug);
 
     // Vérification du statut de la bibliothèque
     function checkLibraryStatus() {
-        console.log('=== VÉRIFICATION BIBLIOTHÈQUE ===');
-        console.log('Html5QrcodeScanner:', typeof Html5QrcodeScanner);
-        console.log('Html5Qrcode:', typeof Html5Qrcode);
+        debugLog('=== VÉRIFICATION BIBLIOTHÈQUE ===');
+        debugLog('Html5QrcodeScanner: ' + typeof Html5QrcodeScanner);
+        debugLog('Html5Qrcode: ' + typeof Html5Qrcode);
         
-        if (typeof Html5QrcodeScanner !== 'undefined' || typeof Html5Qrcode !== 'undefined') {
+        if (typeof Html5QrcodeScanner !== 'undefined' && typeof Html5Qrcode !== 'undefined') {
             libraryLoaded = true;
             showLibrarySuccess();
+            debugLog('✅ Bibliothèque chargée avec succès');
         } else {
-            showLibraryError();
+            debugLog('❌ Bibliothèque non chargée');
+            // Tentative de rechargement
+            if (scanAttempts < 3) {
+                scanAttempts++;
+                debugLog(`Tentative ${scanAttempts}/3 de rechargement...`);
+                setTimeout(() => {
+                    loadBackupQRLibrary();
+                }, 2000);
+            } else {
+                showLibraryError();
+            }
         }
+    }
+
+    // Fonction pour charger une bibliothèque de backup
+    function loadBackupQRLibrary() {
+        debugLog('Chargement de la bibliothèque de backup...');
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+        script.onload = function() {
+            debugLog('Bibliothèque de backup chargée');
+            setTimeout(checkLibraryStatus, 1000);
+        };
+        script.onerror = function() {
+            debugLog('Échec du chargement de la bibliothèque de backup');
+            showLibraryError();
+        };
+        document.head.appendChild(script);
     }
 
     function showLibrarySuccess() {
@@ -374,18 +422,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
 
     // Vérification initiale après chargement de la page
     window.addEventListener('load', function() {
-        setTimeout(checkLibraryStatus, 1000);
+        setTimeout(checkLibraryStatus, 1500);
     });
 
     // Gestion des modes entrée/sortie
     document.getElementById('entreeBtn').addEventListener('click', function() {
         currentMode = 'entree';
         updateModeUI();
+        debugLog('Mode changé: entrée');
     });
 
     document.getElementById('sortieBtn').addEventListener('click', function() {
         currentMode = 'sortie';
         updateModeUI();
+        debugLog('Mode changé: sortie');
     });
 
     function updateModeUI() {
@@ -409,26 +459,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
 
     // Gestion de la géolocalisation
     function getGeolocation(callback) {
+        debugLog('Demande de géolocalisation...');
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 position => {
                     const lat = position.coords.latitude.toFixed(6);
                     const lon = position.coords.longitude.toFixed(6);
+                    debugLog(`Géolocalisation obtenue: ${lat},${lon}`);
                     callback(`${lat},${lon}`);
                 },
                 error => {
-                    console.log('Géolocalisation non disponible:', error);
+                    debugLog('Géolocalisation non disponible: ' + error.message);
                     callback(null);
                 }
             );
         } else {
+            debugLog('Géolocalisation non supportée par le navigateur');
             callback(null);
         }
     }
 
-    // GESTION DU SCANNER QR AMÉLIORÉE
+    // GESTION DU SCANNER QR CORRIGÉE
     document.getElementById('startScan').addEventListener('click', function() {
-        console.log('=== DÉMARRAGE SCANNER ===');
+        debugLog('=== DÉMARRAGE SCANNER DEMANDÉ ===');
         
         if (!libraryLoaded) {
             alert('La bibliothèque QR Code n\'est pas chargée. Utilisez la saisie manuelle.');
@@ -436,7 +489,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
         }
         
         if (isScanning) {
-            console.log('Scanner déjà en cours');
+            debugLog('Scanner déjà en cours');
             return;
         }
         
@@ -444,23 +497,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
     });
 
     document.getElementById('stopScan').addEventListener('click', function() {
-        console.log('=== ARRÊT SCANNER ===');
-        if (isScanning) {
-            stopScanning();
-        }
+        debugLog('=== ARRÊT SCANNER DEMANDÉ ===');
+        stopScanning();
     });
 
     function startScanning() {
-        console.log('Démarrage du scanner...');
+        debugLog('Démarrage du scanner...');
         
         // Vérification finale de la bibliothèque
-        if (typeof Html5QrcodeScanner === 'undefined' && typeof Html5Qrcode === 'undefined') {
+        if (typeof Html5QrcodeScanner === 'undefined') {
+            debugLog('❌ Html5QrcodeScanner non défini');
             alert('Bibliothèque QR Code non disponible. Utilisez la saisie manuelle.');
             return;
         }
         
         // Test des permissions caméra
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            debugLog('❌ MediaDevices non supporté');
             alert('Votre navigateur ne supporte pas l\'accès à la caméra.');
             return;
         }
@@ -468,142 +521,173 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
         // Demander les permissions
         navigator.mediaDevices.getUserMedia({ video: true })
             .then(function(stream) {
-                console.log('Permissions caméra accordées');
+                debugLog('✅ Permissions caméra accordées');
+                // Arrêter le stream test
                 stream.getTracks().forEach(track => track.stop());
                 
-                document.getElementById('qr-reader').innerHTML = '';
+                // Nettoyer le conteneur
+                const qrReaderDiv = document.getElementById('qr-reader');
+                qrReaderDiv.innerHTML = '';
                 
+                // Callback de succès
                 const onScanSuccess = (decodedText, decodedResult) => {
-                    console.log(`QR Code détecté: ${decodedText}`);
+                    debugLog(`🎯 QR Code détecté: ${decodedText}`);
+                    debugLog('Résultat complet:', decodedResult);
+                    
+                    // Arrêter le scanner immédiatement
                     stopScanning();
                     
-                    getGeolocation(function(geoloc) {
-                        document.getElementById('scannedData').value = decodedText;
-                        document.getElementById('currentAction').value = currentMode;
-                        document.getElementById('autoGeoloc').value = geoloc || '';
-                        
-                        console.log('Soumission du formulaire automatique');
-                        document.getElementById('autoSubmitForm').submit();
-                    });
+                    // Traitement du code scanné
+                    processScannedCode(decodedText);
                 };
                 
+                // Callback d'échec (erreurs normales)
                 const onScanFailure = (error) => {
-                    // Erreur normale pendant le scan
+                    // Ne pas logger les erreurs normales de scan
+                    // debugLog('Erreur scan (normale): ' + error);
                 };
                 
                 try {
-                    if (typeof Html5QrcodeScanner !== 'undefined') {
-                        console.log('Utilisation de Html5QrcodeScanner');
-                        
-                        const config = { 
-                            fps: 10,
-                            qrbox: { width: 250, height: 250 },
-                            aspectRatio: 1.0
-                        };
-                        
-                        html5QrcodeScanner = new Html5QrcodeScanner("qr-reader", config);
-                        html5QrcodeScanner.render(onScanSuccess, onScanFailure);
-                        
-                        isScanning = true;
-                        document.getElementById('startScan').classList.add('hidden');
-                        document.getElementById('stopScan').classList.remove('hidden');
-                        
-                        console.log('Scanner démarré avec Html5QrcodeScanner');
-                        
-                    } else if (typeof Html5Qrcode !== 'undefined') {
-                        console.log('Utilisation de Html5Qrcode (fallback)');
-                        
-                        Html5Qrcode.getCameras().then(devices => {
-                            if (devices && devices.length) {
-                                const cameraId = devices[0].id;
-                                console.log('Caméra sélectionnée:', cameraId);
-                                
-                                const html5QrCode = new Html5Qrcode("qr-reader");
-                                html5QrCode.start(
-                                    cameraId,
-                                    { fps: 10, qrbox: { width: 250, height: 250 } },
-                                    onScanSuccess,
-                                    onScanFailure
-                                ).then(() => {
-                                    console.log('Scanner Html5Qrcode démarré');
-                                    html5QrcodeScanner = html5QrCode;
-                                    isScanning = true;
-                                    document.getElementById('startScan').classList.add('hidden');
-                                    document.getElementById('stopScan').classList.remove('hidden');
-                                }).catch(err => {
-                                    console.error('Erreur démarrage Html5Qrcode:', err);
-                                    alert('Erreur lors du démarrage de la caméra: ' + err);
-                                });
-                            } else {
-                                alert('Aucune caméra trouvée sur cet appareil.');
-                            }
-                        }).catch(err => {
-                            console.error('Erreur détection caméras:', err);
-                            alert('Erreur lors de la détection des caméras: ' + err);
-                        });
-                    }
+                    debugLog('Création de Html5QrcodeScanner...');
+                    
+                    const config = { 
+                        fps: 10,
+                        qrbox: { width: 300, height: 300 },
+                        aspectRatio: 1.0,
+                        disableFlip: false,
+                        rememberLastUsedCamera: true,
+                        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+                    };
+                    
+                    html5QrcodeScanner = new Html5QrcodeScanner("qr-reader", config, false);
+                    
+                    debugLog('Rendu du scanner...');
+                    html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+                    
+                    isScanning = true;
+                    document.getElementById('startScan').classList.add('hidden');
+                    document.getElementById('stopScan').classList.remove('hidden');
+                    
+                    debugLog('✅ Scanner démarré avec succès');
                     
                 } catch (error) {
-                    console.error('Erreur lors du démarrage:', error);
+                    debugLog('❌ Erreur lors du démarrage: ' + error.message);
+                    console.error('Erreur scanner:', error);
                     alert('Erreur lors du démarrage du scanner: ' + error.message);
                 }
                 
             })
             .catch(function(error) {
+                debugLog('❌ Erreur permissions caméra: ' + error.message);
                 console.error('Erreur permissions caméra:', error);
                 alert('Permission caméra refusée. Veuillez autoriser l\'accès à la caméra et rafraîchir la page.');
             });
     }
 
     function stopScanning() {
-        console.log('Arrêt du scanner...');
+        debugLog('Arrêt du scanner...');
         
         if (html5QrcodeScanner && isScanning) {
             try {
-                if (typeof html5QrcodeScanner.clear === 'function') {
-                    html5QrcodeScanner.clear().then(() => {
-                        console.log('Scanner arrêté (clear)');
-                    }).catch(err => {
-                        console.error('Erreur clear:', err);
-                    });
-                } else if (typeof html5QrcodeScanner.stop === 'function') {
-                    html5QrcodeScanner.stop().then(() => {
-                        console.log('Scanner arrêté (stop)');
-                    }).catch(err => {
-                        console.error('Erreur stop:', err);
-                    });
-                }
+                html5QrcodeScanner.clear().then(() => {
+                    debugLog('✅ Scanner arrêté proprement');
+                }).catch(err => {
+                    debugLog('⚠️ Erreur lors de l\'arrêt: ' + err);
+                    console.error('Erreur clear:', err);
+                });
             } catch (e) {
+                debugLog('❌ Exception lors de l\'arrêt: ' + e.message);
                 console.error('Erreur arrêt scanner:', e);
             }
+            
+            html5QrcodeScanner = null;
         }
         
         isScanning = false;
         document.getElementById('startScan').classList.remove('hidden');
         document.getElementById('stopScan').classList.add('hidden');
         
+        // Nettoyer l'interface
         setTimeout(() => {
             document.getElementById('qr-reader').innerHTML = '';
         }, 500);
+    }
+
+    // Nouvelle fonction pour traiter le code scanné
+    function processScannedCode(decodedText) {
+        debugLog('=== TRAITEMENT DU CODE SCANNÉ ===');
+        debugLog('Code brut: ' + decodedText);
+        debugLog('Type: ' + typeof decodedText);
+        debugLog('Longueur: ' + decodedText.length);
+        
+        // Test si c'est du JSON
+        try {
+            const jsonTest = JSON.parse(decodedText);
+            debugLog('JSON valide détecté:', jsonTest);
+        } catch (e) {
+            debugLog('Pas un JSON: ' + e.message);
+        }
+        
+        // Obtenir la géolocalisation et soumettre
+        getGeolocation(function(geoloc) {
+            debugLog('Géolocalisation pour envoi: ' + geoloc);
+            
+            // Remplir le formulaire caché
+            document.getElementById('scannedData').value = decodedText;
+            document.getElementById('currentAction').value = currentMode;
+            document.getElementById('autoGeoloc').value = geoloc || '';
+            
+            debugLog('Soumission du formulaire automatique...');
+            debugLog('- Données: ' + decodedText);
+            debugLog('- Action: ' + currentMode);
+            debugLog('- Géoloc: ' + (geoloc || 'non disponible'));
+            
+            // Afficher un message de traitement
+            const qrReaderDiv = document.getElementById('qr-reader');
+            qrReaderDiv.innerHTML = '<div class="text-center py-4"><div class="loading-spinner mb-2"></div><p>Traitement du code scanné...</p></div>';
+            
+            // Soumettre le formulaire
+            document.getElementById('autoSubmitForm').submit();
+        });
     }
 
     // GESTION DE LA SAISIE MANUELLE
     document.addEventListener('DOMContentLoaded', function() {
         const manualInput = document.getElementById('manualCodeInput');
         
+        // Limiter aux chiffres uniquement
         manualInput.addEventListener('input', function() {
             this.value = this.value.replace(/\D/g, '');
         });
         
+        // Obtenir la géolocalisation pour la saisie manuelle
         getGeolocation(function(geoloc) {
             if (geoloc) {
                 document.getElementById('manualGeoloc').value = geoloc;
+                debugLog('Géolocalisation définie pour saisie manuelle: ' + geoloc);
+            }
+        });
+        
+        // Focus automatique sur le champ de saisie
+        manualInput.focus();
+        
+        // Soumission rapide avec Entrée
+        manualInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (currentMode === 'entree') {
+                    document.getElementById('manualEntree').click();
+                } else {
+                    document.getElementById('manualSortie').click();
+                }
             }
         });
     });
 
     function validateManualCode() {
         const code = document.getElementById('manualCodeInput').value.trim();
+        
+        debugLog('Validation du code manuel: ' + code);
         
         if (code.length === 0) {
             alert('Veuillez saisir votre code employé');
@@ -615,22 +699,114 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
             return false;
         }
         
+        // Validation spécifique pour les codes à 8 chiffres
+        if (code.length === 8) {
+            debugLog('Code à 8 chiffres détecté: ' + code);
+        } else if (code.length <= 6) {
+            debugLog('ID employé détecté: ' + code);
+        } else {
+            alert('Le code doit faire 8 chiffres (code badge) ou être un ID employé (1-6 chiffres)');
+            return false;
+        }
+        
         return true;
     }
 
     document.getElementById('manualForm').addEventListener('submit', function(e) {
         if (!validateManualCode()) {
             e.preventDefault();
+        } else {
+            debugLog('Soumission formulaire manuel validée');
         }
+    });
+
+    // Gestion des erreurs de réseau
+    window.addEventListener('online', function() {
+        debugLog('🟢 Connexion réseau rétablie');
+    });
+
+    window.addEventListener('offline', function() {
+        debugLog('🔴 Connexion réseau perdue');
     });
 
     // Auto-refresh après pointage réussi
     <?php if ($pointage_success): ?>
+    debugLog('Pointage réussi - rechargement dans 3 secondes');
     setTimeout(function() {
-        console.log('Rechargement de la page après succès');
+        debugLog('Rechargement de la page après succès');
         window.location.reload();
     }, 3000);
     <?php endif; ?>
+
+    // Détection des formats de QR codes pour debug
+    function analyzeQRCode(data) {
+        debugLog('=== ANALYSE DU QR CODE ===');
+        
+        // Test format JSON
+        try {
+            const json = JSON.parse(data);
+            debugLog('Format JSON détecté:');
+            debugLog('- ID: ' + (json.id || 'non défini'));
+            debugLog('- Code numérique: ' + (json.code_numerique || 'non défini'));
+            debugLog('- Nom: ' + (json.nom || 'non défini'));
+            return 'json';
+        } catch (e) {
+            // Pas du JSON
+        }
+        
+        // Test format EMP_
+        if (data.startsWith('EMP_')) {
+            const id = data.substring(4);
+            debugLog('Format EMP_ détecté: ID=' + id);
+            return 'emp_legacy';
+        }
+        
+        // Test format numérique pur
+        if (/^\d+$/.test(data)) {
+            if (data.length === 8) {
+                debugLog('Code numérique à 8 chiffres détecté: ' + data);
+                return 'code_numerique';
+            } else {
+                debugLog('ID employé numérique détecté: ' + data);
+                return 'id_numerique';
+            }
+        }
+        
+        debugLog('Format non reconnu: ' + data);
+        return 'unknown';
+    }
+
+    // Test de la caméra au démarrage
+    function testCamera() {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => {
+                    debugLog('✅ Test caméra: OK');
+                    stream.getTracks().forEach(track => track.stop());
+                })
+                .catch(err => {
+                    debugLog('❌ Test caméra: ' + err.message);
+                });
+        } else {
+            debugLog('❌ API MediaDevices non disponible');
+        }
+    }
+
+    // Lancer le test de caméra
+    setTimeout(testCamera, 2000);
+
+    // Raccourci clavier pour activer/désactiver le debug
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+            e.preventDefault();
+            toggleDebug();
+        }
+    });
+
+    debugLog('🚀 Script initialisé - Version avec debug');
+    debugLog('Mode actuel: ' + currentMode);
+    debugLog('URL actuelle: ' + window.location.href);
+    debugLog('User Agent: ' + navigator.userAgent);
     </script>
 </body>
 </html>
