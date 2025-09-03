@@ -373,6 +373,22 @@ usort($allImages, function($a, $b) {
 $stmt = $conn->prepare('SELECT name FROM gallery_categories ORDER BY name');
 $stmt->execute();
 $allCategories = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+// Calculer les statistiques
+$totalImages = count($allImages);
+$totalCategories = count($allCategories);
+$dishImages = count($dishes);
+$normalImages = count($images);
+
+// Statistiques par catégorie
+$categoryStats = [];
+foreach ($allImages as $img) {
+    $cat = $img['category'];
+    if (!isset($categoryStats[$cat])) {
+        $categoryStats[$cat] = 0;
+    }
+    $categoryStats[$cat]++;
+}
 ?>
 
 <!doctype html>
@@ -380,76 +396,267 @@ $allCategories = $stmt->fetchAll(PDO::FETCH_COLUMN);
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Galerie — Admin</title>
+    <title>Restaurant Mulho - Galerie</title>
+    <link rel="icon" type="image/x-icon" href="../assets/img/logo.jpg">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-</head>
-<body class="bg-gray-100 font-sans antialiased">
-       <div class="flex h-screen overflow-hidden relative z-10">
-        <!-- Sidebar (préservé tel quel) -->
-        <?php include 'sidebar.php'; ?>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
         
-    <div class="flex-1 p-6 overflow-y-auto">
-        <div class="flex justify-between items-center mb-6">
-            <h1 class="text-2xl font-semibold">Galerie d'images</h1>
-            <div class="flex gap-2">
-                <button onclick="openCategoryModal()" class="bg-purple-600 text-white px-3 py-2 rounded hover:bg-purple-700">
-                    Gérer les catégories
-                </button>
-                <button onclick="openUploadModal()" class="bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700">
-                    Ajouter une image
-                </button>
-            </div>
-        </div>
-
-        <!-- Messages de notification -->
-        <div id="notification" class="hidden mb-4 p-3 rounded"></div>
-
-        <!-- Info sur la catégorie plats -->
-        <div class="bg-blue-50 border border-blue-200 text-blue-700 p-3 rounded mb-4">
-            <p><strong>Note :</strong> La catégorie "plats" affiche automatiquement les plats depuis votre gestion des plats. 
-            Pour modifier ou supprimer ces images, utilisez la page de gestion des plats.</p>
-        </div>
-
-        <!-- Grille des images -->
-        <div id="gallery-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <?php foreach($allImages as $img): ?>
-                <?php 
-                $isDish = isset($img['is_dish']) && $img['is_dish'];
-                $imageUrl = $isDish ? DISHES_UPLOAD_URL . htmlspecialchars($img['filename']) : UPLOAD_URL . htmlspecialchars($img['filename']);
-                $cardClass = $isDish ? 'bg-blue-50 border border-blue-200' : 'bg-white';
-                ?>
-                <div class="<?=$cardClass?> rounded shadow p-2 image-card" data-id="<?=$img['id']?>" data-is-dish="<?=$isDish ? 'true' : 'false'?>">
-                    <img src="<?=$imageUrl?>" alt="" class="w-full h-48 object-cover rounded mb-2">
-                    <div class="text-sm mb-2">
-                        <span class="font-medium">Titre:</span> 
-                        <span class="image-title"><?=htmlspecialchars($img['title'] ?: '-')?></span>
-                        <?php if ($isDish): ?>
-                            <span class="ml-2 text-xs bg-blue-600 text-white px-2 py-1 rounded">Plat</span>
-                        <?php endif; ?>
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .image-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.7) 100%);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+        
+        .image-card:hover .image-overlay {
+            opacity: 1;
+        }
+        
+        .image-card:hover .image-actions {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        
+        .image-actions {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 1rem;
+            transform: translateY(20px);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        
+        .stat-card-blue {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        
+        .stat-card-green {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        }
+        
+        .stat-card-purple {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        }
+        
+        .category-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .dish-badge {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        
+        .glass-effect {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.95);
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-50 to-gray-100 font-sans antialiased min-h-screen">
+    <div class="flex h-screen overflow-hidden relative z-10">
+        <?php include 'sidebar.php'; ?>   
+        
+        <div class="flex-1 p-6 overflow-y-auto">
+            <!-- Header avec gradient -->
+            <div class="gradient-bg rounded-xl p-6 mb-8 text-white">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-3xl font-bold mb-2">
+                            <i class="fas fa-images mr-3"></i>Galerie d'images
+                        </h1>
+                        <p class="text-gray-100 text-lg">Gérez vos images et créez une galerie attractive</p>
                     </div>
-                    <div class="text-xs text-gray-600 mb-2">
-                        <span class="font-medium">Catégorie:</span> 
-                        <span class="image-category font-semibold"><?=htmlspecialchars($img['category'])?></span>
-                    </div>
-                    <div class="flex gap-2">
-                        <?php if ($isDish): ?>
-                            <button onclick="alert('Pour modifier ce plat, utilisez la page de gestion des plats.')" 
-                                    class="flex-1 text-center border border-blue-500 text-blue-500 p-2 rounded hover:bg-blue-50">
-                                Voir dans gestion plats
-                            </button>
-                        <?php else: ?>
-                            <button onclick="openEditModal('<?=$img['id']?>', '<?=htmlspecialchars($img['title'], ENT_QUOTES)?>', '<?=htmlspecialchars($img['category'])?>')" 
-                                    class="flex-1 text-center border border-blue-500 text-blue-500 p-2 rounded hover:bg-blue-50">
-                                Modifier
-                            </button>
-                            <button onclick="deleteImage('<?=$img['id']?>')" 
-                                    class="bg-red-600 text-white px-3 py-2 rounded hover:bg-red-700">
-                                Supprimer
-                            </button>
-                        <?php endif; ?>
+                    <div class="flex gap-3">
+                        <button onclick="openCategoryModal()" class="bg-white bg-opacity-20 backdrop-blur-sm text-white px-4 py-3 rounded-xl hover:bg-opacity-30 transition-all duration-300 flex items-center gap-2">
+                            <i class="fas fa-tags"></i>
+                            Gérer les catégories
+                        </button>
+                        <button onclick="openUploadModal()" class="bg-white bg-opacity-20 backdrop-blur-sm text-white px-4 py-3 rounded-xl hover:bg-opacity-30 transition-all duration-300 flex items-center gap-2">
+                            <i class="fas fa-plus"></i>
+                            Ajouter une image
+                        </button>
                     </div>
                 </div>
-            <?php endforeach; ?>
+            </div>
+
+            <!-- Cartes de statistiques -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <!-- Total des images -->
+                <div class="stat-card text-white p-6 rounded-xl card-hover">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-white text-opacity-80 text-sm font-medium">Total Images</p>
+                            <p class="text-3xl font-bold"><?= $totalImages ?></p>
+                        </div>
+                        <div class="bg-white bg-opacity-20 p-3 rounded-full">
+                            <i class="fas fa-images text-2xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Images de plats -->
+                <div class="stat-card-blue text-white p-6 rounded-xl card-hover">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-white text-opacity-80 text-sm font-medium">Images de Plats</p>
+                            <p class="text-3xl font-bold"><?= $dishImages ?></p>
+                        </div>
+                        <div class="bg-white bg-opacity-20 p-3 rounded-full">
+                            <i class="fas fa-utensils text-2xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Images normales -->
+                <div class="stat-card-green text-white p-6 rounded-xl card-hover">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-white text-opacity-80 text-sm font-medium">Images Galerie</p>
+                            <p class="text-3xl font-bold"><?= $normalImages ?></p>
+                        </div>
+                        <div class="bg-white bg-opacity-20 p-3 rounded-full">
+                            <i class="fas fa-camera text-2xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Total catégories -->
+                <div class="stat-card-purple text-white p-6 rounded-xl card-hover">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-white text-opacity-80 text-sm font-medium">Catégories</p>
+                            <p class="text-3xl font-bold"><?= $totalCategories ?></p>
+                        </div>
+                        <div class="bg-white bg-opacity-20 p-3 rounded-full">
+                            <i class="fas fa-tags text-2xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Messages de notification -->
+            <div id="notification" class="hidden mb-6 p-4 rounded-xl"></div>
+
+            <!-- Info sur la catégorie plats avec design amélioré -->
+            <div class="glass-effect border border-blue-200 text-blue-800 p-4 rounded-xl mb-6 flex items-center gap-3">
+                <div class="bg-blue-100 p-2 rounded-full">
+                    <i class="fas fa-info-circle text-blue-600"></i>
+                </div>
+                <div>
+                    <p class="font-medium">Information importante</p>
+                    <p class="text-sm text-blue-600">La catégorie "plats" affiche automatiquement les plats depuis votre gestion des plats. Pour modifier ou supprimer ces images, utilisez la page de gestion des plats.</p>
+                </div>
+            </div>
+
+            <!-- Grille des images avec design amélioré -->
+            <div id="gallery-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <?php foreach($allImages as $img): ?>
+                    <?php 
+                    $isDish = isset($img['is_dish']) && $img['is_dish'];
+                    $imageUrl = $isDish ? DISHES_UPLOAD_URL . htmlspecialchars($img['filename']) : UPLOAD_URL . htmlspecialchars($img['filename']);
+                    $cardClass = $isDish ? 'border-l-4 border-blue-500' : 'border-l-4 border-green-500';
+                    ?>
+                    <div class="bg-white rounded-xl shadow-lg overflow-hidden card-hover image-card relative <?=$cardClass?>" data-id="<?=$img['id']?>" data-is-dish="<?=$isDish ? 'true' : 'false'?>">
+                        <!-- Image container -->
+                        <div class="relative overflow-hidden">
+                            <img src="<?=$imageUrl?>" alt="" class="w-full h-56 object-cover">
+                            <div class="image-overlay"></div>
+                            
+                            <!-- Badge catégorie -->
+                            <div class="absolute top-3 right-3">
+                                <?php if ($isDish): ?>
+                                    <span class="dish-badge text-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                                        <i class="fas fa-utensils"></i>
+                                        Plat
+                                    </span>
+                                <?php else: ?>
+                                    <span class="category-badge text-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                                        <i class="fas fa-tag"></i>
+                                        <?=htmlspecialchars($img['category'])?>
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                            
+                            <!-- Actions overlay -->
+                            <div class="image-actions">
+                                <div class="flex gap-2">
+                                    <?php if ($isDish): ?>
+                                        <button onclick="alert('Pour modifier ce plat, utilisez la page de gestion des plats.')" 
+                                                class="flex-1 bg-white bg-opacity-90 text-blue-600 py-2 px-3 rounded-lg hover:bg-opacity-100 transition-all duration-300 text-sm font-medium flex items-center justify-center gap-2">
+                                            <i class="fas fa-external-link-alt"></i>
+                                            Voir dans gestion
+                                        </button>
+                                    <?php else: ?>
+                                        <button onclick="openEditModal('<?=$img['id']?>', '<?=htmlspecialchars($img['title'], ENT_QUOTES)?>', '<?=htmlspecialchars($img['category'])?>')" 
+                                                class="flex-1 bg-white bg-opacity-90 text-blue-600 py-2 px-3 rounded-lg hover:bg-opacity-100 transition-all duration-300 text-sm font-medium flex items-center justify-center gap-2">
+                                            <i class="fas fa-edit"></i>
+                                            Modifier
+                                        </button>
+                                        <button onclick="deleteImage('<?=$img['id']?>')" 
+                                                class="bg-red-500 bg-opacity-90 text-white p-2 rounded-lg hover:bg-opacity-100 transition-all duration-300 flex items-center justify-center">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Contenu de la carte -->
+                        <div class="p-4">
+                            <div class="mb-2">
+                                <h3 class="font-semibold text-gray-800 text-lg image-title truncate">
+                                    <?=htmlspecialchars($img['title'] ?: 'Sans titre')?>
+                                </h3>
+                            </div>
+                            
+                            <div class="flex items-center justify-between text-sm text-gray-600">
+                                <span class="image-category font-medium"><?=htmlspecialchars($img['category'])?></span>
+                                <span class="text-xs">
+                                    <i class="fas fa-clock mr-1"></i>
+                                    <?= date('d/m/Y', strtotime($img['created_at'])) ?>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+            
+            <?php if (empty($allImages)): ?>
+                <div class="text-center py-16">
+                    <div class="bg-gray-100 rounded-full w-24 h-24 mx-auto mb-4 flex items-center justify-center">
+                        <i class="fas fa-images text-4xl text-gray-400"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-600 mb-2">Aucune image trouvée</h3>
+                    <p class="text-gray-500 mb-6">Commencez par ajouter votre première image à la galerie</p>
+                    <button onclick="openUploadModal()" class="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors duration-300 flex items-center gap-2 mx-auto">
+                        <i class="fas fa-plus"></i>
+                        Ajouter une image
+                    </button>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -568,8 +775,15 @@ $allCategories = $stmt->fetchAll(PDO::FETCH_COLUMN);
         // Gestion des notifications
         function showNotification(message, type = 'success') {
             const notification = document.getElementById('notification');
-            notification.className = `mb-4 p-3 rounded ${type === 'success' ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'}`;
-            notification.textContent = message;
+            notification.className = `mb-6 p-4 rounded-xl flex items-center gap-3 ${type === 'success' ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'}`;
+            
+            const icon = type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle';
+            notification.innerHTML = `
+                <div class="bg-${type === 'success' ? 'green' : 'red'}-100 p-2 rounded-full">
+                    <i class="${icon} text-${type === 'success' ? 'green' : 'red'}-600"></i>
+                </div>
+                <span>${message}</span>
+            `;
             notification.classList.remove('hidden');
             
             setTimeout(() => {
@@ -861,7 +1075,7 @@ $allCategories = $stmt->fetchAll(PDO::FETCH_COLUMN);
         function updateImageInGrid(image) {
             const card = document.querySelector(`[data-id="${image.id}"]`);
             if (card) {
-                card.querySelector('.image-title').textContent = image.title || '-';
+                card.querySelector('.image-title').textContent = image.title || 'Sans titre';
                 card.querySelector('.image-category').textContent = image.category;
                 
                 // Mettre à jour les boutons
@@ -875,34 +1089,58 @@ $allCategories = $stmt->fetchAll(PDO::FETCH_COLUMN);
         function removeImageFromGrid(id) {
             const card = document.querySelector(`[data-id="${id}"]`);
             if (card) {
-                card.remove();
+                card.style.transform = 'scale(0)';
+                card.style.opacity = '0';
+                setTimeout(() => card.remove(), 300);
             }
         }
 
         function createImageCard(image) {
-            const title = image.title ? image.title : '-';
+            const title = image.title ? image.title : 'Sans titre';
             const imageUrl = '../uploads/gallery/' + image.filename;
             
             return `
-                <div class="bg-white rounded shadow p-2 image-card" data-id="${image.id}" data-is-dish="false">
-                    <img src="${imageUrl}" alt="" class="w-full h-48 object-cover rounded mb-2">
-                    <div class="text-sm mb-2">
-                        <span class="font-medium">Titre:</span> 
-                        <span class="image-title">${title}</span>
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden card-hover image-card relative border-l-4 border-green-500" data-id="${image.id}" data-is-dish="false">
+                    <div class="relative overflow-hidden">
+                        <img src="${imageUrl}" alt="" class="w-full h-56 object-cover">
+                        <div class="image-overlay"></div>
+                        
+                        <div class="absolute top-3 right-3">
+                            <span class="category-badge text-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                                <i class="fas fa-tag"></i>
+                                ${image.category}
+                            </span>
+                        </div>
+                        
+                        <div class="image-actions">
+                            <div class="flex gap-2">
+                                <button onclick="openEditModal('${image.id}', '${title.replace(/'/g, "\\'")}', '${image.category}')" 
+                                        class="flex-1 bg-white bg-opacity-90 text-blue-600 py-2 px-3 rounded-lg hover:bg-opacity-100 transition-all duration-300 text-sm font-medium flex items-center justify-center gap-2">
+                                    <i class="fas fa-edit"></i>
+                                    Modifier
+                                </button>
+                                <button onclick="deleteImage('${image.id}')" 
+                                        class="bg-red-500 bg-opacity-90 text-white p-2 rounded-lg hover:bg-opacity-100 transition-all duration-300 flex items-center justify-center">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                    <div class="text-xs text-gray-600 mb-2">
-                        <span class="font-medium">Catégorie:</span> 
-                        <span class="image-category font-semibold">${image.category}</span>
-                    </div>
-                    <div class="flex gap-2">
-                        <button onclick="openEditModal('${image.id}', '${title.replace(/'/g, "\\'")}', '${image.category}')" 
-                                class="flex-1 text-center border border-blue-500 text-blue-500 p-2 rounded hover:bg-blue-50">
-                            Modifier
-                        </button>
-                        <button onclick="deleteImage('${image.id}')" 
-                                class="bg-red-600 text-white px-3 py-2 rounded hover:bg-red-700">
-                            Supprimer
-                        </button>
+                    
+                    <div class="p-4">
+                        <div class="mb-2">
+                            <h3 class="font-semibold text-gray-800 text-lg image-title truncate">
+                                ${title}
+                            </h3>
+                        </div>
+                        
+                        <div class="flex items-center justify-between text-sm text-gray-600">
+                            <span class="image-category font-medium">${image.category}</span>
+                            <span class="text-xs">
+                                <i class="fas fa-clock mr-1"></i>
+                                Nouveau
+                            </span>
+                        </div>
                     </div>
                 </div>
             `;

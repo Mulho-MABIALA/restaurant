@@ -3,7 +3,7 @@ require_once '../config.php';
 
 // Vérifier si l'ID de la catégorie est présent
 if (!isset($_GET['id'])) {
-    header("Location: gestion_categories.php");
+    header("Location: categories_plats.php");
     exit;
 }
 
@@ -16,7 +16,7 @@ $categorie = $stmt->fetch(PDO::FETCH_ASSOC);
 
 // Vérifier si la catégorie existe
 if (!$categorie) {
-    header("Location: gestion_categories.php?message=error:Catégorie introuvable");
+    header("Location: categories_plats.php?message=error:Catégorie introuvable");
     exit;
 }
 
@@ -90,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['modifier_categorie'])
                             <h1 class="text-2xl font-bold"><i class="fas fa-edit mr-2"></i>Modifier Catégorie</h1>
                             <p class="opacity-90">Modifiez les détails de cette catégorie</p>
                         </div>
-                        <a href="gestion_categories.php" class="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-colors">
+                        <a href="categories_plats.php" class="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-colors">
                             <i class="fas fa-arrow-left mr-2"></i>Retour
                         </a>
                     </div>
@@ -126,7 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['modifier_categorie'])
                                 <i class="fas fa-save mr-2"></i>Enregistrer les modifications
                             </button>
 
-                            <a href="gestion_categories.php" class="text-gray-600 hover:text-gray-800">
+                            <a href="categories_plats.php" class="text-gray-600 hover:text-gray-800">
                                 <i class="fas fa-times mr-1"></i>Annuler
                             </a>
                         </div>
@@ -148,7 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['modifier_categorie'])
                             </p>
                         </div>
                         
-                        <a href="gestion_categories.php?supprimer=<?= $id ?>" 
+                        <a href="categories_plats.php?supprimer=<?= $id ?>" 
                            onclick="return confirm('Êtes-vous sûr de vouloir supprimer définitivement cette catégorie ?');"
                            class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap">
                             <i class="fas fa-trash mr-2"></i>Supprimer

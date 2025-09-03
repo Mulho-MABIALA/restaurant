@@ -653,6 +653,10 @@ try {
                         <i class="fas fa-calendar-alt mr-3 w-5 text-sm"></i>
                         <span class="font-medium">Planification horaire</span>
                     </a>
+                    <a href="gestion_paie.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                        <i class="fas fa-briefcase mr-3 w-5 text-sm"></i>
+                        <span class="font-medium">Gestion paie</span>
+                    </a>
                 </div>
             </div>
                 <a href="admin_gestion.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">

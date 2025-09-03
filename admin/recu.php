@@ -7,12 +7,7 @@ error_reporting(E_ALL);
 session_start();
 require_once '../config.php';
 
-// Import PHPMailer - Vérifiez que ces fichiers existent
-require_once '../vendor/autoload.php'; // Si vous utilisez Composer
-// OU
-// require_once '../PHPMailer/src/PHPMailer.php';
-// require_once '../PHPMailer/src/SMTP.php';
-// require_once '../PHPMailer/src/Exception.php';
+require_once '../vendor/autoload.php'; 
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
@@ -35,7 +30,7 @@ function loadEnv($file = '.env') {
 
         list($name, $value) = explode('=', $line, 2);
         $name = trim($name);
-        $value = trim($value, " \t\n\r\0\x0B\"'"); // Enlever les guillemets
+        $value = trim($value, " \t\n\r\0\x0B\"'"); 
 
         $_ENV[$name] = $value;
         $_SERVER[$name] = $value;
@@ -386,7 +381,8 @@ foreach ($details as $detail) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Détails de la commande #<?= str_pad($commande_id, 6, '0', STR_PAD_LEFT) ?></title>
+    <title>restaurant Mulho #<?= str_pad($commande_id, 6, '0', STR_PAD_LEFT) ?></title>
+    <link rel="icon" type="image/x-icon" href="../assets/img/logo.jpg">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -639,15 +635,7 @@ foreach ($details as $detail) {
                 <button onclick="window.print()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-white transition shadow-sm">
                     <i class="fas fa-print mr-2"></i> Imprimer
                 </button>
-                <!-- Boutons de test -->
-                <button onclick="testEmail()" class="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 rounded-lg text-white transition shadow-sm">
-                    <i class="fas fa-flask mr-2"></i> Test Email
-                </button>
-                <?php if (isset($_GET['debug']) && $_GET['debug'] == '1'): ?>
-                <a href="test_email.php" target="_blank" class="px-5 py-2.5 bg-green-600 hover:bg-green-700 rounded-lg text-white transition shadow-sm">
-                    <i class="fas fa-external-link-alt mr-2"></i> Page Test
-                </a>
-                <?php endif; ?>
+               
             </div>
         </div>
     </div>
@@ -879,55 +867,6 @@ foreach ($details as $detail) {
                 showMessage('Une erreur est survenue: ' + error.message, 'error');
             });
         }
-
-        // Fonction de test email
-        function testEmail() {
-            console.log('🧪 Test d\'envoi d\'email...');
-            
-            const originalUrl = window.location.href;
-            const separator = originalUrl.includes('?') ? '&' : '?';
-            const testUrl = originalUrl + separator + 'test_email=1&t=' + Date.now(); // Cache busting
-            
-            fetch(testUrl, {
-                method: 'GET',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Cache-Control': 'no-cache'
-                }
-            })
-            .then(response => {
-                console.log('📧 Test response status:', response.status);
-                return response.json();
-            })
-            .then(data => {
-                console.log('📧 Résultat test email:', data);
-                showMessage(data.message || 'Test terminé', data.success ? 'success' : 'error');
-            })
-            .catch(error => {
-                console.error('❌ Erreur test email:', error);
-                showMessage('Erreur lors du test: ' + error.message, 'error');
-            });
-        }
-
-        // Debug au chargement avec informations étendues
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('🔧 Page chargée - Configuration SMTP:');
-            console.log('- Host: <?= $smtp_host ?>');
-            console.log('- Port: <?= $smtp_port ?>');
-            console.log('- Username: <?= $smtp_username ?>');
-            console.log('- .env chargé: <?= $env_loaded ? "✅ OUI" : "❌ NON" ?>');
-            
-            // Test automatique de connectivité
-            console.log('🌐 Test de connectivité...');
-            fetch('https://www.google.com/favicon.ico', { 
-                mode: 'no-cors',
-                method: 'HEAD'
-            }).then(() => {
-                console.log('✅ Connexion internet OK');
-            }).catch(() => {
-                console.log('❌ Problème de connexion internet');
-            });
-        });
     </script>
 </body>
 </html>

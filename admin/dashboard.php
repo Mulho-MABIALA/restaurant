@@ -176,7 +176,8 @@ if ($admin_id > 0) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tableau de bord - Administration</title>
+    <title>restaurant Mulho</title>
+    <link rel="icon" type="image/x-icon" href="../assets/img/logo.jpg">
     
     <!-- CSS Frameworks -->
     <script src="https://cdn.tailwindcss.com"></script>

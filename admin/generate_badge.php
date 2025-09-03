@@ -204,7 +204,8 @@ $has_duplicates = !empty($doublons);
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Génération des badges QR</title>
+    <title>restaurant Mulho</title>
+    <link rel="icon" type="image/x-icon" href="../assets/img/logo.jpg">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>

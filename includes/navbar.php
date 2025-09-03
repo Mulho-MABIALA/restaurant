@@ -2,9 +2,7 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mulho - Navbar Moderne</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script>
@@ -407,7 +405,7 @@ $nombreAnnonces = compterAnnoncesActives('site');
                     <a href="index.php" class="flex items-center space-x-2 group logo-container">
                         <div class="relative">
                             <div style="width:70px; height:70px; border-radius:12px; overflow:hidden; box-shadow:0 2px 6px rgba(0,0,0,0.2);">
-    <img src="assets/img/logo.jpg" alt="Logo Mulho" style="width:100%; height:100%; object-fit:cover; border-radius:12px;">
+                             <img src="assets/img/logo.jpg" alt="Logo Mulho" style="width:100%; height:100%; object-fit:cover; border-radius:100px;">
                                 <div class="logo-fallback">
                                     <span class="text-white font-bold text-sm sm:text-base lg:text-lg">M</span>
                                 </div>

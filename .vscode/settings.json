@@ -22,5 +22,8 @@
     "**/vendor/**",
     "**/.vscode/**"
   ],
-  "intelephense.environment.includePaths": ["${workspaceFolder}"]
+  "intelephense.environment.includePaths": ["${workspaceFolder}"],
+  "[php]": {
+    "editor.defaultFormatter": "kokororin.vscode-phpfmt"
+  }
 }

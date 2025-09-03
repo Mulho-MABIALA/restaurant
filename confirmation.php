@@ -79,7 +79,8 @@ if ($totalCommande == 0 && isset($_SESSION['panier']) && !empty($_SESSION['panie
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Commande confirmée - Reçu Impayé</title>
+    <title>restaurant Mulho</title>
+    <link rel="icon" type="image/x-icon" href="assets/img/logo.jpg">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {

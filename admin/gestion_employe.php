@@ -3,7 +3,7 @@ require_once '../config.php';
 require_once 'phpqrcode/qrlib.php';
 
 // GESTIONNAIRE D'EMPLOYÉS
-class EmployeeManager  // Correction: Ajout du mot-clé 'class'
+class EmployeeManager  
 {
     private $conn;
     
@@ -11,7 +11,7 @@ class EmployeeManager  // Correction: Ajout du mot-clé 'class'
         $this->conn = $connection;
     }
     
-    // Version corrigée de getAllEmployees
+    //getAllEmployees
   public function getAllEmployees(): array {
     try {
         $stmt = $this->conn->query("
@@ -1641,7 +1641,8 @@ try {
     <!-- gère l'encodage des caractères -->
     <meta charset="UTF-8"> 
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestion des Employés - Restaurant</title>
+    <title>restaurant Mulho</title>
+    <link rel="icon" type="image/x-icon" href="../assets/img/logo.jpg">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>

@@ -104,8 +104,8 @@ try {
             background: white;
             border-radius: 16px;
             padding: 24px;
-            border: 1px solid rgba(229, 231, 235, 0.4);
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 2px solid #e5e7eb;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
             overflow: hidden;
@@ -123,16 +123,17 @@ try {
         }
         
         .dashboard-card:hover {
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15), 0 4px 8px rgba(0, 0, 0, 0.1);
+            transform: translateY(-3px);
+            border-color: #d1d5db;
         }
         
-        .card-purple { --card-accent: #8b5cf6; }
-        .card-red { --card-accent: #ef4444; }
-        .card-blue { --card-accent: #3b82f6; }
-        .card-green { --card-accent: #10b981; }
-        .card-orange { --card-accent: #f59e0b; }
-        .card-cyan { --card-accent: #06b6d4; }
+        .card-purple { --card-accent: #8b5cf6; border-color: #c4b5fd; }
+        .card-red { --card-accent: #ef4444; border-color: #fca5a5; }
+        .card-blue { --card-accent: #3b82f6; border-color: #93c5fd; }
+        .card-green { --card-accent: #10b981; border-color: #6ee7b7; }
+        .card-orange { --card-accent: #f59e0b; border-color: #fbbf24; }
+        .card-cyan { --card-accent: #06b6d4; border-color: #67e8f9; }
         
         .action-btn {
             display: inline-flex;
@@ -232,6 +233,11 @@ try {
             }
         }
         
+        .table-modern {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        
         .table-modern tr {
             transition: all 0.2s ease;
         }
@@ -239,6 +245,70 @@ try {
         .table-modern tr:hover {
             background: rgba(249, 250, 251, 0.8);
         }
+        
+        .table-modern th {
+            border-bottom: 2px solid #e5e7eb;
+            border-right: 1px solid #e5e7eb;
+        }
+        
+        .table-modern th:last-child {
+            border-right: none;
+        }
+        
+        .table-modern td {
+            border-bottom: 1px solid #e5e7eb;
+            border-right: 1px solid #f3f4f6;
+        }
+        
+        .table-modern td:last-child {
+            border-right: none;
+        }
+        
+        .table-container {
+            border: 2px solid #e5e7eb;
+            border-radius: 16px;
+            overflow: hidden;
+        }
+        .number-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    color: white;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+    border: 2px solid #e5e7eb;
+    transition: all 0.2s ease;
+}
+
+.number-badge:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
+}
+
+.number-badge.alt-1 {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+}
+
+.number-badge.alt-2 {
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);
+}
+
+.number-badge.alt-3 {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
+}
+
+.number-badge.alt-4 {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+}
     </style>
 </head>
 
@@ -316,7 +386,7 @@ try {
                 </div>
 
                 <!-- Section filtres et actions -->
-                <div class="bg-white rounded-2xl p-6 mb-8 shadow-sm border border-gray-200">
+                <div class="bg-white rounded-2xl p-6 mb-8 shadow-sm border-2 border-gray-200">
                     <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
                         <!-- Filtres -->
                         <form method="get" class="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full lg:w-auto">
@@ -328,7 +398,7 @@ try {
                             </div>
                             
                             <div class="flex gap-3 w-full sm:w-auto">
-                                <select name="categorie" id="categorie" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white min-w-48">
+                                <select name="categorie" id="categorie" class="border-2 border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white min-w-48">
                                     <option value="">🍽️ Toutes les catégories</option>
                                     <?php foreach ($categories as $cat): ?>
                                         <option value="<?= $cat['id'] ?>" <?= ($cat['id'] == $filtreCategorie) ? 'selected' : '' ?>>
@@ -364,9 +434,9 @@ try {
                     </div>
                 </div>
 
-                <!-- Tableau moderne -->
-                <div class="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-200">
-                    <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                <!-- Tableau moderne avec bordures visibles -->
+                <div class="bg-white table-container shadow-lg">
+                    <div class="bg-gray-50 px-6 py-4 border-b-2 border-gray-200">
                         <h3 class="text-lg font-semibold text-gray-800 flex items-center">
                             <i class="fas fa-table mr-3 text-gray-600"></i>
                             Liste des plats
@@ -383,112 +453,128 @@ try {
                             <thead class="bg-gray-50">
                                 <tr>
                                     <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                        ID
+                                        <i class="fas fa-hashtag mr-2"></i>N°
                                     </th>
                                     <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                        Nom du plat
+                                        <i class="fas fa-utensils mr-2"></i>Nom du plat
                                     </th>
                                     <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                        Description
+                                        <i class="fas fa-align-left mr-2"></i>Description
                                     </th>
                                     <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                        Prix
+                                        <i class="fas fa-coins mr-2"></i>Prix
                                     </th>
                                     <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden sm:table-cell">
-                                        Catégorie
+                                        <i class="fas fa-tags mr-2"></i>Catégorie
                                     </th>
                                     <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden md:table-cell">
-                                        Image
+                                        <i class="fas fa-image mr-2"></i>Image
                                     </th>
                                     <th class="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                        Actions
+                                        <i class="fas fa-cogs mr-2"></i>Actions
                                     </th>
                                 </tr>
                             </thead>
                         
                             <tbody class="bg-white divide-y divide-gray-100">
-                                <?php if (!empty($plats)): ?>
-                                    <?php foreach ($plats as $index => $plat): ?>
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="text-gray-900 font-medium"><?= $plat['id'] ?></span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="font-semibold text-gray-900">
-                                                <?= htmlspecialchars($plat['nom']) ?>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4">
-                                            <div class="text-gray-600 text-sm max-w-xs truncate">
-                                                <?= htmlspecialchars($plat['description']) ?>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="font-semibold text-gray-900">
-                                                <?= number_format($plat['prix'], 0, ',', ' ') ?> FCFA
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                                            <span class="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-medium">
-                                                <?= htmlspecialchars($plat['categorie_nom'] ?? 'Non catégorisé') ?>
-                                            </span>
-                                        </td>
-                                    
-                                        <td class="px-6 py-4 whitespace-nowrap hidden md:table-cell">
-                                            <?php if (!empty($plat['image']) && file_exists('../uploads/' . $plat['image'])): ?>
-                                                <img src="../uploads/<?= htmlspecialchars($plat['image']) ?>" 
-                                                     class="h-12 w-12 rounded-lg object-cover" 
-                                                     alt="<?= htmlspecialchars($plat['nom']) ?>">
-                                            <?php else: ?>
-                                                <div class="h-12 w-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                                                    <i class="fas fa-image text-gray-400"></i>
-                                                </div>
-                                            <?php endif; ?>
-                                        </td>
+    <?php if (!empty($plats)): ?>
+        <?php foreach ($plats as $index => $plat): ?>
+        <?php 
+            $numeroLigne = $index + 1;
+            // Déterminer la classe de couleur basée sur le numéro
+            $colorClass = '';
+            switch($numeroLigne % 5) {
+                case 1: $colorClass = ''; break; // Bleu par défaut
+                case 2: $colorClass = 'alt-1'; break; // Vert
+                case 3: $colorClass = 'alt-2'; break; // Violet
+                case 4: $colorClass = 'alt-3'; break; // Orange
+                case 0: $colorClass = 'alt-4'; break; // Rouge
+            }
+        ?>
+        <tr>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="flex items-center justify-center">
+                    <div class="number-badge <?= $colorClass ?>">
+                        <?= $numeroLigne ?>
+                    </div>
+                </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="font-semibold text-gray-900">
+                    <?= htmlspecialchars($plat['nom']) ?>
+                </div>
+            </td>
+            <td class="px-6 py-4">
+                <div class="text-gray-600 text-sm max-w-xs truncate">
+                    <?= htmlspecialchars($plat['description']) ?>
+                </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <span class="font-semibold text-gray-900">
+                    <?= number_format($plat['prix'], 0, ',', ' ') ?> FCFA
+                </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                <span class="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-medium">
+                    <?= htmlspecialchars($plat['categorie_nom'] ?? 'Non catégorisé') ?>
+                </span>
+            </td>
+        
+            <td class="px-6 py-4 whitespace-nowrap hidden md:table-cell">
+                <?php if (!empty($plat['image']) && file_exists('../uploads/' . $plat['image'])): ?>
+                    <img src="../uploads/<?= htmlspecialchars($plat['image']) ?>" 
+                         class="h-12 w-12 rounded-lg object-cover border border-gray-200" 
+                         alt="<?= htmlspecialchars($plat['nom']) ?>">
+                <?php else: ?>
+                    <div class="h-12 w-12 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
+                        <i class="fas fa-image text-gray-400"></i>
+                    </div>
+                <?php endif; ?>
+            </td>
 
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="flex items-center justify-center gap-2">
-                                                <button onclick="openEditModal(<?= htmlspecialchars(json_encode($plat), ENT_QUOTES, 'UTF-8') ?>)"
-                                                       class="action-btn btn-edit">
-                                                    <i class="fas fa-edit"></i>
-                                                    <span class="hidden sm:inline">Modifier</span>
-                                                </button>
-                                                <button onclick="confirmDelete(<?= $plat['id'] ?>, '<?= addslashes($plat['nom']) ?>')" 
-                                                        class="action-btn btn-delete">
-                                                    <i class="fas fa-trash"></i>
-                                                    <span class="hidden sm:inline">Supprimer</span>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                <?php else: ?>
-                                    <tr>
-                                        <td colspan="7" class="text-center py-12">
-                                            <div class="flex flex-col items-center gap-4">
-                                                <div class="bg-gray-100 p-6 rounded-full">
-                                                    <i class="fas fa-utensils text-4xl text-gray-400"></i>
-                                                </div>
-                                                <div>
-                                                    <h3 class="text-xl font-semibold text-gray-600 mb-2">Aucun plat trouvé</h3>
-                                                    <p class="text-gray-500">
-                                                        <?php if($filtreCategorie): ?>
-                                                            Aucun plat n'est disponible dans cette catégorie.
-                                                        <?php else: ?>
-                                                            Commencez par ajouter votre premier plat.
-                                                        <?php endif; ?>
-                                                    </p>
-                                                </div>
-                                                <?php if(!$filtreCategorie): ?>
-                                                    <a href="ajouter_plat.php" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors">
-                                                        <i class="fas fa-plus mr-2"></i>Ajouter le premier plat
-                                                    </a>
-                                                <?php endif; ?>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                <?php endif; ?>
-                            </tbody>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="flex items-center justify-center gap-2">
+                    <button onclick="openEditModal(<?= htmlspecialchars(json_encode($plat), ENT_QUOTES, 'UTF-8') ?>)"
+                           class="action-btn btn-edit">
+                        <i class="fas fa-edit"></i>
+                        <span class="hidden sm:inline">Modifier</span>
+                    </button>
+                    <button onclick="confirmDelete(<?= $plat['id'] ?>, '<?= addslashes($plat['nom']) ?>')" 
+                            class="action-btn btn-delete">
+                        <i class="fas fa-trash"></i>
+                        <span class="hidden sm:inline">Supprimer</span>
+                    </button>
+                </div>
+            </td>
+        </tr>
+        <?php endforeach; ?>
+    <?php else: ?>
+        <tr>
+            <td colspan="7" class="text-center py-12">
+                <div class="flex flex-col items-center gap-4">
+                    <div class="bg-gray-100 p-6 rounded-full">
+                        <i class="fas fa-utensils text-4xl text-gray-400"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-semibold text-gray-600 mb-2">Aucun plat trouvé</h3>
+                        <p class="text-gray-500">
+                            <?php if($filtreCategorie): ?>
+                                Aucun plat n'est disponible dans cette catégorie.
+                            <?php else: ?>
+                                Commencez par ajouter votre premier plat.
+                            <?php endif; ?>
+                        </p>
+                    </div>
+                    <?php if(!$filtreCategorie): ?>
+                        <a href="ajouter_plat.php" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors">
+                            <i class="fas fa-plus mr-2"></i>Ajouter le premier plat
+                        </a>
+                    <?php endif; ?>
+                </div>
+            </td>
+        </tr>
+    <?php endif; ?>
+</tbody>
                         </table>
                     </div>
                 </div>
@@ -523,7 +609,7 @@ try {
                             Nom du plat
                         </label>
                         <input type="text" id="edit_nom" name="nom" required
-                               class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                               class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     </div>
 
                     <!-- Prix -->
@@ -532,7 +618,7 @@ try {
                             Prix (FCFA)
                         </label>
                         <input type="number" id="edit_prix" name="prix" step="0.01" required
-                               class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                               class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 focus:border-green-500">
                     </div>
 
                     <!-- Catégorie -->
@@ -541,7 +627,7 @@ try {
                             Catégorie
                         </label>
                         <select id="edit_categorie" name="categorie_id"
-                                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                                class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
                             <option value="">Sélectionner une catégorie</option>
                             <?php foreach ($categories as $cat): ?>
                                 <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['nom']) ?></option>
@@ -555,7 +641,7 @@ try {
                             Description
                         </label>
                         <textarea id="edit_description" name="description" rows="4"
-                                  class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"></textarea>
+                                  class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"></textarea>
                     </div>
 
                     <!-- Image actuelle -->
@@ -574,7 +660,7 @@ try {
                             Nouvelle image (optionnel)
                         </label>
                         <input type="file" id="edit_image" name="image" accept="image/*"
-                               class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-orange-500 focus:border-orange-500">
+                               class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-orange-500 focus:border-orange-500">
                         <p class="text-sm text-gray-500 mt-2">Laissez vide pour conserver l'image actuelle</p>
                     </div>
                 </div>
@@ -636,7 +722,7 @@ try {
                 imageContainer.innerHTML = `
                     <div class="relative inline-block">
                         <img src="../uploads/${plat.image}" 
-                             class="h-24 w-24 rounded-lg object-cover shadow-md border border-gray-200" 
+                             class="h-24 w-24 rounded-lg object-cover shadow-md border-2 border-gray-200" 
                              alt="${plat.nom}">
                         <div class="absolute -top-2 -right-2 bg-green-500 text-white p-1 rounded-full text-xs">
                             <i class="fas fa-check"></i>
@@ -645,7 +731,7 @@ try {
                 `;
             } else {
                 imageContainer.innerHTML = `
-                    <div class="h-24 w-24 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
+                    <div class="h-24 w-24 bg-gray-100 rounded-lg flex items-center justify-center border-2 border-gray-200">
                         <i class="fas fa-image text-gray-400 text-xl"></i>
                     </div>
                 `;
@@ -706,7 +792,7 @@ try {
                 
                 if (data.success) {
                     messagesDiv.innerHTML = `
-                        <div class="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg">
+                        <div class="bg-green-50 border-2 border-green-200 text-green-800 px-4 py-3 rounded-lg">
                             <div class="flex items-center">
                                 <i class="fas fa-check-circle mr-2"></i>
                                 <span>${data.message}</span>
@@ -721,7 +807,7 @@ try {
                     }, 1500);
                 } else {
                     messagesDiv.innerHTML = `
-                        <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
+                        <div class="bg-red-50 border-2 border-red-200 text-red-800 px-4 py-3 rounded-lg">
                             <div class="flex items-center">
                                 <i class="fas fa-exclamation-circle mr-2"></i>
                                 <span>${data.message}</span>
@@ -732,7 +818,7 @@ try {
             })
             .catch(error => {
                 document.getElementById('modal_messages').innerHTML = `
-                    <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
+                    <div class="bg-red-50 border-2 border-red-200 text-red-800 px-4 py-3 rounded-lg">
                         <div class="flex items-center">
                             <i class="fas fa-exclamation-triangle mr-2"></i>
                             <span>Une erreur est survenue lors de la modification.</span>
@@ -753,9 +839,9 @@ try {
             const modal = document.createElement('div');
             modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
             modal.innerHTML = `
-                <div class="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl transform scale-95 transition-all duration-300">
+                <div class="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl transform scale-95 transition-all duration-300 border-2 border-gray-200">
                     <div class="text-center">
-                        <div class="bg-red-100 p-4 rounded-2xl inline-block mb-4">
+                        <div class="bg-red-100 p-4 rounded-2xl inline-block mb-4 border-2 border-red-200">
                             <i class="fas fa-trash text-red-600 text-3xl"></i>
                         </div>
                         <h3 class="text-xl font-bold text-gray-900 mb-2">Confirmer la suppression</h3>
@@ -766,11 +852,11 @@ try {
                         </p>
                         <div class="flex gap-4">
                             <button onclick="this.closest('.fixed').remove()" 
-                                    class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 px-6 rounded-lg font-semibold transition-colors">
+                                    class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 px-6 rounded-lg font-semibold transition-colors border-2 border-gray-300">
                                 <i class="fas fa-times mr-2"></i>Annuler
                             </button>
                             <button onclick="window.location.href='supprimer_plat.php?id=${id}'" 
-                                    class="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 px-6 rounded-lg font-semibold transition-colors">
+                                    class="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 px-6 rounded-lg font-semibold transition-colors border-2 border-red-600">
                                 <i class="fas fa-trash mr-2"></i>Supprimer
                             </button>
                         </div>

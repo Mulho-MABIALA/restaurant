@@ -1,119 +1,119 @@
 <?php
-session_start();
-require_once __DIR__ . '/../vendor/autoload.php';
-require_once '../config.php';
+    session_start();
+    require_once __DIR__ . '/../vendor/autoload.php';
+    require_once '../config.php';
 
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+    error_reporting(E_ALL);
+    ini_set('display_errors', 1);
 
-// Rediriger si l'admin n'est pas connecté
-if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
-    header('Location: login.php');
-    exit;
-}
-
-// Initialisation CSRF
-if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
-
-// Pagination & filtres
-$search = $_GET['search'] ?? '';
-$date_filter = $_GET['date_filter'] ?? '';
-$personnes_filter = $_GET['personnes_filter'] ?? '';
-
-// Marquer toutes les réservations comme lues (optionnel)
-$conn->query("UPDATE reservations SET statut = 'lu' WHERE statut = 'non_lu'");
-
-// Suppression
-if (isset($_GET['delete'])) {
-    $id = (int) $_GET['delete'];
-    $stmt = $conn->prepare("DELETE FROM reservations WHERE id = ?");
-    $stmt->execute([$id]);
-    header("Location: reservations.php");
-    exit;
-}
-
-// Récupération du total global (sans filtre)
-$stmt_total_global = $conn->query("SELECT COUNT(*) AS total_global FROM reservations");
-$total_global = $stmt_total_global->fetch()['total_global'] ?? 0;
-
-// Construction de la requête
-// Dans la requête principale, ajouter le message :
-$query = "SELECT id, nom, email, telephone, personnes, date_reservation, 
-          heure_reservation, message, date_envoi, statut 
-          FROM reservations WHERE 1=1";
-$params = [];
-
-// Recherche
-if (!empty($search)) {
-    $query .= " AND (nom LIKE ? OR email LIKE ? OR telephone LIKE ?)";
-    $params[] = "%$search%";
-    $params[] = "%$search%";
-    $params[] = "%$search%";
-}
-
-// Filtre date
-if (!empty($date_filter)) {
-    $query .= " AND date_reservation = ?";
-    $params[] = $date_filter;
-}
-
-// Filtre nombre de personnes
-if (!empty($personnes_filter)) {
-    if ($personnes_filter === '1-2') {
-        $query .= " AND personnes BETWEEN 1 AND 2";
-    } elseif ($personnes_filter === '3-4') {
-        $query .= " AND personnes BETWEEN 3 AND 4";
-    } elseif ($personnes_filter === '5+') {
-        $query .= " AND personnes >= 5";
+    // Rediriger si l'admin n'est pas connecté
+    if (! isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+        header('Location: login.php');
+        exit;
     }
-}
 
-// Récupération paginée
-$queryWithLimit = $query . " ORDER BY date_envoi ASC, id ASC";
-$stmt = $conn->prepare($queryWithLimit);
-$stmt->execute($params);
-$reservations = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // Initialisation CSRF
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
 
-// Nouvelles réservations
-$stmt_nouvelles = $conn->query("SELECT COUNT(*) AS total FROM reservations WHERE statut = 'non_lu'");
-$data_nouvelles = $stmt_nouvelles->fetch();
-$nombre_nouvelles = $data_nouvelles['total'] ?? 0;
+    // Pagination & filtres
+    $search           = $_GET['search'] ?? '';
+    $date_filter      = $_GET['date_filter'] ?? '';
+    $personnes_filter = $_GET['personnes_filter'] ?? '';
 
-// Insertion manuelle (depuis admin ?)
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $nom = trim($_POST['nom'] ?? '');
-    $email = trim($_POST['email'] ?? '');
-    $telephone = trim($_POST['telephone'] ?? '');
-    $date_reservation = trim($_POST['date_reservation'] ?? '');
-    $heure_reservation = trim($_POST['heure_reservation'] ?? '');
-    $personnes = (int)($_POST['personnes'] ?? 1);
-    $message = trim($_POST['message'] ?? ''); // Ajouté
+    // Marquer toutes les réservations comme lues (optionnel)
+    $conn->query("UPDATE reservations SET statut = 'lu' WHERE statut = 'non_lu'");
 
-    if (!empty($nom) && !empty($email) && !empty($telephone) && 
-        !empty($date_reservation) && !empty($heure_reservation)) {
-        
-        // Requête complète avec tous les champs
-        $stmt = $conn->prepare("INSERT INTO reservations 
+    // Suppression
+    if (isset($_GET['delete'])) {
+        $id   = (int) $_GET['delete'];
+        $stmt = $conn->prepare("DELETE FROM reservations WHERE id = ?");
+        $stmt->execute([$id]);
+        header("Location: reservations.php");
+        exit;
+    }
+
+    // Récupération du total global (sans filtre)
+    $stmt_total_global = $conn->query("SELECT COUNT(*) AS total_global FROM reservations");
+    $total_global      = $stmt_total_global->fetch()['total_global'] ?? 0;
+
+    // Construction de la requête
+    // Dans la requête principale, ajouter le message :
+    $query = "SELECT id, nom, email, telephone, personnes, date_reservation,
+          heure_reservation, message, date_envoi, statut
+          FROM reservations WHERE 1=1";
+    $params = [];
+
+    // Recherche
+    if (! empty($search)) {
+        $query .= " AND (nom LIKE ? OR email LIKE ? OR telephone LIKE ?)";
+        $params[] = "%$search%";
+        $params[] = "%$search%";
+        $params[] = "%$search%";
+    }
+
+    // Filtre date
+    if (! empty($date_filter)) {
+        $query .= " AND date_reservation = ?";
+        $params[] = $date_filter;
+    }
+
+    // Filtre nombre de personnes
+    if (! empty($personnes_filter)) {
+        if ($personnes_filter === '1-2') {
+            $query .= " AND personnes BETWEEN 1 AND 2";
+        } elseif ($personnes_filter === '3-4') {
+            $query .= " AND personnes BETWEEN 3 AND 4";
+        } elseif ($personnes_filter === '5+') {
+            $query .= " AND personnes >= 5";
+        }
+    }
+
+    // Récupération paginée - MODIFIÉ : Tri par date_envoi DESC pour avoir les plus récentes en haut
+    $queryWithLimit = $query . " ORDER BY date_envoi DESC, id DESC";
+    $stmt           = $conn->prepare($queryWithLimit);
+    $stmt->execute($params);
+    $reservations = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Nouvelles réservations
+    $stmt_nouvelles   = $conn->query("SELECT COUNT(*) AS total FROM reservations WHERE statut = 'non_lu'");
+    $data_nouvelles   = $stmt_nouvelles->fetch();
+    $nombre_nouvelles = $data_nouvelles['total'] ?? 0;
+
+    // Insertion manuelle (depuis admin ?)
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $nom               = trim($_POST['nom'] ?? '');
+        $email             = trim($_POST['email'] ?? '');
+        $telephone         = trim($_POST['telephone'] ?? '');
+        $date_reservation  = trim($_POST['date_reservation'] ?? '');
+        $heure_reservation = trim($_POST['heure_reservation'] ?? '');
+        $personnes         = (int) ($_POST['personnes'] ?? 1);
+        $message           = trim($_POST['message'] ?? ''); // Ajouté
+
+        if (! empty($nom) && ! empty($email) && ! empty($telephone) &&
+            ! empty($date_reservation) && ! empty($heure_reservation)) {
+
+            // Requête complète avec tous les champs
+            $stmt = $conn->prepare("INSERT INTO reservations
             (nom, email, telephone, date_reservation, heure_reservation, personnes, message, statut, date_envoi)
             VALUES (?, ?, ?, ?, ?, ?, ?, 'non_lu', NOW())");
 
-        if ($stmt->execute([$nom, $email, $telephone, $date_reservation, $heure_reservation, $personnes, $message])) {
-            header("Location: reservations.php?success=1");
-            exit;
+            if ($stmt->execute([$nom, $email, $telephone, $date_reservation, $heure_reservation, $personnes, $message])) {
+                header("Location: reservations.php?success=1");
+                exit;
+            }
         }
     }
-}
-// Réservations aujourd'hui
-$aujourdhui = date('Y-m-d');
-$stmt_auj = $conn->prepare("SELECT COUNT(*) AS total FROM reservations WHERE date_reservation = ?");
-$stmt_auj->execute([$aujourdhui]);
-$reservations_aujourdhui = $stmt_auj->fetch()['total'] ?? 0;
+    // Réservations aujourd'hui
+    $aujourdhui = date('Y-m-d');
+    $stmt_auj   = $conn->prepare("SELECT COUNT(*) AS total FROM reservations WHERE date_reservation = ?");
+    $stmt_auj->execute([$aujourdhui]);
+    $reservations_aujourdhui = $stmt_auj->fetch()['total'] ?? 0;
 
-// Moyenne des personnes
-$stmt_moy = $conn->query("SELECT AVG(personnes) AS moyenne FROM reservations");
-$moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
+    // Moyenne des personnes
+    $stmt_moy          = $conn->query("SELECT AVG(personnes) AS moyenne FROM reservations");
+    $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
 ?>
 
 <!DOCTYPE html>
@@ -159,12 +159,12 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
 <body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 min-h-screen">
 
   <div class="flex h-screen overflow-hidden">
-    
+
     <?php include 'sidebar.php'; ?>
-    
+
 
     <div class="flex-1 overflow-y-auto">
-      
+
       <!-- Header Section -->
       <div class="bg-white shadow-sm border-b border-gray-200">
         <div class="px-8 py-6">
@@ -177,7 +177,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
             </div>
             <div class="flex items-center space-x-4">
               <div class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg">
-    <?= $total_global ?> réservations au total
+    <?php echo $total_global?> réservations au total
 </div>
             </div>
           </div>
@@ -185,7 +185,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
       </div>
 
       <div class="p-8">
-        
+
         <!-- Message de succès -->
         <?php if (isset($_GET['success']) && $_GET['success'] == 1): ?>
           <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4 mb-6 animate-fade-in">
@@ -204,7 +204,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
 
 <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
     <!-- Carte 1: Total réservations -->
-    <div class="bg-gradient-to-br from-blue-50 to-white rounded-2xl shadow-[0_10px_30px_-15px_rgba(0,0,0,0.1)] overflow-hidden border border-blue-100/70 transition-all duration-300 hover:shadow-[0_15px_40px_-10px_rgba(59,130,246,0.3)] hover:-translate-y-1 group">
+    <div class="bg-gradient-to-br from-blue-50 to-white rounded-2xl shadow-[0_10px_30px_-15px_rgba(0,0,0,0.1)] overflow-hidden border-2 border-blue-200 transition-all duration-300 hover:shadow-[0_15px_40px_-10px_rgba(59,130,246,0.3)] hover:-translate-y-1 group">
         <div class="p-6 relative z-10">
             <div class="flex justify-between items-start mb-4">
                 <div class="bg-blue-500/10 p-2.5 rounded-xl backdrop-blur-sm border border-blue-200">
@@ -216,10 +216,10 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
                     TOTAL
                 </div>
             </div>
-            
-            <div class="text-3xl font-bold text-blue-800 mb-1"><?= $total_global ?></div>
+
+            <div class="text-3xl font-bold text-blue-800 mb-1"><?php echo $total_global?></div>
             <div class="text-sm text-blue-600/80">Toutes les réservations</div>
-            
+
             <div class="absolute bottom-4 right-4 opacity-10 group-hover:opacity-20 transition-opacity">
                 <svg class="w-16 h-16 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
@@ -230,7 +230,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
     </div>
 
     <!-- Carte 2: Nouvelles réservations -->
-    <div class="bg-gradient-to-br from-emerald-50 to-white rounded-2xl shadow-[0_10px_30px_-15px_rgba(0,0,0,0.1)] overflow-hidden border border-emerald-100/70 transition-all duration-300 hover:shadow-[0_15px_40px_-10px_rgba(16,185,129,0.3)] hover:-translate-y-1 group">
+    <div class="bg-gradient-to-br from-emerald-50 to-white rounded-2xl shadow-[0_10px_30px_-15px_rgba(0,0,0,0.1)] overflow-hidden border-2 border-emerald-200 transition-all duration-300 hover:shadow-[0_15px_40px_-10px_rgba(16,185,129,0.3)] hover:-translate-y-1 group">
         <div class="p-6 relative z-10">
             <div class="flex justify-between items-start mb-4">
                 <div class="bg-emerald-500/10 p-2.5 rounded-xl backdrop-blur-sm border border-emerald-200">
@@ -242,10 +242,10 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
                     NOUVELLES
                 </div>
             </div>
-            
-            <div class="text-3xl font-bold text-emerald-800 mb-1"><?= $nombre_nouvelles ?></div>
+
+            <div class="text-3xl font-bold text-emerald-800 mb-1"><?php echo $nombre_nouvelles?></div>
             <div class="text-sm text-emerald-600/80">À traiter</div>
-            
+
             <div class="absolute bottom-4 right-4 opacity-10 group-hover:opacity-20 transition-opacity">
                 <svg class="w-16 h-16 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
@@ -256,7 +256,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
     </div>
 
     <!-- Carte 3: Aujourd'hui -->
-    <div class="bg-gradient-to-br from-amber-50 to-white rounded-2xl shadow-[0_10px_30px_-15px_rgba(0,0,0,0.1)] overflow-hidden border border-amber-100/70 transition-all duration-300 hover:shadow-[0_15px_40px_-10px_rgba(245,158,11,0.3)] hover:-translate-y-1 group">
+    <div class="bg-gradient-to-br from-amber-50 to-white rounded-2xl shadow-[0_10px_30px_-15px_rgba(0,0,0,0.1)] overflow-hidden border-2 border-amber-200 transition-all duration-300 hover:shadow-[0_15px_40px_-10px_rgba(245,158,11,0.3)] hover:-translate-y-1 group">
         <div class="p-6 relative z-10">
             <div class="flex justify-between items-start mb-4">
                 <div class="bg-amber-500/10 p-2.5 rounded-xl backdrop-blur-sm border border-amber-200">
@@ -268,10 +268,10 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
                     AUJOURD'HUI
                 </div>
             </div>
-            
-            <div class="text-3xl font-bold text-amber-800 mb-1"><?= $reservations_aujourdhui ?></div>
-            <div class="text-sm text-amber-600/80"><?= date('d M Y') ?></div>
-            
+
+            <div class="text-3xl font-bold text-amber-800 mb-1"><?php echo $reservations_aujourdhui?></div>
+            <div class="text-sm text-amber-600/80"><?php echo date('d M Y')?></div>
+
             <div class="absolute bottom-4 right-4 opacity-10 group-hover:opacity-20 transition-opacity">
                 <svg class="w-16 h-16 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
@@ -282,7 +282,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
     </div>
 
     <!-- Carte 4: Moyenne personnes -->
-    <div class="bg-gradient-to-br from-violet-50 to-white rounded-2xl shadow-[0_10px_30px_-15px_rgba(0,0,0,0.1)] overflow-hidden border border-violet-100/70 transition-all duration-300 hover:shadow-[0_15px_40px_-10px_rgba(139,92,246,0.3)] hover:-translate-y-1 group">
+    <div class="bg-gradient-to-br from-violet-50 to-white rounded-2xl shadow-[0_10px_30px_-15px_rgba(0,0,0,0.1)] overflow-hidden border-2 border-violet-200 transition-all duration-300 hover:shadow-[0_15px_40px_-10px_rgba(139,92,246,0.3)] hover:-translate-y-1 group">
         <div class="p-6 relative z-10">
             <div class="flex justify-between items-start mb-4">
                 <div class="bg-violet-500/10 p-2.5 rounded-xl backdrop-blur-sm border border-violet-200">
@@ -294,10 +294,10 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
                     MOYENNE
                 </div>
             </div>
-            
-            <div class="text-3xl font-bold text-violet-800 mb-1"><?= $moyenne_personnes ?></div>
+
+            <div class="text-3xl font-bold text-violet-800 mb-1"><?php echo $moyenne_personnes?></div>
             <div class="text-sm text-violet-600/80">Personnes par réservation</div>
-            
+
             <div class="absolute bottom-4 right-4 opacity-10 group-hover:opacity-20 transition-opacity">
                 <svg class="w-16 h-16 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
@@ -318,7 +318,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
             </div>
             <h2 class="text-xl font-semibold text-gray-800 ml-3">Filtres de recherche</h2>
           </div>
-          
+
           <form method="get" class="grid grid-cols-1 lg:grid-cols-4 gap-6 items-end">
             <!-- Recherche -->
             <div class="lg:col-span-2">
@@ -329,7 +329,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
                     <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/>
                   </svg>
                 </div>
-                <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" 
+                <input type="text" name="search" value="<?php echo htmlspecialchars($search)?>"
                        placeholder="Nom, email ou téléphone..."
                        class="pl-10 pr-4 py-3 border border-gray-300 rounded-xl w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-400">
               </div>
@@ -338,18 +338,18 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
             <!-- Filtre date -->
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Date de réservation</label>
-              <input type="date" name="date_filter" value="<?= $_GET['date_filter'] ?? '' ?>" 
+              <input type="date" name="date_filter" value="<?php echo $_GET['date_filter'] ?? ''?>"
                      class="px-4 py-3 border border-gray-300 rounded-xl w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-400">
             </div>
-            
+
             <!-- Filtre personnes -->
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Nombre de personnes</label>
               <select name="personnes_filter" class="px-4 py-3 border border-gray-300 rounded-xl w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-400">
                 <option value="">Toutes</option>
-                <option value="1-2" <?= ($_GET['personnes_filter'] ?? '') === '1-2' ? 'selected' : '' ?>>1-2 personnes</option>
-                <option value="3-4" <?= ($_GET['personnes_filter'] ?? '') === '3-4' ? 'selected' : '' ?>>3-4 personnes</option>
-                <option value="5+" <?= ($_GET['personnes_filter'] ?? '') === '5+' ? 'selected' : '' ?>>5+ personnes</option>
+                <option value="1-2" <?php echo ($_GET['personnes_filter'] ?? '') === '1-2' ? 'selected' : ''?>>1-2 personnes</option>
+                <option value="3-4" <?php echo ($_GET['personnes_filter'] ?? '') === '3-4' ? 'selected' : ''?>>3-4 personnes</option>
+                <option value="5+" <?php echo ($_GET['personnes_filter'] ?? '') === '5+' ? 'selected' : ''?>>5+ personnes</option>
               </select>
             </div>
 
@@ -361,115 +361,116 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
                 </svg>
                 Appliquer les filtres
               </button>
-              
+
               <button type="button" onclick="openModal()" class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-medium rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl">
                 <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
                   <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
                 </svg>
                 Nouvelle réservation
               </button>
-              <button type="button" onclick="exportToPDFAsync()" class="group inline-flex items-center px-6 py-3 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-medium rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl">
-    <svg class="w-4 h-4 mr-2 group-hover:animate-bounce" fill="currentColor" viewBox="0 0 20 20">
-        <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/>
-    </svg>
-    Exporter PDF
-</button>
             </div>
           </form>
         </div>
 
-        <!-- Tableau des réservations -->
-        <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-slide-up">
+        <!-- Tableau des réservations avec bordures visibles -->
+        <div class="bg-white rounded-2xl shadow-xl border-2 border-gray-200 overflow-hidden animate-slide-up">
           <div class="overflow-x-auto">
-            <table class="w-full">
+            <table class="w-full border-collapse">
              <thead>
-  <tr class="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+  <tr class="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-300">
+    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">
       <div class="flex items-center">
         <span class="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-        ID
+        N°
       </div>
     </th>
-    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Client</th>
-    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Contact</th>
-    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Réservation</th>
-    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Personnes</th>
-    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Message</th>
-    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Statut</th>
+    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Client</th>
+    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Contact</th>
+    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Réservation</th>
+    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Personnes</th>
+    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Message</th>
+    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Statut</th>
     <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
   </tr>
 </thead>
 
-              <tbody class="divide-y divide-gray-100">
-  <?php if (!empty($reservations) && is_array($reservations)): ?>
-    <?php foreach ($reservations as $index => $res): ?>
-      <tr class="hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 group">
-        <td class="px-6 py-4 whitespace-nowrap">
-          <div class="flex items-center">
-            <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-              <span class="text-white text-xs font-bold"><?= $index + 1 ?></span>
-            </div>
-          </div>
-        </td>
-        <td class="px-6 py-4 whitespace-nowrap">
-          <div class="flex items-center">
-            <div class="w-10 h-10 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center mr-3">
-              <span class="text-white font-bold text-sm"><?= strtoupper(substr(htmlspecialchars($res['nom'] ?? ''), 0, 1)) ?></span>
-            </div>
-            <div>
-              <div class="text-sm font-semibold text-gray-900"><?= htmlspecialchars($res['nom'] ?? '', ENT_QUOTES, 'UTF-8') ?></div>
-            </div>
-          </div>
-        </td>
-        <td class="px-6 py-4 whitespace-nowrap">
-          <div class="text-sm text-gray-900 font-medium"><?= htmlspecialchars($res['email'] ?? '', ENT_QUOTES, 'UTF-8') ?></div>
-          <div class="text-sm text-gray-500 flex items-center mt-1">
-            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/>
-            </svg>
-            <?= htmlspecialchars($res['telephone'] ?? '', ENT_QUOTES, 'UTF-8') ?>
-          </div>
-        </td>
-        <td class="px-6 py-4 whitespace-nowrap">
-          <div class="flex items-center">
-            <svg class="w-4 h-4 text-blue-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/>
-            </svg>
-            <div>
-              <div class="text-sm font-semibold text-gray-900"><?= htmlspecialchars($res['date_reservation'] ?? '', ENT_QUOTES, 'UTF-8') ?></div>
-              <div class="text-sm text-gray-500"><?= htmlspecialchars($res['heure_reservation'] ?? '', ENT_QUOTES, 'UTF-8') ?></div>
-            </div>
-          </div>
-        </td>
-        <td class="px-6 py-4 whitespace-nowrap">
-          <div class="flex items-center">
-            <div class="w-8 h-8 bg-gradient-to-r from-orange-400 to-red-500 rounded-full flex items-center justify-center mr-2">
-              <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
-              </svg>
-            </div>
-            <span class="text-sm font-bold text-gray-900"><?= htmlspecialchars($res['personnes'] ?? '', ENT_QUOTES, 'UTF-8') ?></span>
-          </div>
-        </td>
-        <!-- NOUVELLE COLONNE MESSAGE -->
-        <td class="px-6 py-4">
-          <div class="max-w-xs">
-            <?php if (!empty($res['message'])): ?>
-              <div class="flex items-start">
-                <svg class="w-4 h-4 text-blue-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd"/>
-                </svg>
-                <div class="text-sm text-gray-700 line-clamp-2">
-                  <?= htmlspecialchars(substr($res['message'], 0, 100) . (strlen($res['message']) > 100 ? '...' : ''), ENT_QUOTES, 'UTF-8') ?>
-                </div>
-              </div>
-              <?php if (strlen($res['message']) > 100): ?>
-                <button onclick="showFullMessage('<?= htmlspecialchars(addslashes($res['message']), ENT_QUOTES, 'UTF-8') ?>')" 
-                        class="text-xs text-blue-600 hover:text-blue-800 mt-1 font-medium">
-                  Voir plus
-                </button>
-              <?php endif; ?>
-            <?php else: ?>
+              <tbody class="divide-y-2 divide-gray-200">
+  <?php if (! empty($reservations) && is_array($reservations)): ?>
+<?php
+    // Calculer le numéro de départ basé sur le nombre total de réservations
+    $total_count = count($reservations);
+    foreach ($reservations as $index => $res):
+        // Le numéro commence par le total et décrémente pour chaque ligne
+        $numero = $total_count - $index;
+    ?>
+	  <tr class="hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 group border-b border-gray-200"
+	      data-reservation-id="<?php echo $res['id']?>">
+	    <td class="px-6 py-4 whitespace-nowrap border-r border-gray-200">
+	      <div class="flex items-center">
+	        <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+	          <span class="text-white text-xs font-bold"><?php echo $numero?></span>
+	        </div>
+	      </div>
+	    </td>
+	        <td class="px-6 py-4 whitespace-nowrap border-r border-gray-200">
+	          <div class="flex items-center">
+	            <div class="w-10 h-10 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center mr-3">
+	              <span class="text-white font-bold text-sm"><?php echo strtoupper(substr(htmlspecialchars($res['nom'] ?? ''), 0, 1))?></span>
+	            </div>
+	            <div>
+	              <div class="text-sm font-semibold text-gray-900"><?php echo htmlspecialchars($res['nom'] ?? '', ENT_QUOTES, 'UTF-8')?></div>
+	            </div>
+	          </div>
+	        </td>
+	        <td class="px-6 py-4 whitespace-nowrap border-r border-gray-200">
+	          <div class="text-sm text-gray-900 font-medium"><?php echo htmlspecialchars($res['email'] ?? '', ENT_QUOTES, 'UTF-8')?></div>
+	          <div class="text-sm text-gray-500 flex items-center mt-1">
+	            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+	              <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/>
+	            </svg>
+	            <?php echo htmlspecialchars($res['telephone'] ?? '', ENT_QUOTES, 'UTF-8')?>
+	          </div>
+	        </td>
+	        <td class="px-6 py-4 whitespace-nowrap border-r border-gray-200">
+	          <div class="flex items-center">
+	            <svg class="w-4 h-4 text-blue-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+	              <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/>
+	            </svg>
+	            <div>
+	              <div class="text-sm font-semibold text-gray-900"><?php echo htmlspecialchars($res['date_reservation'] ?? '', ENT_QUOTES, 'UTF-8')?></div>
+	              <div class="text-sm text-gray-500"><?php echo htmlspecialchars($res['heure_reservation'] ?? '', ENT_QUOTES, 'UTF-8')?></div>
+	            </div>
+	          </div>
+	        </td>
+	        <td class="px-6 py-4 whitespace-nowrap border-r border-gray-200">
+	          <div class="flex items-center">
+	            <div class="w-8 h-8 bg-gradient-to-r from-orange-400 to-red-500 rounded-full flex items-center justify-center mr-2">
+	              <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+	                <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
+	              </svg>
+	            </div>
+	            <span class="text-sm font-bold text-gray-900"><?php echo htmlspecialchars($res['personnes'] ?? '', ENT_QUOTES, 'UTF-8')?></span>
+	          </div>
+	        </td>
+	        <!-- NOUVELLE COLONNE MESSAGE -->
+	        <td class="px-6 py-4 border-r border-gray-200">
+	          <div class="max-w-xs">
+	            <?php if (! empty($res['message'])): ?>
+	              <div class="flex items-start">
+	                <svg class="w-4 h-4 text-blue-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+	                  <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd"/>
+	                </svg>
+	                <div class="text-sm text-gray-700 line-clamp-2">
+	                  <?php echo htmlspecialchars(substr($res['message'], 0, 100) . (strlen($res['message']) > 100 ? '...' : ''), ENT_QUOTES, 'UTF-8')?>
+	                </div>
+	              </div>
+	              <?php if (strlen($res['message']) > 100): ?>
+	                <button onclick="showFullMessage('<?php echo htmlspecialchars(addslashes($res['message']), ENT_QUOTES, 'UTF-8')?>')"
+	                        class="text-xs text-blue-600 hover:text-blue-800 mt-1 font-medium">
+	                  Voir plus
+	                </button>
+	              <?php endif; ?>
+<?php else: ?>
               <span class="text-xs text-gray-400 italic flex items-center">
                 <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                   <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
@@ -479,7 +480,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
             <?php endif; ?>
           </div>
         </td>
-        <td class="px-6 py-4 whitespace-nowrap">
+        <td class="px-6 py-4 whitespace-nowrap border-r border-gray-200">
           <?php if ($res['statut'] === 'non_lu'): ?>
             <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-amber-100 to-orange-100 text-amber-800 border border-amber-200">
               <svg class="w-3 h-3 mr-1 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
@@ -498,20 +499,20 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
         </td>
         <td class="px-6 py-4 whitespace-nowrap">
           <div class="flex space-x-2">
-            <button onclick="openViewModal(<?= $res['id'] ?>)" class="inline-flex items-center px-3 py-2 text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-all duration-200 hover:scale-105 border border-green-200">
+            <button onclick="openViewModal(<?php echo $res['id']?>)" class="inline-flex items-center px-3 py-2 text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-all duration-200 hover:scale-105 border border-green-200">
               <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
                 <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
               </svg>
               Voir
             </button>
-            <button onclick="openEditModal(<?= $res['id'] ?>)" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all duration-200 hover:scale-105 border border-blue-200">
+            <button onclick="openEditModal(<?php echo $res['id']?>)" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all duration-200 hover:scale-105 border border-blue-200">
               <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
               </svg>
               Modifier
             </button>
-            <a href="?delete=<?= $res['id'] ?>" onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette réservation ?')" class="inline-flex items-center px-3 py-2 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-all duration-200 hover:scale-105 border border-red-200">
+            <a href="?delete=<?php echo $res['id']?>" onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette réservation ?')" class="inline-flex items-center px-3 py-2 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-all duration-200 hover:scale-105 border border-red-200">
               <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" clip-rule="evenodd"/>
                 <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3l1.5 1.5a1 1 0 01-1.414 1.414L10 10.414V6a1 1 0 011-1z" clip-rule="evenodd"/>
@@ -523,7 +524,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
         </td>
       </tr>
     <?php endforeach; ?>
-  <?php else: ?>
+<?php else: ?>
     <tr>
       <td colspan="8" class="text-center py-12">
         <div class="flex flex-col items-center">
@@ -538,12 +539,6 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
   <?php endif; ?>
 </tbody>
             </table>
-          </div>
-
-          <!-- Pagination modernisée -->
-           
-             
-            </div>
           </div>
         </div>
       </div>
@@ -567,11 +562,11 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
             </svg>
           </button>
         </div>
-        
+
         <form method="POST" action="update_reservation.php" class="space-y-6">
           <input type="hidden" id="edit_id" name="id">
-          <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-          
+          <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']?>">
+
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label for="edit_nom" class="block text-sm font-semibold text-gray-700 mb-2">
@@ -582,10 +577,10 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
                   Nom complet *
                 </span>
               </label>
-              <input type="text" id="edit_nom" name="nom" required 
+              <input type="text" id="edit_nom" name="nom" required
                      class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-400">
             </div>
-            
+
             <div>
               <label for="edit_email" class="block text-sm font-semibold text-gray-700 mb-2">
                 <span class="flex items-center">
@@ -596,10 +591,10 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
                   Email *
                 </span>
               </label>
-              <input type="email" id="edit_email" name="email" required 
+              <input type="email" id="edit_email" name="email" required
                      class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-400">
             </div>
-            
+
             <div>
               <label for="edit_telephone" class="block text-sm font-semibold text-gray-700 mb-2">
                 <span class="flex items-center">
@@ -609,10 +604,10 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
                   Téléphone *
                 </span>
               </label>
-              <input type="tel" id="edit_telephone" name="telephone" required 
+              <input type="tel" id="edit_telephone" name="telephone" required
                      class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-400">
             </div>
-            
+
             <div>
               <label for="edit_personnes" class="block text-sm font-semibold text-gray-700 mb-2">
                 <span class="flex items-center">
@@ -622,7 +617,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
                   Nombre de personnes *
                 </span>
               </label>
-              <input type="number" id="edit_personnes" name="personnes" min="1" required 
+              <input type="number" id="edit_personnes" name="personnes" min="1" required
                      class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-400">
             </div>
             <div class="md:col-span-2">
@@ -634,8 +629,8 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
       Message du client
     </span>
   </label>
-  <textarea id="edit_message" name="message" rows="4" 
-           class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-400" 
+  <textarea id="edit_message" name="message" rows="4"
+           class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-400"
            placeholder="Message ou demandes spéciales du client..."></textarea>
 </div>
 
@@ -648,10 +643,10 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
                   Date *
                 </span>
               </label>
-              <input type="date" id="edit_date_reservation" name="date_reservation" required 
+              <input type="date" id="edit_date_reservation" name="date_reservation" required
                      class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-400">
             </div>
-            
+
             <div>
               <label for="edit_heure_reservation" class="block text-sm font-semibold text-gray-700 mb-2">
                 <span class="flex items-center">
@@ -661,17 +656,17 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
                   Heure *
                 </span>
               </label>
-              <input type="time" id="edit_heure_reservation" name="heure_reservation" required 
+              <input type="time" id="edit_heure_reservation" name="heure_reservation" required
                      class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-400">
             </div>
           </div>
-          
+
           <div class="flex justify-end space-x-4 pt-6 border-t border-gray-100">
-            <button type="button" onclick="closeEditModal()" 
+            <button type="button" onclick="closeEditModal()"
                     class="px-6 py-3 border border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-50 transition-all duration-200">
               Annuler
             </button>
-            <button type="submit" 
+            <button type="submit"
                     class="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl">
               Mettre à jour
             </button>
@@ -698,7 +693,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
             </svg>
           </button>
         </div>
-        
+
         <form method="POST" action="reservations.php" class="space-y-6">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -710,10 +705,10 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
                   Nom complet *
                 </span>
               </label>
-              <input type="text" id="nom" name="nom" required 
+              <input type="text" id="nom" name="nom" required
                      class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200 hover:border-gray-400">
             </div>
-            
+
             <div>
               <label for="email" class="block text-sm font-semibold text-gray-700 mb-2">
                 <span class="flex items-center">
@@ -724,10 +719,10 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
                   Email *
                 </span>
               </label>
-              <input type="email" id="email" name="email" required 
+              <input type="email" id="email" name="email" required
                      class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200 hover:border-gray-400">
             </div>
-            
+
             <div>
               <label for="telephone" class="block text-sm font-semibold text-gray-700 mb-2">
                 <span class="flex items-center">
@@ -737,10 +732,10 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
                   Téléphone *
                 </span>
               </label>
-              <input type="tel" id="telephone" name="telephone" required 
+              <input type="tel" id="telephone" name="telephone" required
                      class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200 hover:border-gray-400">
             </div>
-            
+
             <div>
               <label for="personnes" class="block text-sm font-semibold text-gray-700 mb-2">
                 <span class="flex items-center">
@@ -750,10 +745,10 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
                   Nombre de personnes *
                 </span>
               </label>
-              <input type="number" id="personnes" name="personnes" min="1" required 
+              <input type="number" id="personnes" name="personnes" min="1" required
                      class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200 hover:border-gray-400">
             </div>
-            
+
             <div>
               <label for="date_reservation" class="block text-sm font-semibold text-gray-700 mb-2">
                 <span class="flex items-center">
@@ -763,10 +758,10 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
                   Date *
                 </span>
               </label>
-              <input type="date" id="date_reservation" name="date_reservation" required 
+              <input type="date" id="date_reservation" name="date_reservation" required
                      class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200 hover:border-gray-400">
             </div>
-            
+
             <div>
               <label for="heure_reservation" class="block text-sm font-semibold text-gray-700 mb-2">
                 <span class="flex items-center">
@@ -776,7 +771,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
                   Heure *
                 </span>
               </label>
-              <input type="time" id="heure_reservation" name="heure_reservation" required 
+              <input type="time" id="heure_reservation" name="heure_reservation" required
                      class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200 hover:border-gray-400">
             </div>
           </div>
@@ -787,13 +782,13 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
   </label>
   <textarea id="message" name="message" class="px-4 py-3 border border-gray-300 rounded-xl w-full focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200 hover:border-gray-400"></textarea>
 </div>
-          
+
           <div class="flex justify-end space-x-4 pt-6 border-t border-gray-100">
-            <button type="button" onclick="closeModal()" 
+            <button type="button" onclick="closeModal()"
                     class="px-6 py-3 border border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-50 transition-all duration-200">
               Annuler
             </button>
-            <button type="submit" 
+            <button type="submit"
                     class="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-medium rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl">
               Enregistrer
             </button>
@@ -819,7 +814,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
           </svg>
         </button>
       </div>
-      
+
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <!-- Informations client -->
         <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
@@ -831,7 +826,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
             </div>
             <h4 class="text-lg font-semibold text-gray-800 ml-3">Informations Client</h4>
           </div>
-          
+
           <div class="space-y-4">
             <div class="flex items-center p-3 bg-white rounded-lg shadow-sm">
               <div class="w-10 h-10 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center mr-3">
@@ -842,7 +837,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
                 <p id="view_nom" class="text-sm font-semibold text-gray-900"></p>
               </div>
             </div>
-            
+
             <div class="flex items-center p-3 bg-white rounded-lg shadow-sm">
               <div class="w-10 h-10 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full flex items-center justify-center mr-3">
                 <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -855,7 +850,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
                 <p id="view_email" class="text-sm font-semibold text-gray-900"></p>
               </div>
             </div>
-            
+
             <div class="flex items-center p-3 bg-white rounded-lg shadow-sm">
               <div class="w-10 h-10 bg-gradient-to-r from-green-400 to-blue-500 rounded-full flex items-center justify-center mr-3">
                 <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -869,7 +864,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
             </div>
           </div>
         </div>
-        
+
         <!-- Informations réservation -->
         <div class="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-6 border border-emerald-100">
           <div class="flex items-center mb-4">
@@ -880,18 +875,18 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
             </div>
             <h4 class="text-lg font-semibold text-gray-800 ml-3">Détails Réservation</h4>
           </div>
-          
+
           <div class="space-y-4">
             <div class="flex items-center p-3 bg-white rounded-lg shadow-sm">
               <div class="w-10 h-10 bg-gradient-to-r from-purple-400 to-pink-500 rounded-full flex items-center justify-center mr-3">
                 <span id="view_id_display" class="text-white font-bold text-sm"></span>
               </div>
               <div>
-                <p class="text-xs text-gray-500 uppercase tracking-wide">ID Réservation</p>
-                <p id="view_id" class="text-sm font-semibold text-gray-900"></p>
+                  <p class="text-xs text-gray-500 uppercase tracking-wide">N° Réservation</p>
+                  <p id="view_id" class="text-sm font-semibold text-gray-900"></p>
               </div>
-            </div>
-            
+              </div>
+
             <div class="flex items-center p-3 bg-white rounded-lg shadow-sm">
               <div class="w-10 h-10 bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full flex items-center justify-center mr-3">
                 <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -903,7 +898,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
                 <p id="view_date_reservation" class="text-sm font-semibold text-gray-900"></p>
               </div>
             </div>
-            
+
             <div class="flex items-center p-3 bg-white rounded-lg shadow-sm">
               <div class="w-10 h-10 bg-gradient-to-r from-orange-400 to-red-500 rounded-full flex items-center justify-center mr-3">
                 <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -915,7 +910,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
                 <p id="view_heure_reservation" class="text-sm font-semibold text-gray-900"></p>
               </div>
             </div>
-            
+
             <div class="flex items-center p-3 bg-white rounded-lg shadow-sm">
               <div class="w-10 h-10 bg-gradient-to-r from-teal-400 to-cyan-500 rounded-full flex items-center justify-center mr-3">
                 <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -930,7 +925,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
           </div>
         </div>
       </div>
-      
+
       <!-- NOUVELLE SECTION MESSAGE -->
       <div class="mt-8 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-6 border border-amber-100">
         <div class="flex items-center mb-4">
@@ -941,14 +936,14 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
           </div>
           <h4 class="text-lg font-semibold text-gray-800 ml-3">Message du client</h4>
         </div>
-        
+
         <div class="bg-white rounded-lg p-4 shadow-sm min-h-[100px]">
           <div id="view_message_content">
             <!-- Le contenu du message sera injecté ici -->
           </div>
         </div>
       </div>
-      
+
       <!-- Informations système -->
       <div class="mt-8 bg-gradient-to-br from-gray-50 to-slate-50 rounded-xl p-6 border border-gray-100">
         <div class="flex items-center mb-4">
@@ -959,7 +954,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
           </div>
           <h4 class="text-lg font-semibold text-gray-800 ml-3">Informations Système</h4>
         </div>
-        
+
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div class="flex items-center p-3 bg-white rounded-lg shadow-sm">
             <div class="w-8 h-8 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mr-3">
@@ -972,7 +967,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
               <p id="view_statut" class="text-sm font-semibold text-gray-900"></p>
             </div>
           </div>
-          
+
           <div class="flex items-center p-3 bg-white rounded-lg shadow-sm">
             <div class="w-8 h-8 bg-gradient-to-r from-indigo-400 to-purple-500 rounded-full flex items-center justify-center mr-3">
               <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -984,7 +979,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
               <p id="view_date_envoi" class="text-sm font-semibold text-gray-900"></p>
             </div>
           </div>
-          
+
           <div class="flex items-center p-3 bg-white rounded-lg shadow-sm">
             <div class="w-8 h-8 bg-gradient-to-r from-pink-400 to-red-500 rounded-full flex items-center justify-center mr-3">
               <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -998,9 +993,9 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
           </div>
         </div>
       </div>
-      
+
       <div class="flex justify-end pt-6 border-t border-gray-100 mt-6">
-        <button onclick="closeViewModal()" 
+        <button onclick="closeViewModal()"
                 class="px-6 py-3 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-medium rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl">
           Fermer
         </button>
@@ -1020,11 +1015,11 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
       const today = new Date().toISOString().split('T')[0];
       document.getElementById('date_reservation').value = today;
     }
-    
+
     function closeModal() {
       document.getElementById('reservationModal').classList.add('hidden');
     }
-    
+
     document.getElementById('reservationModal').addEventListener('click', function(e) {
       if (e.target === this) {
         closeModal();
@@ -1043,10 +1038,10 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
       document.getElementById('edit_personnes').value = data.personnes;
       document.getElementById('edit_date_reservation').value = data.date_reservation;
       document.getElementById('edit_heure_reservation').value = data.heure_reservation;
-      
+
       // AJOUT : Récupération du message
       document.getElementById('edit_message').value = data.message || '';
-      
+
       document.getElementById('editReservationModal').classList.remove('hidden');
     })
     .catch(error => {
@@ -1087,7 +1082,7 @@ $moyenne_personnes = round($stmt_moy->fetch()['moyenne'] ?? 0, 1);
         </div>
       `;
       document.body.appendChild(toast);
-      
+
       setTimeout(() => {
         toast.style.transform = 'translateX(100%)';
         setTimeout(() => {
@@ -1103,8 +1098,13 @@ function openViewModal(reservationId) {
     .then(response => response.json())
     .then(data => {
       // Remplir les informations client
-      document.getElementById('view_id').textContent = data.id;
-      document.getElementById('view_id_display').textContent = data.id;
+    // Calculer le numéro de la réservation basé sur sa position dans le tableau
+const reservationRow = document.querySelector(`tr[data-reservation-id="${reservationId}"]`);
+const numeroElement = reservationRow.querySelector('td:first-child .text-white');
+const numeroReservation = numeroElement.textContent;
+
+      document.getElementById('view_id').textContent = numeroReservation;
+      document.getElementById('view_id_display').textContent = numeroReservation;
       document.getElementById('view_nom').textContent = data.nom;
       document.getElementById('view_nom_initial').textContent = data.nom.charAt(0).toUpperCase();
       document.getElementById('view_email').textContent = data.email;
@@ -1112,7 +1112,7 @@ function openViewModal(reservationId) {
       document.getElementById('view_personnes').textContent = data.personnes;
       document.getElementById('view_date_reservation').textContent = formatDate(data.date_reservation);
       document.getElementById('view_heure_reservation').textContent = data.heure_reservation || 'Non spécifiée';
-      
+
       // GESTION DU MESSAGE
       const messageContent = document.getElementById('view_message_content');
       if (data.message && data.message.trim() !== '') {
@@ -1134,7 +1134,7 @@ function openViewModal(reservationId) {
           </div>
         `;
       }
-      
+
       // Statut avec formatage
       const statutElement = document.getElementById('view_statut');
       if (data.statut === 'non_lu') {
@@ -1142,10 +1142,10 @@ function openViewModal(reservationId) {
       } else {
         statutElement.innerHTML = '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">✅ Lu</span>';
       }
-      
+
       // Date d'envoi formatée
       document.getElementById('view_date_envoi').textContent = formatDateTime(data.date_envoi);
-      
+
       document.getElementById('viewReservationModal').classList.remove('hidden');
     })
     .catch(error => {
@@ -1205,98 +1205,34 @@ function formatDateTime(dateString) {
 async function exportToPDFAsync() {
     try {
         showLoadingIndicator();
-        
-        // Construire l'URL avec les paramètres de filtrage actuels
-        const urlParams = new URLSearchParams();
-        
-        // Récupérer les valeurs des filtres
-        const search = document.querySelector('input[name="search"]')?.value || '';
-        const dateFilter = document.querySelector('input[name="date_filter"]')?.value || '';
-        const personnesFilter = document.querySelector('select[name="personnes_filter"]')?.value || '';
-        
-        // Ajouter les paramètres non vides
-        if (search) urlParams.append('search', search);
-        if (dateFilter) urlParams.append('date_filter', dateFilter);
-        if (personnesFilter) urlParams.append('personnes_filter', personnesFilter);
-        urlParams.append('format', 'pdf');
-        
+
+        // Construire l'URL avec les paramètres
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.set('format', 'pdf'); // S'assurer que format=pdf est présent
+
         const exportUrl = 'export_reservations.php?' + urlParams.toString();
-        
-        // Première méthode : Fetch API
-        try {
-            const response = await fetch(exportUrl, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/pdf'
-                }
-            });
-            
-            if (!response.ok) {
-                // Lire la réponse d'erreur
-                const errorText = await response.text();
-                console.error('Erreur serveur:', errorText);
-                
-                // Essayer de parser en JSON si possible
-                try {
-                    const errorJson = JSON.parse(errorText);
-                    throw new Error(errorJson.message || `Erreur HTTP: ${response.status}`);
-                } catch {
-                    throw new Error(`Erreur HTTP: ${response.status} - ${errorText}`);
-                }
+        console.log('URL d\'export:', exportUrl); // Debug
+
+        // Méthode iframe (plus fiable pour les téléchargements)
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = exportUrl;
+
+        document.body.appendChild(iframe);
+
+        // Nettoyer après délai
+        setTimeout(() => {
+            if (iframe.parentNode) {
+                document.body.removeChild(iframe);
             }
-            
-            // Vérifier le type de contenu
-            const contentType = response.headers.get('content-type');
-            console.log('Content-Type reçu:', contentType);
-            
-            if (!contentType || !contentType.includes('application/pdf')) {
-                const errorText = await response.text();
-                console.error('Réponse non-PDF:', errorText);
-                throw new Error('Le serveur n\'a pas retourné un PDF valide');
-            }
-            
-            const blob = await response.blob();
-            
-            // Vérifier que le blob n'est pas vide
-            if (blob.size === 0) {
-                throw new Error('Le fichier PDF généré est vide');
-            }
-            
-            // Créer le lien de téléchargement
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `reservations_${new Date().toISOString().split('T')[0]}.pdf`;
-            link.style.display = 'none';
-            
-            // Déclencher le téléchargement
-            document.body.appendChild(link);
-            link.click();
-            
-            // Nettoyer
-            setTimeout(() => {
-                document.body.removeChild(link);
-                window.URL.revokeObjectURL(url);
-            }, 100);
-            
             hideLoadingIndicator();
-            showSuccessMessage('PDF exporté avec succès !');
-            
-        } catch (fetchError) {
-            console.error('Erreur fetch:', fetchError);
-            
-            // Méthode de fallback : ouverture directe
-            console.log('Tentative de fallback avec ouverture directe...');
-            fallbackDownload(exportUrl);
-            
-            hideLoadingIndicator();
-            showSuccessMessage('Téléchargement lancé (méthode alternative)');
-        }
-        
+            showSuccessMessage('Export PDF lancé...');
+        }, 3000);
+
     } catch (error) {
-        console.error('Erreur générale lors de l\'export:', error);
+        console.error('Erreur export:', error);
         hideLoadingIndicator();
-        showErrorMessage(`Erreur lors de l'export du PDF: ${error.message}`);
+        showErrorMessage('Erreur lors de l\'export: ' + error.message);
     }
 }
 
@@ -1307,76 +1243,18 @@ function fallbackDownload(url) {
     link.download = `reservations_${new Date().toISOString().split('T')[0]}.pdf`;
     link.target = '_blank';
     link.style.display = 'none';
-    
+
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 }
 
-// Version encore plus simple pour test
-function exportToPDFSimple() {
-    showLoadingIndicator();
-    
-    // Construire l'URL avec les filtres actuels
-    const urlParams = new URLSearchParams(window.location.search);
-    urlParams.append('format', 'pdf');
-    
-    // Créer un iframe caché pour le téléchargement
-    const iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    iframe.src = 'export_reservations.php?' + urlParams.toString();
-    
-    document.body.appendChild(iframe);
-    
-    // Nettoyer après un délai
-    setTimeout(() => {
-        document.body.removeChild(iframe);
-        hideLoadingIndicator();
-        showSuccessMessage('Téléchargement du PDF lancé...');
-    }, 2000);
-}
 
-// Fonction de diagnostic
-async function debugExport() {
-    try {
-        // Test 1: Connectivité
-        console.log('=== Test de connectivité ===');
-        const testResponse = await fetch('export_reservations.php?test=1');
-        const testResult = await testResponse.text();
-        console.log('Test endpoint:', testResult);
-        
-        // Test 2: Headers de la page actuelle
-        console.log('=== Headers de la page ===');
-        console.log('URL actuelle:', window.location.href);
-        console.log('Paramètres URL:', new URLSearchParams(window.location.search).toString());
-        
-        // Test 3: Valeurs des filtres
-        console.log('=== Valeurs des filtres ===');
-        console.log('Search:', document.querySelector('input[name="search"]')?.value);
-        console.log('Date:', document.querySelector('input[name="date_filter"]')?.value);
-        console.log('Personnes:', document.querySelector('select[name="personnes_filter"]')?.value);
-        
-        // Test 4: Tentative d'export minimal
-        console.log('=== Test export minimal ===');
-        const minimalUrl = 'export_reservations.php?format=pdf';
-        const minimalResponse = await fetch(minimalUrl);
-        console.log('Status:', minimalResponse.status);
-        console.log('Content-Type:', minimalResponse.headers.get('content-type'));
-        
-        if (!minimalResponse.ok) {
-            const errorText = await minimalResponse.text();
-            console.error('Erreur export minimal:', errorText);
-        }
-        
-    } catch (error) {
-        console.error('Erreur diagnostic:', error);
-    }
-}
 
 // Fonctions utilitaires (à ajouter si manquantes)
 function showLoadingIndicator() {
     if (document.getElementById('loadingIndicator')) return;
-    
+
     const indicator = document.createElement('div');
     indicator.id = 'loadingIndicator';
     indicator.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
@@ -1409,14 +1287,14 @@ function showErrorMessage(message) {
 function showMessage(message, type) {
     const toast = document.createElement('div');
     const bgColor = type === 'success' ? 'from-green-600 to-emerald-600' : 'from-red-600 to-rose-600';
-    const icon = type === 'success' ? 
+    const icon = type === 'success' ?
         `<svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 20 20">
             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
         </svg>` :
         `<svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 20 20">
             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
         </svg>`;
-    
+
     toast.className = `fixed bottom-4 right-4 bg-gradient-to-r ${bgColor} text-white px-6 py-4 rounded-xl shadow-2xl transform transition-all duration-300 animate-slide-up z-50`;
     toast.innerHTML = `
         <div class="flex items-center">
@@ -1424,9 +1302,9 @@ function showMessage(message, type) {
             <span class="font-medium">${message}</span>
         </div>
     `;
-    
+
     document.body.appendChild(toast);
-    
+
     setTimeout(() => {
         toast.style.transform = 'translateX(100%)';
         setTimeout(() => {

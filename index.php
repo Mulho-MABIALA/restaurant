@@ -30,10 +30,7 @@ try {
     <title>Restaurant Mulho</title>
     <meta name="description" content="Restaurant Mulho - Découvrez nos plats de qualité">
     <meta name="keywords" content="restaurant, mulho, dakar, senegal">
-    
-    <!-- Favicons -->
-    <link href="assets/img/favicon.png" rel="icon">
-    <link href="assets/img/apple-touch-icon.png" rel="apple-touch-icon">
+    <link rel="icon" type="image/x-icon" href="assets/img/logo.jpg">
     
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com" rel="preconnect">

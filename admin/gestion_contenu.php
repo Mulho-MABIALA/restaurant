@@ -1,5 +1,5 @@
 <?php
-require_once '../config.php'; // Connexion PDO
+require_once '../config.php'; 
 session_start();
 
 $id_page = 1;
