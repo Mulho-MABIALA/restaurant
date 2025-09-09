@@ -202,17 +202,38 @@ desactiverAnnoncesExpirees();
         }
 
         body {
-            background: #ffffff;
+            background: #f8f9fa;
             min-height: 100vh;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
+        /* Header simple sans fond bleu */
         .main-header {
-            background: var(--primary-gradient);
-            color: white;
-            padding: 2rem 0;
+            background: transparent;
+            color: #2c3e50;
+            padding: 2rem 0 1rem 0;
             margin-bottom: 2rem;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .main-header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+        }
+
+        .main-header p {
+            color: #6c757d;
+            font-size: 1.1rem;
+        }
+
+        .date-info {
+            background: #fff;
+            padding: 0.75rem 1.5rem;
+            border-radius: 50px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            color: #495057;
+            font-weight: 500;
         }
 
         .stats-card {
@@ -483,7 +504,7 @@ desactiverAnnoncesExpirees();
             border-left: 3px solid #cbd5e1;
         }
 
-        .date-info {
+        .date-info-table {
             font-size: 0.8rem;
         }
 
@@ -530,37 +551,6 @@ desactiverAnnoncesExpirees();
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
         }
 
-        /* Responsive pour les tableaux */
-        @media (max-width: 768px) {
-            .elegant-table thead th,
-            .elegant-table tbody td {
-                padding: 0.75rem 0.5rem;
-                font-size: 0.8rem;
-            }
-
-            .stats-number {
-                font-size: 2rem;
-            }
-            
-            .stats-icon {
-                width: 40px;
-                height: 40px;
-                font-size: 1.25rem;
-                right: 1rem;
-                top: 1rem;
-            }
-
-            .stats-title {
-                font-size: 0.75rem;
-            }
-
-            .action-btn {
-                width: 32px;
-                height: 32px;
-                font-size: 0.75rem;
-            }
-        }
-
         .badge-modern {
             border-radius: 50px;
             padding: 0.5rem 1rem;
@@ -581,17 +571,41 @@ desactiverAnnoncesExpirees();
             box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
         }
 
+        /* Modal styles simplifiés mais jolis */
         .modal-content {
-            border-radius: 20px;
+            border-radius: 15px;
             border: none;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
         }
 
         .modal-header {
-            background: var(--primary-gradient);
-            color: white;
+            background: #f8f9fa;
+            color: #2c3e50;
             border: none;
-            border-radius: 20px 20px 0 0;
+            border-radius: 15px 15px 0 0;
+            padding: 1.5rem;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .modal-title {
+            font-weight: 600;
+            font-size: 1.25rem;
+        }
+
+        .modal-body {
+            padding: 2rem;
+        }
+
+        .modal-footer {
+            background: #f8f9fa;
+            border: none;
+            border-top: 1px solid #dee2e6;
+            border-radius: 0 0 15px 15px;
+            padding: 1rem 2rem;
+        }
+
+        .btn-close {
+            background-size: 1.5em;
         }
 
         .pulse {
@@ -624,10 +638,170 @@ desactiverAnnoncesExpirees();
             font-size: 1.5rem;
             box-shadow: 0 8px 30px rgba(0,0,0,0.3);
         }
+
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .stats-number {
+                font-size: 2.2rem;
+            }
+        }
+
+        @media (max-width: 992px) {
+            .main-header h1 {
+                font-size: 2rem;
+            }
+            
+            .main-header p {
+                font-size: 1rem;
+            }
+            
+            .date-info {
+                margin-top: 1rem;
+                text-align: center;
+            }
+            
+            .stats-number {
+                font-size: 2rem;
+            }
+            
+            .stats-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 1.25rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-header {
+                padding: 1rem 0;
+                text-align: center;
+            }
+            
+            .main-header h1 {
+                font-size: 1.75rem;
+            }
+            
+            .main-header .col-md-4 {
+                text-align: center !important;
+            }
+            
+            .elegant-table {
+                font-size: 0.875rem;
+            }
+            
+            .elegant-table thead th,
+            .elegant-table tbody td {
+                padding: 0.75rem 0.5rem;
+            }
+            
+            .stats-card .card-body {
+                padding: 1rem;
+            }
+            
+            .stats-number {
+                font-size: 1.8rem;
+            }
+            
+            .stats-icon {
+                width: 36px;
+                height: 36px;
+                font-size: 1rem;
+                right: 1rem;
+                top: 1rem;
+            }
+            
+            .stats-title {
+                font-size: 0.75rem;
+            }
+            
+            .action-btn {
+                width: 32px;
+                height: 32px;
+                font-size: 0.75rem;
+            }
+            
+            .modal-body {
+                padding: 1rem;
+            }
+            
+            .modal-footer {
+                padding: 1rem;
+            }
+            
+            .btn-modern {
+                padding: 0.5rem 1.5rem;
+                font-size: 0.875rem;
+            }
+            
+            .floating-btn {
+                width: 50px;
+                height: 50px;
+                font-size: 1.25rem;
+                bottom: 20px;
+                right: 20px;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .main-header h1 {
+                font-size: 1.5rem;
+            }
+            
+            .container {
+                padding: 0 15px;
+            }
+            
+            .modern-card {
+                border-radius: 15px;
+            }
+            
+            .card-header.modern {
+                border-radius: 15px 15px 0 0 !important;
+                padding: 1rem;
+            }
+            
+            .stats-number {
+                font-size: 1.6rem;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+                gap: 0.25rem;
+            }
+            
+            .action-btn {
+                width: 28px;
+                height: 28px;
+            }
+            
+            /* Table responsive pour mobile */
+            .table-responsive {
+                border-radius: 15px;
+            }
+            
+            .elegant-table {
+                border-radius: 15px;
+            }
+        }
+
+        /* Amélioration de l'affichage des formulaires sur mobile */
+        @media (max-width: 768px) {
+            .form-control-modern {
+                font-size: 16px; /* Évite le zoom sur iOS */
+            }
+            
+            .modal-dialog {
+                margin: 0.5rem;
+            }
+            
+            .modal-content {
+                border-radius: 10px;
+            }
+        }
     </style>
 </head>
 <body>
-    <!-- Header -->
+    <!-- Header simplifié -->
     <div class="main-header">
         <div class="container">
             <div class="row align-items-center">
@@ -636,10 +810,10 @@ desactiverAnnoncesExpirees();
                         <i class="fas fa-bullhorn me-3"></i>
                         Gestion des Annonces Publiques
                     </h1>
-                    <p class="mb-0 mt-2 opacity-75">Gérez vos annonces publiques en temps réel</p>
+                    <p class="mb-0 mt-2">Gérez vos annonces publiques en temps réel</p>
                 </div>
                 <div class="col-md-4 text-end">
-                    <div class="d-flex justify-content-end align-items-center">
+                    <div class="date-info">
                         <i class="fas fa-calendar-alt me-2"></i>
                         <?= date('d/m/Y H:i') ?>
                     </div>
@@ -774,6 +948,15 @@ desactiverAnnoncesExpirees();
                                 <small class="text-muted">Laissez vide pour durée illimitée</small>
                             </div>
                         </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="date_fin" class="form-label fw-bold">
+                                    <i class="fas fa-calendar-minus me-1"></i>Date de fin
+                                </label>
+                                <input type="date" class="form-control form-control-modern" id="date_fin" name="date_fin">
+                                <small class="text-muted">Optionnel</small>
+                            </div>
+                        </div>
                     </div>
                     <div class="text-center">
                         <button type="submit" class="btn btn-primary btn-modern pulse">
@@ -845,7 +1028,7 @@ desactiverAnnoncesExpirees();
                                         </span>
                                     </td>
                                     <td>
-                                        <div class="date-info">
+                                        <div class="date-info-table">
                                             <div class="mb-2">
                                                 <span class="date-label">
                                                     <i class="fas fa-play text-success me-1"></i>Début:
@@ -889,7 +1072,7 @@ desactiverAnnoncesExpirees();
         <i class="fas fa-arrow-up"></i>
     </button>
 
-    <!-- Modal de modification -->
+    <!-- Modal de modification simplifié -->
     <div class="modal fade" id="modalModifier" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
@@ -897,15 +1080,15 @@ desactiverAnnoncesExpirees();
                     <h5 class="modal-title">
                         <i class="fas fa-edit me-2"></i>Modifier l'Annonce
                     </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <form method="POST" id="formModifier">
-                    <div class="modal-body p-4">
+                    <div class="modal-body">
                         <input type="hidden" name="action" value="modifier">
                         <input type="hidden" name="id" id="mod_id">
                         
                         <div class="row">
-                            <div class="col-lg-6">
+                            <div class="col-lg-8">
                                 <div class="mb-3">
                                     <label for="mod_titre" class="form-label fw-bold">
                                         <i class="fas fa-heading me-1"></i>Titre *
@@ -913,7 +1096,7 @@ desactiverAnnoncesExpirees();
                                     <input type="text" class="form-control form-control-modern" id="mod_titre" name="titre" required>
                                 </div>
                             </div>
-                            <div class="col-lg-3">
+                            <div class="col-lg-4">
                                 <div class="mb-3">
                                     <label for="mod_type_annonce" class="form-label fw-bold">
                                         <i class="fas fa-tag me-1"></i>Type *
@@ -922,14 +1105,6 @@ desactiverAnnoncesExpirees();
                                         <option value="site">🌐 Site général</option>
                                         <option value="menu">🍽️ Menu restaurant</option>
                                     </select>
-                                </div>
-                            </div>
-                            <div class="col-lg-3">
-                                <div class="mb-3">
-                                    <label for="mod_couleur" class="form-label fw-bold">
-                                        <i class="fas fa-palette me-1"></i>Couleur
-                                    </label>
-                                    <input type="color" class="form-control form-control-modern form-control-color" id="mod_couleur" name="couleur">
                                 </div>
                             </div>
                         </div>
@@ -942,7 +1117,7 @@ desactiverAnnoncesExpirees();
                         </div>
                         
                         <div class="row">
-                            <div class="col-lg-4">
+                            <div class="col-lg-3">
                                 <div class="mb-3">
                                     <label for="mod_statut" class="form-label fw-bold">
                                         <i class="fas fa-toggle-on me-1"></i>Statut
@@ -953,18 +1128,26 @@ desactiverAnnoncesExpirees();
                                     </select>
                                 </div>
                             </div>
-                            <div class="col-lg-4">
+                            <div class="col-lg-3">
+                                <div class="mb-3">
+                                    <label for="mod_couleur" class="form-label fw-bold">
+                                        <i class="fas fa-palette me-1"></i>Couleur
+                                    </label>
+                                    <input type="color" class="form-control form-control-modern form-control-color" id="mod_couleur" name="couleur">
+                                </div>
+                            </div>
+                            <div class="col-lg-3">
                                 <div class="mb-3">
                                     <label for="mod_date_debut" class="form-label fw-bold">
-                                        <i class="fas fa-calendar-plus me-1"></i>Date de début
+                                        <i class="fas fa-calendar-plus me-1"></i>Date début
                                     </label>
                                     <input type="date" class="form-control form-control-modern" id="mod_date_debut" name="date_debut">
                                 </div>
                             </div>
-                            <div class="col-lg-4">
+                            <div class="col-lg-3">
                                 <div class="mb-3">
                                     <label for="mod_date_fin" class="form-label fw-bold">
-                                        <i class="fas fa-calendar-minus me-1"></i>Date de fin
+                                        <i class="fas fa-calendar-minus me-1"></i>Date fin
                                     </label>
                                     <input type="date" class="form-control form-control-modern" id="mod_date_fin" name="date_fin">
                                 </div>
@@ -972,11 +1155,11 @@ desactiverAnnoncesExpirees();
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary btn-modern" data-bs-dismiss="modal">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                             <i class="fas fa-times me-2"></i>Annuler
                         </button>
                         <button type="submit" class="btn btn-success btn-modern">
-                            <i class="fas fa-save me-2"></i>Enregistrer les Modifications
+                            <i class="fas fa-save me-2"></i>Enregistrer
                         </button>
                     </div>
                 </form>
@@ -1035,8 +1218,8 @@ desactiverAnnoncesExpirees();
         }
 
         function supprimerAnnonce(id) {
-            // SweetAlert-like confirmation avec Bootstrap
-            const confirmation = confirm('⚠️ Confirmation de Suppression\n\nÊtes-vous sûr de vouloir supprimer définitivement cette annonce ?\n\nCette action est irréversible.');
+            // Confirmation simple mais efficace
+            const confirmation = confirm('⚠️ Êtes-vous sûr de vouloir supprimer cette annonce ?\n\nCette action est irréversible.');
             
             if (confirmation) {
                 // Créer et soumettre le formulaire de suppression
@@ -1050,16 +1233,6 @@ desactiverAnnoncesExpirees();
                 form.submit();
             }
         }
-
-        // Effet de parallaxe sur le scroll
-        window.addEventListener('scroll', function() {
-            const scrolled = window.pageYOffset;
-            const parallax = document.querySelector('.main-header');
-            if (parallax) {
-                const speed = scrolled * 0.5;
-                parallax.style.transform = `translateY(${speed}px)`;
-            }
-        });
 
         // Auto-hide alerts après 5 secondes
         document.addEventListener('DOMContentLoaded', function() {
@@ -1093,46 +1266,6 @@ desactiverAnnoncesExpirees();
             });
         });
 
-        // Prévisualisation de couleur en temps réel
-        document.addEventListener('DOMContentLoaded', function() {
-            const colorInputs = document.querySelectorAll('input[type="color"]');
-            colorInputs.forEach(input => {
-                input.addEventListener('input', function() {
-                    // Créer un aperçu de la couleur
-                    const preview = document.createElement('div');
-                    preview.style.cssText = `
-                        position: absolute;
-                        top: -30px;
-                        left: 50%;
-                        transform: translateX(-50%);
-                        background: ${this.value};
-                        color: white;
-                        padding: 5px 10px;
-                        border-radius: 15px;
-                        font-size: 12px;
-                        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-                        z-index: 1000;
-                    `;
-                    preview.textContent = this.value;
-                    
-                    // Supprimer l'ancien aperçu s'il existe
-                    const oldPreview = this.parentElement.querySelector('.color-preview');
-                    if (oldPreview) {
-                        oldPreview.remove();
-                    }
-                    
-                    preview.className = 'color-preview';
-                    this.parentElement.style.position = 'relative';
-                    this.parentElement.appendChild(preview);
-                    
-                    // Supprimer l'aperçu après 2 secondes
-                    setTimeout(() => {
-                        preview.remove();
-                    }, 2000);
-                });
-            });
-        });
-
         // Mise à jour automatique des dates minimales
         document.addEventListener('DOMContentLoaded', function() {
             const today = new Date().toISOString().split('T')[0];
@@ -1143,5 +1276,22 @@ desactiverAnnoncesExpirees();
                 }
             });
         });
+
+        // Gestion responsive du tableau
+        window.addEventListener('resize', function() {
+            const table = document.querySelector('.elegant-table');
+            const container = document.querySelector('.table-responsive');
+            
+            if (window.innerWidth < 768 && table && container) {
+                // Ajout d'un scroll indicator sur mobile
+                if (!container.querySelector('.scroll-indicator')) {
+                    const indicator = document.createElement('div');
+                    indicator.className = 'scroll-indicator text-center text-muted py-2';
+                    indicator.innerHTML = '<small><i class="fas fa-arrows-alt-h me-1"></i>Faites défiler horizontalement</small>';
+                    container.appendChild(indicator);
+                }
+            }
+        });
     </script>
 </body>
+</html>

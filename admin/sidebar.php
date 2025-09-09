@@ -474,17 +474,6 @@ try {
                 </div>
                 <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
             </a>
-
-                <a href="cuisine.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
-                    <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
-                        <i class="fas fa-fire nav-icon text-lg"></i>
-                    </div>
-                    <div class="flex-1">
-                        <span class="font-medium text-base">Cuisine</span>
-                        <p class="nav-description text-sm text-gray-400 opacity-80">Gestion de la cuisine</p>
-                    </div>
-                    <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
-                </a>
                 
                 <a href="horaires.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
@@ -579,7 +568,7 @@ try {
                             <i class="fas fa-book mr-3 w-5 text-sm"></i>
                             <span class="font-medium">Ajouter Procédures internes</span>
                         </a>
-                        <a href="communication/voir_annonce.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                        <a href="ommunication/voir_annonce.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                             <i class="fas fa-bullhorn mr-3 w-5 text-sm"></i>
                             <span class="font-medium">Voir annonces</span>
                         </a>

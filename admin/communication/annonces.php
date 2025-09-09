@@ -2,18 +2,31 @@
 session_start();
 require_once '../../config.php';
 
+// Activer les erreurs pour debug (à retirer en production)
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 // Vérification de l'authentification
 if (!isset($_SESSION['admin_id'])) {
     header('Location: login.php');
     exit();
 }
 
+// Configuration du dossier d'upload
+$uploadDir = '../../uploads/annonces/';
+if (!is_dir($uploadDir)) {
+    mkdir($uploadDir, 0755, true);
+}
+
+// Configuration des chemins pour l'affichage
+$webUploadPath = '../uploads/annonces/'; // Chemin relatif pour l'affichage web
+
 // Traitement des requêtes AJAX
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
     header('Content-Type: application/json');
     
     $action = $_POST['ajax_action'] ?? '';
-    $response = ['success' => false, 'message' => ''];
+    $response = ['success' => false, 'message' => '', 'debug' => []];
     
     try {
         switch ($action) {
@@ -32,15 +45,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
             case 'ajouter_categorie':
                 $response = ajouterCategorieAjax($conn);
                 break;
+            case 'supprimer_categorie':
+                $response = supprimerCategorieAjax($conn);
+                break;
             case 'get_annonce':
                 $response = getAnnonceAjax($conn);
                 break;
             case 'get_annonces':
                 $response = getAnnoncesAjax($conn);
                 break;
+            case 'get_categories':
+                $response = getCategoriesAjax($conn);
+                break;
+            default:
+                $response['message'] = 'Action non reconnue : ' . $action;
         }
     } catch (Exception $e) {
-        $response = ['success' => false, 'message' => 'Erreur : ' . $e->getMessage()];
+        $response = [
+            'success' => false, 
+            'message' => 'Erreur : ' . $e->getMessage(),
+            'debug' => [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]
+        ];
     }
     
     echo json_encode($response);
@@ -52,54 +81,188 @@ $annonces = getAnnonces($conn);
 $categories = getCategories($conn);
 $stats = getStatistiques($conn);
 
-// Fonctions AJAX
-function ajouterAnnonceAjax($conn) {
-    try {
-        $stmt = $conn->prepare("
-            INSERT INTO annonces (titre, contenu, categorie_id, priorite, statut, date_debut, date_fin, lien_externe, admin_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        
-        $stmt->execute([
-            $_POST['titre'],
-            $_POST['contenu'],
-            $_POST['categorie_id'] ?: null,
-            $_POST['priorite'],
-            $_POST['statut'],
-            $_POST['date_debut'] ?: null,
-            $_POST['date_fin'] ?: null,
-            $_POST['lien_externe'] ?: null,
-            $_SESSION['admin_id']
-        ]);
-        
-        return ['success' => true, 'message' => 'Annonce ajoutée avec succès !'];
-    } catch (Exception $e) {
-        return ['success' => false, 'message' => 'Erreur lors de l\'ajout : ' . $e->getMessage()];
+// Fonction pour gérer l'upload d'image
+function handleImageUpload($fileInputName) {
+    global $uploadDir;
+    
+    if (!isset($_FILES[$fileInputName]) || $_FILES[$fileInputName]['error'] !== UPLOAD_ERR_OK) {
+        return null;
+    }
+    
+    $file = $_FILES[$fileInputName];
+    $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    $maxSize = 5 * 1024 * 1024; // 5MB
+    
+    // Vérifier le type de fichier
+    if (!in_array($file['type'], $allowedTypes)) {
+        throw new Exception('Type de fichier non autorisé. Utilisez JPG, PNG, GIF ou WebP.');
+    }
+    
+    // Vérifier la taille
+    if ($file['size'] > $maxSize) {
+        throw new Exception('Fichier trop volumineux. Taille maximum: 5MB.');
+    }
+    
+    // Générer un nom unique
+    $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
+    $fileName = uniqid('annonce_') . '.' . $extension;
+    $filePath = $uploadDir . $fileName;
+    
+    // Déplacer le fichier
+    if (move_uploaded_file($file['tmp_name'], $filePath)) {
+        return 'uploads/annonces/' . $fileName;
+    } else {
+        throw new Exception('Erreur lors de l\'upload du fichier.');
     }
 }
 
+// Fonction ajouterAnnonceAjax avec gestion d'image
+function ajouterAnnonceAjax($conn) {
+    try {
+        // Validation des données requises
+        $requiredFields = ['titre', 'contenu', 'priorite', 'statut'];
+        foreach ($requiredFields as $field) {
+            if (!isset($_POST[$field]) || empty(trim($_POST[$field]))) {
+                return [
+                    'success' => false, 
+                    'message' => "Le champ '$field' est obligatoire",
+                    'debug' => ['missing_field' => $field, 'post_data' => $_POST]
+                ];
+            }
+        }
+        
+        // Gestion de l'upload d'image
+        $imagePath = null;
+        try {
+            $imagePath = handleImageUpload('image');
+        } catch (Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'Erreur image: ' . $e->getMessage()
+            ];
+        }
+        
+        // Vérifier la connexion à la base de données
+        if (!$conn) {
+            return [
+                'success' => false, 
+                'message' => 'Erreur de connexion à la base de données'
+            ];
+        }
+        
+        $stmt = $conn->prepare("
+            INSERT INTO annonces (titre, contenu, categorie_id, priorite, statut, date_debut, date_fin, image, admin_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        
+        $categorie_id = !empty($_POST['categorie_id']) ? $_POST['categorie_id'] : null;
+        $date_debut = !empty($_POST['date_debut']) ? $_POST['date_debut'] : null;
+        $date_fin = !empty($_POST['date_fin']) ? $_POST['date_fin'] : null;
+        
+        $result = $stmt->execute([
+            trim($_POST['titre']),
+            trim($_POST['contenu']),
+            $categorie_id,
+            $_POST['priorite'],
+            $_POST['statut'],
+            $date_debut,
+            $date_fin,
+            $imagePath,
+            $_SESSION['admin_id']
+        ]);
+        
+        if ($result) {
+            return [
+                'success' => true, 
+                'message' => 'Annonce ajoutée avec succès !',
+                'debug' => ['insert_id' => $conn->lastInsertId()]
+            ];
+        } else {
+            return [
+                'success' => false, 
+                'message' => 'Erreur lors de l\'insertion en base de données',
+                'debug' => ['error_info' => $stmt->errorInfo()]
+            ];
+        }
+        
+    } catch (Exception $e) {
+        return [
+            'success' => false, 
+            'message' => 'Erreur lors de l\'ajout : ' . $e->getMessage(),
+            'debug' => [
+                'exception' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]
+        ];
+    }
+}
+
+// Fonction modifierAnnonceAjax avec gestion d'image
 function modifierAnnonceAjax($conn) {
     try {
+        // Validation des données requises
+        $requiredFields = ['annonce_id', 'titre', 'contenu', 'priorite', 'statut'];
+        foreach ($requiredFields as $field) {
+            if (!isset($_POST[$field]) || empty(trim($_POST[$field]))) {
+                return [
+                    'success' => false, 
+                    'message' => "Le champ '$field' est obligatoire"
+                ];
+            }
+        }
+        
+        // Récupérer l'image actuelle
+        $stmt = $conn->prepare("SELECT image FROM annonces WHERE id = ?");
+        $stmt->execute([$_POST['annonce_id']]);
+        $currentImage = $stmt->fetchColumn();
+        
+        // Gestion de l'upload d'image (optionnel en modification)
+        $imagePath = $currentImage; // Conserver l'image actuelle par défaut
+        
+        try {
+            $newImagePath = handleImageUpload('image');
+            if ($newImagePath) {
+                // Supprimer l'ancienne image si elle existe
+                if ($currentImage && file_exists('../../' . $currentImage)) {
+                    unlink('../../' . $currentImage);
+                }
+                $imagePath = $newImagePath;
+            }
+        } catch (Exception $e) {
+            // Ne pas arrêter la modification si l'upload échoue
+            // L'image actuelle sera conservée
+        }
+        
         $stmt = $conn->prepare("
             UPDATE annonces 
             SET titre = ?, contenu = ?, categorie_id = ?, priorite = ?, statut = ?, 
-                date_debut = ?, date_fin = ?, lien_externe = ?
+                date_debut = ?, date_fin = ?, image = ?
             WHERE id = ?
         ");
         
-        $stmt->execute([
-            $_POST['titre'],
-            $_POST['contenu'],
-            $_POST['categorie_id'] ?: null,
+        $categorie_id = !empty($_POST['categorie_id']) ? $_POST['categorie_id'] : null;
+        $date_debut = !empty($_POST['date_debut']) ? $_POST['date_debut'] : null;
+        $date_fin = !empty($_POST['date_fin']) ? $_POST['date_fin'] : null;
+        
+        $result = $stmt->execute([
+            trim($_POST['titre']),
+            trim($_POST['contenu']),
+            $categorie_id,
             $_POST['priorite'],
             $_POST['statut'],
-            $_POST['date_debut'] ?: null,
-            $_POST['date_fin'] ?: null,
-            $_POST['lien_externe'] ?: null,
+            $date_debut,
+            $date_fin,
+            $imagePath,
             $_POST['annonce_id']
         ]);
         
-        return ['success' => true, 'message' => 'Annonce modifiée avec succès !'];
+        if ($result && $stmt->rowCount() > 0) {
+            return ['success' => true, 'message' => 'Annonce modifiée avec succès !'];
+        } else {
+            return ['success' => false, 'message' => 'Aucune modification effectuée ou annonce introuvable'];
+        }
+        
     } catch (Exception $e) {
         return ['success' => false, 'message' => 'Erreur lors de la modification : ' . $e->getMessage()];
     }
@@ -107,10 +270,29 @@ function modifierAnnonceAjax($conn) {
 
 function supprimerAnnonceAjax($conn) {
     try {
-        $stmt = $conn->prepare("DELETE FROM annonces WHERE id = ?");
-        $stmt->execute([$_POST['annonce_id']]);
+        if (!isset($_POST['annonce_id']) || empty($_POST['annonce_id'])) {
+            return ['success' => false, 'message' => 'ID de l\'annonce manquant'];
+        }
         
-        return ['success' => true, 'message' => 'Annonce supprimée avec succès !'];
+        // Récupérer l'image pour la supprimer
+        $stmt = $conn->prepare("SELECT image FROM annonces WHERE id = ?");
+        $stmt->execute([$_POST['annonce_id']]);
+        $image = $stmt->fetchColumn();
+        
+        // Supprimer l'annonce
+        $stmt = $conn->prepare("DELETE FROM annonces WHERE id = ?");
+        $result = $stmt->execute([$_POST['annonce_id']]);
+        
+        if ($result && $stmt->rowCount() > 0) {
+            // Supprimer l'image du serveur si elle existe
+            if ($image && file_exists('../../' . $image)) {
+                unlink('../../' . $image);
+            }
+            return ['success' => true, 'message' => 'Annonce supprimée avec succès !'];
+        } else {
+            return ['success' => false, 'message' => 'Annonce introuvable ou déjà supprimée'];
+        }
+        
     } catch (Exception $e) {
         return ['success' => false, 'message' => 'Erreur lors de la suppression : ' . $e->getMessage()];
     }
@@ -118,10 +300,19 @@ function supprimerAnnonceAjax($conn) {
 
 function changerStatutAnnonceAjax($conn) {
     try {
-        $stmt = $conn->prepare("UPDATE annonces SET statut = ? WHERE id = ?");
-        $stmt->execute([$_POST['nouveau_statut'], $_POST['annonce_id']]);
+        if (!isset($_POST['annonce_id']) || !isset($_POST['nouveau_statut'])) {
+            return ['success' => false, 'message' => 'Données manquantes pour changer le statut'];
+        }
         
-        return ['success' => true, 'message' => 'Statut modifié avec succès !'];
+        $stmt = $conn->prepare("UPDATE annonces SET statut = ? WHERE id = ?");
+        $result = $stmt->execute([$_POST['nouveau_statut'], $_POST['annonce_id']]);
+        
+        if ($result && $stmt->rowCount() > 0) {
+            return ['success' => true, 'message' => 'Statut modifié avec succès !'];
+        } else {
+            return ['success' => false, 'message' => 'Aucune modification effectuée'];
+        }
+        
     } catch (Exception $e) {
         return ['success' => false, 'message' => 'Erreur lors du changement de statut : ' . $e->getMessage()];
     }
@@ -129,26 +320,73 @@ function changerStatutAnnonceAjax($conn) {
 
 function ajouterCategorieAjax($conn) {
     try {
+        if (!isset($_POST['nom_categorie']) || empty(trim($_POST['nom_categorie']))) {
+            return ['success' => false, 'message' => 'Le nom de la catégorie est obligatoire'];
+        }
+        
         $stmt = $conn->prepare("
-            INSERT INTO categories_annonces (nom, description, couleur, icone)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO categories_annonces (nom, description, couleur)
+            VALUES (?, ?, ?)
         ");
         
-        $stmt->execute([
-            $_POST['nom_categorie'],
-            $_POST['description_categorie'],
-            $_POST['couleur_categorie'],
-            $_POST['icone_categorie']
+        $description = !empty($_POST['description_categorie']) ? $_POST['description_categorie'] : null;
+        $couleur = !empty($_POST['couleur_categorie']) ? $_POST['couleur_categorie'] : '#007bff';
+        
+        $result = $stmt->execute([
+            trim($_POST['nom_categorie']),
+            $description,
+            $couleur
         ]);
         
-        return ['success' => true, 'message' => 'Catégorie ajoutée avec succès !'];
+        if ($result) {
+            return ['success' => true, 'message' => 'Catégorie ajoutée avec succès !'];
+        } else {
+            return ['success' => false, 'message' => 'Erreur lors de l\'ajout de la catégorie'];
+        }
+        
     } catch (Exception $e) {
         return ['success' => false, 'message' => 'Erreur lors de l\'ajout de la catégorie : ' . $e->getMessage()];
     }
 }
 
+function supprimerCategorieAjax($conn) {
+    try {
+        if (!isset($_POST['categorie_id']) || empty($_POST['categorie_id'])) {
+            return ['success' => false, 'message' => 'ID de la catégorie manquant'];
+        }
+        
+        // Vérifier s'il y a des annonces liées à cette catégorie
+        $stmt = $conn->prepare("SELECT COUNT(*) FROM annonces WHERE categorie_id = ?");
+        $stmt->execute([$_POST['categorie_id']]);
+        $count = $stmt->fetchColumn();
+        
+        if ($count > 0) {
+            return [
+                'success' => false, 
+                'message' => "Impossible de supprimer cette catégorie car $count annonce(s) y sont liées. Veuillez d'abord modifier ou supprimer ces annonces."
+            ];
+        }
+        
+        $stmt = $conn->prepare("DELETE FROM categories_annonces WHERE id = ?");
+        $result = $stmt->execute([$_POST['categorie_id']]);
+        
+        if ($result && $stmt->rowCount() > 0) {
+            return ['success' => true, 'message' => 'Catégorie supprimée avec succès !'];
+        } else {
+            return ['success' => false, 'message' => 'Catégorie introuvable ou déjà supprimée'];
+        }
+        
+    } catch (Exception $e) {
+        return ['success' => false, 'message' => 'Erreur lors de la suppression : ' . $e->getMessage()];
+    }
+}
+
 function getAnnonceAjax($conn) {
     try {
+        if (!isset($_POST['annonce_id']) || empty($_POST['annonce_id'])) {
+            return ['success' => false, 'message' => 'ID de l\'annonce manquant'];
+        }
+        
         $stmt = $conn->prepare("
             SELECT a.*, c.nom as categorie_nom
             FROM annonces a
@@ -178,42 +416,73 @@ function getAnnoncesAjax($conn) {
     }
 }
 
-// Fonctions utilitaires (inchangées)
+function getCategoriesAjax($conn) {
+    try {
+        $categories = getCategories($conn);
+        return ['success' => true, 'categories' => $categories];
+    } catch (Exception $e) {
+        return ['success' => false, 'message' => 'Erreur : ' . $e->getMessage()];
+    }
+}
+
+// Fonctions utilitaires (améliorées avec toutes les colonnes)
 function getAnnonces($conn) {
-    $stmt = $conn->query("
-        SELECT a.*, c.nom as categorie_nom, c.couleur as categorie_couleur,
-               ad.nom_utilisateur as admin_nom
-        FROM annonces a
-        LEFT JOIN categories_annonces c ON a.categorie_id = c.id
-        LEFT JOIN admins ad ON a.admin_id = ad.id
-        ORDER BY a.date_creation DESC
-    ");
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    try {
+        $stmt = $conn->prepare("
+            SELECT a.*, c.nom as categorie_nom, c.couleur as categorie_couleur,
+                   ad.nom_utilisateur as admin_nom
+            FROM annonces a
+            LEFT JOIN categories_annonces c ON a.categorie_id = c.id
+            LEFT JOIN admins ad ON a.admin_id = ad.id
+            ORDER BY a.date_creation DESC
+        ");
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        error_log("Erreur getAnnonces: " . $e->getMessage());
+        return [];
+    }
 }
 
 function getCategories($conn) {
-    $stmt = $conn->query("SELECT * FROM categories_annonces WHERE actif = 1 ORDER BY nom");
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    try {
+        $stmt = $conn->prepare("SELECT * FROM categories_annonces WHERE actif = 1 ORDER BY nom");
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        error_log("Erreur getCategories: " . $e->getMessage());
+        return [];
+    }
 }
 
 function getStatistiques($conn) {
     $stats = [];
     
-    // Total des annonces
-    $stmt = $conn->query("SELECT COUNT(*) as total FROM annonces");
-    $stats['total'] = $stmt->fetchColumn();
-    
-    // Annonces publiées
-    $stmt = $conn->query("SELECT COUNT(*) as publie FROM annonces WHERE statut = 'publie'");
-    $stats['publie'] = $stmt->fetchColumn();
-    
-    // Annonces en brouillon
-    $stmt = $conn->query("SELECT COUNT(*) as brouillon FROM annonces WHERE statut = 'brouillon'");
-    $stats['brouillon'] = $stmt->fetchColumn();
-    
-    // Annonces urgentes
-    $stmt = $conn->query("SELECT COUNT(*) as urgente FROM annonces WHERE priorite = 'urgente'");
-    $stats['urgente'] = $stmt->fetchColumn();
+    try {
+        // Total des annonces
+        $stmt = $conn->prepare("SELECT COUNT(*) as total FROM annonces");
+        $stmt->execute();
+        $stats['total'] = $stmt->fetchColumn();
+        
+        // Annonces publiées
+        $stmt = $conn->prepare("SELECT COUNT(*) as publie FROM annonces WHERE statut = 'publie'");
+        $stmt->execute();
+        $stats['publie'] = $stmt->fetchColumn();
+        
+        // Annonces en brouillon
+        $stmt = $conn->prepare("SELECT COUNT(*) as brouillon FROM annonces WHERE statut = 'brouillon'");
+        $stmt->execute();
+        $stats['brouillon'] = $stmt->fetchColumn();
+        
+        // Annonces urgentes
+        $stmt = $conn->prepare("SELECT COUNT(*) as urgente FROM annonces WHERE priorite = 'urgente'");
+        $stmt->execute();
+        $stats['urgente'] = $stmt->fetchColumn();
+        
+    } catch (Exception $e) {
+        error_log("Erreur getStatistiques: " . $e->getMessage());
+        $stats = ['total' => 0, 'publie' => 0, 'brouillon' => 0, 'urgente' => 0];
+    }
     
     return $stats;
 }
@@ -247,10 +516,175 @@ function getStatutColor($statut) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        .card-stats {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        /* Nouveau design moderne pour les cartes */
+        .modern-card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+            border: none;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .modern-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.12);
+        }
+        
+        .modern-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            border-radius: 20px 20px 0 0;
+        }
+        
+        .modern-card.card-purple::before {
+            background: linear-gradient(90deg, #8B5CF6, #A855F7);
+        }
+        
+        .modern-card.card-blue::before {
+            background: linear-gradient(90deg, #3B82F6, #6366F1);
+        }
+        
+        .modern-card.card-green::before {
+            background: linear-gradient(90deg, #10B981, #059669);
+        }
+        
+        .modern-card.card-orange::before {
+            background: linear-gradient(90deg, #F59E0B, #D97706);
+        }
+        
+        .card-header-modern {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .card-title-modern {
+            color: #6B7280;
+            font-size: 14px;
+            font-weight: 500;
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .card-icon-modern {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
             color: white;
         }
+        
+        .icon-purple {
+            background: linear-gradient(135deg, #8B5CF6, #A855F7);
+        }
+        
+        .icon-blue {
+            background: linear-gradient(135deg, #3B82F6, #6366F1);
+        }
+        
+        .icon-green {
+            background: linear-gradient(135deg, #10B981, #059669);
+        }
+        
+        .icon-orange {
+            background: linear-gradient(135deg, #F59E0B, #D97706);
+        }
+        
+        .card-value-modern {
+            font-size: 48px;
+            font-weight: 700;
+            color: #111827;
+            line-height: 1;
+            margin-bottom: 8px;
+        }
+        
+        .card-trend-modern {
+            display: flex;
+            align-items: center;
+            color: #10B981;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .card-trend-modern i {
+            margin-right: 4px;
+            font-size: 12px;
+        }
+        
+        .card-subtitle-modern {
+            color: #6B7280;
+            font-size: 14px;
+            margin-top: 4px;
+        }
+
+        /* Styles pour la gestion des catégories */
+        .category-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            margin-bottom: 5px;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+        }
+        
+        .category-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+
+        /* Styles pour l'aperçu d'image */
+        .image-preview {
+            max-width: 150px;
+            max-height: 100px;
+            border-radius: 8px;
+            object-fit: cover;
+        }
+        
+        .image-preview-container {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .remove-image {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        /* Styles pour les miniatures dans le tableau */
+        .table-image {
+            width: 40px;
+            height: 40px;
+            border-radius: 6px;
+            object-fit: cover;
+            cursor: pointer;
+        }
+
+        /* Conserver le reste du CSS existant */
         .priorite-badge {
             font-size: 0.75em;
         }
@@ -281,9 +715,6 @@ function getStatutColor($statut) {
             <a class="nav-link" href="dashboard.php">
                 <i class="fas fa-dashboard me-1"></i>Tableau de bord
             </a>
-            <a class="nav-link" href="logout.php">
-                <i class="fas fa-sign-out-alt me-1"></i>Déconnexion
-            </a>
         </div>
     </div>
 </nav>
@@ -292,74 +723,66 @@ function getStatutColor($statut) {
     <!-- Zone des alertes -->
     <div id="alertZone"></div>
 
-    <!-- Statistiques -->
-    <div class="row mb-4" id="statsContainer">
-        <div class="col-md-3">
-            <div class="card card-stats">
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-8">
-                            <div class="numbers">
-                                <p class="card-category">Total</p>
-                                <h3 class="card-title" id="statTotal"><?= $stats['total'] ?></h3>
-                            </div>
+    <!-- Statistiques avec nouveau design moderne et valeurs dynamiques -->
+    <div class="row mb-4 g-4" id="statsContainer">
+        <div class="col-lg-3 col-md-6">
+            <div class="card modern-card card-purple">
+                <div class="card-header-modern">
+                    <div>
+                        <h6 class="card-title-modern">Total des annonces</h6>
+                        <div class="card-value-modern" id="statTotal"><?= $stats['total'] ?></div>
+                        <div class="card-trend-modern">
+                            <i class="fas fa-arrow-up"></i>
+                            Toutes catégories
                         </div>
-                        <div class="col-4 text-end">
-                            <div class="icon-big">
-                                <i class="fas fa-bullhorn fa-2x"></i>
-                            </div>
-                        </div>
+                    </div>
+                    <div class="card-icon-modern icon-purple">
+                        <i class="fas fa-bullhorn"></i>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white;">
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-8">
-                            <div class="numbers">
-                                <p class="card-category">Publiées</p>
-                                <h3 class="card-title" id="statPublie"><?= $stats['publie'] ?></h3>
-                            </div>
-                        </div>
-                        <div class="col-4 text-end">
-                            <i class="fas fa-check-circle fa-2x"></i>
-                        </div>
+        
+        <div class="col-lg-3 col-md-6">
+            <div class="card modern-card card-green">
+                <div class="card-header-modern">
+                    <div>
+                        <h6 class="card-title-modern">Publiées</h6>
+                        <div class="card-value-modern" id="statPublie"><?= $stats['publie'] ?></div>
+                        <div class="card-subtitle-modern">Actives</div>
+                    </div>
+                    <div class="card-icon-modern icon-green">
+                        <i class="fas fa-check-circle"></i>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-8">
-                            <div class="numbers">
-                                <p class="card-category">Brouillons</p>
-                                <h3 class="card-title" id="statBrouillon"><?= $stats['brouillon'] ?></h3>
-                            </div>
-                        </div>
-                        <div class="col-4 text-end">
-                            <i class="fas fa-edit fa-2x"></i>
-                        </div>
+        
+        <div class="col-lg-3 col-md-6">
+            <div class="card modern-card card-blue">
+                <div class="card-header-modern">
+                    <div>
+                        <h6 class="card-title-modern">Brouillons</h6>
+                        <div class="card-value-modern" id="statBrouillon"><?= $stats['brouillon'] ?></div>
+                        <div class="card-subtitle-modern">En attente</div>
+                    </div>
+                    <div class="card-icon-modern icon-blue">
+                        <i class="fas fa-edit"></i>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card" style="background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); color: white;">
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-8">
-                            <div class="numbers">
-                                <p class="card-category">Urgentes</p>
-                                <h3 class="card-title" id="statUrgente"><?= $stats['urgente'] ?></h3>
-                            </div>
-                        </div>
-                        <div class="col-4 text-end">
-                            <i class="fas fa-exclamation-triangle fa-2x"></i>
-                        </div>
+        
+        <div class="col-lg-3 col-md-6">
+            <div class="card modern-card card-orange">
+                <div class="card-header-modern">
+                    <div>
+                        <h6 class="card-title-modern">Urgentes</h6>
+                        <div class="card-value-modern" id="statUrgente"><?= $stats['urgente'] ?></div>
+                        <div class="card-subtitle-modern">Prioritaires</div>
+                    </div>
+                    <div class="card-icon-modern icon-orange">
+                        <i class="fas fa-exclamation-triangle"></i>
                     </div>
                 </div>
             </div>
@@ -374,6 +797,9 @@ function getStatutColor($statut) {
             </button>
             <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalAjouterCategorie">
                 <i class="fas fa-folder-plus me-1"></i>Nouvelle Catégorie
+            </button>
+            <button class="btn btn-info" data-bs-toggle="modal" data-bs-target="#modalGererCategories">
+                <i class="fas fa-cogs me-1"></i>Gérer les Catégories
             </button>
         </div>
     </div>
@@ -391,12 +817,16 @@ function getStatutColor($statut) {
                     <thead class="table-dark">
                         <tr>
                             <th>ID</th>
+                            <th>Image</th>
                             <th>Titre</th>
                             <th>Catégorie</th>
                             <th>Priorité</th>
                             <th>Statut</th>
-                            <th>Date création</th>
+                            <th>Date début</th>
+                            <th>Date fin</th>
                             <th>Vues</th>
+                            <th>Créé le</th>
+                            <th>Modifié le</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -404,6 +834,18 @@ function getStatutColor($statut) {
                         <?php foreach ($annonces as $annonce): ?>
                         <tr data-id="<?= $annonce['id'] ?>">
                             <td><?= $annonce['id'] ?></td>
+                            <td>
+                                <?php if ($annonce['image']): ?>
+                                    <img src="<?= htmlspecialchars($annonce['image']) ?>" 
+                                         alt="Image annonce" 
+                                         class="table-image"
+                                         onclick="showImageModal('<?= htmlspecialchars($annonce['image']) ?>', '<?= htmlspecialchars($annonce['titre']) ?>')">
+                                <?php else: ?>
+                                    <div class="text-muted">
+                                        <i class="fas fa-image"></i>
+                                    </div>
+                                <?php endif; ?>
+                            </td>
                             <td>
                                 <strong><?= htmlspecialchars($annonce['titre']) ?></strong>
                                 <?php if ($annonce['admin_nom']): ?>
@@ -429,21 +871,32 @@ function getStatutColor($statut) {
                                     <?= ucfirst($annonce['statut']) ?>
                                 </span>
                             </td>
-                            <td><?= date('d/m/Y H:i', strtotime($annonce['date_creation'])) ?></td>
+                            <td>
+                                <?= $annonce['date_debut'] ? date('d/m/Y', strtotime($annonce['date_debut'])) : '<span class="text-muted">-</span>' ?>
+                            </td>
+                            <td>
+                                <?= $annonce['date_fin'] ? date('d/m/Y', strtotime($annonce['date_fin'])) : '<span class="text-muted">-</span>' ?>
+                            </td>
                             <td>
                                 <span class="badge bg-info"><?= $annonce['nombre_vues'] ?></span>
                             </td>
+                            <td>
+                                <small><?= date('d/m/Y H:i', strtotime($annonce['date_creation'])) ?></small>
+                            </td>
+                            <td>
+                                <small><?= date('d/m/Y H:i', strtotime($annonce['date_modification'])) ?></small>
+                            </td>
                             <td class="table-actions">
-                                <button class="btn btn-sm btn-outline-primary" onclick="voirAnnonce(<?= $annonce['id'] ?>)">
+                                <button class="btn btn-sm btn-outline-primary" onclick="voirAnnonce(<?= $annonce['id'] ?>)" title="Voir">
                                     <i class="fas fa-eye"></i>
                                 </button>
-                                <button class="btn btn-sm btn-outline-warning" onclick="modifierAnnonce(<?= $annonce['id'] ?>)">
+                                <button class="btn btn-sm btn-outline-warning" onclick="modifierAnnonce(<?= $annonce['id'] ?>)" title="Modifier">
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <button class="btn btn-sm btn-outline-secondary" onclick="archiverAnnonce(<?= $annonce['id'] ?>)">
+                                <button class="btn btn-sm btn-outline-secondary" onclick="archiverAnnonce(<?= $annonce['id'] ?>)" title="Archiver">
                                     <i class="fas fa-archive"></i>
                                 </button>
-                                <button class="btn btn-sm btn-outline-danger" onclick="supprimerAnnonce(<?= $annonce['id'] ?>)">
+                                <button class="btn btn-sm btn-outline-danger" onclick="supprimerAnnonce(<?= $annonce['id'] ?>)" title="Supprimer">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </td>
@@ -456,11 +909,11 @@ function getStatutColor($statut) {
     </div>
 </div>
 
-<!-- Modal Ajouter/Modifier Annonce -->
+<!-- Modal Ajouter/Modifier Annonce avec gestion d'image -->
 <div class="modal fade" id="modalAjouterAnnonce" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <form id="formAjouterAnnonce">
+            <form id="formAjouterAnnonce" enctype="multipart/form-data">
                 <div class="modal-header">
                     <h5 class="modal-title" id="modalAnnonceTitle">Nouvelle Annonce</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -491,6 +944,16 @@ function getStatutColor($statut) {
                     <div class="mb-3">
                         <label class="form-label">Contenu *</label>
                         <textarea class="form-control" name="contenu" id="annonceContenu" rows="6" required></textarea>
+                    </div>
+
+                    <!-- Section Image -->
+                    <div class="mb-3">
+                        <label class="form-label">Image</label>
+                        <input type="file" class="form-control" name="image" id="annonceImage" accept="image/*" onchange="previewImage(this)">
+                        <small class="form-text text-muted">
+                            Formats acceptés: JPG, PNG, GIF, WebP. Taille max: 5MB.
+                        </small>
+                        <div id="imagePreview" class="mt-2"></div>
                     </div>
 
                     <div class="row">
@@ -530,11 +993,6 @@ function getStatutColor($statut) {
                                 <input type="date" class="form-control" name="date_fin" id="annonceDateFin">
                             </div>
                         </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Lien externe</label>
-                        <input type="url" class="form-control" name="lien_externe" id="annonceLien" placeholder="https://...">
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -576,12 +1034,6 @@ function getStatutColor($statut) {
                                 <input type="color" class="form-control form-control-color" name="couleur_categorie" value="#007bff">
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Icône (FontAwesome)</label>
-                                <input type="text" class="form-control" name="icone_categorie" placeholder="fas fa-bullhorn">
-                            </div>
-                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -596,15 +1048,94 @@ function getStatutColor($statut) {
     </div>
 </div>
 
+<!-- Modal Gérer les Catégories -->
+<div class="modal fade" id="modalGererCategories" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Gérer les Catégories</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="listeCategoriesGestion">
+                    <!-- Les catégories seront chargées ici -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                <button type="button" class="btn btn-primary" onclick="chargerCategories()">
+                    <i class="fas fa-sync-alt"></i> Actualiser
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal pour afficher l'image en grand -->
+<div class="modal fade" id="modalImage" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalImageTitle">Image de l'annonce</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="modalImageContent" src="" alt="Image" class="img-fluid rounded">
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 // Variables globales
 let isEditing = false;
 let currentAnnonceId = null;
 
+// Fonction pour prévisualiser l'image
+function previewImage(input) {
+    const preview = document.getElementById('imagePreview');
+    
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            preview.innerHTML = `
+                <div class="image-preview-container">
+                    <img src="${e.target.result}" alt="Aperçu" class="image-preview">
+                    <button type="button" class="remove-image" onclick="removeImagePreview()" title="Supprimer l'image">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+        };
+        
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+// Fonction pour supprimer l'aperçu d'image
+function removeImagePreview() {
+    document.getElementById('imagePreview').innerHTML = '';
+    document.getElementById('annonceImage').value = '';
+}
+
+// Fonction pour afficher l'image en modal
+function showImageModal(imageSrc, titre) {
+    document.getElementById('modalImageContent').src = imageSrc;
+    document.getElementById('modalImageTitle').textContent = `Image: ${titre}`;
+    const modal = new bootstrap.Modal(document.getElementById('modalImage'));
+    modal.show();
+}
+
 // Fonction pour afficher les alertes
 function showAlert(message, type = 'success') {
     const alertZone = document.getElementById('alertZone');
+    if (!alertZone) {
+        console.error('Zone d\'alerte non trouvée');
+        return;
+    }
+    
     const alertId = 'alert-' + Date.now();
     
     const alertHTML = `
@@ -626,19 +1157,15 @@ function showAlert(message, type = 'success') {
     }, 5000);
 }
 
-// Fonction pour effectuer une requête AJAX
-async function ajaxRequest(action, data) {
-    const formData = new FormData();
-    formData.append('ajax_action', action);
-    
-    for (const key in data) {
-        formData.append(key, data[key]);
-    }
+// Fonction pour effectuer une requête AJAX avec FormData
+async function ajaxRequest(action, formData = null) {
+    const form = formData || new FormData();
+    form.append('ajax_action', action);
     
     try {
         const response = await fetch(window.location.href, {
             method: 'POST',
-            body: formData
+            body: form
         });
         
         if (!response.ok) {
@@ -652,12 +1179,43 @@ async function ajaxRequest(action, data) {
     }
 }
 
-// Fonction pour mettre à jour les statistiques
+// Fonction pour mettre à jour les statistiques avec animation
 function updateStats(stats) {
-    document.getElementById('statTotal').textContent = stats.total;
-    document.getElementById('statPublie').textContent = stats.publie;
-    document.getElementById('statBrouillon').textContent = stats.brouillon;
-    document.getElementById('statUrgente').textContent = stats.urgente;
+    if (stats) {
+        animateCounter('statTotal', stats.total || 0);
+        animateCounter('statPublie', stats.publie || 0);
+        animateCounter('statBrouillon', stats.brouillon || 0);
+        animateCounter('statUrgente', stats.urgente || 0);
+    }
+}
+
+// Animation des compteurs
+function animateCounter(elementId, targetValue) {
+    const element = document.getElementById(elementId);
+    
+    if (!element) {
+        console.error(`Élément avec l'ID '${elementId}' non trouvé`);
+        return;
+    }
+    
+    const currentValue = parseInt(element.textContent) || 0;
+    
+    if (currentValue === targetValue) return;
+    
+    const increment = targetValue > currentValue ? 1 : -1;
+    const duration = 1000;
+    const steps = Math.abs(targetValue - currentValue);
+    const stepDuration = steps > 0 ? duration / steps : 0;
+    
+    let current = currentValue;
+    const timer = setInterval(() => {
+        current += increment;
+        element.textContent = current;
+        
+        if (current === targetValue) {
+            clearInterval(timer);
+        }
+    }, stepDuration);
 }
 
 // Fonction pour générer le HTML d'une ligne d'annonce
@@ -676,49 +1234,64 @@ function generateAnnonceRow(annonce) {
     };
     
     const categorieHTML = annonce.categorie_nom 
-        ? `<span class="badge" style="background-color: ${annonce.categorie_couleur}">${annonce.categorie_nom}</span>`
+        ? `<span class="badge" style="background-color: ${annonce.categorie_couleur || '#007bff'}">${annonce.categorie_nom}</span>`
         : '<span class="text-muted">Aucune</span>';
     
     const adminHTML = annonce.admin_nom 
         ? `<small class="text-muted d-block">par ${annonce.admin_nom}</small>`
         : '';
+
+    const imageHTML = annonce.image 
+        ? `<img src="${annonce.image}" alt="Image annonce" class="table-image" onclick="showImageModal('${annonce.image}', '${annonce.titre}')">`
+        : '<div class="text-muted"><i class="fas fa-image"></i></div>';
     
     return `
         <tr data-id="${annonce.id}">
             <td>${annonce.id}</td>
+            <td>${imageHTML}</td>
             <td>
                 <strong>${annonce.titre}</strong>
                 ${adminHTML}
             </td>
             <td>${categorieHTML}</td>
             <td>
-                <span class="badge bg-${prioriteColors[annonce.priorite]} priorite-badge">
-                    ${annonce.priorite.charAt(0).toUpperCase() + annonce.priorite.slice(1)}
+                <span class="badge bg-${prioriteColors[annonce.priorite] || 'primary'} priorite-badge">
+                    ${annonce.priorite ? annonce.priorite.charAt(0).toUpperCase() + annonce.priorite.slice(1) : 'Normale'}
                 </span>
             </td>
             <td>
-                <span class="badge bg-${statutColors[annonce.statut]}">
-                    ${annonce.statut.charAt(0).toUpperCase() + annonce.statut.slice(1)}
+                <span class="badge bg-${statutColors[annonce.statut] || 'primary'}">
+                    ${annonce.statut ? annonce.statut.charAt(0).toUpperCase() + annonce.statut.slice(1) : 'Brouillon'}
                 </span>
             </td>
-            <td>${new Date(annonce.date_creation).toLocaleDateString('fr-FR', {
-                year: 'numeric', month: '2-digit', day: '2-digit',
-                hour: '2-digit', minute: '2-digit'
-            })}</td>
+            <td>${annonce.date_debut ? new Date(annonce.date_debut).toLocaleDateString('fr-FR') : '<span class="text-muted">-</span>'}</td>
+            <td>${annonce.date_fin ? new Date(annonce.date_fin).toLocaleDateString('fr-FR') : '<span class="text-muted">-</span>'}</td>
             <td>
                 <span class="badge bg-info">${annonce.nombre_vues || 0}</span>
             </td>
+            <td>
+                <small>${new Date(annonce.date_creation).toLocaleDateString('fr-FR', {
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit'
+                })}</small>
+            </td>
+            <td>
+                <small>${new Date(annonce.date_modification).toLocaleDateString('fr-FR', {
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit'
+                })}</small>
+            </td>
             <td class="table-actions">
-                <button class="btn btn-sm btn-outline-primary" onclick="voirAnnonce(${annonce.id})">
+                <button class="btn btn-sm btn-outline-primary" onclick="voirAnnonce(${annonce.id})" title="Voir">
                     <i class="fas fa-eye"></i>
-                    </button>
-                <button class="btn btn-sm btn-outline-warning" onclick="modifierAnnonce(${annonce.id})">
+                </button>
+                <button class="btn btn-sm btn-outline-warning" onclick="modifierAnnonce(${annonce.id})" title="Modifier">
                     <i class="fas fa-edit"></i>
                 </button>
-                <button class="btn btn-sm btn-outline-secondary" onclick="archiverAnnonce(${annonce.id})">
+                <button class="btn btn-sm btn-outline-secondary" onclick="archiverAnnonce(${annonce.id})" title="Archiver">
                     <i class="fas fa-archive"></i>
                 </button>
-                <button class="btn btn-sm btn-outline-danger" onclick="supprimerAnnonce(${annonce.id})">
+                <button class="btn btn-sm btn-outline-danger" onclick="supprimerAnnonce(${annonce.id})" title="Supprimer">
                     <i class="fas fa-trash"></i>
                 </button>
             </td>
@@ -728,201 +1301,361 @@ function generateAnnonceRow(annonce) {
 
 // Fonction pour recharger la liste des annonces
 async function reloadAnnonces() {
-    const result = await ajaxRequest('get_annonces', {});
+    const result = await ajaxRequest('get_annonces');
     
     if (result.success) {
         const tbody = document.getElementById('annoncesTableBody');
-        tbody.innerHTML = '';
-        
-        result.annonces.forEach(annonce => {
-            tbody.insertAdjacentHTML('beforeend', generateAnnonceRow(annonce));
-        });
-        
-        updateStats(result.stats);
+        if (tbody && result.annonces) {
+            tbody.innerHTML = '';
+            
+            result.annonces.forEach(annonce => {
+                tbody.insertAdjacentHTML('beforeend', generateAnnonceRow(annonce));
+            });
+            
+            updateStats(result.stats);
+        } else {
+            console.error('Élément tbody non trouvé ou données manquantes');
+        }
     } else {
-        showAlert(result.message, 'danger');
+        showAlert(result.message || 'Erreur lors du rechargement', 'danger');
+    }
+}
+
+// Fonction pour charger les catégories dans le modal de gestion
+async function chargerCategories() {
+    const result = await ajaxRequest('get_categories');
+    
+    if (result.success) {
+        const container = document.getElementById('listeCategoriesGestion');
+        if (!container) {
+            console.error('Container des catégories non trouvé');
+            return;
+        }
+        
+        container.innerHTML = '';
+        
+        if (!result.categories || result.categories.length === 0) {
+            container.innerHTML = '<p class="text-muted text-center">Aucune catégorie trouvée.</p>';
+            return;
+        }
+        
+        result.categories.forEach(categorie => {
+            const categorieHTML = `
+                <div class="category-item" data-id="${categorie.id}">
+                    <div class="d-flex align-items-center">
+                        <div class="category-color" style="background-color: ${categorie.couleur || '#007bff'}"></div>
+                        <div>
+                            <strong>${categorie.nom}</strong>
+                            ${categorie.description ? `<br><small class="text-muted">${categorie.description}</small>` : ''}
+                        </div>
+                    </div>
+                    <div>
+                        <button class="btn btn-sm btn-outline-danger" onclick="supprimerCategorie(${categorie.id}, '${categorie.nom}')">
+                            <i class="fas fa-trash"></i> Supprimer
+                        </button>
+                    </div>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', categorieHTML);
+        });
+    } else {
+        showAlert(result.message || 'Erreur lors du chargement des catégories', 'danger');
+    }
+}
+
+// Fonction pour supprimer une catégorie
+async function supprimerCategorie(categorieId, nomCategorie) {
+    if (confirm(`Êtes-vous sûr de vouloir supprimer la catégorie "${nomCategorie}" ?\n\nAttention : Cette action est irréversible et ne sera possible que si aucune annonce n'est liée à cette catégorie.`)) {
+        const formData = new FormData();
+        formData.append('categorie_id', categorieId);
+        
+        const result = await ajaxRequest('supprimer_categorie', formData);
+        
+        if (result.success) {
+            showAlert(result.message, 'success');
+            await chargerCategories();
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showAlert(result.message, 'danger');
+        }
     }
 }
 
 // Fonction pour réinitialiser le formulaire d'annonce
 function resetAnnonceForm() {
     const form = document.getElementById('formAjouterAnnonce');
+    if (!form) {
+        console.error('Formulaire d\'annonce non trouvé');
+        return;
+    }
+    
     form.reset();
     
     // Réinitialiser les variables globales
     isEditing = false;
     currentAnnonceId = null;
     
+    // Réinitialiser l'aperçu d'image
+    document.getElementById('imagePreview').innerHTML = '';
+    
     // Réinitialiser le titre du modal
-    document.getElementById('modalAnnonceTitle').textContent = 'Nouvelle Annonce';
-    document.getElementById('btnSauvegarderAnnonce').textContent = 'Ajouter l\'annonce';
-    document.getElementById('annonceId').value = '';
+    const modalTitle = document.getElementById('modalAnnonceTitle');
+    const btnSauvegarder = document.getElementById('btnSauvegarderAnnonce');
+    const annonceId = document.getElementById('annonceId');
+    
+    if (modalTitle) modalTitle.textContent = 'Nouvelle Annonce';
+    if (btnSauvegarder) btnSauvegarder.textContent = 'Ajouter l\'annonce';
+    if (annonceId) annonceId.value = '';
     
     // Retirer les classes d'erreur
     form.querySelectorAll('.is-invalid').forEach(field => {
-        field.classList.remove('is-invalid');
+        if (field && field.classList) {
+            field.classList.remove('is-invalid');
+        }
     });
 }
 
 // Gestionnaire pour le formulaire d'ajout/modification d'annonce
-document.getElementById('formAjouterAnnonce').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    const btn = document.getElementById('btnSauvegarderAnnonce');
-    const spinner = document.getElementById('spinnerAnnonce');
-    
-    // Validation côté client
-    const requiredFields = this.querySelectorAll('[required]');
-    let isValid = true;
-    
-    requiredFields.forEach(field => {
-        if (!field.value.trim()) {
-            field.classList.add('is-invalid');
-            isValid = false;
-        } else {
-            field.classList.remove('is-invalid');
-        }
-    });
-    
-    if (!isValid) {
-        showAlert('Veuillez remplir tous les champs obligatoires.', 'danger');
-        return;
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('formAjouterAnnonce');
+    if (form) {
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const btn = document.getElementById('btnSauvegarderAnnonce');
+            const spinner = document.getElementById('spinnerAnnonce');
+            
+            // Validation côté client
+            const requiredFields = this.querySelectorAll('[required]');
+            let isValid = true;
+            
+            requiredFields.forEach(field => {
+                if (field && field.value !== undefined) {
+                    if (!field.value.trim()) {
+                        if (field.classList) field.classList.add('is-invalid');
+                        isValid = false;
+                    } else {
+                        if (field.classList) field.classList.remove('is-invalid');
+                    }
+                }
+            });
+            
+            if (!isValid) {
+                showAlert('Veuillez remplir tous les champs obligatoires.', 'danger');
+                return;
+            }
+            
+            // Afficher le spinner
+            if (btn) btn.disabled = true;
+            if (spinner && spinner.classList) spinner.classList.remove('d-none');
+            
+            // Préparer les données avec FormData pour gérer les fichiers
+            const formData = new FormData(this);
+            
+            // Déterminer l'action
+            const action = isEditing ? 'modifier' : 'ajouter';
+            
+            try {
+                const result = await ajaxRequest(action, formData);
+                
+                if (result.success) {
+                    showAlert(result.message, 'success');
+                    
+                    // Fermer le modal
+                    const modalElement = document.getElementById('modalAjouterAnnonce');
+                    if (modalElement) {
+                        const modal = bootstrap.Modal.getInstance(modalElement);
+                        if (modal) modal.hide();
+                    }
+                    
+                    // Recharger la liste
+                    await reloadAnnonces();
+                    
+                    // Réinitialiser le formulaire
+                    resetAnnonceForm();
+                } else {
+                    showAlert(result.message, 'danger');
+                }
+            } catch (error) {
+                showAlert('Erreur lors de la sauvegarde', 'danger');
+            } finally {
+                if (btn) btn.disabled = false;
+                if (spinner && spinner.classList) spinner.classList.add('d-none');
+            }
+        });
     }
-    
-    // Afficher le spinner
-    btn.disabled = true;
-    spinner.classList.remove('d-none');
-    
-    // Préparer les données
-    const formData = new FormData(this);
-    const data = Object.fromEntries(formData.entries());
-    
-    // Déterminer l'action
-    const action = isEditing ? 'modifier' : 'ajouter';
-    
-    try {
-        const result = await ajaxRequest(action, data);
-        
-        if (result.success) {
-            showAlert(result.message, 'success');
-            
-            // Fermer le modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('modalAjouterAnnonce'));
-            modal.hide();
-            
-            // Recharger la liste
-            await reloadAnnonces();
-            
-            // Réinitialiser le formulaire
-            resetAnnonceForm();
-        } else {
-            showAlert(result.message, 'danger');
-        }
-    } catch (error) {
-        showAlert('Erreur lors de la sauvegarde', 'danger');
-    } finally {
-        btn.disabled = false;
-        spinner.classList.add('d-none');
-    }
-});
 
-// Gestionnaire pour le formulaire d'ajout de catégorie
-document.getElementById('formAjouterCategorie').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    const btn = document.getElementById('btnSauvegarderCategorie');
-    const spinner = document.getElementById('spinnerCategorie');
-    
-    // Validation côté client
-    const requiredFields = this.querySelectorAll('[required]');
-    let isValid = true;
-    
-    requiredFields.forEach(field => {
-        if (!field.value.trim()) {
-            field.classList.add('is-invalid');
-            isValid = false;
-        } else {
-            field.classList.remove('is-invalid');
+    // Gestionnaire pour le formulaire d'ajout de catégorie
+    const formCategorie = document.getElementById('formAjouterCategorie');
+    if (formCategorie) {
+        formCategorie.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const btn = document.getElementById('btnSauvegarderCategorie');
+            const spinner = document.getElementById('spinnerCategorie');
+            
+            // Validation côté client
+            const requiredFields = this.querySelectorAll('[required]');
+            let isValid = true;
+            
+            requiredFields.forEach(field => {
+                if (field && field.value !== undefined) {
+                    if (!field.value.trim()) {
+                        if (field.classList) field.classList.add('is-invalid');
+                        isValid = false;
+                    } else {
+                        if (field.classList) field.classList.remove('is-invalid');
+                    }
+                }
+            });
+            
+            if (!isValid) {
+                showAlert('Veuillez remplir tous les champs obligatoires.', 'danger');
+                return;
+            }
+            
+            // Afficher le spinner
+            if (btn) btn.disabled = true;
+            if (spinner && spinner.classList) spinner.classList.remove('d-none');
+            
+            // Préparer les données
+            const formData = new FormData(this);
+            
+            try {
+                const result = await ajaxRequest('ajouter_categorie', formData);
+                
+                if (result.success) {
+                    showAlert(result.message, 'success');
+                    
+                    // Fermer le modal
+                    const modalElement = document.getElementById('modalAjouterCategorie');
+                    if (modalElement) {
+                        const modal = bootstrap.Modal.getInstance(modalElement);
+                        if (modal) modal.hide();
+                    }
+                    
+                    // Réinitialiser le formulaire
+                    this.reset();
+                    
+                    // Recharger la page pour mettre à jour la liste des catégories dans le select
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    showAlert(result.message, 'danger');
+                }
+            } catch (error) {
+                showAlert('Erreur lors de la sauvegarde', 'danger');
+            } finally {
+                if (btn) btn.disabled = false;
+                if (spinner && spinner.classList) spinner.classList.add('d-none');
+            }
+        });
+    }
+
+    // Validation en temps réel
+    document.querySelectorAll('[required]').forEach(function(field) {
+        if (field) {
+            field.addEventListener('blur', function() {
+                if (this.value && this.value.trim()) {
+                    if (this.classList) this.classList.remove('is-invalid');
+                } else {
+                    if (this.classList) this.classList.add('is-invalid');
+                }
+            });
         }
     });
-    
-    if (!isValid) {
-        showAlert('Veuillez remplir tous les champs obligatoires.', 'danger');
-        return;
+
+    // Event listeners pour les modals
+    const modalAnnonce = document.getElementById('modalAjouterAnnonce');
+    if (modalAnnonce) {
+        modalAnnonce.addEventListener('show.bs.modal', function() {
+            if (!isEditing) {
+                resetAnnonceForm();
+            }
+        });
+
+        modalAnnonce.addEventListener('hidden.bs.modal', function() {
+            resetAnnonceForm();
+        });
     }
-    
-    // Afficher le spinner
-    btn.disabled = true;
-    spinner.classList.remove('d-none');
-    
-    // Préparer les données
-    const formData = new FormData(this);
-    const data = Object.fromEntries(formData.entries());
-    
-    try {
-        const result = await ajaxRequest('ajouter_categorie', data);
-        
-        if (result.success) {
-            showAlert(result.message, 'success');
-            
-            // Fermer le modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('modalAjouterCategorie'));
-            modal.hide();
-            
-            // Réinitialiser le formulaire
-            this.reset();
-            
-            // Recharger la page pour mettre à jour la liste des catégories dans le select
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
-        } else {
-            showAlert(result.message, 'danger');
-        }
-    } catch (error) {
-        showAlert('Erreur lors de la sauvegarde', 'danger');
-    } finally {
-        btn.disabled = false;
-        spinner.classList.add('d-none');
+
+    const modalCategories = document.getElementById('modalGererCategories');
+    if (modalCategories) {
+        modalCategories.addEventListener('show.bs.modal', function() {
+            chargerCategories();
+        });
     }
 });
 
 // Fonction pour voir une annonce
 function voirAnnonce(annonceId) {
-    // Vous pouvez implémenter une modal de visualisation ou rediriger
     window.open('voir_annonce.php?id=' + annonceId, '_blank');
 }
 
 // Fonction pour modifier une annonce
 async function modifierAnnonce(annonceId) {
-    // Récupérer les données de l'annonce
-    const result = await ajaxRequest('get_annonce', { annonce_id: annonceId });
+    const formData = new FormData();
+    formData.append('annonce_id', annonceId);
+    
+    const result = await ajaxRequest('get_annonce', formData);
     
     if (result.success) {
         const annonce = result.annonce;
         
-        // Remplir le formulaire
-        document.getElementById('annonceId').value = annonce.id;
-        document.getElementById('annonceTitre').value = annonce.titre;
-        document.getElementById('annonceContenu').value = annonce.contenu;
-        document.getElementById('annonceCategorie').value = annonce.categorie_id || '';
-        document.getElementById('annoncePriorite').value = annonce.priorite;
-        document.getElementById('annonceStatut').value = annonce.statut;
-        document.getElementById('annonceDateDebut').value = annonce.date_debut || '';
-        document.getElementById('annonceDateFin').value = annonce.date_fin || '';
-        document.getElementById('annonceLien').value = annonce.lien_externe || '';
+        // Remplir le formulaire avec vérifications
+        const fields = {
+            'annonceId': annonce.id,
+            'annonceTitre': annonce.titre,
+            'annonceContenu': annonce.contenu,
+            'annonceCategorie': annonce.categorie_id || '',
+            'annoncePriorite': annonce.priorite,
+            'annonceStatut': annonce.statut,
+            'annonceDateDebut': annonce.date_debut || '',
+            'annonceDateFin': annonce.date_fin || ''
+        };
+
+        Object.keys(fields).forEach(fieldId => {
+            const element = document.getElementById(fieldId);
+            if (element) {
+                element.value = fields[fieldId];
+            } else {
+                console.warn(`Champ ${fieldId} non trouvé`);
+            }
+        });
+        
+        // Afficher l'image actuelle si elle existe
+        if (annonce.image) {
+            document.getElementById('imagePreview').innerHTML = `
+                <div class="image-preview-container">
+                    <img src="${annonce.image}" alt="Image actuelle" class="image-preview">
+                    <button type="button" class="remove-image" onclick="removeImagePreview()" title="Supprimer l'image">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <small class="text-muted d-block mt-1">Image actuelle (vous pouvez la remplacer en sélectionnant un nouveau fichier)</small>
+            `;
+        }
         
         // Configurer le mode édition
         isEditing = true;
         currentAnnonceId = annonceId;
         
         // Changer le titre du modal
-        document.getElementById('modalAnnonceTitle').textContent = 'Modifier l\'annonce';
-        document.getElementById('btnSauvegarderAnnonce').textContent = 'Sauvegarder les modifications';
+        const modalTitle = document.getElementById('modalAnnonceTitle');
+        const btnSauvegarder = document.getElementById('btnSauvegarderAnnonce');
+        
+        if (modalTitle) modalTitle.textContent = 'Modifier l\'annonce';
+        if (btnSauvegarder) btnSauvegarder.textContent = 'Sauvegarder les modifications';
         
         // Ouvrir le modal
-        const modal = new bootstrap.Modal(document.getElementById('modalAjouterAnnonce'));
-        modal.show();
+        const modalElement = document.getElementById('modalAjouterAnnonce');
+        if (modalElement) {
+            const modal = new bootstrap.Modal(modalElement);
+            modal.show();
+        }
     } else {
         showAlert(result.message, 'danger');
     }
@@ -931,10 +1664,11 @@ async function modifierAnnonce(annonceId) {
 // Fonction pour archiver une annonce
 async function archiverAnnonce(annonceId) {
     if (confirm('Êtes-vous sûr de vouloir archiver cette annonce ?')) {
-        const result = await ajaxRequest('changer_statut', {
-            annonce_id: annonceId,
-            nouveau_statut: 'archive'
-        });
+        const formData = new FormData();
+        formData.append('annonce_id', annonceId);
+        formData.append('nouveau_statut', 'archive');
+        
+        const result = await ajaxRequest('changer_statut', formData);
         
         if (result.success) {
             showAlert(result.message, 'success');
@@ -948,7 +1682,10 @@ async function archiverAnnonce(annonceId) {
 // Fonction pour supprimer une annonce
 async function supprimerAnnonce(annonceId) {
     if (confirm('Êtes-vous sûr de vouloir supprimer cette annonce ? Cette action est irréversible.')) {
-        const result = await ajaxRequest('supprimer', { annonce_id: annonceId });
+        const formData = new FormData();
+        formData.append('annonce_id', annonceId);
+        
+        const result = await ajaxRequest('supprimer', formData);
         
         if (result.success) {
             showAlert(result.message, 'success');
@@ -959,52 +1696,7 @@ async function supprimerAnnonce(annonceId) {
     }
 }
 
-// Réinitialiser le formulaire à l'ouverture du modal d'ajout
-document.getElementById('modalAjouterAnnonce').addEventListener('show.bs.modal', function() {
-    if (!isEditing) {
-        resetAnnonceForm();
-    }
-});
-
-// Réinitialiser les variables quand le modal se ferme
-document.getElementById('modalAjouterAnnonce').addEventListener('hidden.bs.modal', function() {
-    resetAnnonceForm();
-});
-
-// Validation en temps réel
-document.addEventListener('DOMContentLoaded', function() {
-    // Validation pour tous les champs requis
-    document.querySelectorAll('[required]').forEach(function(field) {
-        field.addEventListener('blur', function() {
-            if (this.value.trim()) {
-                this.classList.remove('is-invalid');
-            } else {
-                this.classList.add('is-invalid');
-            }
-        });
-    });
-});
-
-// Fonction utilitaire pour gérer les erreurs de connexion
-function handleConnectionError() {
-    showAlert('Erreur de connexion. Vérifiez votre connexion internet.', 'danger');
-}
-
-// Ajouter un indicateur de chargement pour le tableau
-function showTableLoading() {
-    const tbody = document.getElementById('annoncesTableBody');
-    tbody.innerHTML = `
-        <tr>
-            <td colspan="8" class="text-center py-4">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Chargement...</span>
-                </div>
-            </td>
-        </tr>
-    `;
-}
-
-// Auto-actualisation périodique (optionnel)
+// Auto-actualisation périodique des statistiques
 let autoRefreshInterval;
 
 function startAutoRefresh() {
@@ -1031,199 +1723,6 @@ document.addEventListener('visibilitychange', function() {
     } else {
         startAutoRefresh();
     }
-});
-
-// Fonction pour publier une annonce rapidement
-async function publierAnnonce(annonceId) {
-    if (confirm('Êtes-vous sûr de vouloir publier cette annonce ?')) {
-        const result = await ajaxRequest('changer_statut', {
-            annonce_id: annonceId,
-            nouveau_statut: 'publie'
-        });
-        
-        if (result.success) {
-            showAlert(result.message, 'success');
-            await reloadAnnonces();
-        } else {
-            showAlert(result.message, 'danger');
-        }
-    }
-}
-
-// Fonction pour mettre en brouillon une annonce
-async function mettreEnBrouillon(annonceId) {
-    if (confirm('Êtes-vous sûr de vouloir remettre cette annonce en brouillon ?')) {
-        const result = await ajaxRequest('changer_statut', {
-            annonce_id: annonceId,
-            nouveau_statut: 'brouillon'
-        });
-        
-        if (result.success) {
-            showAlert(result.message, 'success');
-            await reloadAnnonces();
-        } else {
-            showAlert(result.message, 'danger');
-        }
-    }
-}
-
-// Fonction pour filtrer les annonces par statut (bonus)
-function filtrerAnnonces(statut) {
-    const rows = document.querySelectorAll('#annoncesTableBody tr');
-    
-    rows.forEach(row => {
-        if (statut === 'tous') {
-            row.style.display = '';
-        } else {
-            const statutBadge = row.querySelector('td:nth-child(5) .badge');
-            if (statutBadge && statutBadge.textContent.toLowerCase().includes(statut.toLowerCase())) {
-                row.style.display = '';
-            } else {
-                row.style.display = 'none';
-            }
-        }
-    });
-}
-
-// Fonction pour trier les annonces (bonus)
-function trierAnnonces(critere, ordre = 'asc') {
-    const tbody = document.getElementById('annoncesTableBody');
-    const rows = Array.from(tbody.querySelectorAll('tr'));
-    
-    rows.sort((a, b) => {
-        let valeurA, valeurB;
-        
-        switch (critere) {
-            case 'id':
-                valeurA = parseInt(a.cells[0].textContent);
-                valeurB = parseInt(b.cells[0].textContent);
-                break;
-            case 'titre':
-                valeurA = a.cells[1].textContent.toLowerCase();
-                valeurB = b.cells[1].textContent.toLowerCase();
-                break;
-            case 'date':
-                valeurA = new Date(a.cells[5].textContent);
-                valeurB = new Date(b.cells[5].textContent);
-                break;
-            case 'vues':
-                valeurA = parseInt(a.cells[6].textContent);
-                valeurB = parseInt(b.cells[6].textContent);
-                break;
-            default:
-                return 0;
-        }
-        
-        if (ordre === 'asc') {
-            return valeurA > valeurB ? 1 : -1;
-        } else {
-            return valeurA < valeurB ? 1 : -1;
-        }
-    });
-    
-    // Réorganiser les lignes
-    rows.forEach(row => tbody.appendChild(row));
-}
-
-// Fonction pour rechercher dans les annonces (bonus)
-function rechercherAnnonces(terme) {
-    const rows = document.querySelectorAll('#annoncesTableBody tr');
-    const termeMinuscule = terme.toLowerCase();
-    
-    rows.forEach(row => {
-        const titre = row.cells[1].textContent.toLowerCase();
-        const categorie = row.cells[2].textContent.toLowerCase();
-        
-        if (titre.includes(termeMinuscule) || categorie.includes(termeMinuscule)) {
-            row.style.display = '';
-        } else {
-            row.style.display = 'none';
-        }
-    });
-}
-
-// Gestion des raccourcis clavier (bonus)
-document.addEventListener('keydown', function(e) {
-    // Ctrl + N : Nouvelle annonce
-    if (e.ctrlKey && e.key === 'n') {
-        e.preventDefault();
-        const modal = new bootstrap.Modal(document.getElementById('modalAjouterAnnonce'));
-        modal.show();
-    }
-    
-    // Ctrl + R : Recharger les annonces
-    if (e.ctrlKey && e.key === 'r') {
-        e.preventDefault();
-        reloadAnnonces();
-    }
-    
-    // Échap : Fermer les modals
-    if (e.key === 'Escape') {
-        const modals = document.querySelectorAll('.modal.show');
-        modals.forEach(modal => {
-            const bsModal = bootstrap.Modal.getInstance(modal);
-            if (bsModal) {
-                bsModal.hide();
-            }
-        });
-    }
-});
-
-// Sauvegarde automatique des brouillons (bonus - à implémenter selon vos besoins)
-let brouillonTimer;
-
-function demarrerSauvegardeBrouillon() {
-    const contenuField = document.getElementById('annonceContenu');
-    const titreField = document.getElementById('annonceTitre');
-    
-    if (contenuField && titreField) {
-        [contenuField, titreField].forEach(field => {
-            field.addEventListener('input', function() {
-                clearTimeout(brouillonTimer);
-                brouillonTimer = setTimeout(() => {
-                    // Sauvegarder en localStorage pour éviter les pertes
-                    const brouillon = {
-                        titre: titreField.value,
-                        contenu: contenuField.value,
-                        timestamp: Date.now()
-                    };
-                    localStorage.setItem('annonce_brouillon', JSON.stringify(brouillon));
-                }, 2000); // Sauvegarde après 2 secondes d'inactivité
-            });
-        });
-    }
-}
-
-// Restaurer un brouillon sauvé
-function restaurerBrouillon() {
-    const brouillon = localStorage.getItem('annonce_brouillon');
-    if (brouillon) {
-        const data = JSON.parse(brouillon);
-        const maintenant = Date.now();
-        
-        // Restaurer seulement si le brouillon a moins de 24 heures
-        if (maintenant - data.timestamp < 24 * 60 * 60 * 1000) {
-            if (confirm('Un brouillon a été trouvé. Voulez-vous le restaurer ?')) {
-                document.getElementById('annonceTitre').value = data.titre;
-                document.getElementById('annonceContenu').value = data.contenu;
-            }
-        }
-    }
-}
-
-// Nettoyer le brouillon après sauvegarde réussie
-function nettoyerBrouillon() {
-    localStorage.removeItem('annonce_brouillon');
-}
-
-// Initialisation finale
-document.addEventListener('DOMContentLoaded', function() {
-    demarrerSauvegardeBrouillon();
-    
-    // Proposer de restaurer un brouillon au clic sur "Nouvelle annonce"
-    document.querySelector('[data-bs-target="#modalAjouterAnnonce"]').addEventListener('click', function() {
-        setTimeout(restaurerBrouillon, 500);
-    });
 });
 </script>
 </body>

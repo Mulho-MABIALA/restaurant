@@ -1,47 +1,40 @@
 <?php
+    require_once '../config.php';
+    session_start();
 
-require_once '../config.php';
-require_once '../vendor/autoload.php'; // Pour TCPDF
-session_start();
-
-// Vérifie l'accès admin
-if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
-    header('Location: login.php');
-    exit;
-}
-
-// Configuration des types de contrat
-const TYPES_CONTRAT = [
-    'CDI' => 'Contrat à Durée Indéterminée',
-    'CDD' => 'Contrat à Durée Déterminée', 
-    'STAGE' => 'Stage',
-    'APPRENTISSAGE' => 'Contrat d\'Apprentissage',
-    'CONSULTANT' => 'Consultant',
-    'SAISONNIER' => 'Contrat Saisonnier'
-];
-
-// ====================================================================
-// 2. CLASSES ET FONCTIONS UTILITAIRES
-// ====================================================================
-
-/**
- * Classe pour gérer les opérations sur les postes
- */
-class PosteManager {
-    private $conn;
-    
-    public function __construct($connection) {
-        $this->conn = $connection;
+    // Vérifie l'accès admin
+    if (! isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+        header('Location: login.php');
+        exit;
     }
-    
-    /**
-     * Récupère tous les postes avec leurs informations détaillées
-     */
-    public function getAllPostes() {
-    $stmt = $this->conn->query("
+
+    // Configuration des types de contrat
+    const TYPES_CONTRAT = [
+        'CDI'           => 'Contrat à Durée Indéterminée',
+        'CDD'           => 'Contrat à Durée Déterminée',
+        'STAGE'         => 'Stage',
+        'APPRENTISSAGE' => 'Contrat d\'Apprentissage',
+        'CONSULTANT'    => 'Consultant',
+        'SAISONNIER'    => 'Contrat Saisonnier',
+    ];
+    class PosteManager
+    {
+        private $conn;
+
+        public function __construct($connection)
+        {
+            $this->conn = $connection;
+        }
+
+        /**
+         * Récupère tous les postes avec leurs informations détaillées
+         */
+        public function getAllPostes()
+        {
+            $stmt = $this->conn->query("
         SELECT p.*,
         (SELECT COUNT(*) FROM employes e WHERE e.poste_id = p.id AND e.statut = 'actif') as nb_employes,
-        ps.nom as poste_superieur_nom, 
+        ps.nom as poste_superieur_nom,
         nh.libelle as niveau_libelle,
         d.nom as departement_nom
         FROM postes p
@@ -51,27 +44,28 @@ class PosteManager {
         WHERE p.actif = TRUE
         ORDER BY p.niveau_hierarchique, p.nom
     ");
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
-    
-    /**
-     * Crée un nouveau poste
-     */
-   public function createPoste($data) {
-    // Validation
-    if (empty($data['nom'])) {
-        throw new Exception('Le nom du poste est requis');
-    }
-    
-    // Vérifier unicité
-    $stmt = $this->conn->prepare("SELECT id FROM postes WHERE nom = ? AND actif = TRUE");
-    $stmt->execute([$data['nom']]);
-    if ($stmt->fetch()) {
-        throw new Exception('Un poste avec ce nom existe déjà');
-    }
-    
-    // Insertion avec département
-    $stmt = $this->conn->prepare("
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        /**
+         * Crée un nouveau poste
+         */
+        public function createPoste($data)
+        {
+            // Validation
+            if (empty($data['nom'])) {
+                throw new Exception('Le nom du poste est requis');
+            }
+
+            // Vérifier unicité
+            $stmt = $this->conn->prepare("SELECT id FROM postes WHERE nom = ? AND actif = TRUE");
+            $stmt->execute([$data['nom']]);
+            if ($stmt->fetch()) {
+                throw new Exception('Un poste avec ce nom existe déjà');
+            }
+
+            // Insertion avec département
+            $stmt = $this->conn->prepare("
         INSERT INTO postes (nom, description, salaire, couleur, type_contrat,
                           niveau_hierarchique, poste_superieur_id, competences_requises,
                           nombre_postes_prevus, duree_contrat, avantages, code_paie,
@@ -79,304 +73,350 @@ class PosteManager {
                           departement_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
-    
-    $stmt->execute([
-        $data['nom'],
-        $data['description'] ?? null,
-        intval($data['salaire'] ?? 0),
-        $data['couleur'] ?? '#3B82F6',
-        $data['type_contrat'] ?? 'CDI',
-        !empty($data['niveau_hierarchique']) ? intval($data['niveau_hierarchique']) : null,
-        !empty($data['poste_superieur_id']) ? $data['poste_superieur_id'] : null,
-        $data['competences_requises'] ?? null,
-        intval($data['nombre_postes_prevus'] ?? 1),
-        $data['duree_contrat'] ?? null,
-        $data['avantages'] ?? null,
-        $data['code_paie'] ?? null,
-        $data['categorie_paie'] ?? null,
-        $data['regime_social'] ?? null,
-        $data['taux_cotisation'] ?? null,
-        intval($data['heures_travail'] ?? 35),
-        !empty($data['departement_id']) ? $data['departement_id'] : null
-    ]);
-    
-    return $this->conn->lastInsertId();
-}
- 
-    public function updatePoste($id, $data) {
-        if (empty($data['nom'])) {
-            throw new Exception('Le nom du poste est requis');
+
+            $stmt->execute([
+                $data['nom'],
+                $data['description'] ?? null,
+                intval($data['salaire'] ?? 0),
+                $data['couleur'] ?? '#3B82F6',
+                $data['type_contrat'] ?? 'CDI',
+                ! empty($data['niveau_hierarchique']) ? intval($data['niveau_hierarchique']) : null,
+                ! empty($data['poste_superieur_id']) ? $data['poste_superieur_id'] : null,
+                $data['competences_requises'] ?? null,
+                intval($data['nombre_postes_prevus'] ?? 1),
+                $data['duree_contrat'] ?? null,
+                $data['avantages'] ?? null,
+                $data['code_paie'] ?? null,
+                $data['categorie_paie'] ?? null,
+                $data['regime_social'] ?? null,
+                $data['taux_cotisation'] ?? null,
+                intval($data['heures_travail'] ?? 35),
+                ! empty($data['departement_id']) ? $data['departement_id'] : null,
+            ]);
+
+            return $this->conn->lastInsertId();
         }
-        
-        // Vérifier unicité (excluant le poste actuel)
-        $stmt = $this->conn->prepare("SELECT id FROM postes WHERE nom = ? AND id != ? AND actif = TRUE");
-        $stmt->execute([$data['nom'], $id]);
-        if ($stmt->fetch()) {
-            throw new Exception('Un poste avec ce nom existe déjà');
+
+        public function updatePoste($id, $data)
+        {
+            if (empty($data['nom'])) {
+                throw new Exception('Le nom du poste est requis');
+            }
+
+            // Vérifier unicité (excluant le poste actuel)
+            $stmt = $this->conn->prepare("SELECT id FROM postes WHERE nom = ? AND id != ? AND actif = TRUE");
+            $stmt->execute([$data['nom'], $id]);
+            if ($stmt->fetch()) {
+                throw new Exception('Un poste avec ce nom existe déjà');
+            }
+
+            $stmt = $this->conn->prepare("
+        UPDATE postes SET
+            nom = ?,
+            description = ?,
+            salaire = ?,
+            couleur = ?,
+            type_contrat = ?,
+            niveau_hierarchique = ?,
+            poste_superieur_id = ?,
+            competences_requises = ?,
+            nombre_postes_prevus = ?,
+            duree_contrat = ?,
+            avantages = ?,
+            code_paie = ?,
+            categorie_paie = ?,
+            regime_social = ?,
+            taux_cotisation = ?,
+            heures_travail = ?,
+            departement_id = ?
+        WHERE id = ? AND actif = TRUE
+    ");
+
+            $result = $stmt->execute([
+                $data['nom'],
+                $data['description'] ?? null,
+                intval($data['salaire'] ?? 0),
+                $data['couleur'] ?? '#3B82F6',
+                $data['type_contrat'] ?? 'CDI',
+                ! empty($data['niveau_hierarchique']) ? intval($data['niveau_hierarchique']) : null,
+                ! empty($data['poste_superieur_id']) ? $data['poste_superieur_id'] : null,
+                $data['competences_requises'] ?? null,
+                intval($data['nombre_postes_prevus'] ?? 1),
+                $data['duree_contrat'] ?? null,
+                $data['avantages'] ?? null,
+                $data['code_paie'] ?? null,
+                $data['categorie_paie'] ?? null,
+                $data['regime_social'] ?? null,
+                $data['taux_cotisation'] ?? null,
+                intval($data['heures_travail'] ?? 35),
+                ! empty($data['departement_id']) ? $data['departement_id'] : null, // AJOUT DE CE CHAMP
+                $id,                                                              // L'ID doit être en dernier
+            ]);
+
+            if ($stmt->rowCount() === 0) {
+                throw new Exception('Poste non trouvé ou non modifiable');
+            }
+
+            return true;
         }
-        
-        $stmt = $this->conn->prepare("
-            UPDATE postes SET nom = ?, description = ?, salaire = ?, couleur = ?, type_contrat = ?,
-                   niveau_hierarchique = ?, poste_superieur_id = ?, competences_requises = ?,
-                   nombre_postes_prevus = ?, duree_contrat = ?, avantages = ?,
-                   code_paie = ?, categorie_paie = ?, regime_social = ?, taux_cotisation = ?,
-                   heures_travail = ?
-            WHERE id = ? AND actif = TRUE
-        ");
-        
-        $result = $stmt->execute([
-            $data['nom'], $data['description'] ?? null, intval($data['salaire'] ?? 0),
-            $data['couleur'] ?? '#3B82F6', $data['type_contrat'] ?? 'CDI',
-            !empty($data['niveau_hierarchique']) ? intval($data['niveau_hierarchique']) : null,
-            !empty($data['poste_superieur_id']) ? $data['poste_superieur_id'] : null,
-            $data['competences_requises'] ?? null, intval($data['nombre_postes_prevus'] ?? 1),
-            $data['duree_contrat'] ?? null, $data['avantages'] ?? null,
-            $data['code_paie'] ?? null, $data['categorie_paie'] ?? null,
-            $data['regime_social'] ?? null, $data['taux_cotisation'] ?? null,
-            intval($data['heures_travail'] ?? 35), $id
-        ]);
-        
-        if ($stmt->rowCount() === 0) {
-            throw new Exception('Poste non trouvé ou non modifiable');
+
+        public function deletePoste($id)
+        {
+            // Vérifications de sécurité
+            $stmt = $this->conn->prepare("SELECT COUNT(*) FROM employes WHERE poste_id = ? AND statut != 'inactif'");
+            $stmt->execute([$id]);
+            $nb_employees = $stmt->fetchColumn();
+
+            if ($nb_employees > 0) {
+                throw new Exception("Impossible de supprimer ce poste car $nb_employees employé(s) y sont associé(s)");
+            }
+
+            $stmt = $this->conn->prepare("SELECT COUNT(*) FROM postes WHERE poste_superieur_id = ? AND actif = TRUE");
+            $stmt->execute([$id]);
+            $nb_subordonnes = $stmt->fetchColumn();
+
+            if ($nb_subordonnes > 0) {
+                throw new Exception("Impossible de supprimer ce poste car $nb_subordonnes poste(s) en dépendent hiérarchiquement");
+            }
+
+            // Désactivation
+            $stmt = $this->conn->prepare("UPDATE postes SET actif = FALSE WHERE id = ?");
+            $stmt->execute([$id]);
+
+            if ($stmt->rowCount() === 0) {
+                throw new Exception('Poste non trouvé');
+            }
+
+            return true;
         }
-        
-        return true;
-    }
-    
-    /**
-     * Supprime un poste (désactivation logique)
-     */
-    public function deletePoste($id) {
-        // Vérifications de sécurité
-        $stmt = $this->conn->prepare("SELECT COUNT(*) FROM employes WHERE poste_id = ? AND statut != 'inactif'");
-        $stmt->execute([$id]);
-        $nb_employees = $stmt->fetchColumn();
-        
-        if ($nb_employees > 0) {
-            throw new Exception("Impossible de supprimer ce poste car $nb_employees employé(s) y sont associé(s)");
+
+        public function duplicatePoste($id)
+        {
+            $stmt = $this->conn->prepare("SELECT * FROM postes WHERE id = ? AND actif = TRUE");
+            $stmt->execute([$id]);
+            $original = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (! $original) {
+                throw new Exception('Poste non trouvé');
+            }
+
+            // Générer nom unique
+            $nouveau_nom = $original['nom'] . ' (Copie)';
+            $counter     = 1;
+
+            while (true) {
+                $stmt = $this->conn->prepare("SELECT id FROM postes WHERE nom = ? AND actif = TRUE");
+                $stmt->execute([$nouveau_nom]);
+                if (! $stmt->fetch()) {
+                    break;
+                }
+
+                $counter++;
+                $nouveau_nom = $original['nom'] . ' (Copie ' . $counter . ')';
+            }
+
+            // Créer copie avec le nouveau nom
+            $original['nom'] = $nouveau_nom;
+            unset($original['id']); // Supprimer l'ID original
+
+            // S'assurer que tous les champs nécessaires sont présents
+            $dataToInsert = [
+                'nom'                  => $original['nom'],
+                'description'          => $original['description'] ?? null,
+                'salaire'              => $original['salaire'] ?? 0,
+                'couleur'              => $original['couleur'] ?? '#3B82F6',
+                'type_contrat'         => $original['type_contrat'] ?? 'CDI',
+                'niveau_hierarchique'  => $original['niveau_hierarchique'] ?? null,
+                'poste_superieur_id'   => $original['poste_superieur_id'] ?? null,
+                'competences_requises' => $original['competences_requises'] ?? null,
+                'nombre_postes_prevus' => $original['nombre_postes_prevus'] ?? 1,
+                'duree_contrat'        => $original['duree_contrat'] ?? null,
+                'avantages'            => $original['avantages'] ?? null,
+                'code_paie'            => $original['code_paie'] ?? null,
+                'categorie_paie'       => $original['categorie_paie'] ?? null,
+                'regime_social'        => $original['regime_social'] ?? null,
+                'taux_cotisation'      => $original['taux_cotisation'] ?? null,
+                'heures_travail'       => $original['heures_travail'] ?? 35,
+                'departement_id'       => $original['departement_id'] ?? null,
+            ];
+
+            return $this->createPoste($dataToInsert);
         }
-        
-        $stmt = $this->conn->prepare("SELECT COUNT(*) FROM postes WHERE poste_superieur_id = ? AND actif = TRUE");
-        $stmt->execute([$id]);
-        $nb_subordonnes = $stmt->fetchColumn();
-        
-        if ($nb_subordonnes > 0) {
-            throw new Exception("Impossible de supprimer ce poste car $nb_subordonnes poste(s) en dépendent hiérarchiquement");
-        }
-        
-        // Désactivation
-        $stmt = $this->conn->prepare("UPDATE postes SET actif = FALSE WHERE id = ?");
-        $stmt->execute([$id]);
-        
-        if ($stmt->rowCount() === 0) {
-            throw new Exception('Poste non trouvé');
-        }
-        
-        return true;
-    }
-    
-    /**
-     * Duplique un poste
-     */
-    public function duplicatePoste($id) {
-        $stmt = $this->conn->prepare("SELECT * FROM postes WHERE id = ? AND actif = TRUE");
-        $stmt->execute([$id]);
-        $original = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if (!$original) {
-            throw new Exception('Poste non trouvé');
-        }
-        
-        // Générer nom unique
-        $nouveau_nom = $original['nom'] . ' (Copie)';
-        $counter = 1;
-        
-        while (true) {
-            $stmt = $this->conn->prepare("SELECT id FROM postes WHERE nom = ? AND actif = TRUE");
-            $stmt->execute([$nouveau_nom]);
-            if (!$stmt->fetch()) break;
-            $counter++;
-            $nouveau_nom = $original['nom'] . ' (Copie ' . $counter . ')';
-        }
-        
-        // Créer copie
-        $original['nom'] = $nouveau_nom;
-        unset($original['id']);
-        
-        return $this->createPoste($original);
-    }
-    
-    /**
-     * Recherche des postes avec filtres
-     */
-    public function searchPostes($filters) {
-        $sql = "SELECT p.*,
+
+        /**
+         * Recherche des postes avec filtres
+         */
+        public function searchPostes($filters)
+        {
+            $sql = "SELECT p.*,
                 (SELECT COUNT(*) FROM employes e WHERE e.poste_id = p.id AND e.statut = 'actif') as nb_employes,
                 ps.nom as poste_superieur_nom, nh.libelle as niveau_libelle
                 FROM postes p
                 LEFT JOIN postes ps ON p.poste_superieur_id = ps.id
                 LEFT JOIN niveaux_hierarchiques nh ON p.niveau_hierarchique = nh.niveau
                 WHERE p.actif = TRUE";
-        
-        $params = [];
-        
-        if (!empty($filters['search'])) {
-            $sql .= " AND (p.nom LIKE ? OR p.description LIKE ? OR p.competences_requises LIKE ?)";
-            $search = "%{$filters['search']}%";
-            $params[] = $search;
-            $params[] = $search;
-            $params[] = $search;
-        }
-        
-        if (!empty($filters['type_contrat'])) {
-            $sql .= " AND p.type_contrat = ?";
-            $params[] = $filters['type_contrat'];
-        }
-        
-         if (!empty($filters['niveau_hierarchique'])) {
-            $sql .= " AND p.niveau_hierarchique = ?";
-            $params[] = $filters['niveau_hierarchique'];
-        }
-        
-        if (!empty($filters['departement_id'])) {
-            $sql .= " AND p.departement_id = ?";
-            $params[] = $filters['departement_id'];
-        }
-        
-        $sql .= " ORDER BY p.niveau_hierarchique, p.nom";
-        
-        $stmt = $this->conn->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-}
-class PosteSuperieurManager {
-    private $conn;
-    
-    public function __construct($connection) {
-        $this->conn = $connection;
-    }
-    
-    /**
-     * Vérifie si l'utilisateur est admin
-     */
-    private function checkAdminAccess() {
-    if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
-        throw new Exception('Accès refusé. Seuls les administrateurs peuvent gérer les postes supérieurs.');
-    }
-}
 
-    /**
-     * Récupère tous les postes supérieurs possibles
-     */
-    public function getAvailablePostesSupérieurs($excludeId = null) {
-        $this->checkAdminAccess();
-        
-        $sql = "SELECT p.*, 
+            $params = [];
+
+            if (! empty($filters['search'])) {
+                $sql .= " AND (p.nom LIKE ? OR p.description LIKE ? OR p.competences_requises LIKE ?)";
+                $search   = "%{$filters['search']}%";
+                $params[] = $search;
+                $params[] = $search;
+                $params[] = $search;
+            }
+
+            if (! empty($filters['type_contrat'])) {
+                $sql .= " AND p.type_contrat = ?";
+                $params[] = $filters['type_contrat'];
+            }
+
+            if (! empty($filters['niveau_hierarchique'])) {
+                $sql .= " AND p.niveau_hierarchique = ?";
+                $params[] = $filters['niveau_hierarchique'];
+            }
+
+            if (! empty($filters['departement_id'])) {
+                $sql .= " AND p.departement_id = ?";
+                $params[] = $filters['departement_id'];
+            }
+
+            $sql .= " ORDER BY p.niveau_hierarchique, p.nom";
+
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+    }
+    class PosteSuperieurManager
+    {
+        private $conn;
+
+        public function __construct($connection)
+        {
+            $this->conn = $connection;
+        }
+
+        /**
+         * Vérifie si l'utilisateur est admin
+         */
+        private function checkAdminAccess()
+        {
+            if (! isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+                throw new Exception('Accès refusé. Seuls les administrateurs peuvent gérer les postes supérieurs.');
+            }
+        }
+
+        /**
+         * Récupère tous les postes supérieurs possibles
+         */
+        public function getAvailablePostesSupérieurs($excludeId = null)
+        {
+            $this->checkAdminAccess();
+
+            $sql = "SELECT p.*,
                        nh.libelle as niveau_libelle,
                        d.nom as departement_nom
                 FROM postes p
                 LEFT JOIN niveaux_hierarchiques nh ON p.niveau_hierarchique = nh.niveau
                 LEFT JOIN departements d ON p.departement_id = d.id
                 WHERE p.actif = TRUE";
-        
-        $params = [];
-        if ($excludeId) {
-            $sql .= " AND p.id != ?";
-            $params[] = $excludeId;
+
+            $params = [];
+            if ($excludeId) {
+                $sql .= " AND p.id != ?";
+                $params[] = $excludeId;
+            }
+
+            $sql .= " ORDER BY p.niveau_hierarchique ASC, p.nom";
+
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
-        
-        $sql .= " ORDER BY p.niveau_hierarchique ASC, p.nom";
-        
-        $stmt = $this->conn->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-    
-    /**
-     * Définit un poste supérieur
-     */
-    public function setPosteSuperior($posteId, $posteSuperieurId) {
-        $this->checkAdminAccess();
-        
-        // Vérifications de sécurité
-        if ($posteId == $posteSuperieurId) {
-            throw new Exception('Un poste ne peut pas être son propre supérieur');
+
+        /**
+         * Définit un poste supérieur
+         */
+        public function setPosteSuperior($posteId, $posteSuperieurId)
+        {
+            $this->checkAdminAccess();
+
+            // Vérifications de sécurité
+            if ($posteId == $posteSuperieurId) {
+                throw new Exception('Un poste ne peut pas être son propre supérieur');
+            }
+
+            // Vérifier que le poste supérieur existe
+            if ($posteSuperieurId) {
+                $stmt = $this->conn->prepare("SELECT id FROM postes WHERE id = ? AND actif = TRUE");
+                $stmt->execute([$posteSuperieurId]);
+                if (! $stmt->fetch()) {
+                    throw new Exception('Le poste supérieur spécifié n\'existe pas');
+                }
+            }
+
+            // Vérifier qu'on ne crée pas de cycle dans la hiérarchie
+            if ($posteSuperieurId && $this->detectsCycle($posteId, $posteSuperieurId)) {
+                throw new Exception('Cette assignation créerait une boucle dans la hiérarchie');
+            }
+
+            // Mise à jour
+            $stmt = $this->conn->prepare("UPDATE postes SET poste_superieur_id = ? WHERE id = ? AND actif = TRUE");
+            $stmt->execute([$posteSuperieurId ?: null, $posteId]);
+
+            if ($stmt->rowCount() === 0) {
+                throw new Exception('Poste non trouvé ou non modifiable');
+            }
+
+            return true;
         }
-        
-        // Vérifier que le poste supérieur existe
-        if ($posteSuperieurId) {
-            $stmt = $this->conn->prepare("SELECT id FROM postes WHERE id = ? AND actif = TRUE");
+
+        /**
+         * Supprime la relation de supériorité d'un poste
+         */
+        public function removePosteSuperior($posteId)
+        {
+            $this->checkAdminAccess();
+
+            $stmt = $this->conn->prepare("UPDATE postes SET poste_superieur_id = NULL WHERE id = ? AND actif = TRUE");
+            $stmt->execute([$posteId]);
+
+            if ($stmt->rowCount() === 0) {
+                throw new Exception('Poste non trouvé');
+            }
+
+            return true;
+        }
+
+        private function detectsCycle($posteId, $posteSuperieurId, $visited = [])
+        {
+            if (in_array($posteSuperieurId, $visited)) {
+                return true; // Cycle détecté
+            }
+
+            $visited[] = $posteSuperieurId;
+
+            $stmt = $this->conn->prepare("SELECT poste_superieur_id FROM postes WHERE id = ? AND actif = TRUE");
             $stmt->execute([$posteSuperieurId]);
-            if (!$stmt->fetch()) {
-                throw new Exception('Le poste supérieur spécifié n\'existe pas');
+            $parent = $stmt->fetch();
+
+            if ($parent && $parent['poste_superieur_id']) {
+                if ($parent['poste_superieur_id'] == $posteId) {
+                    return true; // Cycle direct
+                }
+                return $this->detectsCycle($posteId, $parent['poste_superieur_id'], $visited);
             }
+
+            return false;
         }
-        
-        // Vérifier qu'on ne crée pas de cycle dans la hiérarchie
-        if ($posteSuperieurId && $this->detectsCycle($posteId, $posteSuperieurId)) {
-            throw new Exception('Cette assignation créerait une boucle dans la hiérarchie');
-        }
-        
-        // Mise à jour
-        $stmt = $this->conn->prepare("UPDATE postes SET poste_superieur_id = ? WHERE id = ? AND actif = TRUE");
-        $stmt->execute([$posteSuperieurId ?: null, $posteId]);
-        
-        if ($stmt->rowCount() === 0) {
-            throw new Exception('Poste non trouvé ou non modifiable');
-        }
-        
-        return true;
-    }
-    
-    /**
-     * Supprime la relation de supériorité d'un poste
-     */
-    public function removePosteSuperior($posteId) {
-        $this->checkAdminAccess();
-        
-        $stmt = $this->conn->prepare("UPDATE postes SET poste_superieur_id = NULL WHERE id = ? AND actif = TRUE");
-        $stmt->execute([$posteId]);
-        
-        if ($stmt->rowCount() === 0) {
-            throw new Exception('Poste non trouvé');
-        }
-        
-        return true;
-    }
-    
-    /**
-     * Détecte les cycles dans la hiérarchie
-     */
-    private function detectsCycle($posteId, $posteSuperieurId, $visited = []) {
-        if (in_array($posteSuperieurId, $visited)) {
-            return true; // Cycle détecté
-        }
-        
-        $visited[] = $posteSuperieurId;
-        
-        $stmt = $this->conn->prepare("SELECT poste_superieur_id FROM postes WHERE id = ? AND actif = TRUE");
-        $stmt->execute([$posteSuperieurId]);
-        $parent = $stmt->fetch();
-        
-        if ($parent && $parent['poste_superieur_id']) {
-            if ($parent['poste_superieur_id'] == $posteId) {
-                return true; // Cycle direct
-            }
-            return $this->detectsCycle($posteId, $parent['poste_superieur_id'], $visited);
-        }
-        
-        return false;
-    }
-    
-    /**
-     * Récupère l'arbre hiérarchique complet
-     */
-    public function getHierarchieComplete() {
-        $this->checkAdminAccess();
-        
-        $stmt = $this->conn->query("
-            SELECT p.id, p.nom, p.poste_superieur_id, 
+
+        public function getHierarchieComplete()
+        {
+            $this->checkAdminAccess();
+
+            $stmt = $this->conn->query("
+            SELECT p.id, p.nom, p.poste_superieur_id,
                    nh.libelle as niveau_libelle,
                    (SELECT COUNT(*) FROM employes e WHERE e.poste_id = p.id AND e.statut = 'actif') as nb_employes
             FROM postes p
@@ -384,451 +424,402 @@ class PosteSuperieurManager {
             WHERE p.actif = TRUE
             ORDER BY p.niveau_hierarchique, p.nom
         ");
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
     }
-}
 
-class DepartementManager {
-    private $conn;
-    
-    public function __construct($connection) {
-        $this->conn = $connection;
-    }
-    
-    public function getAllDepartements() {
-        $stmt = $this->conn->query("
-            SELECT d.*, 
-                   COUNT(p.id) as nb_postes 
-            FROM departements d 
-            LEFT JOIN postes p ON d.id = p.departement_id AND p.actif = TRUE 
-            WHERE d.actif = TRUE 
-            GROUP BY d.id 
+    class DepartementManager
+    {
+        private $conn;
+
+        public function __construct($connection)
+        {
+            $this->conn = $connection;
+        }
+
+        public function getAllDepartements()
+        {
+            $stmt = $this->conn->query("
+            SELECT d.*,
+                   COUNT(p.id) as nb_postes
+            FROM departements d
+            LEFT JOIN postes p ON d.id = p.departement_id AND p.actif = TRUE
+            WHERE d.actif = TRUE
+            GROUP BY d.id
             ORDER BY d.nom
         ");
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-    
-    public function createDepartement($data) {
-        if (empty($data['nom'])) {
-            throw new Exception('Le nom du département est requis');
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
-        
-        $nom = trim($data['nom']);
-        
-        // Vérifier unicité
-        $stmt = $this->conn->prepare("SELECT id FROM departements WHERE nom = ? AND actif = TRUE");
-        $stmt->execute([$nom]);
-        if ($stmt->fetch()) {
-            throw new Exception('Un département avec ce nom existe déjà');
-        }
-        
-        $stmt = $this->conn->prepare("
+
+        public function createDepartement($data)
+        {
+            if (empty($data['nom'])) {
+                throw new Exception('Le nom du département est requis');
+            }
+
+            $nom = trim($data['nom']);
+
+            // Vérifier unicité
+            $stmt = $this->conn->prepare("SELECT id FROM departements WHERE nom = ? AND actif = TRUE");
+            $stmt->execute([$nom]);
+            if ($stmt->fetch()) {
+                throw new Exception('Un département avec ce nom existe déjà');
+            }
+
+            $stmt = $this->conn->prepare("
             INSERT INTO departements (nom, description)
             VALUES (?, ?)
         ");
-        
-        $stmt->execute([
-            $nom,
-            $data['description'] ?? null
-        ]);
-        
-        return $this->conn->lastInsertId();
-    }
-    
-    public function updateDepartement($id, $data) {
-        if (empty($data['nom'])) {
-            throw new Exception('Le nom du département est requis');
+
+            $stmt->execute([
+                $nom,
+                $data['description'] ?? null,
+            ]);
+
+            return $this->conn->lastInsertId();
         }
-        
-        $nom = trim($data['nom']);
-        
-        // Vérifier unicité (excluant le département actuel)
-        $stmt = $this->conn->prepare("SELECT id FROM departements WHERE nom = ? AND id != ? AND actif = TRUE");
-        $stmt->execute([$nom, $id]);
-        if ($stmt->fetch()) {
-            throw new Exception('Un département avec ce nom existe déjà');
-        }
-        
-        $stmt = $this->conn->prepare("
-            UPDATE departements 
+
+        public function updateDepartement($id, $data)
+        {
+            if (empty($data['nom'])) {
+                throw new Exception('Le nom du département est requis');
+            }
+
+            $nom = trim($data['nom']);
+
+            // Vérifier unicité (excluant le département actuel)
+            $stmt = $this->conn->prepare("SELECT id FROM departements WHERE nom = ? AND id != ? AND actif = TRUE");
+            $stmt->execute([$nom, $id]);
+            if ($stmt->fetch()) {
+                throw new Exception('Un département avec ce nom existe déjà');
+            }
+
+            $stmt = $this->conn->prepare("
+            UPDATE departements
             SET nom = ?, description = ?
             WHERE id = ? AND actif = TRUE
         ");
-        
-        $result = $stmt->execute([
-            $nom,
-            $data['description'] ?? null,
-            $id
-        ]);
-        
-        if ($stmt->rowCount() === 0) {
-            throw new Exception('Département non trouvé ou non modifiable');
-        }
-        
-        return true;
-    }
-    
-    public function deleteDepartement($id) {
-        // Vérifier utilisation
-        $stmt = $this->conn->prepare("SELECT COUNT(*) FROM postes WHERE departement_id = ? AND actif = TRUE");
-        $stmt->execute([$id]);
-        $nb_postes = $stmt->fetchColumn();
-        
-        if ($nb_postes > 0) {
-            throw new Exception("Impossible de supprimer ce département car $nb_postes poste(s) y sont associé(s)");
-        }
-        
-        // Désactivation logique
-        $stmt = $this->conn->prepare("UPDATE departements SET actif = FALSE WHERE id = ?");
-        $stmt->execute([$id]);
-        
-        if ($stmt->rowCount() === 0) {
-            throw new Exception('Département non trouvé');
-        }
-        
-        return true;
-    }
-}
 
-/**
- * Classe pour gérer les niveaux hiérarchiques
- */
-class NiveauManager {
-    private $conn;
-    
-    public function __construct($connection) {
-        $this->conn = $connection;
+            $result = $stmt->execute([
+                $nom,
+                $data['description'] ?? null,
+                $id,
+            ]);
+
+            if ($stmt->rowCount() === 0) {
+                throw new Exception('Département non trouvé ou non modifiable');
+            }
+
+            return true;
+        }
+
+        public function deleteDepartement($id)
+        {
+            // Vérifier utilisation
+            $stmt = $this->conn->prepare("SELECT COUNT(*) FROM postes WHERE departement_id = ? AND actif = TRUE");
+            $stmt->execute([$id]);
+            $nb_postes = $stmt->fetchColumn();
+
+            if ($nb_postes > 0) {
+                throw new Exception("Impossible de supprimer ce département car $nb_postes poste(s) y sont associé(s)");
+            }
+
+            // Désactivation logique
+            $stmt = $this->conn->prepare("UPDATE departements SET actif = FALSE WHERE id = ?");
+            $stmt->execute([$id]);
+
+            if ($stmt->rowCount() === 0) {
+                throw new Exception('Département non trouvé');
+            }
+
+            return true;
+        }
     }
-    
-    public function getAllNiveaux() {
-        $stmt = $this->conn->query("SELECT * FROM niveaux_hierarchiques ORDER BY niveau ASC");
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-    
-    public function createNiveau($data) {
-        if (empty($data['niveau']) || empty($data['libelle'])) {
-            throw new Exception('Le niveau et le libellé sont requis');
+
+    class NiveauManager
+    {
+        private $conn;
+
+        public function __construct($connection)
+        {
+            $this->conn = $connection;
         }
-        
-        $niveau = intval($data['niveau']);
-        $libelle = trim($data['libelle']);
-        
-        // Vérifications d'unicité
-        $stmt = $this->conn->prepare("SELECT id FROM niveaux_hierarchiques WHERE niveau = ?");
-        $stmt->execute([$niveau]);
-        if ($stmt->fetch()) {
-            throw new Exception('Ce niveau hiérarchique existe déjà');
+
+        public function getAllNiveaux()
+        {
+            $stmt = $this->conn->query("SELECT * FROM niveaux_hierarchiques ORDER BY niveau ASC");
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
-        
-        $stmt = $this->conn->prepare("SELECT id FROM niveaux_hierarchiques WHERE libelle = ?");
-        $stmt->execute([$libelle]);
-        if ($stmt->fetch()) {
-            throw new Exception('Ce libellé existe déjà');
-        }
-        
-        $stmt = $this->conn->prepare("
+
+        public function createNiveau($data)
+        {
+            if (empty($data['niveau']) || empty($data['libelle'])) {
+                throw new Exception('Le niveau et le libellé sont requis');
+            }
+
+            $niveau  = intval($data['niveau']);
+            $libelle = trim($data['libelle']);
+
+            // Vérifications d'unicité
+            $stmt = $this->conn->prepare("SELECT id FROM niveaux_hierarchiques WHERE niveau = ?");
+            $stmt->execute([$niveau]);
+            if ($stmt->fetch()) {
+                throw new Exception('Ce niveau hiérarchique existe déjà');
+            }
+
+            $stmt = $this->conn->prepare("SELECT id FROM niveaux_hierarchiques WHERE libelle = ?");
+            $stmt->execute([$libelle]);
+            if ($stmt->fetch()) {
+                throw new Exception('Ce libellé existe déjà');
+            }
+
+            $stmt = $this->conn->prepare("
             INSERT INTO niveaux_hierarchiques (niveau, libelle, description)
             VALUES (?, ?, ?)
         ");
-        $stmt->execute([$niveau, $libelle, $data['description'] ?? null]);
-        
-        return $this->conn->lastInsertId();
-    }
-    
-    public function updateNiveau($id, $data) {
-        if (empty($data['niveau']) || empty($data['libelle'])) {
-            throw new Exception('Niveau et libellé requis');
+            $stmt->execute([$niveau, $libelle, $data['description'] ?? null]);
+
+            return $this->conn->lastInsertId();
         }
-        
-        $niveau = intval($data['niveau']);
-        $libelle = trim($data['libelle']);
-        
-        // Vérifications d'unicité
-        $stmt = $this->conn->prepare("SELECT id FROM niveaux_hierarchiques WHERE niveau = ? AND id != ?");
-        $stmt->execute([$niveau, $id]);
-        if ($stmt->fetch()) {
-            throw new Exception('Ce niveau hiérarchique existe déjà');
-        }
-        
-        $stmt = $this->conn->prepare("SELECT id FROM niveaux_hierarchiques WHERE libelle = ? AND id != ?");
-        $stmt->execute([$libelle, $id]);
-        if ($stmt->fetch()) {
-            throw new Exception('Ce libellé existe déjà');
-        }
-        
-        $stmt = $this->conn->prepare("
+
+        public function updateNiveau($id, $data)
+        {
+            if (empty($data['niveau']) || empty($data['libelle'])) {
+                throw new Exception('Niveau et libellé requis');
+            }
+
+            $niveau  = intval($data['niveau']);
+            $libelle = trim($data['libelle']);
+
+            // Vérifications d'unicité
+            $stmt = $this->conn->prepare("SELECT id FROM niveaux_hierarchiques WHERE niveau = ? AND id != ?");
+            $stmt->execute([$niveau, $id]);
+            if ($stmt->fetch()) {
+                throw new Exception('Ce niveau hiérarchique existe déjà');
+            }
+
+            $stmt = $this->conn->prepare("SELECT id FROM niveaux_hierarchiques WHERE libelle = ? AND id != ?");
+            $stmt->execute([$libelle, $id]);
+            if ($stmt->fetch()) {
+                throw new Exception('Ce libellé existe déjà');
+            }
+
+            $stmt = $this->conn->prepare("
             UPDATE niveaux_hierarchiques
             SET niveau = ?, libelle = ?, description = ?
             WHERE id = ?
         ");
-        $stmt->execute([$niveau, $libelle, $data['description'] ?? null, $id]);
-        
-        if ($stmt->rowCount() === 0) {
-            throw new Exception('Niveau non trouvé ou non modifiable');
-        }
-        
-        return true;
-    }
-    
-    public function deleteNiveau($id) {
-        $stmt = $this->conn->prepare("SELECT niveau FROM niveaux_hierarchiques WHERE id = ?");
-        $stmt->execute([$id]);
-        $niveau_data = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if (!$niveau_data) {
-            throw new Exception('Niveau non trouvé');
-        }
-        
-        // Vérifier utilisation
-        $stmt = $this->conn->prepare("SELECT COUNT(*) FROM postes WHERE niveau_hierarchique = ? AND actif = TRUE");
-        $stmt->execute([$niveau_data['niveau']]);
-        $nb_postes = $stmt->fetchColumn();
-        
-        if ($nb_postes > 0) {
-            throw new Exception("Impossible de supprimer ce niveau car $nb_postes poste(s) l'utilisent");
-        }
-        
-        $stmt = $this->conn->prepare("DELETE FROM niveaux_hierarchiques WHERE id = ?");
-        $stmt->execute([$id]);
-        
-        return true;
-    }
-}
+            $stmt->execute([$niveau, $libelle, $data['description'] ?? null, $id]);
 
-/**
- * Fonctions utilitaires
- */
-class Utils {
-    public static function sendJsonResponse($data) {
-        header('Content-Type: application/json');
-        echo json_encode($data);
-        exit;
+            if ($stmt->rowCount() === 0) {
+                throw new Exception('Niveau non trouvé ou non modifiable');
+            }
+
+            return true;
+        }
+
+        public function deleteNiveau($id)
+        {
+            $stmt = $this->conn->prepare("SELECT niveau FROM niveaux_hierarchiques WHERE id = ?");
+            $stmt->execute([$id]);
+            $niveau_data = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (! $niveau_data) {
+                throw new Exception('Niveau non trouvé');
+            }
+
+            // Vérifier utilisation
+            $stmt = $this->conn->prepare("SELECT COUNT(*) FROM postes WHERE niveau_hierarchique = ? AND actif = TRUE");
+            $stmt->execute([$niveau_data['niveau']]);
+            $nb_postes = $stmt->fetchColumn();
+
+            if ($nb_postes > 0) {
+                throw new Exception("Impossible de supprimer ce niveau car $nb_postes poste(s) l'utilisent");
+            }
+
+            $stmt = $this->conn->prepare("DELETE FROM niveaux_hierarchiques WHERE id = ?");
+            $stmt->execute([$id]);
+
+            return true;
+        }
     }
-    
-    public static function logActivity($conn, $action, $table, $id, $details) {
-        try {
-            $stmt = $conn->prepare("
+
+    class Utils
+    {
+        public static function sendJsonResponse($data)
+        {
+            // Nettoyer tout output précédent
+            if (ob_get_level()) {
+                ob_end_clean();
+            }
+
+            header('Content-Type: application/json; charset=utf-8');
+            header('Cache-Control: no-cache, must-revalidate');
+
+            echo json_encode($data, JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        public static function logActivity($conn, $action, $table, $id, $details)
+        {
+            try {
+                $stmt = $conn->prepare("
                 INSERT INTO logs_activite (action, table_concernee, id_enregistrement, details)
                 VALUES (?, ?, ?, ?)
             ");
-            $stmt->execute([$action, $table, $id, json_encode($details)]);
-        } catch (Exception $e) {
-            // Log silencieux
-        }
-    }
-}
-
-/**
- * Générateur de PDF
- */
-class PDFGenerator {
-    public static function generatePostesPDF($conn) {
-        try {
-            $posteManager = new PosteManager($conn);
-            $postes = $posteManager->getAllPostes();
-            
-            $pdf = new TCPDF();
-            $pdf->SetCreator('Système de Gestion RH');
-            $pdf->SetAuthor('Restaurant Management System');
-            $pdf->SetTitle('Liste des Postes - ' . date('d/m/Y'));
-            $pdf->AddPage();
-            
-            // En-tête
-            $pdf->SetFont('helvetica', 'B', 16);
-            $pdf->Cell(0, 10, 'LISTE DES POSTES', 0, 1, 'C');
-            $pdf->Cell(0, 5, 'Générée le ' . date('d/m/Y à H:i'), 0, 1, 'C');
-            $pdf->Ln(10);
-            
-            // Statistiques
-            $pdf->SetFont('helvetica', 'B', 12);
-            $pdf->Cell(0, 8, 'STATISTIQUES GÉNÉRALES', 0, 1, 'L');
-            $pdf->SetFont('helvetica', '', 10);
-            
-            $total_postes = count($postes);
-            $total_employes = array_sum(array_column($postes, 'nb_employes'));
-            $salaires = array_filter(array_column($postes, 'salaire'));
-            $salaire_moyen = !empty($salaires) ? array_sum($salaires) / count($salaires) : 0;
-            
-            $pdf->Cell(50, 6, 'Nombre total de postes:', 0, 0, 'L');
-            $pdf->Cell(0, 6, $total_postes, 0, 1, 'L');
-            $pdf->Cell(50, 6, 'Nombre total d\'employés:', 0, 0, 'L');
-            $pdf->Cell(0, 6, $total_employes, 0, 1, 'L');
-            $pdf->Cell(50, 6, 'Salaire moyen:', 0, 0, 'L');
-            $pdf->Cell(0, 6, number_format($salaire_moyen, 0, ',', ' ') . ' FCFA', 0, 1, 'L');
-            $pdf->Ln(5);
-            
-            // Tableau des postes
-            $pdf->SetFont('helvetica', 'B', 12);
-            $pdf->Cell(0, 8, 'DÉTAIL DES POSTES', 0, 1, 'L');
-            
-            // En-têtes
-            $pdf->SetFont('helvetica', 'B', 8);
-            $pdf->SetFillColor(230, 230, 230);
-            $pdf->Cell(40, 8, 'POSTE', 1, 0, 'C', true);
-            $pdf->Cell(25, 8, 'TYPE CONTRAT', 1, 0, 'C', true);
-            $pdf->Cell(35, 8, 'NIVEAU', 1, 0, 'C', true);
-            $pdf->Cell(30, 8, 'SALAIRE (FCFA)', 1, 0, 'C', true);
-            $pdf->Cell(20, 8, 'EMPLOYÉS', 1, 0, 'C', true);
-            $pdf->Cell(15, 8, 'HEURES', 1, 0, 'C', true);
-            $pdf->Cell(30, 8, 'DESCRIPTION', 1, 1, 'C', true);
-            
-            // Données
-            $pdf->SetFont('helvetica', '', 8);
-            foreach ($postes as $poste) {
-                $pdf->Cell(40, 6, substr($poste['nom'], 0, 25), 1, 0, 'L');
-                $pdf->Cell(25, 6, $poste['type_contrat'] ?? 'CDI', 1, 0, 'C');
-                $pdf->Cell(35, 6, $poste['niveau_libelle'] ?? 'Non défini', 1, 0, 'C');
-                $pdf->Cell(30, 6, number_format($poste['salaire'], 0, ',', ' '), 1, 0, 'R');
-                $pdf->Cell(20, 6, $poste['nb_employes'], 1, 0, 'C');
-                $pdf->Cell(15, 6, $poste['heures_travail'] ?? '35', 1, 0, 'C');
-                $pdf->Cell(30, 6, substr($poste['description'] ?? '', 0, 30), 1, 1, 'L');
+                $stmt->execute([$action, $table, $id, json_encode($details)]);
+            } catch (Exception $e) {
+                // Log silencieux
             }
-            
-            return $pdf->Output('postes_' . date('Y-m-d') . '.pdf', 'S');
-        } catch (Exception $e) {
-            throw new Exception('Erreur lors de la génération du PDF: ' . $e->getMessage());
         }
     }
-}
 
-// ====================================================================
-// 3. GESTIONNAIRES DE REQUÊTES AJAX
-// ====================================================================
+    // Initialisation des managers
+    $posteManager          = new PosteManager($conn);
+    $niveauManager         = new NiveauManager($conn);
+    $departementManager    = new DepartementManager($conn);
+    $posteSuperieurManager = new PosteSuperieurManager($conn);
 
-// Initialisation des managers
-$posteManager = new PosteManager($conn);
-$niveauManager = new NiveauManager($conn);
-$departementManager = new DepartementManager($conn);
-$posteSuperieurManager = new PosteSuperieurManager($conn);
+    if (isset($_GET['action'])) {
+        $action = $_GET['action'];
 
-if (isset($_GET['action'])) {
-    $action = $_GET['action'];
-    
-    try {
-        switch ($action) {
-            // === GESTION DES NIVEAUX ===
-            case 'get_niveaux':
-                $niveaux = $niveauManager->getAllNiveaux();
-                Utils::sendJsonResponse(['success' => true, 'niveaux' => $niveaux]);
-                break;
-                
-            case 'add_niveau':
-                $niveau_id = $niveauManager->createNiveau($_POST);
-                Utils::logActivity($conn, 'CREATE_NIVEAU', 'niveaux_hierarchiques', $niveau_id, $_POST);
-                Utils::sendJsonResponse(['success' => true, 'message' => 'Niveau ajouté avec succès', 'niveau_id' => $niveau_id]);
-                break;
-                
-            case 'update_niveau':
-                $niveauManager->updateNiveau($_POST['id'], $_POST);
-                Utils::logActivity($conn, 'UPDATE_NIVEAU', 'niveaux_hierarchiques', $_POST['id'], $_POST);
-                Utils::sendJsonResponse(['success' => true, 'message' => 'Niveau modifié avec succès']);
-                break;
-                
-            case 'delete_niveau':
-                $input = json_decode(file_get_contents('php://input'), true);
-                $niveauManager->deleteNiveau($input['id']);
-                Utils::logActivity($conn, 'DELETE_NIVEAU', 'niveaux_hierarchiques', $input['id'], $input);
-                Utils::sendJsonResponse(['success' => true, 'message' => 'Niveau supprimé avec succès']);
-                break;
-                
-            // === GESTION DES POSTES ===
-            case 'add_poste':
-                $poste_id = $posteManager->createPoste($_POST);
-                Utils::logActivity($conn, 'CREATE_POSTE', 'postes', $poste_id, $_POST);
-                Utils::sendJsonResponse(['success' => true, 'message' => 'Poste ajouté avec succès', 'poste_id' => $poste_id]);
-                break;
-                
-            case 'update_poste':
-                $posteManager->updatePoste($_POST['id'], $_POST);
-                Utils::logActivity($conn, 'UPDATE_POSTE', 'postes', $_POST['id'], $_POST);
-                Utils::sendJsonResponse(['success' => true, 'message' => 'Poste modifié avec succès']);
-                break;
-                
-            case 'delete_poste':
-                $input = json_decode(file_get_contents('php://input'), true);
-                $posteManager->deletePoste($input['id']);
-                Utils::logActivity($conn, 'DELETE_POSTE', 'postes', $input['id'], $input);
-                Utils::sendJsonResponse(['success' => true, 'message' => 'Poste supprimé avec succès']);
-                break;
-                
-            case 'duplicate_poste':
-                $input = json_decode(file_get_contents('php://input'), true);
-                $nouveau_id = $posteManager->duplicatePoste($input['id']);
-                Utils::logActivity($conn, 'DUPLICATE_POSTE', 'postes', $nouveau_id, $input);
-                Utils::sendJsonResponse(['success' => true, 'message' => 'Poste dupliqué avec succès', 'nouveau_id' => $nouveau_id]);
-                break;
-                
-            case 'get_postes':
-                $postes = $posteManager->getAllPostes();
-                Utils::sendJsonResponse(['success' => true, 'postes' => $postes]);
-                break;
-                
-            case 'search_postes':
-                $postes = $posteManager->searchPostes($_POST);
-                Utils::sendJsonResponse(['success' => true, 'postes' => $postes]);
-                break;
-                
-            // === GESTION DES DÉPARTEMENTS ===
-            case 'get_departements':
-                $departements = $departementManager->getAllDepartements();
-                Utils::sendJsonResponse(['success' => true, 'departements' => $departements]);
-                break;
-                
-            case 'add_departement':
-                $dept_id = $departementManager->createDepartement($_POST);
-                Utils::logActivity($conn, 'CREATE_DEPARTEMENT', 'departements', $dept_id, $_POST);
-                Utils::sendJsonResponse(['success' => true, 'message' => 'Département ajouté avec succès', 'departement_id' => $dept_id]);
-                break;
-                
-            case 'update_departement':
-                $departementManager->updateDepartement($_POST['id'], $_POST);
-                Utils::logActivity($conn, 'UPDATE_DEPARTEMENT', 'departements', $_POST['id'], $_POST);
-                Utils::sendJsonResponse(['success' => true, 'message' => 'Département modifié avec succès']);
-                break;
-                
-            case 'delete_departement':
-                $input = json_decode(file_get_contents('php://input'), true);
-                $departementManager->deleteDepartement($input['id']);
-                Utils::logActivity($conn, 'DELETE_DEPARTEMENT', 'departements', $input['id'], $input);
-                Utils::sendJsonResponse(['success' => true, 'message' => 'Département supprimé avec succès']);
-                break;
+        try {
+            switch ($action) {
+                // === GESTION DES NIVEAUX ===
+                case 'get_niveaux':
+                    $niveaux = $niveauManager->getAllNiveaux();
+                    Utils::sendJsonResponse(['success' => true, 'niveaux' => $niveaux]);
+                    break;
 
-                 // === GESTION DES POSTES SUPÉRIEURS (ADMIN SEULEMENT) ===
-            case 'get_postes_superieurs':
-                $postes_sup = $posteSuperieurManager->getAvailablePostesSupérieurs($_GET['exclude'] ?? null);
-                Utils::sendJsonResponse(['success' => true, 'postes' => $postes_sup]);
-                break;
-                
-            case 'set_poste_superieur':
-                $input = json_decode(file_get_contents('php://input'), true);
-                $posteSuperieurManager->setPosteSuperior($input['poste_id'], $input['poste_superieur_id'] ?? null);
-                Utils::logActivity($conn, 'SET_POSTE_SUPERIEUR', 'postes', $input['poste_id'], $input);
-                Utils::sendJsonResponse(['success' => true, 'message' => 'Hiérarchie mise à jour avec succès']);
-                break;
-                
-            case 'remove_poste_superieur':
-                $input = json_decode(file_get_contents('php://input'), true);
-                $posteSuperieurManager->removePosteSuperior($input['poste_id']);
-                Utils::logActivity($conn, 'REMOVE_POSTE_SUPERIEUR', 'postes', $input['poste_id'], $input);
-                Utils::sendJsonResponse(['success' => true, 'message' => 'Relation hiérarchique supprimée']);
-                break;
-                
-            case 'get_hierarchie_complete':
-                $hierarchie = $posteSuperieurManager->getHierarchieComplete();
-                Utils::sendJsonResponse(['success' => true, 'hierarchie' => $hierarchie]);
-                break;
+                case 'add_niveau':
+                    $niveau_id = $niveauManager->createNiveau($_POST);
+                    Utils::logActivity($conn, 'CREATE_NIVEAU', 'niveaux_hierarchiques', $niveau_id, $_POST);
+                    Utils::sendJsonResponse(['success' => true, 'message' => 'Niveau ajouté avec succès', 'niveau_id' => $niveau_id]);
+                    break;
 
-            // === STATISTIQUES ===
-            case 'get_stats':
-                $stats = [];
-                
-                $stmt = $conn->query("SELECT COUNT(*) FROM postes WHERE actif = TRUE");
-                $stats['total_postes'] = $stmt->fetchColumn();
-                
-                $stmt = $conn->query("SELECT type_contrat, COUNT(*) as nb_postes FROM postes WHERE actif = TRUE GROUP BY type_contrat");
-                $stats['repartition_contrats'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                
-                $stmt = $conn->query("
+                case 'update_niveau':
+                    $niveauManager->updateNiveau($_POST['id'], $_POST);
+                    Utils::logActivity($conn, 'UPDATE_NIVEAU', 'niveaux_hierarchiques', $_POST['id'], $_POST);
+                    Utils::sendJsonResponse(['success' => true, 'message' => 'Niveau modifié avec succès']);
+                    break;
+
+                case 'delete_niveau':
+                    $input = json_decode(file_get_contents('php://input'), true);
+                    $niveauManager->deleteNiveau($input['id']);
+                    Utils::logActivity($conn, 'DELETE_NIVEAU', 'niveaux_hierarchiques', $input['id'], $input);
+                    Utils::sendJsonResponse(['success' => true, 'message' => 'Niveau supprimé avec succès']);
+                    break;
+
+                // === GESTION DES POSTES ===
+                case 'add_poste':
+                    $poste_id = $posteManager->createPoste($_POST);
+                    Utils::logActivity($conn, 'CREATE_POSTE', 'postes', $poste_id, $_POST);
+                    Utils::sendJsonResponse(['success' => true, 'message' => 'Poste ajouté avec succès', 'poste_id' => $poste_id]);
+                    break;
+
+                case 'update_poste':
+                    $posteManager->updatePoste($_POST['id'], $_POST);
+                    Utils::logActivity($conn, 'UPDATE_POSTE', 'postes', $_POST['id'], $_POST);
+                    Utils::sendJsonResponse(['success' => true, 'message' => 'Poste modifié avec succès']);
+                    break;
+
+                case 'delete_poste':
+                    try {
+                        // Lire les données JSON envoyées
+                        $input = json_decode(file_get_contents('php://input'), true);
+
+                        if (! $input || ! isset($input['id'])) {
+                            Utils::sendJsonResponse(['success' => false, 'message' => 'ID du poste manquant']);
+                            break;
+                        }
+
+                        $posteManager->deletePoste($input['id']);
+                        Utils::logActivity($conn, 'DELETE_POSTE', 'postes', $input['id'], $input);
+                        Utils::sendJsonResponse(['success' => true, 'message' => 'Poste supprimé avec succès']);
+
+                    } catch (Exception $e) {
+                        Utils::sendJsonResponse(['success' => false, 'message' => $e->getMessage()]);
+                    }
+                    break;
+
+                case 'duplicate_poste':
+                    $input      = json_decode(file_get_contents('php://input'), true);
+                    $nouveau_id = $posteManager->duplicatePoste($input['id']);
+                    Utils::logActivity($conn, 'DUPLICATE_POSTE', 'postes', $nouveau_id, $input);
+                    Utils::sendJsonResponse(['success' => true, 'message' => 'Poste dupliqué avec succès', 'nouveau_id' => $nouveau_id]);
+                    break;
+
+                case 'get_postes':
+                    $postes = $posteManager->getAllPostes();
+                    Utils::sendJsonResponse(['success' => true, 'postes' => $postes]);
+                    break;
+
+                case 'search_postes':
+                    $postes = $posteManager->searchPostes($_POST);
+                    Utils::sendJsonResponse(['success' => true, 'postes' => $postes]);
+                    break;
+
+                // === GESTION DES DÉPARTEMENTS ===
+                case 'get_departements':
+                    $departements = $departementManager->getAllDepartements();
+                    Utils::sendJsonResponse(['success' => true, 'departements' => $departements]);
+                    break;
+
+                case 'add_departement':
+                    $dept_id = $departementManager->createDepartement($_POST);
+                    Utils::logActivity($conn, 'CREATE_DEPARTEMENT', 'departements', $dept_id, $_POST);
+                    Utils::sendJsonResponse(['success' => true, 'message' => 'Département ajouté avec succès', 'departement_id' => $dept_id]);
+                    break;
+
+                case 'update_departement':
+                    $departementManager->updateDepartement($_POST['id'], $_POST);
+                    Utils::logActivity($conn, 'UPDATE_DEPARTEMENT', 'departements', $_POST['id'], $_POST);
+                    Utils::sendJsonResponse(['success' => true, 'message' => 'Département modifié avec succès']);
+                    break;
+
+                case 'delete_departement':
+                    $input = json_decode(file_get_contents('php://input'), true);
+                    $departementManager->deleteDepartement($input['id']);
+                    Utils::logActivity($conn, 'DELETE_DEPARTEMENT', 'departements', $input['id'], $input);
+                    Utils::sendJsonResponse(['success' => true, 'message' => 'Département supprimé avec succès']);
+                    break;
+
+                // === GESTION DES POSTES SUPÉRIEURS (ADMIN SEULEMENT) ===
+                case 'get_postes_superieurs':
+                    $postes_sup = $posteSuperieurManager->getAvailablePostesSupérieurs($_GET['exclude'] ?? null);
+                    Utils::sendJsonResponse(['success' => true, 'postes' => $postes_sup]);
+                    break;
+
+                case 'set_poste_superieur':
+                    $input = json_decode(file_get_contents('php://input'), true);
+                    $posteSuperieurManager->setPosteSuperior($input['poste_id'], $input['poste_superieur_id'] ?? null);
+                    Utils::logActivity($conn, 'SET_POSTE_SUPERIEUR', 'postes', $input['poste_id'], $input);
+                    Utils::sendJsonResponse(['success' => true, 'message' => 'Hiérarchie mise à jour avec succès']);
+                    break;
+
+                case 'remove_poste_superieur':
+    $input = json_decode(file_get_contents('php://input'), true);
+    if (!$input || !isset($input['poste_id'])) {
+        Utils::sendJsonResponse(['success' => false, 'message' => 'ID du poste manquant']);
+        break;
+    }
+
+                case 'get_hierarchie_complete':
+                    $hierarchie = $posteSuperieurManager->getHierarchieComplete();
+                    Utils::sendJsonResponse(['success' => true, 'hierarchie' => $hierarchie]);
+                    break;
+
+                // === STATISTIQUES ===
+                case 'get_stats':
+                    $stats = [];
+
+                    $stmt                  = $conn->query("SELECT COUNT(*) FROM postes WHERE actif = TRUE");
+                    $stats['total_postes'] = $stmt->fetchColumn();
+
+                    $stmt                          = $conn->query("SELECT type_contrat, COUNT(*) as nb_postes FROM postes WHERE actif = TRUE GROUP BY type_contrat");
+                    $stats['repartition_contrats'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                    $stmt = $conn->query("
                     SELECT p.nom,
                            (SELECT COUNT(*) FROM employes e WHERE e.poste_id = p.id AND e.statut = 'actif') as nb_employes_actuels,
                            p.nombre_postes_prevus,
@@ -838,75 +829,56 @@ if (isset($_GET['action'])) {
                     AND p.nombre_postes_prevus > (SELECT COUNT(*) FROM employes e WHERE e.poste_id = p.id AND e.statut = 'actif')
                     ORDER BY deficit DESC
                 ");
-                $stats['postes_sous_dotes'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                
-                Utils::sendJsonResponse(['success' => true, 'stats' => $stats]);
-                break;
+                    $stats['postes_sous_dotes'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            // === ORGANIGRAMME ===
-            case 'get_organigramme':
-                $postes = $posteManager->getAllPostes();
-                
-                // Construire arbre hiérarchique
-                $postes_par_id = [];
-                foreach ($postes as $poste) {
-                    $postes_par_id[$poste['id']] = $poste;
-                    $postes_par_id[$poste['id']]['enfants'] = [];
-                }
-                
-                $arbre = [];
-                foreach ($postes as $poste) {
-                    if (!empty($poste['poste_superieur_id']) && isset($postes_par_id[$poste['poste_superieur_id']])) {
-                        $postes_par_id[$poste['poste_superieur_id']]['enfants'][] = &$postes_par_id[$poste['id']];
-                    } else {
-                        $arbre[] = &$postes_par_id[$poste['id']];
+                    Utils::sendJsonResponse(['success' => true, 'stats' => $stats]);
+                    break;
+
+                // === ORGANIGRAMME ===
+                case 'get_organigramme':
+                    $postes = $posteManager->getAllPostes();
+
+                    // Construire arbre hiérarchique
+                    $postes_par_id = [];
+                    foreach ($postes as $poste) {
+                        $postes_par_id[$poste['id']]            = $poste;
+                        $postes_par_id[$poste['id']]['enfants'] = [];
                     }
-                }
-                
-                Utils::sendJsonResponse(['success' => true, 'organigramme' => $arbre]);
-                break;
-                
-            default:
-                Utils::sendJsonResponse(['success' => false, 'message' => 'Action non reconnue']);
+
+                    $arbre = [];
+                    foreach ($postes as $poste) {
+                        if (! empty($poste['poste_superieur_id']) && isset($postes_par_id[$poste['poste_superieur_id']])) {
+                            $postes_par_id[$poste['poste_superieur_id']]['enfants'][] = &$postes_par_id[$poste['id']];
+                        } else {
+                            $arbre[] = &$postes_par_id[$poste['id']];
+                        }
+                    }
+
+                    Utils::sendJsonResponse(['success' => true, 'organigramme' => $arbre]);
+                    break;
+
+                default:
+                    Utils::sendJsonResponse(['success' => false, 'message' => 'Action non reconnue']);
+            }
+        } catch (Exception $e) {
+            Utils::sendJsonResponse(['success' => false, 'message' => $e->getMessage()]);
         }
-    } catch (Exception $e) {
-        Utils::sendJsonResponse(['success' => false, 'message' => $e->getMessage()]);
     }
-}
-
-// === EXPORT PDF ===
-if (isset($_GET['action']) && $_GET['action'] === 'export_postes_pdf' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     try {
-        $pdfContent = PDFGenerator::generatePostesPDF($conn);
-        header('Content-Type: application/pdf');
-        header('Content-Disposition: attachment; filename="postes_' . date('Y-m-d') . '.pdf"');
-        header('Content-Length: ' . strlen($pdfContent));
-        Utils::logActivity($conn, 'EXPORT_POSTES_PDF', 'postes', null, ['date' => date('Y-m-d H:i:s')]);
-        echo $pdfContent;
-        exit;
-    } catch (Exception $e) {
-        die('Erreur lors de l\'export PDF: ' . $e->getMessage());
-    }
-}
+        $postes = $posteManager->getAllPostes();
 
-// ====================================================================
-// 4. CHARGEMENT DES DONNÉES POUR L'AFFICHAGE  
-// ====================================================================
-try {
-    $postes = $posteManager->getAllPostes();
-    
-    $stmt = $conn->query("SELECT id, nom FROM postes WHERE actif = TRUE ORDER BY niveau_hierarchique, nom");
-    $tous_postes = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    $niveaux_hierarchiques = $niveauManager->getAllNiveaux();
-    
-    // Récupération des départements
-    $stmt = $conn->query("SELECT id, nom FROM departements WHERE actif = TRUE ORDER BY nom");
-    $departements = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-} catch (Exception $e) {
-    die("Erreur: " . $e->getMessage());
-}
+        $stmt        = $conn->query("SELECT id, nom FROM postes WHERE actif = TRUE ORDER BY niveau_hierarchique, nom");
+        $tous_postes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $niveaux_hierarchiques = $niveauManager->getAllNiveaux();
+
+        // Récupération des départements
+        $stmt         = $conn->query("SELECT id, nom FROM departements WHERE actif = TRUE ORDER BY nom");
+        $departements = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    } catch (Exception $e) {
+        die("Erreur: " . $e->getMessage());
+    }
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -914,320 +886,315 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestion des Postes - Restaurant</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        .table-hover tbody tr:hover {
+            background-color: rgba(59, 130, 246, 0.08);
+        }
+        .badge-contrat {
+            font-size: 0.75rem;
+            padding: 0.35em 0.65em;
+        }
+        .color-indicator {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        .poste-table th {
+            background-color: #f8f9fa;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .progress {
+            height: 8px;
+            width: 100px;
+        }
+        .action-buttons .btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem;
+        }
+        .modal-header {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .info-label {
+            font-weight: 500;
+            color: #6c757d;
+            min-width: 140px;
+        }
+        .modal-content {
+            border-radius: 0.5rem;
+            border: none;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        }
+        .detail-section {
+            border-left: 3px solid #0d6efd;
+            padding-left: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .tab-content {
+            padding: 20px 0;
+        }
+        .hidden {
+            display: none;
+        }
+        .tab-active {
+            background-color: #0d6efd;
+            color: white;
+        }
+        .tab-inactive {
+            background-color: #f8f9fa;
+            color: #6c757d;
+        }
         .notification {
-            position: fixed; top: 20px; right: 20px; z-index: 1000;
-            opacity: 0; transition: opacity 0.3s ease;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1050;
+            opacity: 0;
+            transition: opacity 0.5s;
         }
-        .notification.show { opacity: 1; }
-        .loading {
-            display: none; position: fixed; top: 50%; left: 50%;
-            transform: translate(-50%, -50%); z-index: 1000;
+        .notification.show {
+            opacity: 1;
         }
-        .organigramme-node { transition: transform 0.2s ease; }
-        .organigramme-node:hover { transform: scale(1.05); }
-        .niveau-1 { border-left: 4px solid #ef4444; }
-        .niveau-2 { border-left: 4px solid #f97316; }
-        .niveau-3 { border-left: 4px solid #eab308; }
-        .niveau-4 { border-left: 4px solid #22c55e; }
-        .niveau-5 { border-left: 4px solid #3b82f6; }
-        .tab-active { background-color: #3b82f6; color: white; }
-        .tab-inactive { background-color: #f3f4f6; color: #6b7280; }
+        #loading {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            z-index: 9999;
+        }
+        .organigramme-node {
+            margin-bottom: 15px;
+        }
+        .children-container {
+            margin-left: 30px;
+            border-left: 2px solid #dee2e6;
+            padding-left: 15px;
+        }
+        .niveau-1 { border-left-color: #dc3545; }
+        .niveau-2 { border-left-color: #fd7e14; }
+        .niveau-3 { border-left-color: #ffc107; }
+        .niveau-4 { border-left-color: #20c997; }
+        .niveau-5 { border-left-color: #0dcaf0; }
 
-        #confirmModal {
-    z-index: 60 !important;
+  /* Correction pour les modals de confirmation */
+.modal-top-level {
+    z-index: 1070 !important;
 }
 
-/* Modal de gestion des départements */
-#departementsModal {
-    z-index: 50;
+.modal-top-level .modal-backdrop {
+    z-index: 1065 !important;
 }
 
-/* Modal de gestion des niveaux */
-#niveauxModal {
-    z-index: 50;
-}
-
-/* Modal de gestion des postes */
-#posteModal {
-    z-index: 50;
-}
-
-/* Alternative: Vous pouvez aussi utiliser cette hiérarchie plus claire */
-.modal-base {
-    z-index: 50;
-}
-
-.modal-confirmation {
-    z-index: 60;
-}
-
-.modal-priority {
-    z-index: 70;
-}
-/* Configuration des z-index pour les modals */
-
-/* Modal de base - niveau le plus bas */
-#posteModal,
-#departementsModal,
-#niveauxModal {
-    z-index: 50 !important;
-}
-
-/* Modal de gestion hiérarchie - niveau intermédiaire */
-#hierarchieModal {
-    z-index: 55 !important;
-}
-
-/* Modal de modification hiérarchie - niveau supérieur */
-#modifierHierarchieModal {
-    z-index: 60 !important;
-}
-
-/* Modal de confirmation - niveau le plus élevé */
 #confirmModal {
-    z-index: 65 !important;
+    z-index: 1060 !important;
 }
 
-/* Classes génériques pour organiser la hiérarchie */
-.modal-base {
-    z-index: 50 !important;
-}
-
-.modal-secondary {
-    z-index: 55 !important;
-}
-
-.modal-tertiary {
-    z-index: 60 !important;
-}
-
-.modal-confirmation {
-    z-index: 65 !important;
-}
-
-.modal-priority {
-    z-index: 70 !important;
-}
-
-/* Assurer que les overlays respectent aussi la hiérarchie */
-.modal-overlay-base {
-    z-index: 49;
-}
-
-.modal-overlay-secondary {
-    z-index: 54;
-}
-
-.modal-overlay-tertiary {
-    z-index: 59;
-}
-
-.modal-overlay-confirmation {
-    z-index: 64;
+#confirmModal .modal-backdrop {
+    z-index: 1055 !important;
 }
     </style>
-
 </head>
-<body class="bg-gray-50">
+<body class="bg-light">
     <!-- Notification Toast -->
-    <div id="notification" class="notification bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg">
-        <span id="notificationText"></span>
-    </div>
-    
-    <!-- Loading Spinner -->
-    <div id="loading" class="loading">
-        <div class="bg-white p-4 rounded-lg shadow-lg">
-            <i class="fas fa-spinner fa-spin text-blue-600 text-2xl"></i>
-            <span class="ml-2">Chargement...</span>
+    <div id="notification" class="toast position-fixed top-0 end-0 m-3" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="3000">
+        <div class="toast-header">
+            <strong class="me-auto">Notification</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
         </div>
+        <div class="toast-body" id="notificationText"></div>
     </div>
-    
-    <div class="max-w-7xl mx-auto p-6">
-        <!-- En-tête -->
-        <div class="flex justify-between items-center mb-6">
-            <h1 class="text-3xl font-bold text-gray-900">
-                <i class="fas fa-briefcase mr-3 text-blue-600"></i>Gestion des Postes
-            </h1>
-            <div class="flex space-x-3">
-    <button onclick="exportPostesPDF()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg">
-        <i class="fas fa-file-pdf mr-2"></i>Export PDF
-    </button>
-    <button onclick="openDepartementsModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg">
-        <i class="fas fa-building mr-2"></i>Gérer Départements
-    </button>
-    <button onclick="openNiveauxModal()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg">
-        <i class="fas fa-layer-group mr-2"></i>Gérer Niveaux
-    </button>
 
-    <button onclick="openHierarchieModal()" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg">
-        <i class="fas fa-sitemap mr-2"></i>Gérer Hiérarchie
-    </button>
-   
-    <button onclick="openAddModal()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">
-        <i class="fas fa-plus mr-2"></i>Nouveau Poste
-    </button>
-</div>
+    <!-- Loading Spinner -->
+    <div id="loading" class="d-none position-fixed top-50 start-50 translate-middle z-50">
+        <div class="bg-white p-4 rounded shadow-lg d-flex align-items-center">
+            <div class="spinner-border text-primary me-2" role="status"></div>
+            <span>Chargement...</span>
         </div>
-        
-        <!-- Onglets de navigation -->
-        <div class="mb-6">
-            <div class="border-b border-gray-200">
-                <nav class="-mb-px flex space-x-8">
-                    <button onclick="showTab('postes')" id="tab-postes" class="tab-active py-2 px-1 border-b-2 border-transparent font-medium text-sm">
-                        <i class="fas fa-list mr-2"></i>Liste des Postes
-                    </button>
-                    <button onclick="showTab('organigramme')" id="tab-organigramme" class="tab-inactive py-2 px-1 border-b-2 border-transparent font-medium text-sm">
-                        <i class="fas fa-sitemap mr-2"></i>Organigramme
-                    </button>
-                    <button onclick="showTab('previsions')" id="tab-previsions" class="tab-inactive py-2 px-1 border-b-2 border-transparent font-medium text-sm">
-                        <i class="fas fa-chart-line mr-2"></i>Prévisions
-                    </button>
-                </nav>
+    </div>
+
+    <div class="container-fluid py-4">
+        <!-- En-tête -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-briefcase me-2 text-primary"></i>Gestion des Postes
+            </h1>
+            <div class="d-flex gap-2">
+                <button onclick="openDepartementsModal()" class="btn btn-primary">
+                    <i class="fas fa-building me-2"></i>Gérer Départements
+                </button>
+                <button onclick="openNiveauxModal()" class="btn btn-primary">
+                    <i class="fas fa-layer-group me-2"></i>Gérer Niveaux
+                </button>
+                <button onclick="openHierarchieModal()" class="btn btn-primary">
+                    <i class="fas fa-sitemap me-2"></i>Gérer Hiérarchie
+                </button>
+                <button onclick="openAddModal()" class="btn btn-success">
+                    <i class="fas fa-plus me-2"></i>Nouveau Poste
+                </button>
             </div>
+        </div>
+
+        <!-- Onglets de navigation -->
+        <div class="d-flex border-bottom mb-4" id="postsTabs">
+            <button id="tab-postes" class="tab-active px-4 py-2 border-0 rounded-top" onclick="showTab('postes')">
+                <i class="fas fa-list me-2"></i>Liste des Postes
+            </button>
+            <button id="tab-organigramme" class="tab-inactive px-4 py-2 border-0 rounded-top" onclick="showTab('organigramme')">
+                <i class="fas fa-sitemap me-2"></i>Organigramme
+            </button>
+            <button id="tab-previsions" class="tab-inactive px-4 py-2 border-0 rounded-top" onclick="showTab('previsions')">
+                <i class="fas fa-chart-line me-2"></i>Prévisions
+            </button>
         </div>
 
         <!-- Contenu de l'onglet Liste des Postes -->
         <div id="content-postes">
             <!-- Barre de recherche et filtres -->
-            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Recherche</label>
-                        <input type="text" id="searchInput" placeholder="Nom, description, compétences..."
-                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Type de contrat</label>
-                        <select id="typeContratFilter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                            <option value="">Tous les types</option>
-                            <?php foreach (TYPES_CONTRAT as $code => $libelle): ?>
-                                <option value="<?php echo $code; ?>"><?php echo $libelle; ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                      <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Niveau hiérarchique</label>
-                        <select id="niveauFilter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                            <option value="">Tous les niveaux</option>
-                            <?php foreach ($niveaux_hierarchiques as $niveau): ?>
-                                <option value="<?php echo $niveau['niveau']; ?>"><?php echo $niveau['niveau']; ?> - <?php echo $niveau['libelle']; ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Département</label>
-                        <select id="departementFilter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                            <option value="">Tous les départements</option>
-                            <?php foreach ($departements as $dept): ?>
-                                <option value="<?php echo $dept['id']; ?>"><?php echo htmlspecialchars($dept['nom']); ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                </div>
-                <div class="flex gap-2">
-                    <button onclick="applyFilters()" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors">
-                        <i class="fas fa-search mr-2"></i>Filtrer
-                    </button>
-                    <button onclick="clearFilters()" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors">
-                        <i class="fas fa-times mr-2"></i>Effacer
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Grille des postes -->
-            <div id="postesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <?php foreach ($postes as $poste): ?>
-                    <div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow niveau-<?php echo $poste['niveau_hierarchique'] ?? 5; ?>">
-                        <div class="flex items-center justify-between mb-4">
-                            <div class="flex items-center">
-                                <div class="w-4 h-4 rounded-full mr-3" style="background-color: <?php echo $poste['couleur']; ?>"></div>
-                                <div>
-                                    <h3 class="text-lg font-semibold text-gray-900"><?php echo htmlspecialchars($poste['nom']); ?></h3>
-                                    <span class="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full"><?php echo $poste['type_contrat'] ?? 'CDI'; ?></span>
-                                </div>
-                            </div>
-                            
-                            <div class="flex space-x-2">
-                                <button onclick="editPoste(<?php echo $poste['id']; ?>)" class="text-blue-600 hover:text-blue-800 transition-colors" title="Modifier">
-                                    <i class="fas fa-edit"></i>
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3">
+                            <label for="searchInput" class="form-label">Recherche</label>
+                            <input type="text" id="searchInput" class="form-control" placeholder="Nom, description, compétences...">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="typeContratFilter" class="form-label">Type de contrat</label>
+                            <select id="typeContratFilter" class="form-select">
+                                <option value="">Tous les types</option>
+                                <?php foreach (TYPES_CONTRAT as $code => $libelle): ?>
+                                    <option value="<?php echo $code; ?>"><?php echo $libelle; ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="niveauFilter" class="form-label">Niveau hiérarchique</label>
+                            <select id="niveauFilter" class="form-select">
+                                <option value="">Tous les niveaux</option>
+                                <?php foreach ($niveaux_hierarchiques as $niveau): ?>
+                                    <option value="<?php echo $niveau['niveau']; ?>"><?php echo $niveau['niveau']; ?> -<?php echo $niveau['libelle']; ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="departementFilter" class="form-label">Département</label>
+                            <select id="departementFilter" class="form-select">
+                                <option value="">Tous les départements</option>
+                                <?php foreach ($departements as $dept): ?>
+                                    <option value="<?php echo $dept['id']; ?>"><?php echo htmlspecialchars($dept['nom']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <div class="d-flex gap-2 w-100">
+                                <button onclick="applyFilters()" class="btn btn-primary flex-grow-1">
+                                    <i class="fas fa-search me-2"></i>Filtrer
                                 </button>
-                                <button onclick="duplicatePoste(<?php echo $poste['id']; ?>)" class="text-green-600 hover:text-green-800 transition-colors" title="Dupliquer">
-                                    <i class="fas fa-copy"></i>
-                                </button>
-                                <button onclick="deletePoste(<?php echo $poste['id']; ?>)" class="text-red-600 hover:text-red-800 transition-colors" title="Supprimer">
-                                    <i class="fas fa-trash"></i>
+                                <button onclick="clearFilters()" class="btn btn-outline-secondary">
+                                    <i class="fas fa-times"></i>
                                 </button>
                             </div>
                         </div>
-                        
-                        <div class="space-y-2 mb-4">
-                            <p class="text-gray-600 text-sm min-h-[40px]"><?php echo htmlspecialchars($poste['description'] ?? 'Aucune description'); ?></p>
-                            <?php if (!empty($poste['competences_requises'])): ?>
-                                <div class="text-xs text-gray-500">
-                                    <i class="fas fa-star mr-1"></i>Compétences: <?php echo htmlspecialchars(substr($poste['competences_requises'], 0, 50)); ?>...
-                                </div>
-                            <?php endif; ?>
-                            <?php if (!empty($poste['poste_superieur_nom'])): ?>
-                                <div class="text-xs text-gray-500">
-                                    <i class="fas fa-level-up-alt mr-1"></i>Rapporte à: <?php echo htmlspecialchars($poste['poste_superieur_nom']); ?>
-                                </div>
-                            <?php endif; ?>
-                                                    <?php if (!empty($poste['avantages'])): ?>
-                                <div class="text-xs text-gray-500">
-                                    <i class="fas fa-gift mr-1"></i>Avantages: <?php echo htmlspecialchars(substr($poste['avantages'], 0, 50)); ?>...
-                                </div>
-                            <?php endif; ?>
-                            <?php if (!empty($poste['departement_nom'])): ?>
-                                <div class="text-xs text-gray-500">
-                                    <i class="fas fa-building mr-1"></i>Département: <?php echo htmlspecialchars($poste['departement_nom']); ?>
-                                </div>
-                            <?php endif; ?>
-                            <div class="text-xs text-gray-500">
-                                <i class="fas fa-clock mr-1"></i>
-                                Heures/semaine: <?php echo $poste['heures_travail'] ?? '35'; ?>h
-                            </div>
+                    </div>
+                </div>
+            </div>
 
-                        </div>
-                        
-                        <div class="text-center mb-4">
-                            <span class="text-gray-500 text-sm">Salaire:</span>
-                            <div class="font-medium text-green-600 text-lg"><?php echo number_format($poste['salaire'], 0, ',', ' '); ?> FCFA</div>
-                            <?php if (!empty($poste['duree_contrat'])): ?>
-                                <div class="text-xs text-gray-500">Durée: <?php echo htmlspecialchars($poste['duree_contrat']); ?></div>
-                            <?php endif; ?>
-                        </div>
-                        <?php if (!empty($poste['departement_nom'])): ?>
-    <div class="text-xs text-gray-500">
-        <i class="fas fa-building mr-1"></i>Département: <?php echo htmlspecialchars($poste['departement_nom']); ?>
-    </div>
-<?php endif; ?>
-                        
-                        <div class="pt-4 border-t border-gray-200 space-y-2">
-                            <div class="flex justify-between items-center text-sm">
-                                <span class="text-gray-500">Employés actuels:</span>
-                                <span class="font-medium bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                                    <?php echo $poste['nb_employes']; ?>/<?php echo $poste['nombre_postes_prevus'] ?? 1; ?>
-                                </span>
+            <!-- Grille des postes -->
+            <div class="card">
+                <div class="card-body">
+                    <div id="postesGrid" class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
+                        <?php foreach ($postes as $poste): ?>
+                            <div class="col">
+                                <div class="card h-100 shadow-sm">
+                                    <div class="card-header d-flex justify-content-between align-items-center" style="border-left: 4px solid                                                                                                                                             <?php echo $poste['couleur']; ?>">
+                                        <h5 class="card-title mb-0"><?php echo htmlspecialchars($poste['nom']); ?></h5>
+                                        <span class="badge bg-secondary"><?php echo $poste['type_contrat'] ?? 'CDI'; ?></span>
+                                    </div>
+                                    <div class="card-body">
+                                        <p class="card-text text-muted"><?php echo ! empty($poste['description']) ? htmlspecialchars(substr($poste['description'], 0, 100)) . (strlen($poste['description']) > 100 ? '...' : '') : 'Aucune description'; ?></p>
+
+                                        <div class="mb-3">
+                                            <small class="text-muted">Département:</small>
+                                            <div><?php echo ! empty($poste['departement_nom']) ? htmlspecialchars($poste['departement_nom']) : 'Non assigné'; ?></div>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <small class="text-muted">Niveau hiérarchique:</small>
+                                            <div><?php echo $poste['niveau_libelle'] ?? 'Non défini'; ?></div>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <small class="text-muted">Salaire:</small>
+                                            <div class="fw-bold text-success"><?php echo number_format($poste['salaire'], 0, ',', ' '); ?> FCFA</div>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <small class="text-muted">Effectif:</small>
+                                                <span><?php echo $poste['nb_employes']; ?>/<?php echo $poste['nombre_postes_prevus'] ?? 1; ?></span>
+                                            </div>
+                                            <div class="progress" style="height: 8px;">
+                                                <?php
+                                                    $percentage = $poste['nombre_postes_prevus'] > 0
+                                                        ? min(100, ($poste['nb_employes'] / $poste['nombre_postes_prevus']) * 100)
+                                                        : 0;
+                                                    $bgClass = $percentage >= 100 ? 'bg-success' : ($percentage >= 70 ? 'bg-warning' : 'bg-danger');
+                                                ?>
+                                                <div class="progress-bar<?php echo $bgClass; ?>"
+                                                     role="progressbar"
+                                                     style="width:                                                                   <?php echo $percentage; ?>%"
+                                                     aria-valuenow="<?php echo $percentage; ?>"
+                                                     aria-valuemin="0"
+                                                     aria-valuemax="100"></div>
+                                            </div>
+                                        </div>
+
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <?php if ($poste['nb_employes'] >= ($poste['nombre_postes_prevus'] ?? 1)): ?>
+                                                <span class="badge bg-success">Complet</span>
+                                            <?php elseif ($poste['nb_employes'] > 0): ?>
+                                                <span class="badge bg-warning text-dark">Partiel</span>
+                                            <?php else: ?>
+                                                <span class="badge bg-danger">Vacant</span>
+                                            <?php endif; ?>
+
+                                            <div class="btn-group">
+                                                <button onclick="viewPoste(<?php echo $poste['id']; ?>)" class="btn btn-sm btn-info text-white" title="Voir détails">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                <button onclick="editPoste(<?php echo $poste['id']; ?>)" class="btn btn-sm btn-primary" title="Modifier">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button onclick="duplicatePoste(<?php echo $poste['id']; ?>)" class="btn btn-sm btn-success" title="Dupliquer">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                                <button onclick="deletePoste(<?php echo $poste['id']; ?>)" class="btn btn-sm btn-danger" title="Supprimer">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="flex justify-between items-center text-sm">
-                                <span class="text-gray-500">Niveau:</span>
-                                <span class="font-medium text-gray-800">
-                                    <?php echo $poste['niveau_libelle'] ?? 'Non défini'; ?>
-                                </span>
-                            </div>
-                        </div>
+                        <?php endforeach; ?>
                     </div>
-                <?php endforeach; ?>
-            </div>
-            
-            <!-- Message si aucun poste -->
-            <div id="noResults" class="text-center py-12 hidden">
-                <i class="fas fa-search text-gray-400 text-6xl mb-4"></i>
-                <h3 class="text-xl font-medium text-gray-600 mb-2">Aucun poste trouvé</h3>
-                <p class="text-gray-500">Modifiez vos critères de recherche ou ajoutez un nouveau poste.</p>
+
+                    <!-- Message si aucun poste -->
+                    <div id="noResults" class="text-center py-5 d-none">
+                        <i class="fas fa-search text-muted fs-1 mb-3"></i>
+                        <h5 class="text-muted">Aucun poste trouvé</h5>
+                        <p class="text-muted">Modifiez vos critères de recherche ou ajoutez un nouveau poste.</p>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1249,7 +1216,7 @@ try {
                     </h3>
                     <div id="postesSousDotesList" class="space-y-3"></div>
                 </div>
-                
+
                 <!-- Coûts prévisionnels -->
                 <div class="bg-white rounded-lg shadow-md p-6">
                     <h3 class="text-lg font-semibold mb-4 text-blue-600">
@@ -1274,175 +1241,166 @@ try {
         </div>
     </div>
 
-    <!-- Modal de confirmation de suppression -->
-    <div id="confirmModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="bg-white rounded-lg max-w-md w-full">
-                <div class="px-6 py-4 border-b border-gray-200">
-                    <h3 class="text-lg font-semibold text-gray-900">Confirmation</h3>
+    <!-- Modal de détail du poste -->
+    <div class="modal fade" id="viewPosteModal" tabindex="-1" aria-labelledby="viewPosteModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="viewPosteModalLabel">Détails du poste</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="p-6">
-                    <p id="confirmMessage" class="text-gray-700 mb-6"></p>
-                    <div class="flex justify-end space-x-3">
-                        <button onclick="closeConfirmModal()" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors">
-                            Annuler
-                        </button>
-                        <button id="confirmButton" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors">
-                            Confirmer
-                        </button>
-                    </div>
+                <div class="modal-body" id="posteDetailsContent">
+                    <!-- Contenu chargé dynamiquement -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de confirmation de suppression -->
+    <div id="confirmModal" class="modal fade" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirmation</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="confirmMessage"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-danger" id="confirmButton">Confirmer</button>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Modal pour ajouter/modifier un poste -->
-    <div id="posteModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="bg-white rounded-lg max-w-2xl w-full max-h-screen overflow-y-auto">
-                <div class="px-6 py-4 border-b border-gray-200">
-                    <h3 id="modalTitle" class="text-lg font-semibold text-gray-900">Ajouter un poste</h3>
+    <div class="modal fade" id="posteModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">Ajouter un poste</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form id="posteForm" class="p-6">
-                    <input type="hidden" id="posteId" name="id">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <!-- Informations de base -->
-                        <div class="space-y-4">
-                            <h4 class="font-medium text-gray-900 border-b pb-2">Informations de base</h4>
-                            <div>
-                                <label for="nom" class="block text-sm font-medium text-gray-700 mb-2">Nom du poste *</label>
-                                <input type="text" id="nom" name="nom" required
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <form id="posteForm">
+                    <div class="modal-body">
+                        <input type="hidden" id="posteId" name="id">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="nom" class="form-label">Nom du poste *</label>
+                                    <input type="text" class="form-control" id="nom" name="nom" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="type_contrat" class="form-label">Type de contrat</label>
+                                    <select class="form-select" id="type_contrat" name="type_contrat">
+                                        <?php foreach (TYPES_CONTRAT as $code => $libelle): ?>
+                                            <option value="<?php echo $code; ?>"><?php echo $libelle; ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="niveau_hierarchique" class="form-label">Niveau hiérarchique</label>
+                                    <select class="form-select" id="niveau_hierarchique" name="niveau_hierarchique">
+                                        <option value="">Sélectionnez un niveau</option>
+                                        <?php foreach ($niveaux_hierarchiques as $niveau): ?>
+                                            <option value="<?php echo $niveau['niveau']; ?>"><?php echo $niveau['niveau']; ?> -<?php echo $niveau['libelle']; ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="heures_travail" class="form-label">Heures de travail par semaine</label>
+                                    <input type="number" class="form-control" id="heures_travail" name="heures_travail" min="1" max="80" value="35">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="poste_superieur_id" class="form-label">Poste supérieur</label>
+                                    <select class="form-select" id="poste_superieur_id" name="poste_superieur_id">
+                                        <option value="">Aucun (poste de direction)</option>
+                                        <?php foreach ($tous_postes as $poste): ?>
+                                            <option value="<?php echo $poste['id']; ?>"><?php echo htmlspecialchars($poste['nom']); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="couleur" class="form-label">Couleur</label>
+                                    <input type="color" class="form-control form-control-color" id="couleur" name="couleur" value="#3B82F6" title="Choisir une couleur">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="departement_id" class="form-label">Département</label>
+                                    <select class="form-select" id="departement_id" name="departement_id">
+                                        <option value="">Sélectionnez un département</option>
+                                        <?php foreach ($departements as $dept): ?>
+                                            <option value="<?php echo $dept['id']; ?>"><?php echo htmlspecialchars($dept['nom']); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
                             </div>
-                            <div>
-                                <label for="type_contrat" class="block text-sm font-medium text-gray-700 mb-2">Type de contrat</label>
-                                <select id="type_contrat" name="type_contrat"
-                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                    <?php foreach (TYPES_CONTRAT as $code => $libelle): ?>
-                                        <option value="<?php echo $code; ?>"><?php echo $libelle; ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="niveau_hierarchique" class="block text-sm font-medium text-gray-700 mb-2">Niveau hiérarchique</label>
-                                <select id="niveau_hierarchique" name="niveau_hierarchique"
-                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                    <option value="">Sélectionnez un niveau</option>
-                                    <?php foreach ($niveaux_hierarchiques as $niveau): ?>
-                                        <option value="<?php echo $niveau['niveau']; ?>"><?php echo $niveau['niveau']; ?> - <?php echo $niveau['libelle']; ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="heures_travail" class="block text-sm font-medium text-gray-700 mb-2">Heures de travail par semaine</label>
-                                <input type="number" id="heures_travail" name="heures_travail" min="1" max="80" value="35"
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                            </div>
-                            <div>
-                                <label for="poste_superieur_id" class="block text-sm font-medium text-gray-700 mb-2">Poste supérieur</label>
-                                <select id="poste_superieur_id" name="poste_superieur_id"
-                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                    <option value="">Aucun (poste de direction)</option>
-                                    <?php foreach ($tous_postes as $poste): ?>
-                                        <option value="<?php echo $poste['id']; ?>"><?php echo htmlspecialchars($poste['nom']); ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            
-                            <div>
-                                <label for="couleur" class="block text-sm font-medium text-gray-700 mb-2">Couleur</label>
-                                <input type="color" id="couleur" name="couleur" value="#3B82F6"
-                                       class="w-full h-10 border border-gray-300 rounded-md cursor-pointer">
-                            </div>
-                            <div>
-                                <label for="departement_id" class="block text-sm font-medium text-gray-700 mb-2">Département</label>
-                                <select id="departement_id" name="departement_id"
-                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                    <option value="">Sélectionnez un département</option>
-                                    <?php foreach ($departements as $dept): ?>
-                                        <option value="<?php echo $dept['id']; ?>"><?php echo htmlspecialchars($dept['nom']); ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                        </div>
-                        <!-- Informations détaillées -->
-                        <div class="space-y-4">
-                            <h4 class="font-medium text-gray-900 border-b pb-2">Détails du poste</h4>
-                            <div>
-                                <label for="salaire" class="block text-sm font-medium text-gray-700 mb-2">Salaire (FCFA)</label>
-                                <input type="number" id="salaire" name="salaire" step="1" min="0"
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                            </div>
-                            <div>
-                                <label for="nombre_postes_prevus" class="block text-sm font-medium text-gray-700 mb-2">Nombre de postes prévus</label>
-                                <input type="number" id="nombre_postes_prevus" name="nombre_postes_prevus" min="1" value="1"
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                            </div>
-                            <div>
-                                <label for="duree_contrat" class="block text-sm font-medium text-gray-700 mb-2">Durée du contrat</label>
-                                <input type="text" id="duree_contrat" name="duree_contrat" placeholder="Ex: 12 mois, Indéterminée"
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                            </div>
-                            <div>
-                                <label for="code_paie" class="block text-sm font-medium text-gray-700 mb-2">Code Paie</label>
-                                <input type="text" id="code_paie" name="code_paie"
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                            </div>
-                            <div>
-                                <label for="categorie_paie" class="block text-sm font-medium text-gray-700 mb-2">Catégorie de Paie</label>
-                                <select id="categorie_paie" name="categorie_paie"
-                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                    <option value="">Sélectionnez une catégorie</option>
-                                    <option value="Cadre">Cadre</option>
-                                    <option value="Non-cadre">Non-cadre</option>
-                                    <option value="Stagiaire">Stagiaire</option>
-                                    <option value="Apprenti">Apprenti</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="regime_social" class="block text-sm font-medium text-gray-700 mb-2">Régime Social</label>
-                                <select id="regime_social" name="regime_social"
-                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                    <option value="">Sélectionnez un régime</option>
-                                    <option value="Régime général">Régime général</option>
-                                    <option value="Régime agricole">Régime agricole</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="taux_cotisation" class="block text-sm font-medium text-gray-700 mb-2">Taux de Cotisation (%)</label>
-                                <input type="number" id="taux_cotisation" name="taux_cotisation" step="0.01" min="0" max="100"
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="salaire" class="form-label">Salaire (FCFA)</label>
+                                    <input type="number" class="form-control" id="salaire" name="salaire" step="1" min="0">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="nombre_postes_prevus" class="form-label">Nombre de postes prévus</label>
+                                    <input type="number" class="form-control" id="nombre_postes_prevus" name="nombre_postes_prevus" min="1" value="1">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="duree_contrat" class="form-label">Durée du contrat</label>
+                                    <input type="text" class="form-control" id="duree_contrat" name="duree_contrat" placeholder="Ex: 12 mois, Indéterminée">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="code_paie" class="form-label">Code Paie</label>
+                                    <input type="text" class="form-control" id="code_paie" name="code_paie">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="categorie_paie" class="form-label">Catégorie de Paie</label>
+                                    <select class="form-select" id="categorie_paie" name="categorie_paie">
+                                        <option value="">Sélectionnez une catégorie</option>
+                                        <option value="Cadre">Cadre</option>
+                                        <option value="Non-cadre">Non-cadre</option>
+                                        <option value="Stagiaire">Stagiaire</option>
+                                        <option value="Apprenti">Apprenti</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="regime_social" class="form-label">Régime Social</label>
+                                    <select class="form-select" id="regime_social" name="regime_social">
+                                        <option value="">Sélectionnez un régime</option>
+                                        <option value="Régime général">Régime général</option>
+                                        <option value="Régime agricole">Régime agricole</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="taux_cotisation" class="form-label">Taux de Cotisation (%)</label>
+                                    <input type="number" class="form-control" id="taux_cotisation" name="taux_cotisation" step="0.01" min="0" max="100">
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    
-                    <!-- Champs texte longs -->
-                    <div class="mt-6 space-y-4">
-                        <div>
-                            <label for="description" class="block text-sm font-medium text-gray-700 mb-2">Description du poste</label>
-                            <textarea id="description" name="description" rows="3"
-                                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
-                        </div>
-                        <div>
-                            <label for="competences_requises" class="block text-sm font-medium text-gray-700 mb-2">Compétences requises</label>
-                            <textarea id="competences_requises" name="competences_requises" rows="3"
-                                      placeholder="Listez les compétences et qualifications nécessaires..."
-                                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
-                        </div>
-                        <div>
-                            <label for="avantages" class="block text-sm font-medium text-gray-700 mb-2">Avantages</label>
-                            <textarea id="avantages" name="avantages" rows="2"
-                                      placeholder="Avantages sociaux, primes, etc."
-                                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="mb-3">
+                                    <label for="description" class="form-label">Description du poste</label>
+                                    <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="competences_requises" class="form-label">Compétences requises</label>
+                                    <textarea class="form-control" id="competences_requises" name="competences_requises" rows="3" placeholder="Listez les compétences et qualifications nécessaires..."></textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="avantages" class="form-label">Avantages</label>
+                                    <textarea class="form-control" id="avantages" name="avantages" rows="2" placeholder="Avantages sociaux, primes, etc."></textarea>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    
-                    <div class="mt-6 flex justify-end space-x-3">
-                        <button type="button" onclick="closeModal()" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors">
-                            Annuler
-                        </button>
-                        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
-                            <i class="fas fa-save mr-2"></i>Enregistrer
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Enregistrer
                         </button>
                     </div>
                 </form>
@@ -1451,52 +1409,58 @@ try {
     </div>
 
     <!-- Modal de gestion des niveaux hiérarchiques -->
-    <div id="niveauxModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="bg-white rounded-lg max-w-4xl w-full max-h-screen overflow-y-auto">
-                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                    <h3 class="text-lg font-semibold text-gray-900">Gestion des Niveaux Hiérarchiques</h3>
-                    <button onclick="closeNiveauxModal()" class="text-gray-400 hover:text-gray-600">
-                        <i class="fas fa-times text-xl"></i>
-                    </button>
+    <div class="modal fade" id="niveauxModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Gestion des Niveaux Hiérarchiques</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                
-                <div class="p-6">
+                <div class="modal-body">
                     <!-- Formulaire d'ajout/modification de niveau -->
-                    <div class="mb-6 p-4 bg-gray-50 rounded-lg">
-                        <h4 class="font-medium text-gray-900 mb-4">Ajouter/Modifier un niveau</h4>
-                        <form id="niveauForm" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <input type="hidden" id="niveauId" name="id">
-                            <div>
-                                <label for="niveauNum" class="block text-sm font-medium text-gray-700 mb-1">Niveau (numéro) *</label>
-                                <input type="number" id="niveauNum" name="niveau" min="1" max="99" required
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                            </div>
-                            <div>
-                                <label for="niveauLibelle" class="block text-sm font-medium text-gray-700 mb-1">Libellé *</label>
-                                <input type="text" id="niveauLibelle" name="libelle" required
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                            </div>
-                            <div>
-                                <label for="niveauDescription" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                                <input type="text" id="niveauDescription" name="description"
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                            </div>
-                            <div class="md:col-span-3 flex space-x-3">
-                                <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors">
-                                    <i class="fas fa-save mr-2"></i>Enregistrer
-                                </button>
-                                <button type="button" onclick="clearNiveauForm()" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors">
-                                    <i class="fas fa-times mr-2"></i>Annuler
-                                </button>
-                            </div>
-                        </form>
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6 class="mb-0">Ajouter/Modifier un niveau</h6>
+                        </div>
+                        <div class="card-body">
+                            <form id="niveauForm">
+                                <input type="hidden" id="niveauId" name="id">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label for="niveauNum" class="form-label">Niveau (numéro) *</label>
+                                            <input type="number" class="form-control" id="niveauNum" name="niveau" min="1" max="99" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label for="niveauLibelle" class="form-label">Libellé *</label>
+                                            <input type="text" class="form-control" id="niveauLibelle" name="libelle" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label for="niveauDescription" class="form-label">Description</label>
+                                            <input type="text" class="form-control" id="niveauDescription" name="description">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i>Enregistrer
+                                    </button>
+                                    <button type="button" onclick="clearNiveauForm()" class="btn btn-secondary">
+                                        <i class="fas fa-times me-2"></i>Annuler
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                     
+
                     <!-- Liste des niveaux existants -->
                     <div>
-                        <h4 class="font-medium text-gray-900 mb-4">Niveaux existants</h4>
-                        <div id="niveauxList" class="space-y-2">
+                        <h6 class="mb-3">Niveaux existants</h6>
+                        <div id="niveauxList" class="list-group">
                             <!-- Liste générée dynamiquement -->
                         </div>
                     </div>
@@ -1504,527 +1468,770 @@ try {
             </div>
         </div>
     </div>
-    <!-- MODAL DE GESTION DES DÉPARTEMENTS - À ajouter après la modal des niveaux -->
-<!-- MODAL DE GESTION DES DÉPARTEMENTS - Version simplifiée -->
-<div id="departementsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
-    <div class="flex items-center justify-center min-h-screen p-4">
-        <div class="bg-white rounded-lg max-w-4xl w-full max-h-screen overflow-y-auto">
-            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                <h3 class="text-lg font-semibold text-gray-900">Gestion des Départements</h3>
-                <button onclick="closeDepartementsModal()" class="text-gray-400 hover:text-gray-600">
-                    <i class="fas fa-times text-xl"></i>
-                </button>
-            </div>
-            
-            <div class="p-6">
-                <!-- Formulaire d'ajout/modification de département -->
-                <div class="mb-6 p-4 bg-gray-50 rounded-lg">
-                    <h4 class="font-medium text-gray-900 mb-4">Ajouter/Modifier un département</h4>
-                    <form id="departementForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <input type="hidden" id="departementId" name="id">
-                        
-                        <div>
-                            <label for="departementNom" class="block text-sm font-medium text-gray-700 mb-1">Nom du département *</label>
-                            <input type="text" id="departementNom" name="nom" required
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                        </div>
-                        
-                        <div>
-                            <label for="departementDescription" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                            <input type="text" id="departementDescription" name="description"
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                        </div>
-                        
-                        <div class="md:col-span-2 flex space-x-3">
-                            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors">
-                                <i class="fas fa-save mr-2"></i>Enregistrer
-                            </button>
-                            <button type="button" onclick="clearDepartementForm()" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors">
-                                <i class="fas fa-times mr-2"></i>Annuler
-                            </button>
-                        </div>
-                    </form>
+
+    <!-- Modal de gestion des départements -->
+    <div class="modal fade" id="departementsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Gestion des Départements</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                
-                <!-- Liste des départements existants -->
-                <div>
-                    <h4 class="font-medium text-gray-900 mb-4">Départements existants</h4>
-                    <div id="departementsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <!-- Liste générée dynamiquement -->
+                <div class="modal-body">
+                    <!-- Formulaire d'ajout/modification de département -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6 class="mb-0">Ajouter/Modifier un département</h6>
+                        </div>
+                        <div class="card-body">
+                            <form id="departementForm">
+                                <input type="hidden" id="departementId" name="id">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="departementNom" class="form-label">Nom du département *</label>
+                                            <input type="text" class="form-control" id="departementNom" name="nom" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="departementDescription" class="form-label">Description</label>
+                                            <input type="text" class="form-control" id="departementDescription" name="description">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i>Enregistrer
+                                    </button>
+                                    <button type="button" onclick="clearDepartementForm()" class="btn btn-secondary">
+                                        <i class="fas fa-times me-2"></i>Annuler
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Liste des départements existants -->
+                    <div>
+                        <h6 class="mb-3">Départements existants</h6>
+                        <div id="departementsList" class="row row-cols-1 row-cols-md-2 g-3">
+                            <!-- Liste générée dynamiquement -->
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- Modal de gestion de la hiérarchie (Admin seulement) -->
-<div id="hierarchieModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
-    <div class="flex items-center justify-center min-h-screen p-4">
-        <div class="bg-white rounded-lg max-w-6xl w-full max-h-screen overflow-y-auto">
-            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                <h3 class="text-lg font-semibold text-gray-900">
-                    <i class="fas fa-sitemap mr-2"></i>Gestion de la Hiérarchie (Admin)
-                </h3>
-                <button onclick="closeHierarchieModal()" class="text-gray-400 hover:text-gray-600">
-                    <i class="fas fa-times text-xl"></i>
-                </button>
-            </div>
-            
-            <div class="p-6">
-                <!-- Instructions -->
-                <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <h4 class="font-medium text-blue-900 mb-2">Instructions</h4>
-                    <ul class="text-sm text-blue-800 space-y-1">
-                        <li>• Cliquez sur un poste pour modifier sa relation hiérarchique</li>
-                        <li>• Les postes de niveau supérieur ne peuvent pas dépendre de postes de niveau inférieur</li>
-                        <li>• Le système empêche la création de boucles hiérarchiques</li>
-                    </ul>
+    <!-- Modal de gestion de la hiérarchie (Admin seulement) -->
+    <div class="modal fade" id="hierarchieModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-sitemap me-2"></i>Gestion de la Hiérarchie (Admin)
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                
-                <!-- Arbre hiérarchique interactif -->
-                <div id="hierarchieTree" class="space-y-4">
-                    <!-- Généré dynamiquement -->
+                <div class="modal-body">
+                    <!-- Instructions -->
+                    <div class="alert alert-info mb-4">
+                        <h6 class="alert-heading">Instructions</h6>
+                        <ul class="mb-0">
+                            <li>• Cliquez sur un poste pour modifier sa relation hiérarchique</li>
+                            <li>• Les postes de niveau supérieur ne peuvent pas dépendre de postes de niveau inférieur</li>
+                            <li>• Le système empêche la création de boucles hiérarchiques</li>
+                        </ul>
+                    </div>
+
+                    <!-- Arbre hiérarchique interactif -->
+                    <div id="hierarchieTree" class="space-y-4">
+                        <!-- Généré dynamiquement -->
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- Modal d'édition de relation hiérarchique -->
-<div id="editHierarchieModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-60">
-    <div class="flex items-center justify-center min-h-screen p-4">
-        <div class="bg-white rounded-lg max-w-lg w-full">
-            <div class="px-6 py-4 border-b border-gray-200">
-                <h3 class="text-lg font-semibold text-gray-900">Modifier la hiérarchie</h3>
-            </div>
-            
-            <div class="p-6">
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Poste</label>
-                    <input type="text" id="currentPosteName" readonly 
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100">
+    <!-- Modal d'édition de relation hiérarchique -->
+    <div class="modal fade" id="editHierarchieModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Modifier la hiérarchie</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                
-                <div class="mb-6">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Poste supérieur</label>
-                    <select id="newPosteSuperieur" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                        <option value="">Aucun (poste de direction)</option>
-                    </select>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Poste</label>
+                        <input type="text" id="currentPosteName" class="form-control" readonly>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">Poste supérieur</label>
+                        <select id="newPosteSuperieur" class="form-select">
+                            <option value="">Aucun (poste de direction)</option>
+                        </select>
+                    </div>
                 </div>
-                
-                <div class="flex justify-end space-x-3">
-                    <button onclick="closeEditHierarchieModal()" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
-                        Annuler
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-primary" onclick="saveHierarchieChange()">
+                        <i class="fas fa-save me-2"></i>Enregistrer
                     </button>
-                    <button onclick="saveHierarchieChange()" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
-                        <i class="fas fa-save mr-2"></i>Enregistrer
-                    </button>
-                    <button onclick="removeHierarchieRelation()" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">
-                        <i class="fas fa-unlink mr-2"></i>Supprimer relation
+                    <button type="button" class="btn btn-danger" onclick="removeHierarchieRelation()">
+                        <i class="fas fa-unlink me-2"></i>Supprimer relation
                     </button>
                 </div>
             </div>
         </div>
     </div>
-</div>
-    <!-- ====================================================================== -->
-    <!-- 6. JAVASCRIPT ORGANISÉ PAR MODULES                                    -->
-    <!-- ====================================================================== -->
-    <script>
-        // ============================================================
-// VARIABLES GLOBALES ET CONFIGURATION
-// ============================================================
-let postes = <?php echo json_encode($postes); ?>;
-let niveauxHierarchiques = <?php echo json_encode($niveaux_hierarchiques); ?>;
-let departements = <?php echo json_encode($departements); ?>;
-let currentAction = null;
-let currentTab = 'postes';
 
-// ============================================================
-// MODULE UTILITAIRES
-// ============================================================
-const Utils = {
-    showNotification: function(message, type = 'success') {
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+      <script>
+    // Variables globales
+    let postes =                 <?php echo json_encode($postes); ?>;
+    let niveauxHierarchiques =                               <?php echo json_encode($niveaux_hierarchiques); ?>;
+    let departements =                       <?php echo json_encode($departements); ?>;
+    let currentAction = null;
+    let currentTab = 'postes';
+    let currentPosteId = null;
+
+    // Utilitaire pour afficher les notifications
+    function showNotification(message, type = 'success') {
         const notification = document.getElementById('notification');
         const notificationText = document.getElementById('notificationText');
+
         notificationText.textContent = message;
-        notification.className = `notification ${type === 'success' ? 'bg-green-500' : 'bg-red-500'} text-white px-6 py-3 rounded-lg shadow-lg show`;
-        setTimeout(() => {
-            notification.classList.remove('show');
-        }, 3000);
-    },
 
-    showLoading: function() {
-        document.getElementById('loading').style.display = 'block';
-    },
+        // Changer la couleur selon le type
+        const toastHeader = notification.querySelector('.toast-header strong');
+        if (type === 'success') {
+            toastHeader.className = 'me-auto text-success';
+        } else {
+            toastHeader.className = 'me-auto text-danger';
+        }
 
-    hideLoading: function() {
-        document.getElementById('loading').style.display = 'none';
-    },
+        // Afficher la notification
+        const bsToast = new bootstrap.Toast(notification);
+        bsToast.show();
+    }
 
-    debounce: function(func, wait) {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
-    },
+    // Fonction pour afficher le chargement
+    function showLoading() {
+        document.getElementById('loading').classList.remove('d-none');
+    }
 
-    escapeHtml: function(text) {
+    // Fonction pour cacher le chargement
+    function hideLoading() {
+        document.getElementById('loading').classList.add('d-none');
+    }
+
+    // Fonction pour échapper le HTML
+    function escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
-    },
+    }
 
-    formatNumber: function(number) {
+    // Fonction pour formater les nombres
+    function formatNumber(number) {
         return new Intl.NumberFormat('fr-FR').format(number);
     }
-};
 
-// ============================================================
-// MODULE VALIDATION
-// ============================================================
-const Validator = {
-    validatePosteForm: function() {
-        const nom = document.getElementById('nom').value.trim();
-        const salaire = parseInt(document.getElementById('salaire').value) || 0;
-        const nombrePostes = parseInt(document.getElementById('nombre_postes_prevus').value) || 1;
-        const tauxCotisation = parseFloat(document.getElementById('taux_cotisation').value) || 0;
-        const heuresTravail = parseInt(document.getElementById('heures_travail').value) || 35;
+   // Dans votre fonction makeRequest, améliorez cette partie :
 
-        if (nom.length < 2) {
-            Utils.showNotification('Le nom du poste doit contenir au moins 2 caractères', 'error');
-            return false;
-        }
-        if (salaire < 0) {
-            Utils.showNotification('Le salaire ne peut pas être négatif', 'error');
-            return false;
-        }
-        if (nombrePostes < 1) {
-            Utils.showNotification('Le nombre de postes prévus doit être au moins de 1', 'error');
-            return false;
-        }
-        if (tauxCotisation < 0 || tauxCotisation > 100) {
-            Utils.showNotification('Le taux de cotisation doit être compris entre 0 et 100%', 'error');
-            return false;
-        }
-        if (heuresTravail < 1 || heuresTravail > 80) {
-            Utils.showNotification('Le nombre d\'heures de travail doit être compris entre 1 et 80 heures par semaine', 'error');
-            return false;
-        }
-        return true;
-    },
-
-    validateNiveauForm: function() {
-        const niveau = parseInt(document.getElementById('niveauNum').value) || 0;
-        const libelle = document.getElementById('niveauLibelle').value.trim();
-
-        if (niveau < 1 || niveau > 99) {
-            Utils.showNotification('Le niveau doit être compris entre 1 et 99', 'error');
-            return false;
-        }
-        if (libelle.length < 2) {
-            Utils.showNotification('Le libellé doit contenir au moins 2 caractères', 'error');
-            return false;
-        }
-        return true;
-    },
-validateDepartementForm: function() {
-    const nom = document.getElementById('departementNom').value.trim();
-    if (nom.length < 2) {
-        Utils.showNotification('Le nom du département doit contenir au moins 2 caractères', 'error');
-        return false;
-    }
-    return true;
-}
-};
-
-// ============================================================
-// MODULE GESTION DES ONGLETS
-// ============================================================
-const TabManager = {
-    showTab: function(tabName) {
-        const contents = ['postes', 'organigramme', 'previsions'];
-        
-        contents.forEach(content => {
-            const contentEl = document.getElementById(`content-${content}`);
-            const tabEl = document.getElementById(`tab-${content}`);
-            
-            if (contentEl) contentEl.classList.add('hidden');
-            if (tabEl) {
-                tabEl.classList.remove('tab-active');
-                tabEl.classList.add('tab-inactive');
+function makeRequest(action, data = {}, method = 'POST') {
+    // Pour les actions de suppression, utiliser JSON
+    if (action.includes('delete')) {
+        return fetch(`?action=${action}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => {
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                return response.json();
+            } else {
+                return response.text().then(text => {
+                    console.error('Réponse non-JSON:', text);
+                    throw new Error('Réponse du serveur invalide');
+                });
             }
         });
-        
-        const activeContent = document.getElementById(`content-${tabName}`);
-        const activeTab = document.getElementById(`tab-${tabName}`);
-        
-        if (activeContent) activeContent.classList.remove('hidden');
-        if (activeTab) {
-            activeTab.classList.remove('tab-inactive');
-            activeTab.classList.add('tab-active');
+    }
+
+    // Pour les autres actions, gérer correctement FormData et objets simples
+    let body;
+    if (data instanceof FormData) {
+        body = data;
+    } else {
+        const formData = new FormData();
+        for (const key in data) {
+            if (data.hasOwnProperty(key) && data[key] !== null && data[key] !== undefined) {
+                formData.append(key, data[key]);
+            }
         }
-        
+        body = formData;
+    }
+
+    return fetch(`?action=${action}`, {
+        method: method,
+        body: body
+    })
+    .then(response => {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            return response.json();
+        } else {
+            return response.text().then(text => {
+                console.error('Réponse non-JSON:', text);
+                throw new Error('Réponse du serveur invalide');
+            });
+        }
+    });
+}
+
+    // Fonctions pour gérer les onglets
+    function showTab(tabName) {
+        // Cacher tous les contenus d'onglets
+        document.querySelectorAll('[id^="content-"]').forEach(tab => {
+            tab.classList.add('hidden');
+        });
+
+        // Désactiver tous les onglets
+        document.querySelectorAll('[id^="tab-"]').forEach(tab => {
+            tab.classList.remove('tab-active');
+            tab.classList.add('tab-inactive');
+        });
+
+        // Afficher l'onglet sélectionné
+        document.getElementById(`content-${tabName}`).classList.remove('hidden');
+        document.getElementById(`tab-${tabName}`).classList.remove('tab-inactive');
+        document.getElementById(`tab-${tabName}`).classList.add('tab-active');
+
         currentTab = tabName;
-        
+
+        // Charger le contenu spécifique de l'onglet
         if (tabName === 'organigramme') {
-            OrganigrammeManager.load();
+            loadOrganigramme();
         } else if (tabName === 'previsions') {
-            PrevisionManager.load();
+            loadPrevisions();
         }
     }
-};
 
-// ============================================================
-// MODULE GESTION DES MODALES
-// ============================================================
-const ModalManager = {
-    openAddModal: function() {
+    // Fonctions pour les modales
+    function openAddModal() {
         document.getElementById('modalTitle').textContent = 'Ajouter un poste';
         document.getElementById('posteForm').reset();
         document.getElementById('posteId').value = '';
         document.getElementById('couleur').value = '#3B82F6';
-        document.getElementById('type_contrat').value = 'CDI';
-        document.getElementById('nombre_postes_prevus').value = '1';
-        document.getElementById('heures_travail').value = '35';
-        document.getElementById('posteModal').classList.remove('hidden');
-        document.getElementById('nom').focus();
-    },
 
-    closeModal: function() {
-        document.getElementById('posteModal').classList.add('hidden');
-    },
-
-    openConfirmModal: function(message, action) {
-        document.getElementById('confirmMessage').textContent = message;
-        document.getElementById('confirmModal').classList.remove('hidden');
-        currentAction = action;
-    },
-
-    closeConfirmModal: function() {
-        document.getElementById('confirmModal').classList.add('hidden');
-        currentAction = null;
-    },
-
-    openNiveauxModal: function() {
-        document.getElementById('niveauxModal').classList.remove('hidden');
-        NiveauManager.load();
-    },
-
-    closeNiveauxModal: function() {
-        document.getElementById('niveauxModal').classList.add('hidden');
-        NiveauManager.clearForm();
-    },
-
-    openDepartementsModal: function() {
-        document.getElementById('departementsModal').classList.remove('hidden');
-        DepartementManager.load();
-    },
-
-    closeDepartementsModal: function() {
-        document.getElementById('departementsModal').classList.add('hidden');
-        DepartementManager.clearForm();
+        const modal = new bootstrap.Modal(document.getElementById('posteModal'));
+        modal.show();
     }
-};
 
-// ============================================================
-// MODULE GESTION DES DÉPARTEMENTS
-// ============================================================
-const DepartementManager = {
-    load: function() {
-        Utils.showLoading();
-        fetch('?action=get_departements', { method: 'POST' })
-            .then(response => response.json())
+    function closeModal() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('posteModal'));
+    if (modal) {
+        modal.hide();
+    }
+}
+
+    function openNiveauxModal() {
+        loadNiveaux();
+        const modal = new bootstrap.Modal(document.getElementById('niveauxModal'));
+        modal.show();
+    }
+
+    function closeNiveauxModal() {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('niveauxModal'));
+        modal.hide();
+    }
+
+    function openDepartementsModal() {
+        loadDepartements();
+        const modal = new bootstrap.Modal(document.getElementById('departementsModal'));
+        modal.show();
+    }
+
+    function closeDepartementsModal() {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('departementsModal'));
+        modal.hide();
+    }
+
+    function openHierarchieModal() {
+        loadHierarchie();
+        const modal = new bootstrap.Modal(document.getElementById('hierarchieModal'));
+        modal.show();
+    }
+
+    function closeHierarchieModal() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('hierarchieModal'));
+    if (modal) {
+        modal.hide();
+    }
+    // Réinitialiser ici car on quitte complètement la gestion de hiérarchie
+    currentPosteId = null;
+    console.log('Modal hiérarchie fermé, currentPosteId réinitialisé');
+}
+
+    function closeEditHierarchieModal() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('editHierarchieModal'));
+    if (modal) {
+        modal.hide();
+    }
+    // Ne pas réinitialiser currentPosteId ici car on peut encore en avoir besoin
+    console.log('Modal fermé, currentPosteId conservé:', currentPosteId);
+}
+
+    // Fonctions pour la gestion des postes
+    function viewPoste(posteId) {
+        showLoading();
+
+        // Recherche des informations du poste
+        const poste = postes.find(p => p.id == posteId);
+        if (!poste) {
+            hideLoading();
+            showNotification('Poste non trouvé', 'error');
+            return;
+        }
+
+        // Construction du contenu HTML pour les détails du poste
+        let detailsHtml = `
+            <div class="mb-4">
+                <div class="d-flex align-items-center mb-3">
+                    <span class="color-indicator me-2" style="background-color: ${poste.couleur || '#3B82F6'}"></span>
+                    <h4 class="mb-0">${escapeHtml(poste.nom)}</h4>
+                    <span class="badge bg-secondary ms-2">${poste.type_contrat || 'CDI'}</span>
+                </div>
+
+                ${poste.description ? `<p class="text-muted">${escapeHtml(poste.description)}</p>` : ''}
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="detail-section">
+                        <h5 class="mb-3">Informations générales</h5>
+
+                        <div class="mb-2 d-flex">
+                            <span class="info-label">Département:</span>
+                            <span>${poste.departement_nom ? escapeHtml(poste.departement_nom) : 'Non assigné'}</span>
+                        </div>
+
+                        <div class="mb-2 d-flex">
+                            <span class="info-label">Niveau hiérarchique:</span>
+                            <span>${poste.niveau_libelle || 'Non défini'}</span>
+                        </div>
+
+                        <div class="mb-2 d-flex">
+                            <span class="info-label">Poste supérieur:</span>
+                            <span>${poste.poste_superieur_nom ? escapeHtml(poste.poste_superieur_nom) : 'Aucun'}</span>
+                        </div>
+
+                        <div class="mb-2 d-flex">
+                            <span class="info-label">Heures/semaine:</span>
+                            <span>${poste.heures_travail || '35'}h</span>
+                        </div>
+
+                        <div class="mb-2 d-flex">
+                            <span class="info-label">Salaire:</span>
+                            <span class="fw-bold text-success">${formatNumber(poste.salaire || 0)} FCFA</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="detail-section">
+                        <h5 class="mb-3">Effectif et postes</h5>
+
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>Employés actuels:</span>
+                                <span class="fw-bold">${poste.nb_employes || 0}/${poste.nombre_postes_prevus || 1}</span>
+                            </div>
+                            <div class="progress" style="height: 10px;">
+                                ${function() {
+                                    const percentage = poste.nombre_postes_prevus > 0
+                                        ? Math.min(100, (poste.nb_employes / poste.nombre_postes_prevus) * 100)
+                                        : 0;
+                                    const bgClass = percentage >= 100 ? 'bg-success' : (percentage >= 70 ? 'bg-warning' : 'bg-danger');
+                                    return `<div class="progress-bar ${bgClass}"
+                                             role="progressbar"
+                                             style="width: ${percentage}%"
+                                             aria-valuenow="${percentage}"
+                                             aria-valuemin="0"
+                                             aria-valuemax="100"></div>`;
+                                }()}
+                            </div>
+                        </div>
+
+                        ${poste.duree_contrat ? `
+                        <div class="mb-2 d-flex">
+                            <span class="info-label">Durée contrat:</span>
+                            <span>${escapeHtml(poste.duree_contrat)}</span>
+                        </div>
+                        ` : ''}
+
+                        ${poste.code_paie ? `
+                        <div class="mb-2 d-flex">
+                            <span class="info-label">Code paie:</span>
+                            <span>${escapeHtml(poste.code_paie)}</span>
+                        </div>
+                        ` : ''}
+
+                        ${poste.categorie_paie ? `
+                        <div class="mb-2 d-flex">
+                            <span class="info-label">Catégorie paie:</span>
+                            <span>${escapeHtml(poste.categorie_paie)}</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Section compétences requises
+        if (poste.competences_requises) {
+            detailsHtml += `
+                <div class="detail-section">
+                    <h5>Compétences requises</h5>
+                    <p>${escapeHtml(poste.competences_requises)}</p>
+                </div>
+            `;
+        }
+
+        // Section avantages
+        if (poste.avantages) {
+            detailsHtml += `
+                <div class="detail-section">
+                    <h5>Avantages</h5>
+                    <p>${escapeHtml(poste.avantages)}</p>
+                </div>
+            `;
+        }
+
+        // Section informations administratives
+        detailsHtml += `
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="detail-section">
+                        <h5>Informations administratives</h5>
+
+                        ${poste.regime_social ? `
+                        <div class="mb-2 d-flex">
+                            <span class="info-label">Régime social:</span>
+                            <span>${escapeHtml(poste.regime_social)}</span>
+                        </div>
+                        ` : ''}
+
+                        ${poste.taux_cotisation ? `
+                        <div class="mb-2 d-flex">
+                            <span class="info-label">Taux cotisation:</span>
+                            <span>${poste.taux_cotisation}%</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Mise à jour du contenu du modal et affichage
+        document.getElementById('posteDetailsContent').innerHTML = detailsHtml;
+        hideLoading();
+
+        // Afficher le modal
+        const viewModal = new bootstrap.Modal(document.getElementById('viewPosteModal'));
+        viewModal.show();
+    }
+
+    function editPoste(posteId) {
+        const poste = postes.find(p => p.id == posteId);
+        if (!poste) {
+            showNotification('Poste non trouvé', 'error');
+            return;
+        }
+
+        document.getElementById('modalTitle').textContent = 'Modifier le poste';
+
+        // Remplir le formulaire avec les données du poste
+        const fields = [
+            'id', 'nom', 'description', 'salaire', 'couleur', 'type_contrat',
+            'niveau_hierarchique', 'poste_superieur_id', 'competences_requises',
+            'nombre_postes_prevus', 'duree_contrat', 'heures_travail', 'avantages',
+            'code_paie', 'categorie_paie', 'regime_social', 'taux_cotisation', 'departement_id'
+        ];
+
+        fields.forEach(field => {
+            const element = document.getElementById(field === 'id' ? 'posteId' : field);
+            if (element && poste[field] !== undefined) {
+                element.value = poste[field] || '';
+            }
+        });
+
+        const modal = new bootstrap.Modal(document.getElementById('posteModal'));
+        modal.show();
+    }
+function deletePoste(posteId) {
+    const poste = postes.find(p => p.id == posteId);
+    if (!poste) return;
+
+    document.getElementById('confirmMessage').textContent = `Êtes-vous sûr de vouloir supprimer le poste "${poste.nom}" ?\n\nCette action est irréversible.`;
+
+    const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+    confirmModal.show();
+
+    // Définir l'action de confirmation
+    document.getElementById('confirmButton').onclick = function() {
+        showLoading();
+
+        // Utiliser fetch avec JSON au lieu de FormData
+        fetch('?action=delete_poste', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ id: posteId })
+        })
+        .then(response => {
+            // Vérifier si la réponse est du JSON valide
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                return response.json();
+            } else {
+                // Si ce n'est pas du JSON, lire comme texte pour déboguer
+                return response.text().then(text => {
+                    console.error('Réponse non-JSON reçue:', text);
+                    throw new Error('Réponse du serveur invalide');
+                });
+            }
+        })
+        .then(data => {
+            hideLoading();
+            confirmModal.hide();
+            if (data.success) {
+                showNotification(data.message);
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showNotification(data.message, 'error');
+            }
+        })
+        .catch(error => {
+            hideLoading();
+            confirmModal.hide();
+            console.error('Erreur complète:', error);
+            showNotification('Erreur de connexion: ' + error.message, 'error');
+        });
+    };
+}
+
+   // Correction de la fonction duplicatePoste dans le JavaScript
+function duplicatePoste(posteId) {
+    const poste = postes.find(p => p.id == posteId);
+    if (!poste) return;
+
+    document.getElementById('confirmMessage').textContent = `Voulez-vous dupliquer le poste "${poste.nom}" ?`;
+
+    const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+    confirmModal.show();
+
+    // Définir l'action de confirmation
+    document.getElementById('confirmButton').onclick = function() {
+        showLoading();
+
+        // Utiliser fetch avec JSON (comme pour delete_poste)
+        fetch('?action=duplicate_poste', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ id: posteId })
+        })
+        .then(response => {
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                return response.json();
+            } else {
+                return response.text().then(text => {
+                    console.error('Réponse non-JSON:', text);
+                    throw new Error('Réponse du serveur invalide');
+                });
+            }
+        })
+        .then(data => {
+            hideLoading();
+            confirmModal.hide();
+            if (data.success) {
+                showNotification(data.message);
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showNotification(data.message, 'error');
+            }
+        })
+        .catch(error => {
+            hideLoading();
+            confirmModal.hide();
+            console.error('Erreur complète:', error);
+            showNotification('Erreur de connexion: ' + error.message, 'error');
+        });
+    };
+}
+
+    function applyFilters() {
+        const filters = {
+            search: document.getElementById('searchInput').value.trim(),
+            type_contrat: document.getElementById('typeContratFilter').value,
+            niveau_hierarchique: document.getElementById('niveauFilter').value,
+            departement_id: document.getElementById('departementFilter').value
+        };
+
+        showLoading();
+        makeRequest('search_postes', filters)
             .then(data => {
-                Utils.hideLoading();
+                hideLoading();
                 if (data.success) {
-                    departements = data.departements;
-                    this.render(data.departements);
-                    this.updateSelects(data.departements);
+                    updatePostesGrid(data.postes);
                 } else {
-                    Utils.showNotification(data.message, 'error');
+                    showNotification(data.message, 'error');
                 }
             })
             .catch(error => {
-                Utils.hideLoading();
-                Utils.showNotification('Erreur de connexion: ' + error.message, 'error');
+                hideLoading();
+                showNotification('Erreur de connexion: ' + error.message, 'error');
             });
-    },
-
-    render: function(departements) {
-        const container = document.getElementById('departementsList');
-        container.innerHTML = '';
-        
-        if (departements.length === 0) {
-            container.innerHTML = `
-                <div class="col-span-full text-center text-gray-500 py-8">
-                    <i class="fas fa-building text-4xl mb-2"></i>
-                    <p>Aucun département défini.</p>
-                </div>
-            `;
-            return;
-        }
-
-        departements.forEach(dept => {
-            const card = document.createElement('div');
-            card.className = 'bg-white border rounded-lg p-4 hover:shadow-md transition-shadow';
-            card.style.borderLeftColor = dept.couleur;
-            card.style.borderLeftWidth = '4px';
-            
-            card.innerHTML = `
-                <div class="flex justify-between items-start mb-3">
-                    <div class="flex-1">
-                        <h5 class="font-semibold text-gray-900 text-lg">${Utils.escapeHtml(dept.nom)}</h5>
-                        ${dept.responsable ? `<p class="text-sm text-gray-600 mt-1"><i class="fas fa-user mr-1"></i>${Utils.escapeHtml(dept.responsable)}</p>` : ''}
-                    </div>
-                    <div class="flex space-x-2">
-                        <button onclick="DepartementManager.edit(${dept.id})" class="text-blue-600 hover:text-blue-800" title="Modifier">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button onclick="DepartementManager.delete(${dept.id})" class="text-red-600 hover:text-red-800" title="Supprimer">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                </div>
-                
-                ${dept.description ? `<p class="text-sm text-gray-600 mb-3">${Utils.escapeHtml(dept.description)}</p>` : ''}
-                
-                <div class="space-y-2">
-                    <div class="flex justify-between items-center text-sm">
-                        <span class="text-gray-500">Postes associés:</span>
-                        <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-medium">
-                            ${dept.nb_postes || 0} poste(s)
-                        </span>
-                    </div>
-                    
-                    ${dept.budget_annuel ? `
-                        <div class="flex justify-between items-center text-sm">
-                            <span class="text-gray-500">Budget annuel:</span>
-                            <span class="font-medium text-green-600">
-                                ${Utils.formatNumber(dept.budget_annuel)} FCFA
-                            </span>
-                        </div>
-                    ` : ''}
-                </div>
-            `;
-            container.appendChild(card);
-        });
-    },
-
-    updateSelects: function(departements) {
-        const selects = ['departement_id', 'departementFilter'];
-        
-        selects.forEach(selectId => {
-            const select = document.getElementById(selectId);
-            if (select) {
-                const currentValue = select.value;
-                const options = select.querySelectorAll('option:not(:first-child)');
-                options.forEach(option => option.remove());
-                
-                departements.forEach(dept => {
-                    const option = document.createElement('option');
-                    option.value = dept.id;
-                    option.textContent = dept.nom;
-                    select.appendChild(option);
-                });
-                
-                if (currentValue) {
-                    select.value = currentValue;
-                }
-            }
-        });
-    },
-
-    clearForm: function() {
-        document.getElementById('departementForm').reset();
-        document.getElementById('departementId').value = '';
-    },
-
-    edit: function(id) {
-        const dept = departements.find(d => d.id == id);
-        if (!dept) {
-            Utils.showNotification('Département non trouvé', 'error');
-            return;
-        }
-        
-        document.getElementById('departementId').value = dept.id;
-        document.getElementById('departementNom').value = dept.nom;
-        document.getElementById('departementDescription').value = dept.description || '';
-        document.getElementById('departementForm').scrollIntoView({ behavior: 'smooth' });
-    },
-
-    delete: function(id) {
-        const dept = departements.find(d => d.id == id);
-        if (!dept) return;
-        
-        ModalManager.openConfirmModal(
-            `Êtes-vous sûr de vouloir supprimer le département "${dept.nom}" ?\n\nCette action est irréversible et ne sera possible que si aucun poste n'est associé à ce département.`,
-            () => {
-                Utils.showLoading();
-                fetch('?action=delete_departement', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({id: id})
-                })
-                .then(response => response.json())
-                .then(data => {
-                    Utils.hideLoading();
-                    ModalManager.closeConfirmModal();
-                    if (data.success) {
-                        Utils.showNotification(data.message);
-                        DepartementManager.load();
-                    } else {
-                        Utils.showNotification(data.message, 'error');
-                    }
-                })
-                .catch(error => {
-                    Utils.hideLoading();
-                    ModalManager.closeConfirmModal();
-                    Utils.showNotification('Erreur de connexion: ' + error.message, 'error');
-                });
-            }
-        );
     }
-};
 
-// ============================================================
-// MODULE GESTION DES NIVEAUX HIÉRARCHIQUES
-// ============================================================
-const NiveauManager = {
-    load: function() {
-        Utils.showLoading();
-        fetch('?action=get_niveaux', { method: 'POST' })
-            .then(response => response.json())
+    function clearFilters() {
+        document.getElementById('searchInput').value = '';
+        document.getElementById('typeContratFilter').value = '';
+        document.getElementById('niveauFilter').value = '';
+        document.getElementById('departementFilter').value = '';
+        location.reload();
+    }
+
+    function updatePostesGrid(postesData) {
+        const grid = document.getElementById('postesGrid');
+        const noResults = document.getElementById('noResults');
+
+        if (postesData.length === 0) {
+            grid.innerHTML = '';
+            noResults.classList.remove('d-none');
+            return;
+        }
+
+        noResults.classList.add('d-none');
+
+        let gridHtml = '';
+        postesData.forEach(poste => {
+            const percentage = poste.nombre_postes_prevus > 0
+                ? Math.min(100, (poste.nb_employes / poste.nombre_postes_prevus) * 100)
+                : 0;
+            const bgClass = percentage >= 100 ? 'bg-success' : (percentage >= 70 ? 'bg-warning' : 'bg-danger');
+            const statusBadge = poste.nb_employes >= (poste.nombre_postes_prevus || 1)
+                ? '<span class="badge bg-success">Complet</span>'
+                : (poste.nb_employes > 0
+                    ? '<span class="badge bg-warning text-dark">Partiel</span>'
+                    : '<span class="badge bg-danger">Vacant</span>');
+
+            gridHtml += `
+                <div class="col">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-header d-flex justify-content-between align-items-center" style="border-left: 4px solid ${poste.couleur || '#3B82F6'}">
+                            <h5 class="card-title mb-0">${escapeHtml(poste.nom)}</h5>
+                            <span class="badge bg-secondary">${poste.type_contrat || 'CDI'}</span>
+                        </div>
+                        <div class="card-body">
+                            <p class="card-text text-muted">${poste.description ? escapeHtml(poste.description.substring(0, 100)) + (poste.description.length > 100 ? '...' : '') : 'Aucune description'}</p>
+
+                            <div class="mb-3">
+                                <small class="text-muted">Département:</small>
+                                <div>${poste.departement_nom ? escapeHtml(poste.departement_nom) : 'Non assigné'}</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <small class="text-muted">Niveau hiérarchique:</small>
+                                <div>${poste.niveau_libelle || 'Non défini'}</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <small class="text-muted">Salaire:</small>
+                                <div class="fw-bold text-success">${formatNumber(poste.salaire || 0)} FCFA</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <small class="text-muted">Effectif:</small>
+                                    <span>${poste.nb_employes || 0}/${poste.nombre_postes_prevus || 1}</span>
+                                </div>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar ${bgClass}"
+                                         role="progressbar"
+                                         style="width: ${percentage}%"
+                                         aria-valuenow="${percentage}"
+                                         aria-valuemin="0"
+                                         aria-valuemax="100"></div>
+                                </div>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center">
+                                ${statusBadge}
+
+                                <div class="btn-group">
+                                    <button onclick="viewPoste(${poste.id})" class="btn btn-sm btn-info text-white" title="Voir détails">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button onclick="editPoste(${poste.id})" class="btn btn-sm btn-primary" title="Modifier">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button onclick="duplicatePoste(${poste.id})" class="btn btn-sm btn-success" title="Dupliquer">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                    <button onclick="deletePoste(${poste.id})" class="btn btn-sm btn-danger" title="Supprimer">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        grid.innerHTML = gridHtml;
+    }
+
+    // Fonctions pour la gestion des niveaux hiérarchiques
+    function loadNiveaux() {
+        showLoading();
+        makeRequest('get_niveaux')
             .then(data => {
-                Utils.hideLoading();
+                hideLoading();
                 if (data.success) {
                     niveauxHierarchiques = data.niveaux;
-                    this.render(data.niveaux);
-                    this.updateSelects(data.niveaux);
+                    renderNiveaux(data.niveaux);
                 } else {
-                    Utils.showNotification(data.message, 'error');
+                    showNotification(data.message, 'error');
                 }
             })
             .catch(error => {
-                Utils.hideLoading();
-                Utils.showNotification('Erreur de connexion: ' + error.message, 'error');
+                hideLoading();
+                showNotification('Erreur de connexion: ' + error.message, 'error');
             });
-    },
+    }
 
-    render: function(niveaux) {
+    function renderNiveaux(niveaux) {
         const container = document.getElementById('niveauxList');
         container.innerHTML = '';
-        
+
         if (niveaux.length === 0) {
             container.innerHTML = `
-                <div class="text-center text-gray-500 py-4">
-                    <i class="fas fa-layer-group text-2xl mb-2"></i>
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-layer-group fs-1 mb-2"></i>
                     <p>Aucun niveau hiérarchique défini.</p>
                 </div>
             `;
@@ -2033,1110 +2240,710 @@ const NiveauManager = {
 
         niveaux.forEach(niveau => {
             const item = document.createElement('div');
-            item.className = 'flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50';
+            item.className = 'list-group-item';
             item.innerHTML = `
-                <div class="flex items-center">
-                    <div class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium mr-3">
-                        ${niveau.niveau}
-                    </div>
+                <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <div class="font-medium text-gray-900">${Utils.escapeHtml(niveau.libelle)}</div>
-                        ${niveau.description ? `<div class="text-sm text-gray-500">${Utils.escapeHtml(niveau.description)}</div>` : ''}
+                        <div class="d-flex align-items-center">
+                            <span class="badge bg-primary me-2">${niveau.niveau}</span>
+                            <h6 class="mb-0">${escapeHtml(niveau.libelle)}</h6>
+                        </div>
+                        ${niveau.description ? `<small class="text-muted">${escapeHtml(niveau.description)}</small>` : ''}
                     </div>
-                </div>
-                <div class="flex space-x-2">
-                    <button onclick="NiveauManager.edit(${niveau.id})" class="text-blue-600 hover:text-blue-800" title="Modifier">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button onclick="NiveauManager.delete(${niveau.id})" class="text-red-600 hover:text-red-800" title="Supprimer">
-                        <i class="fas fa-trash"></i>
-                    </button>
+                    <div class="btn-group">
+                        <button onclick="editNiveau(${niveau.id})" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button onclick="deleteNiveau(${niveau.id})" class="btn btn-sm btn-outline-danger">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </div>
             `;
             container.appendChild(item);
         });
-    },
+    }
 
-    updateSelects: function(niveaux) {
-        const selects = ['niveau_hierarchique', 'niveauFilter'];
-        
-        selects.forEach(selectId => {
-            const select = document.getElementById(selectId);
-            if (select) {
-                const currentValue = select.value;
-                const options = select.querySelectorAll('option:not(:first-child)');
-                options.forEach(option => option.remove());
-                
-                niveaux.forEach(niveau => {
-                    const option = document.createElement('option');
-                    option.value = niveau.niveau;
-                    option.textContent = `${niveau.niveau} - ${niveau.libelle}`;
-                    select.appendChild(option);
-                });
-                
-                if (currentValue) {
-                    select.value = currentValue;
-                }
-            }
-        });
-    },
-
-    clearForm: function() {
-        document.getElementById('niveauForm').reset();
-        document.getElementById('niveauId').value = '';
-    },
-
-    edit: function(id) {
-        const niveau = niveauxHierarchiques.find(n => n.id == id);
+    function editNiveau(niveauId) {
+        const niveau = niveauxHierarchiques.find(n => n.id == niveauId);
         if (!niveau) {
-            Utils.showNotification('Niveau non trouvé', 'error');
+            showNotification('Niveau non trouvé', 'error');
             return;
         }
-        
+
         document.getElementById('niveauId').value = niveau.id;
         document.getElementById('niveauNum').value = niveau.niveau;
         document.getElementById('niveauLibelle').value = niveau.libelle;
         document.getElementById('niveauDescription').value = niveau.description || '';
-        
-        document.getElementById('niveauForm').scrollIntoView({ behavior: 'smooth' });
-    },
+    }
 
-    delete: function(id) {
-        const niveau = niveauxHierarchiques.find(n => n.id == id);
+    function deleteNiveau(niveauId) {
+        const niveau = niveauxHierarchiques.find(n => n.id == niveauId);
         if (!niveau) return;
-        
-        ModalManager.openConfirmModal(
-            `Êtes-vous sûr de vouloir supprimer le niveau "${niveau.libelle}" ?\n\nCette action est irréversible et ne sera possible que si aucun poste n'utilise ce niveau.`,
-            () => {
-                Utils.showLoading();
-                fetch('?action=delete_niveau', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({id: id})
-                })
-                .then(response => response.json())
+
+        document.getElementById('confirmMessage').textContent = `Êtes-vous sûr de vouloir supprimer le niveau "${niveau.libelle}" ?\n\nCette action est irréversible.`;
+
+        const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+        confirmModal.show();
+
+        // Définir l'action de confirmation
+        document.getElementById('confirmButton').onclick = function() {
+            showLoading();
+            makeRequest('delete_niveau', { id: niveauId })
                 .then(data => {
-                    Utils.hideLoading();
-                    ModalManager.closeConfirmModal();
+                    hideLoading();
+                    confirmModal.hide();
                     if (data.success) {
-                        Utils.showNotification(data.message);
-                        NiveauManager.load();
+                        showNotification(data.message);
+                        loadNiveaux();
                     } else {
-                        Utils.showNotification(data.message, 'error');
+                        showNotification(data.message, 'error');
                     }
                 })
                 .catch(error => {
-                    Utils.hideLoading();
-                    ModalManager.closeConfirmModal();
-                    Utils.showNotification('Erreur de connexion: ' + error.message, 'error');
+                    hideLoading();
+                    confirmModal.hide();
+                    showNotification('Erreur de connexion: ' + error.message, 'error');
                 });
-            }
-        );
+        };
     }
-};
 
-// ============================================================
-// MODULE GESTION DES POSTES
-// ============================================================
-const PosteManager = {
-    edit: function(id) {
-        const poste = postes.find(p => p.id == id);
-        if (!poste) {
-            Utils.showNotification('Poste non trouvé', 'error');
-            return;
-        }
-        
-        document.getElementById('modalTitle').textContent = 'Modifier le poste';
-        document.getElementById('posteId').value = poste.id;
-        document.getElementById('nom').value = poste.nom;
-        document.getElementById('description').value = poste.description || '';
-        document.getElementById('salaire').value = poste.salaire || '';
-        document.getElementById('couleur').value = poste.couleur;
-        document.getElementById('type_contrat').value = poste.type_contrat || 'CDI';
-        document.getElementById('niveau_hierarchique').value = poste.niveau_hierarchique || '';
-        document.getElementById('poste_superieur_id').value = poste.poste_superieur_id || '';
-        document.getElementById('competences_requises').value = poste.competences_requises || '';
-        document.getElementById('nombre_postes_prevus').value = poste.nombre_postes_prevus || '1';
-        document.getElementById('duree_contrat').value = poste.duree_contrat || '';
-        document.getElementById('heures_travail').value = poste.heures_travail || '35';
-        document.getElementById('avantages').value = poste.avantages || '';
-        document.getElementById('code_paie').value = poste.code_paie || '';
-        document.getElementById('categorie_paie').value = poste.categorie_paie || '';
-        document.getElementById('regime_social').value = poste.regime_social || '';
-        document.getElementById('taux_cotisation').value = poste.taux_cotisation || '';
-        document.getElementById('departement_id').value = poste.departement_id || '';
-        
-        document.getElementById('posteModal').classList.remove('hidden');
-        document.getElementById('nom').focus();
-    },
-
-    delete: function(id) {
-        const poste = postes.find(p => p.id == id);
-        if (!poste) return;
-        
-        ModalManager.openConfirmModal(
-            `Êtes-vous sûr de vouloir supprimer le poste "${poste.nom}" ?`,
-            () => {
-                Utils.showLoading();
-                fetch('?action=delete_poste', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({id: id})
-                })
-                .then(response => response.json())
-                .then(data => {
-                    Utils.hideLoading();
-                    ModalManager.closeConfirmModal();
-                    if (data.success) {
-                        Utils.showNotification(data.message);
-                        setTimeout(() => location.reload(), 1000);
-                    } else {
-                        Utils.showNotification(data.message, 'error');
-                    }
-                })
-                .catch(error => {
-                    Utils.hideLoading();
-                    ModalManager.closeConfirmModal();
-                    Utils.showNotification('Erreur de connexion: ' + error.message, 'error');
-                });
-            }
-        );
-    },
-
-    duplicate: function(id) {
-        const poste = postes.find(p => p.id == id);
-        if (!poste) return;
-        
-        ModalManager.openConfirmModal(
-            `Voulez-vous dupliquer le poste "${poste.nom}" ?`,
-            () => {
-                Utils.showLoading();
-                fetch('?action=duplicate_poste', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({id: id})
-                })
-                .then(response => response.json())
-                .then(data => {
-                    Utils.hideLoading();
-                    ModalManager.closeConfirmModal();
-                    if (data.success) {
-                        Utils.showNotification(data.message);
-                        setTimeout(() => location.reload(), 1000);
-                    } else {
-                        Utils.showNotification(data.message, 'error');
-                    }
-                })
-                .catch(error => {
-                    Utils.hideLoading();
-                    ModalManager.closeConfirmModal();
-                    Utils.showNotification('Erreur de connexion: ' + error.message, 'error');
-                });
-            }
-        );
-    },
-
-    applyFilters: function() {
-        const search = document.getElementById('searchInput').value.trim();
-        const typeContrat = document.getElementById('typeContratFilter').value;
-        const niveau = document.getElementById('niveauFilter').value;
-        const departement = document.getElementById('departementFilter').value;
-        
-        Utils.showLoading();
-        const formData = new FormData();
-        formData.append('search', search);
-        formData.append('type_contrat', typeContrat);
-        formData.append('niveau_hierarchique', niveau);
-        formData.append('departement_id', departement);
-        
-        fetch('?action=search_postes', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            Utils.hideLoading();
-            if (data.success) {
-                this.updateGrid(data.postes);
-            } else {
-                Utils.showNotification(data.message, 'error');
-            }
-        })
-        .catch(error => {
-            Utils.hideLoading();
-            Utils.showNotification('Erreur de connexion: ' + error.message, 'error');
-        });
-    },
-
-    clearFilters: function() {
-        document.getElementById('searchInput').value = '';
-        document.getElementById('typeContratFilter').value = '';
-        document.getElementById('niveauFilter').value = '';
-        document.getElementById('departementFilter').value = '';
-        location.reload();
-    },
-
-   // Remplacez cette fonction dans le module PosteManager
-updateGrid: function(postesData) {
-    const grid = document.getElementById('postesGrid');
-    const noResults = document.getElementById('noResults');
-    
-    if (postesData.length === 0) {
-        grid.classList.add('hidden');
-        noResults.classList.remove('hidden');
-        return;
+    function clearNiveauForm() {
+        document.getElementById('niveauForm').reset();
+        document.getElementById('niveauId').value = '';
     }
-    
-    grid.classList.remove('hidden');
-    noResults.classList.add('hidden');
-    
-    grid.innerHTML = '';
-    postesData.forEach(poste => {
-        const card = document.createElement('div');
-        card.className = `bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow niveau-${poste.niveau_hierarchique || 5}`;
-        
-        card.innerHTML = `
-            <div class="flex items-center justify-between mb-4">
-                <div class="flex items-center">
-                    <div class="w-4 h-4 rounded-full mr-3" style="background-color: ${poste.couleur || '#3B82F6'}"></div>
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-900">${Utils.escapeHtml(poste.nom)}</h3>
-                        <span class="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">${poste.type_contrat || 'CDI'}</span>
-                    </div>
-                </div>
-                
-                <div class="flex space-x-2">
-                    <button onclick="editPoste(${poste.id})" class="text-blue-600 hover:text-blue-800 transition-colors" title="Modifier">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button onclick="duplicatePoste(${poste.id})" class="text-green-600 hover:text-green-800 transition-colors" title="Dupliquer">
-                        <i class="fas fa-copy"></i>
-                    </button>
-                    <button onclick="deletePoste(${poste.id})" class="text-red-600 hover:text-red-800 transition-colors" title="Supprimer">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            </div>
-            
-            <div class="space-y-2 mb-4">
-                <p class="text-gray-600 text-sm min-h-[40px]">${Utils.escapeHtml(poste.description || 'Aucune description')}</p>
-                ${poste.competences_requises ? `
-                    <div class="text-xs text-gray-500">
-                        <i class="fas fa-star mr-1"></i>Compétences: ${Utils.escapeHtml(poste.competences_requises.substring(0, 50))}${poste.competences_requises.length > 50 ? '...' : ''}
-                    </div>
-                ` : ''}
-                ${poste.poste_superieur_nom ? `
-                    <div class="text-xs text-gray-500">
-                        <i class="fas fa-level-up-alt mr-1"></i>Rapporte à: ${Utils.escapeHtml(poste.poste_superieur_nom)}
-                    </div>
-                ` : ''}
-                ${poste.avantages ? `
-                    <div class="text-xs text-gray-500">
-                        <i class="fas fa-gift mr-1"></i>Avantages: ${Utils.escapeHtml(poste.avantages.substring(0, 50))}${poste.avantages.length > 50 ? '...' : ''}
-                    </div>
-                ` : ''}
-                ${poste.departement_nom ? `
-                    <div class="text-xs text-gray-500">
-                        <i class="fas fa-building mr-1"></i>Département: ${Utils.escapeHtml(poste.departement_nom)}
-                    </div>
-                ` : ''}
-                <div class="text-xs text-gray-500">
-                    <i class="fas fa-clock mr-1"></i>
-                    Heures/semaine: ${poste.heures_travail || '35'}h
-                </div>
-            </div>
-            
-            <div class="text-center mb-4">
-                <span class="text-gray-500 text-sm">Salaire:</span>
-                <div class="font-medium text-green-600 text-lg">${Utils.formatNumber(poste.salaire || 0)} FCFA</div>
-                ${poste.duree_contrat ? `<div class="text-xs text-gray-500">Durée: ${Utils.escapeHtml(poste.duree_contrat)}</div>` : ''}
-            </div>
-            
-            <div class="pt-4 border-t border-gray-200 space-y-2">
-                <div class="flex justify-between items-center text-sm">
-                    <span class="text-gray-500">Employés actuels:</span>
-                    <span class="font-medium bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                        ${poste.nb_employes || 0}/${poste.nombre_postes_prevus || 1}
-                    </span>
-                </div>
-                <div class="flex justify-between items-center text-sm">
-                    <span class="text-gray-500">Niveau:</span>
-                    <span class="font-medium text-gray-800">
-                        ${poste.niveau_libelle || 'Non défini'}
-                    </span>
-                </div>
-            </div>
-        `;
-        grid.appendChild(card);
-    });
-}
-};
 
-// ============================================================
-// MODULE ORGANIGRAMME
-// ============================================================
-const OrganigrammeManager = {
-    load: function() {
-        Utils.showLoading();
-        fetch('?action=get_organigramme', { method: 'POST' })
-            .then(response => response.json())
+    // Fonctions pour la gestion des départements
+    function loadDepartements() {
+        showLoading();
+        makeRequest('get_departements')
             .then(data => {
-                Utils.hideLoading();
+                hideLoading();
                 if (data.success) {
-                    this.render(data.organigramme);
+                    departements = data.departements;
+                    renderDepartements(data.departements);
                 } else {
-                    const container = document.getElementById('organigrammeContainer');
-                    container.innerHTML = `
-                        <div class="text-center text-gray-500 py-8">
-                            <i class="fas fa-exclamation-triangle text-4xl mb-2"></i>
-                            <p>${data.message || 'Erreur lors du chargement de l\'organigramme.'}</p>
-                        </div>
-                    `;
+                    showNotification(data.message, 'error');
                 }
             })
             .catch(error => {
-                Utils.hideLoading();
-                const container = document.getElementById('organigrammeContainer');
-                container.innerHTML = `
-                    <div class="text-center text-gray-500 py-8">
-                        <i class="fas fa-exclamation-triangle text-4xl mb-2"></i>
-                        <p>Erreur de connexion : ${error.message}</p>
-                    </div>
-                `;
+                hideLoading();
+                showNotification('Erreur de connexion: ' + error.message, 'error');
             });
-    },
+    }
 
-    render: function(arbre) {
-        const container = document.getElementById('organigrammeContainer');
+    function renderDepartements(departements) {
+        const container = document.getElementById('departementsList');
         container.innerHTML = '';
-        
-        if (!arbre || arbre.length === 0) {
+
+        if (departements.length === 0) {
             container.innerHTML = `
-                <div class="text-center text-gray-500 py-8">
-                    <i class="fas fa-sitemap text-4xl mb-2"></i>
-                    <p>Aucun poste à afficher dans l'organigramme.</p>
+                <div class="col-12 text-center text-muted py-4">
+                    <i class="fas fa-building fs-1 mb-2"></i>
+                    <p>Aucun département défini.</p>
                 </div>
             `;
             return;
         }
-        
-        arbre.forEach(poste => {
-            container.appendChild(this.createPosteNode(poste));
-        });
-    },
 
-    createPosteNode: function(poste) {
-        const node = document.createElement('div');
-        node.className = 'organigramme-node mb-4';
-
-        const card = document.createElement('div');
-        card.className = `bg-white border-l-4 rounded-lg p-4 shadow-md niveau-${poste.niveau_hierarchique}`;
-        card.style.borderColor = poste.couleur;
-        card.innerHTML = `
-            <div class="flex justify-between items-center">
-                <div>
-                    <h4 class="font-semibold text-gray-900">${Utils.escapeHtml(poste.nom)}</h4>
-                    <p class="text-sm text-gray-600">${poste.type_contrat || 'CDI'} - ${poste.niveau_libelle || 'Niveau non défini'}</p>
-                </div>
-                <div class="text-right">
-                    <div class="text-sm font-medium text-green-600">${Utils.formatNumber(poste.salaire || 0)} FCFA</div>
-                    <div class="text-xs text-gray-500">${poste.nb_employes || 0} employé(s)</div>
-                </div>
-            </div>
-            ${poste.description ? `<p class="text-xs text-gray-500 mt-2">${Utils.escapeHtml(poste.description.substring(0, 100))}${poste.description.length > 100 ? '...' : ''}</p>` : ''}
-        `;
-
-        node.appendChild(card);
-
-        if (poste.enfants && poste.enfants.length > 0) {
-            const childrenContainer = document.createElement('div');
-            childrenContainer.className = 'children-container ml-6 mt-2 border-l-2 border-gray-200 pl-4';
-            poste.enfants.forEach(enfant => {
-                childrenContainer.appendChild(this.createPosteNode(enfant));
-            });
-            node.appendChild(childrenContainer);
-        }
-
-        return node;
-    }
-};
-
-// ============================================================
-// MODULE PRÉVISIONS
-// ============================================================
-const PrevisionManager = {
-    load: function() {
-        Utils.showLoading();
-        fetch('?action=get_stats', { method: 'POST' })
-            .then(response => response.json())
-            .then(data => {
-                Utils.hideLoading();
-                if (data.success) {
-                    this.renderPostesSousDotes(data.stats.postes_sous_dotes);
-                    this.calculateCoutsPrevisionnels();
-                } else {
-                    const sousDotesContainer = document.getElementById('postesSousDotesList');
-                    sousDotesContainer.innerHTML = `
-                        <div class="text-center text-gray-500 py-4">
-                            <i class="fas fa-exclamation-triangle text-2xl mb-2"></i>
-                            <p>${data.message || 'Erreur lors du chargement des prévisions.'}</p>
+        departements.forEach(dept => {
+            const col = document.createElement('div');
+            col.className = 'col';
+            col.innerHTML = `
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">${escapeHtml(dept.nom)}</h5>
+                        ${dept.description ? `<p class="card-text">${escapeHtml(dept.description)}</p>` : ''}
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="badge bg-primary">${dept.nb_postes || 0} poste(s)</span>
+                            <div class="btn-group">
+                                <button onclick="editDepartement(${dept.id})" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button onclick="deleteDepartement(${dept.id})" class="btn btn-sm btn-outline-danger">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
                         </div>
-                    `;
-                }
-            })
-            .catch(error => {
-                Utils.hideLoading();
-                const sousDotesContainer = document.getElementById('postesSousDotesList');
-                sousDotesContainer.innerHTML = `
-                    <div class="text-center text-gray-500 py-4">
-                        <i class="fas fa-exclamation-triangle text-2xl mb-2"></i>
-                        <p>Erreur de connexion : ${error.message}</p>
                     </div>
-                `;
-            });
-    },
-
-    renderPostesSousDotes: function(postesSousDotes) {
-        const container = document.getElementById('postesSousDotesList');
-        container.innerHTML = '';
-        
-        if (!postesSousDotes || postesSousDotes.length === 0) {
-            container.innerHTML = `
-                <div class="text-center text-gray-500 py-4">
-                    <i class="fas fa-check-circle text-2xl mb-2 text-green-500"></i>
-                    <p>Aucun poste sous-doté détecté.</p>
                 </div>
             `;
+            container.appendChild(col);
+        });
+    }
+
+    function editDepartement(departementId) {
+        const dept = departements.find(d => d.id == departementId);
+        if (!dept) {
+            showNotification('Département non trouvé', 'error');
             return;
         }
-        
-        postesSousDotes.forEach(poste => {
-            const item = document.createElement('div');
-            item.className = 'flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-lg mb-2';
-            item.innerHTML = `
-                <div>
-                    <h4 class="font-medium text-red-900">${Utils.escapeHtml(poste.nom)}</h4>
-                    <p class="text-sm text-red-700">
-                        ${poste.nb_employes_actuels} employé(s) sur ${poste.nombre_postes_prevus} prévu(s)
-                    </p>
-                </div>
-                <div class="text-right">
-                    <div class="text-lg font-bold text-red-600">-${poste.deficit}</div>
-                    <div class="text-xs text-red-500">employé(s) manquant(s)</div>
-                </div>
-            `;
-            container.appendChild(item);
-        });
-    },
 
-    calculateCoutsPrevisionnels: function() {
-        let coutActuel = 0;
-        let coutPrevisionnel = 0;
-        
-        postes.forEach(poste => {
-            const salaire = parseInt(poste.salaire) || 0;
-            const nbEmployesActuels = parseInt(poste.nb_employes) || 0;
-            const nbEmployesPrevus = parseInt(poste.nombre_postes_prevus) || 1;
-            
-            coutActuel += salaire * nbEmployesActuels;
-            coutPrevisionnel += salaire * nbEmployesPrevus;
-        });
-        
-        const difference = coutPrevisionnel - coutActuel;
-        
-        document.getElementById('coutActuel').textContent = Utils.formatNumber(coutActuel) + ' FCFA';
-        document.getElementById('coutPrevisionnel').textContent = Utils.formatNumber(coutPrevisionnel) + ' FCFA';
-        
-        const diffElement = document.getElementById('coutDifference');
-        diffElement.textContent = (difference >= 0 ? '+' : '') + Utils.formatNumber(difference) + ' FCFA';
-        diffElement.className = difference > 0 ? 'text-2xl font-bold text-red-600' :
-                               difference < 0 ? 'text-2xl font-bold text-green-600' :
-                               'text-2xl font-bold text-gray-600';
+        document.getElementById('departementId').value = dept.id;
+        document.getElementById('departementNom').value = dept.nom;
+        document.getElementById('departementDescription').value = dept.description || '';
     }
-};
 
-// ============================================================
-// MODULE EXPORT
-// ============================================================
-const ExportManager = {
-    exportPostesPDF: function() {
-        Utils.showLoading();
-        const link = document.createElement('a');
-        link.href = '?action=export_postes_pdf';
-        link.download = `postes_${new Date().toISOString().split('T')[0]}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => {
-            Utils.hideLoading();
-            Utils.showNotification('Export PDF terminé avec succès');
-        }, 1000);
+    function deleteDepartement(departementId) {
+        const dept = departements.find(d => d.id == departementId);
+        if (!dept) return;
+
+        document.getElementById('confirmMessage').textContent = `Êtes-vous sûr de vouloir supprimer le département "${dept.nom}" ?\n\nCette action est irréversible.`;
+
+        const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+        confirmModal.show();
+
+        // Définir l'action de confirmation
+        document.getElementById('confirmButton').onclick = function() {
+            showLoading();
+            makeRequest('delete_departement', { id: departementId })
+                .then(data => {
+                    hideLoading();
+                    confirmModal.hide();
+                    if (data.success) {
+                        showNotification(data.message);
+                        loadDepartements();
+                    } else {
+                        showNotification(data.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    hideLoading();
+                    confirmModal.hide();
+                    showNotification('Erreur de connexion: ' + error.message, 'error');
+                });
+        };
     }
-};
 
-// ============================================================
-// FONCTIONS GLOBALES (POUR COMPATIBILITÉ AVEC L'HTML)
-// ============================================================
-function showTab(tabName) {
-    TabManager.showTab(tabName);
-}
+    function clearDepartementForm() {
+        document.getElementById('departementForm').reset();
+        document.getElementById('departementId').value = '';
+    }
 
-function openAddModal() {
-    ModalManager.openAddModal();
-}
-
-function closeModal() {
-    ModalManager.closeModal();
-}
-
-function openConfirmModal(message, action) {
-    ModalManager.openConfirmModal(message, action);
-}
-
-function closeConfirmModal() {
-    ModalManager.closeConfirmModal();
-}
-
-function openNiveauxModal() {
-    ModalManager.openNiveauxModal();
-}
-
-function closeNiveauxModal() {
-    ModalManager.closeNiveauxModal();
-}
-
-function openDepartementsModal() {
-    ModalManager.openDepartementsModal();
-}
-
-function closeDepartementsModal() {
-    ModalManager.closeDepartementsModal();
-}
-
-function clearDepartementForm() {
-    DepartementManager.clearForm();
-}
-
-function clearNiveauForm() {
-    NiveauManager.clearForm();
-}
-
-function editPoste(id) {
-    PosteManager.edit(id);
-}
-
-function deletePoste(id) {
-    PosteManager.delete(id);
-}
-
-function duplicatePoste(id) {
-    PosteManager.duplicate(id);
-}
-
-function applyFilters() {
-    PosteManager.applyFilters();
-}
-
-function clearFilters() {
-    PosteManager.clearFilters();
-}
-
-function exportPostesPDF() {
-    ExportManager.exportPostesPDF();
-}
-
-// ============================================================
-// GESTIONNAIRES D'ÉVÉNEMENTS ET INITIALISATION
-// ============================================================
-document.addEventListener('DOMContentLoaded', function() {
-    // Gestionnaire de formulaire pour les postes
-    const posteForm = document.getElementById('posteForm');
-    if (posteForm) {
-        posteForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            if (!Validator.validatePosteForm()) return;
-            
-            Utils.showLoading();
-            const formData = new FormData(e.target);
-            const isEdit = formData.get('id') !== '';
-            const action = isEdit ? 'update_poste' : 'add_poste';
-            
-            fetch('?action=' + action, {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
+    // Fonctions pour la gestion de la hiérarchie
+    function loadHierarchie() {
+        showLoading();
+        makeRequest('get_hierarchie_complete')
             .then(data => {
-                Utils.hideLoading();
+                hideLoading();
                 if (data.success) {
-                    Utils.showNotification(data.message);
-                    ModalManager.closeModal();
-                    setTimeout(() => location.reload(), 500);
+                    renderHierarchie(data.hierarchie);
                 } else {
-                    Utils.showNotification(data.message, 'error');
+                    showNotification(data.message, 'error');
                 }
             })
             .catch(error => {
-                Utils.hideLoading();
-                Utils.showNotification('Erreur de connexion: ' + error.message, 'error');
+                hideLoading();
+                showNotification('Erreur de connexion: ' + error.message, 'error');
             });
-        });
     }
 
-    // Gestionnaire de formulaire pour les niveaux
-    const niveauForm = document.getElementById('niveauForm');
-    if (niveauForm) {
-        niveauForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            if (!Validator.validateNiveauForm()) return;
-            
-            Utils.showLoading();
-            const formData = new FormData(e.target);
-            const isEdit = formData.get('id') !== '';
-            const action = isEdit ? 'update_niveau' : 'add_niveau';
-            
-            fetch('?action=' + action, {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                Utils.hideLoading();
-                if (data.success) {
-                    Utils.showNotification(data.message);
-                    NiveauManager.clearForm();
-                    NiveauManager.load();
-                } else {
-                    Utils.showNotification(data.message, 'error');
-                }
-            })
-            .catch(error => {
-                Utils.hideLoading();
-                Utils.showNotification('Erreur de connexion: ' + error.message, 'error');
-            });
-        });
-    }
-
-    // Gestionnaire de formulaire pour les départements
-    const departementForm = document.getElementById('departementForm');
-    if (departementForm) {
-        departementForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            if (!Validator.validateDepartementForm()) return;
-            
-            Utils.showLoading();
-            const formData = new FormData(e.target);
-            const isEdit = formData.get('id') !== '';
-            const action = isEdit ? 'update_departement' : 'add_departement';
-            
-            fetch('?action=' + action, {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                Utils.hideLoading();
-                if (data.success) {
-                    Utils.showNotification(data.message);
-                    DepartementManager.clearForm();
-                    DepartementManager.load();
-                } else {
-                    Utils.showNotification(data.message, 'error');
-                }
-            })
-            .catch(error => {
-                Utils.hideLoading();
-                Utils.showNotification('Erreur de connexion: ' + error.message, 'error');
-            });
-        });
-    }
-
-    // Gestionnaire du bouton de confirmation
-    const confirmButton = document.getElementById('confirmButton');
-    if (confirmButton) {
-        confirmButton.addEventListener('click', function() {
-            if (currentAction) {
-                currentAction();
-            }
-        });
-    }
-
-    // Gestionnaires de recherche et filtres
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput) {
-        searchInput.addEventListener('input', Utils.debounce(PosteManager.applyFilters.bind(PosteManager), 500));
-    }
-    
-    const typeContratFilter = document.getElementById('typeContratFilter');
-    if (typeContratFilter) {
-        typeContratFilter.addEventListener('change', PosteManager.applyFilters.bind(PosteManager));
-    }
-    
-    const niveauFilter = document.getElementById('niveauFilter');
-    if (niveauFilter) {
-        niveauFilter.addEventListener('change', PosteManager.applyFilters.bind(PosteManager));
-    }
-    
-    const departementFilter = document.getElementById('departementFilter');
-    if (departementFilter) {
-        departementFilter.addEventListener('change', PosteManager.applyFilters.bind(PosteManager));
-    }
-
-    // Gestionnaires de clic sur les modales pour fermeture
-    const modals = [
-        { id: 'posteModal', closeFunc: ModalManager.closeModal },
-        { id: 'confirmModal', closeFunc: ModalManager.closeConfirmModal },
-        { id: 'niveauxModal', closeFunc: ModalManager.closeNiveauxModal },
-        { id: 'departementsModal', closeFunc: ModalManager.closeDepartementsModal }
-    ];
-
-    modals.forEach(modal => {
-        const modalElement = document.getElementById(modal.id);
-        if (modalElement) {
-            modalElement.addEventListener('click', function(e) {
-                if (e.target === this) modal.closeFunc();
-            });
-        }
-    });
-
-    // Gestionnaire de touche Escape
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            ModalManager.closeModal();
-            ModalManager.closeConfirmModal();
-            ModalManager.closeNiveauxModal();
-            ModalManager.closeDepartementsModal();
-        }
-    });
-
-    // Validation en temps réel des champs
-    const validationFields = [
-        {
-            id: 'nom',
-            validator: function(value) {
-                if (value.length > 0 && value.length < 2) {
-                    Utils.showNotification('Le nom du poste doit contenir au moins 2 caractères', 'error');
-                    this.focus();
-                }
-            }
-        },
-        {
-            id: 'salaire',
-            validator: function(value) {
-                const salaire = parseInt(value) || 0;
-                if (value && salaire < 0) {
-                    Utils.showNotification('Le salaire ne peut pas être négatif', 'error');
-                    this.value = 0;
-                }
-            }
-        },
-        {
-            id: 'nombre_postes_prevus',
-            validator: function(value) {
-                const nombre = parseInt(value) || 1;
-                if (nombre < 1) {
-                    Utils.showNotification('Le nombre de postes prévus doit être au moins de 1', 'error');
-                    this.value = 1;
-                }
-            }
-        },
-        {
-            id: 'heures_travail',
-            validator: function(value) {
-                const heures = parseInt(value) || 35;
-                if (heures < 1 || heures > 80) {
-                    Utils.showNotification('Le nombre d\'heures doit être compris entre 1 et 80 heures par semaine', 'error');
-                    this.value = 35;
-                }
-            }
-        },
-        {
-            id: 'taux_cotisation',
-            validator: function(value) {
-                const taux = parseFloat(value) || 0;
-                if (value && (taux < 0 || taux > 100)) {
-                    Utils.showNotification('Le taux de cotisation doit être compris entre 0 et 100%', 'error');
-                    this.value = '';
-                }
-            }
-        },
-        {
-            id: 'niveauNum',
-            validator: function(value) {
-                const niveau = parseInt(value) || 0;
-                if (value && (niveau < 1 || niveau > 99)) {
-                    Utils.showNotification('Le niveau doit être compris entre 1 et 99', 'error');
-                    this.value = '';
-                }
-            }
-        },
-        {
-            id: 'niveauLibelle',
-            validator: function(value) {
-                if (value.length > 0 && value.length < 2) {
-                    Utils.showNotification('Le libellé doit contenir au moins 2 caractères', 'error');
-                    this.focus();
-                }
-            }
-        },
-        {
-            id: 'departementNom',
-            validator: function(value) {
-                if (value.length > 0 && value.length < 2) {
-                    Utils.showNotification('Le nom du département doit contenir au moins 2 caractères', 'error');
-                    this.focus();
-                }
-            }
-        },
-    ];
-
-    validationFields.forEach(field => {
-        const element = document.getElementById(field.id);
-        if (element) {
-            element.addEventListener('blur', function() {
-                field.validator.call(this, this.value.trim());
-            });
-        }
-    });
-
-    // Initialiser l'onglet par défaut
-    TabManager.showTab('postes');
-});
-
-// ============================================================
-// MODULE GESTION HIÉRARCHIE (ADMIN SEULEMENT)
-// ============================================================
-const HierarchieManager = {
-    currentPosteId: null,
-    
-    openModal: function() {
-        document.getElementById('hierarchieModal').classList.remove('hidden');
-        this.loadHierarchie();
-    },
-    
-    closeModal: function() {
-        document.getElementById('hierarchieModal').classList.add('hidden');
-        this.currentPosteId = null;
-    },
-    
-    loadHierarchie: function() {
-        Utils.showLoading();
-        fetch('?action=get_hierarchie_complete', { method: 'POST' })
-            .then(response => response.json())
-            .then(data => {
-                Utils.hideLoading();
-                if (data.success) {
-                    this.renderHierarchie(data.hierarchie);
-                } else {
-                    Utils.showNotification(data.message, 'error');
-                }
-            })
-            .catch(error => {
-                Utils.hideLoading();
-                Utils.showNotification('Erreur de connexion: ' + error.message, 'error');
-            });
-    },
-    
-    renderHierarchie: function(hierarchie) {
+    function renderHierarchie(hierarchie) {
         const container = document.getElementById('hierarchieTree');
         container.innerHTML = '';
-        
-        // Créer l'arbre
-        const tree = this.buildTree(hierarchie);
-        tree.forEach(node => {
-            container.appendChild(this.createNodeElement(node));
-        });
-    },
-    
-    buildTree: function(postes) {
+
+        if (!hierarchie || hierarchie.length === 0) {
+            container.innerHTML = `
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-sitemap fs-1 mb-2"></i>
+                    <p>Aucune hiérarchie à afficher.</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Construire l'arbre hiérarchique
         const postesMap = {};
         const tree = [];
-        
+
         // Créer la map des postes
-        postes.forEach(poste => {
+        hierarchie.forEach(poste => {
             postesMap[poste.id] = { ...poste, children: [] };
         });
-        
+
         // Construire l'arbre
-        postes.forEach(poste => {
+        hierarchie.forEach(poste => {
             if (poste.poste_superieur_id && postesMap[poste.poste_superieur_id]) {
                 postesMap[poste.poste_superieur_id].children.push(postesMap[poste.id]);
             } else {
                 tree.push(postesMap[poste.id]);
             }
         });
-        
-        return tree;
-    },
-    
-    createNodeElement: function(node) {
+
+        // Rendre l'arbre
+        tree.forEach(node => {
+            container.appendChild(createHierarchieNode(node));
+        });
+    }
+
+    function createHierarchieNode(node) {
         const div = document.createElement('div');
-        div.className = 'border border-gray-200 rounded-lg p-4 bg-white';
-        
-        const nodeHtml = `
-            <div class="flex items-center justify-between mb-2">
-                <div class="flex items-center">
-                    <i class="fas fa-briefcase mr-2 text-blue-600"></i>
-                    <span class="font-medium text-gray-900">${Utils.escapeHtml(node.nom)}</span>
-                    <span class="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                        ${node.niveau_libelle || 'N/A'}
-                    </span>
-                </div>
-                <div class="flex items-center space-x-2">
-                    <span class="text-sm text-gray-600">${node.nb_employes} employé(s)</span>
-                    <button onclick="HierarchieManager.editRelation(${node.id}, '${node.nom.replace(/'/g, "\\'")}', ${node.poste_superieur_id || 'null'})" 
-                            class="text-blue-600 hover:text-blue-800 text-sm">
-                        <i class="fas fa-edit mr-1"></i>Modifier
+        div.className = 'card mb-3';
+
+        div.innerHTML = `
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-0">${escapeHtml(node.nom)}</h6>
+                        <small class="text-muted">${node.niveau_libelle || 'N/A'} - ${node.nb_employes} employé(s)</small>
+                    </div>
+                    <button onclick="editHierarchieRelation(${node.id}, '${escapeHtml(node.nom)}', ${node.poste_superieur_id || 'null'})" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-edit me-1"></i>Modifier
                     </button>
                 </div>
             </div>
         `;
-        
-        div.innerHTML = nodeHtml;
-        
-        // Ajouter les enfants si ils existent
+
+        // Ajouter les enfants s'ils existent
         if (node.children && node.children.length > 0) {
             const childrenContainer = document.createElement('div');
-            childrenContainer.className = 'ml-6 mt-3 space-y-2 border-l-2 border-gray-200 pl-4';
-            
+            childrenContainer.className = 'ms-4';
+
             node.children.forEach(child => {
-                childrenContainer.appendChild(this.createNodeElement(child));
+                childrenContainer.appendChild(createHierarchieNode(child));
             });
-            
+
             div.appendChild(childrenContainer);
         }
-        
+
         return div;
-    },
+    }
+
+   function editHierarchieRelation(posteId, posteName, currentSuperieurId) {
+    // S'assurer que currentPosteId est bien défini
+    currentPosteId = parseInt(posteId);
     
-    editRelation: function(posteId, posteName, currentSuperieurId) {
-        this.currentPosteId = posteId;
-        document.getElementById('currentPosteName').value = posteName;
-        
-        // Charger les postes supérieurs possibles
-        Utils.showLoading();
-        fetch(`?action=get_postes_superieurs&exclude=${posteId}`, { method: 'POST' })
-            .then(response => response.json())
-            .then(data => {
-                Utils.hideLoading();
-                if (data.success) {
-                    const select = document.getElementById('newPosteSuperieur');
-                    select.innerHTML = '<option value="">Aucun (poste de direction)</option>';
-                    
-                    data.postes.forEach(poste => {
-                        const option = document.createElement('option');
-                        option.value = poste.id;
-                        option.textContent = `${poste.nom} (${poste.niveau_libelle || 'N/A'})`;
-                        if (poste.id == currentSuperieurId) {
-                            option.selected = true;
-                        }
-                        select.appendChild(option);
-                    });
-                    
-                    document.getElementById('editHierarchieModal').classList.remove('hidden');
-                } else {
-                    Utils.showNotification(data.message, 'error');
-                }
-            })
-            .catch(error => {
-                Utils.hideLoading();
-                Utils.showNotification('Erreur de connexion: ' + error.message, 'error');
-            });
-    },
+    console.log('editHierarchieRelation appelée avec:', {
+        posteId: currentPosteId,
+        posteName: posteName,
+        currentSuperieurId: currentSuperieurId
+    });
     
-    closeEditModal: function() {
-        document.getElementById('editHierarchieModal').classList.add('hidden');
-        this.currentPosteId = null;
-    },
-    
-    saveChange: function() {
-        if (!this.currentPosteId) return;
-        
-        const newSuperieurId = document.getElementById('newPosteSuperieur').value || null;
-        
-        Utils.showLoading();
-        fetch('?action=set_poste_superieur', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                poste_id: this.currentPosteId,
-                poste_superieur_id: newSuperieurId
-            })
-        })
-        .then(response => response.json())
+    document.getElementById('currentPosteName').value = posteName;
+
+    showLoading();
+    makeRequest(`get_postes_superieurs&exclude=${posteId}`)
         .then(data => {
-            Utils.hideLoading();
+            hideLoading();
             if (data.success) {
-                Utils.showNotification(data.message);
-                this.closeEditModal();
-                this.loadHierarchie();
+                const select = document.getElementById('newPosteSuperieur');
+                select.innerHTML = '<option value="">Aucun (poste de direction)</option>';
+
+                data.postes.forEach(poste => {
+                    const option = document.createElement('option');
+                    option.value = poste.id;
+                    option.textContent = `${poste.nom} (${poste.niveau_libelle || 'N/A'})`;
+                    if (poste.id == currentSuperieurId) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                });
+
+                const modal = new bootstrap.Modal(document.getElementById('editHierarchieModal'));
+                modal.show();
             } else {
-                Utils.showNotification(data.message, 'error');
+                showNotification(data.message, 'error');
             }
         })
         .catch(error => {
-            Utils.hideLoading();
-            Utils.showNotification('Erreur de connexion: ' + error.message, 'error');
+            hideLoading();
+            showNotification('Erreur de connexion: ' + error.message, 'error');
         });
-    },
-    
-    removeRelation: function() {
-        if (!this.currentPosteId) return;
-        
-        ModalManager.openConfirmModal(
-            'Êtes-vous sûr de vouloir supprimer la relation hiérarchique de ce poste ?',
-            () => {
-                Utils.showLoading();
-                fetch('?action=remove_poste_superieur', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ poste_id: this.currentPosteId })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    Utils.hideLoading();
-                    ModalManager.closeConfirmModal();
-                    if (data.success) {
-                        Utils.showNotification(data.message);
-                        this.closeEditModal();
-                        this.loadHierarchie();
-                    } else {
-                        Utils.showNotification(data.message, 'error');
-                    }
-                })
-                .catch(error => {
-                    Utils.hideLoading();
-                    ModalManager.closeConfirmModal();
-                    Utils.showNotification('Erreur de connexion: ' + error.message, 'error');
-                });
-            }
-        );
+}
+
+   function saveHierarchieChange() {
+    if (!currentPosteId || currentPosteId === null || currentPosteId === undefined) {
+        console.error('currentPosteId non défini:', currentPosteId);
+        showNotification('Erreur: Aucun poste sélectionné', 'error');
+        return;
     }
-};
 
-// FONCTIONS GLOBALES POUR LA HIÉRARCHIE
-function openHierarchieModal() {
-    HierarchieManager.openModal();
+    const newSuperieurId = document.getElementById('newPosteSuperieur').value || null;
+    
+    console.log('saveHierarchieChange avec:', {
+        poste_id: currentPosteId,
+        poste_superieur_id: newSuperieurId
+    });
+
+    showLoading();
+    
+    // Utiliser fetch avec JSON
+    fetch('?action=set_poste_superieur', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            poste_id: currentPosteId,
+            poste_superieur_id: newSuperieurId
+        })
+    })
+    .then(response => {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            return response.json();
+        } else {
+            return response.text().then(text => {
+                console.error('Réponse non-JSON:', text);
+                throw new Error('Réponse du serveur invalide');
+            });
+        }
+    })
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            showNotification(data.message);
+            closeEditHierarchieModal();
+            loadHierarchie();
+        } else {
+            showNotification(data.message, 'error');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Erreur lors de la sauvegarde:', error);
+        showNotification('Erreur de connexion: ' + error.message, 'error');
+    });
 }
-
-function closeHierarchieModal() {
-    HierarchieManager.closeModal();
+    function removeHierarchieRelation() {
+    // Vérifier que currentPosteId est bien défini
+    if (!currentPosteId || currentPosteId === null || currentPosteId === undefined) {
+        console.error('currentPosteId non défini:', currentPosteId);
+        showNotification('Erreur: Aucun poste sélectionné', 'error');
+        return;
+    }
+    
+    console.log('removeHierarchieRelation appelée avec currentPosteId:', currentPosteId);
+    
+    // Fermer d'abord le modal d'édition de hiérarchie
+    const editModal = bootstrap.Modal.getInstance(document.getElementById('editHierarchieModal'));
+    if (editModal) {
+        editModal.hide();
+    }
+    
+    // Attendre que le modal soit fermé avant d'ouvrir la confirmation
+    setTimeout(() => {
+        document.getElementById('confirmMessage').textContent = 'Êtes-vous sûr de vouloir supprimer la relation hiérarchique de ce poste ?';
+        
+        // Ajouter la classe pour z-index élevé
+        document.getElementById('confirmModal').classList.add('modal-top-level');
+        
+        const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+        confirmModal.show();
+        
+        // Définir l'action de confirmation
+        document.getElementById('confirmButton').onclick = function() {
+            console.log('Confirmation - currentPosteId:', currentPosteId);
+            
+            showLoading();
+            
+            // Utiliser fetch avec JSON comme pour les autres actions de suppression
+            fetch('?action=remove_poste_superieur', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ poste_id: currentPosteId })
+            })
+            .then(response => {
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    return response.json();
+                } else {
+                    return response.text().then(text => {
+                        console.error('Réponse non-JSON:', text);
+                        throw new Error('Réponse du serveur invalide');
+                    });
+                }
+            })
+            .then(data => {
+                hideLoading();
+                confirmModal.hide();
+                
+                // Nettoyer la classe après fermeture
+                setTimeout(() => {
+                    document.getElementById('confirmModal').classList.remove('modal-top-level');
+                }, 300);
+                
+                if (data.success) {
+                    showNotification(data.message);
+                    // Réinitialiser currentPosteId après succès
+                    currentPosteId = null;
+                    loadHierarchie();
+                } else {
+                    showNotification(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                confirmModal.hide();
+                
+                setTimeout(() => {
+                    document.getElementById('confirmModal').classList.remove('modal-top-level');
+                }, 300);
+                
+                console.error('Erreur lors de la suppression:', error);
+                showNotification('Erreur de connexion: ' + error.message, 'error');
+            });
+        };
+    }, 300); // Délai pour laisser le temps au modal de se fermer
 }
+    // Fonctions pour l'organigramme
+    function loadOrganigramme() {
+        showLoading();
+        makeRequest('get_organigramme')
+            .then(data => {
+                hideLoading();
+                if (data.success) {
+                    renderOrganigramme(data.organigramme);
+                } else {
+                    showNotification(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                showNotification('Erreur de connexion: ' + error.message, 'error');
+            });
+    }
 
-function closeEditHierarchieModal() {
-    HierarchieManager.closeEditModal();
-}
+    function renderOrganigramme(organigramme) {
+        const container = document.getElementById('organigrammeContainer');
+        container.innerHTML = '';
 
-function saveHierarchieChange() {
-    HierarchieManager.saveChange();
-}
+        if (!organigramme || organigramme.length === 0) {
+            container.innerHTML = `
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-sitemap fs-1 mb-2"></i>
+                    <p>Aucun poste à afficher dans l'organigramme.</p>
+                </div>
+            `;
+            return;
+        }
 
-function removeHierarchieRelation() {
-    HierarchieManager.removeRelation();
-}
+        organigramme.forEach(poste => {
+            container.appendChild(createOrganigrammeNode(poste));
+        });
+    }
 
+    function createOrganigrammeNode(poste) {
+        const node = document.createElement('div');
+        node.className = `organigramme-node niveau-${poste.niveau_hierarchique || 5}`;
+
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.style.borderLeft = `4px solid ${poste.couleur || '#3B82F6'}`;
+        card.innerHTML = `
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-0">${escapeHtml(poste.nom)}</h6>
+                        <small class="text-muted">${poste.type_contrat || 'CDI'} - ${poste.niveau_libelle || 'Niveau non défini'}</small>
+                    </div>
+                    <div class="text-end">
+                        <div class="fw-bold text-success">${formatNumber(poste.salaire || 0)} FCFA</div>
+                        <small class="text-muted">${poste.nb_employes || 0} employé(s)</small>
+                    </div>
+                </div>
+                ${poste.description ? `<p class="card-text mt-2"><small>${escapeHtml(poste.description.substring(0, 100))}${poste.description.length > 100 ? '...' : ''}</small></p>` : ''}
+            </div>
+        `;
+
+        node.appendChild(card);
+
+        if (poste.enfants && poste.enfants.length > 0) {
+            const childrenContainer = document.createElement('div');
+            childrenContainer.className = 'children-container';
+            poste.enfants.forEach(enfant => {
+                childrenContainer.appendChild(createOrganigrammeNode(enfant));
+            });
+            node.appendChild(childrenContainer);
+        }
+
+        return node;
+    }
+
+    // Fonctions pour les prévisions
+    function loadPrevisions() {
+        showLoading();
+        makeRequest('get_stats')
+            .then(data => {
+                hideLoading();
+                if (data.success) {
+                    renderPostesSousDotes(data.stats.postes_sous_dotes);
+                    calculateCoutsPrevisionnels();
+                } else {
+                    showNotification(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                showNotification('Erreur de connexion: ' + error.message, 'error');
+            });
+    }
+
+    function renderPostesSousDotes(postesSousDotes) {
+        const container = document.getElementById('postesSousDotesList');
+        container.innerHTML = '';
+
+        if (!postesSousDotes || postesSousDotes.length === 0) {
+            container.innerHTML = `
+                <div class="text-center text-success py-4">
+                    <i class="fas fa-check-circle fs-1 mb-2"></i>
+                    <p>Aucun poste sous-doté détecté.</p>
+                </div>
+            `;
+            return;
+        }
+
+        postesSousDotes.forEach(poste => {
+            const item = document.createElement('div');
+            item.className = 'alert alert-warning';
+            item.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="alert-heading">${escapeHtml(poste.nom)}</h6>
+                        <p class="mb-0">${poste.nb_employes_actuels} employé(s) sur ${poste.nombre_postes_prevus} prévu(s)</p>
+                    </div>
+                    <div class="text-end">
+                        <div class="fw-bold fs-5">-${poste.deficit}</div>
+                        <small>employé(s) manquant(s)</small>
+                    </div>
+                </div>
+            `;
+            container.appendChild(item);
+        });
+    }
+
+    function calculateCoutsPrevisionnels() {
+        let coutActuel = 0;
+        let coutPrevisionnel = 0;
+
+        postes.forEach(poste => {
+            const salaire = parseInt(poste.salaire) || 0;
+            const nbEmployesActuels = parseInt(poste.nb_employes) || 0;
+            const nbEmployesPrevus = parseInt(poste.nombre_postes_prevus) || 1;
+
+            coutActuel += salaire * nbEmployesActuels;
+            coutPrevisionnel += salaire * nbEmployesPrevus;
+        });
+
+        const difference = coutPrevisionnel - coutActuel;
+
+        document.getElementById('coutActuel').textContent = formatNumber(coutActuel) + ' FCFA';
+        document.getElementById('coutPrevisionnel').textContent = formatNumber(coutPrevisionnel) + ' FCFA';
+
+        const differenceElement = document.getElementById('coutDifference');
+        differenceElement.textContent = (difference >= 0 ? '+' : '') + formatNumber(difference) + ' FCFA';
+
+        if (difference > 0) {
+            differenceElement.className = 'text-2xl font-bold text-danger';
+        } else if (difference < 0) {
+            differenceElement.className = 'text-2xl font-bold text-success';
+        } else {
+            differenceElement.className = 'text-2xl font-bold text-muted';
+        }
+    }
+
+    // Gestionnaires d'événements pour les formulaires
+document.getElementById('posteForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const formData = new FormData(this);
+    const isEdit = formData.get('id') !== '' && formData.get('id') !== null;
+    const action = isEdit ? 'update_poste' : 'add_poste';
+
+    showLoading();
+
+    // Utiliser directement fetch au lieu de makeRequest pour éviter les problèmes
+    fetch(`?action=${action}`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+
+        if (data.success) {
+            showNotification(data.message);
+            const modal = bootstrap.Modal.getInstance(document.getElementById('posteModal'));
+            if (modal) {
+                modal.hide();
+            }
+            // Recharger la page après un court délai
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        } else {
+            showNotification(data.message, 'error');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        showNotification('Erreur de connexion: ' + error.message, 'error');
+    });
+});
+
+    document.getElementById('niveauForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const formData = new FormData(this);
+        const isEdit = formData.get('id') !== '';
+        const action = isEdit ? 'update_niveau' : 'add_niveau';
+
+        showLoading();
+        makeRequest(action, formData)
+            .then(data => {
+                hideLoading();
+                if (data.success) {
+                    showNotification(data.message);
+                    clearNiveauForm();
+                    loadNiveaux();
+                } else {
+                    showNotification(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                showNotification('Erreur de connexion: ' + error.message, 'error');
+            });
+    });
+
+    document.getElementById('departementForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const formData = new FormData(this);
+        const isEdit = formData.get('id') !== '';
+        const action = isEdit ? 'update_departement' : 'add_departement';
+
+        showLoading();
+        makeRequest(action, formData)
+            .then(data => {
+                hideLoading();
+                if (data.success) {
+                    showNotification(data.message);
+                    clearDepartementForm();
+                    loadDepartements();
+                } else {
+                    showNotification(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                showNotification('Erreur de connexion: ' + error.message, 'error');
+            });
+    });
+
+    // Initialisation au chargement de la page
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialiser les tooltips Bootstrap
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+
+        // Afficher l'onglet par défaut
+        showTab('postes');
+    });
     </script>
 </body>
 </html>
-            
-            

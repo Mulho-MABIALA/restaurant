@@ -183,16 +183,16 @@ function formatTaillieFichier($taille) {
                     <div class="contenu-annonce">
                         <?= nl2br(htmlspecialchars($annonce['contenu'])) ?>
                     </div>
-                    
-                    <?php if ($annonce['lien_externe']): ?>
-                        <div class="mt-4 p-3 bg-light rounded">
-                            <h6><i class="fas fa-external-link-alt me-2"></i>Lien externe</h6>
-                            <a href="<?= htmlspecialchars($annonce['lien_externe']) ?>" target="_blank" class="btn btn-outline-primary">
-                                <i class="fas fa-external-link-alt me-1"></i>
-                                Accéder au lien
-                            </a>
-                        </div>
-                    <?php endif; ?>
+                    <?php if (!empty($annonce['lien_externe'] ?? null)): ?>
+    <div class="mt-4 p-3 bg-light rounded">
+        <h6><i class="fas fa-external-link-alt me-2"></i>Lien externe</h6>
+        <a href="<?= htmlspecialchars($annonce['lien_externe']) ?>" target="_blank" class="btn btn-outline-primary">
+            <i class="fas fa-external-link-alt me-1"></i>
+            Accéder au lien
+        </a>
+    </div>
+<?php endif; ?>
+
                 </div>
             </div>
             

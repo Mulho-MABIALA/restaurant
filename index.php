@@ -1,9 +1,6 @@
 <?php
 session_start();
-include('lang.php');
 require_once 'config.php';
-
-
 try {
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     // Requête pour récupérer les horaires d'ouverture/fermeture par jour
@@ -1264,13 +1261,6 @@ try {
             }
         }
         updateCartCount();
-
-        // === 🌐 Changement de langue ===
-        function changeLanguage(lang) {
-            console.log('Langue sélectionnée:', lang);
-            window.location.search = `?lang=${lang}`;
-        }
-        window.changeLanguage = changeLanguage;
 
         // === 🔗 Scroll fluide vers les ancres ===
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
