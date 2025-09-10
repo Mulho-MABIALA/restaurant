@@ -437,12 +437,11 @@
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
         transition: transform 0.2s ease;
     }
-
     .flag-icon:hover {
         transform: scale(1.1);
     }
 
-    /* Responsive pour sélecteur */
+    /* Responsive pour sélecteur */p$
     @media (max-width: 1023px) {
         .language-dropdown {
             position: fixed !important;

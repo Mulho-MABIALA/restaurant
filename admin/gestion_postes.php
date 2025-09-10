@@ -25,27 +25,26 @@
         {
             $this->conn = $connection;
         }
+         public function getAllPostes()
+    {
+        $stmt = $this->conn->query("
+            SELECT p.*,
+            (SELECT COUNT(*) FROM employes e WHERE e.poste_id = p.id AND e.statut = 'actif') as nb_employes,
+            ps.nom as poste_superieur_nom,
+            nh.libelle as niveau_libelle,
+            d.nom as departement_nom,
+            d.responsable_nom as departement_responsable_nom,
+            d.responsable_prenom as departement_responsable_prenom
+            FROM postes p
+            LEFT JOIN postes ps ON p.poste_superieur_id = ps.id
+            LEFT JOIN niveaux_hierarchiques nh ON p.niveau_hierarchique = nh.niveau
+            LEFT JOIN departements d ON p.departement_id = d.id
+            WHERE p.actif = TRUE
+            ORDER BY p.niveau_hierarchique, p.nom
+        ");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 
-        /**
-         * Récupère tous les postes avec leurs informations détaillées
-         */
-        public function getAllPostes()
-        {
-            $stmt = $this->conn->query("
-        SELECT p.*,
-        (SELECT COUNT(*) FROM employes e WHERE e.poste_id = p.id AND e.statut = 'actif') as nb_employes,
-        ps.nom as poste_superieur_nom,
-        nh.libelle as niveau_libelle,
-        d.nom as departement_nom
-        FROM postes p
-        LEFT JOIN postes ps ON p.poste_superieur_id = ps.id
-        LEFT JOIN niveaux_hierarchiques nh ON p.niveau_hierarchique = nh.niveau
-        LEFT JOIN departements d ON p.departement_id = d.id
-        WHERE p.actif = TRUE
-        ORDER BY p.niveau_hierarchique, p.nom
-    ");
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        }
 
         /**
          * Crée un nouveau poste
@@ -243,51 +242,54 @@
             return $this->createPoste($dataToInsert);
         }
 
-        /**
-         * Recherche des postes avec filtres
-         */
-        public function searchPostes($filters)
-        {
-            $sql = "SELECT p.*,
+         public function searchPostes($filters)
+    {
+        $sql = "SELECT p.*,
                 (SELECT COUNT(*) FROM employes e WHERE e.poste_id = p.id AND e.statut = 'actif') as nb_employes,
-                ps.nom as poste_superieur_nom, nh.libelle as niveau_libelle
+                ps.nom as poste_superieur_nom, 
+                nh.libelle as niveau_libelle,
+                d.nom as departement_nom,
+                d.responsable_nom as departement_responsable_nom,
+                d.responsable_prenom as departement_responsable_prenom
                 FROM postes p
                 LEFT JOIN postes ps ON p.poste_superieur_id = ps.id
                 LEFT JOIN niveaux_hierarchiques nh ON p.niveau_hierarchique = nh.niveau
+                LEFT JOIN departements d ON p.departement_id = d.id
                 WHERE p.actif = TRUE";
 
-            $params = [];
+        $params = [];
 
-            if (! empty($filters['search'])) {
-                $sql .= " AND (p.nom LIKE ? OR p.description LIKE ? OR p.competences_requises LIKE ?)";
-                $search   = "%{$filters['search']}%";
-                $params[] = $search;
-                $params[] = $search;
-                $params[] = $search;
-            }
-
-            if (! empty($filters['type_contrat'])) {
-                $sql .= " AND p.type_contrat = ?";
-                $params[] = $filters['type_contrat'];
-            }
-
-            if (! empty($filters['niveau_hierarchique'])) {
-                $sql .= " AND p.niveau_hierarchique = ?";
-                $params[] = $filters['niveau_hierarchique'];
-            }
-
-            if (! empty($filters['departement_id'])) {
-                $sql .= " AND p.departement_id = ?";
-                $params[] = $filters['departement_id'];
-            }
-
-            $sql .= " ORDER BY p.niveau_hierarchique, p.nom";
-
-            $stmt = $this->conn->prepare($sql);
-            $stmt->execute($params);
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if (!empty($filters['search'])) {
+            $sql .= " AND (p.nom LIKE ? OR p.description LIKE ? OR p.competences_requises LIKE ?)";
+            $search = "%{$filters['search']}%";
+            $params[] = $search;
+            $params[] = $search;
+            $params[] = $search;
         }
+
+        if (!empty($filters['type_contrat'])) {
+            $sql .= " AND p.type_contrat = ?";
+            $params[] = $filters['type_contrat'];
+        }
+
+        if (!empty($filters['niveau_hierarchique'])) {
+            $sql .= " AND p.niveau_hierarchique = ?";
+            $params[] = $filters['niveau_hierarchique'];
+        }
+
+        if (!empty($filters['departement_id'])) {
+            $sql .= " AND p.departement_id = ?";
+            $params[] = $filters['departement_id'];
+        }
+
+        $sql .= " ORDER BY p.niveau_hierarchique, p.nom";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+}
+
     class PosteSuperieurManager
     {
         private $conn;
@@ -437,9 +439,9 @@
             $this->conn = $connection;
         }
 
-        public function getAllDepartements()
-        {
-            $stmt = $this->conn->query("
+         public function getAllDepartements()
+    {
+        $stmt = $this->conn->query("
             SELECT d.*,
                    COUNT(p.id) as nb_postes
             FROM departements d
@@ -448,70 +450,87 @@
             GROUP BY d.id
             ORDER BY d.nom
         ");
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function createDepartement($data)
+    {
+        if (empty($data['nom'])) {
+            throw new Exception('Le nom du département est requis');
         }
 
-        public function createDepartement($data)
-        {
-            if (empty($data['nom'])) {
-                throw new Exception('Le nom du département est requis');
-            }
+        $nom = trim($data['nom']);
 
-            $nom = trim($data['nom']);
+        // Vérifier unicité
+        $stmt = $this->conn->prepare("SELECT id FROM departements WHERE nom = ? AND actif = TRUE");
+        $stmt->execute([$nom]);
+        if ($stmt->fetch()) {
+            throw new Exception('Un département avec ce nom existe déjà');
+        }
 
-            // Vérifier unicité
-            $stmt = $this->conn->prepare("SELECT id FROM departements WHERE nom = ? AND actif = TRUE");
-            $stmt->execute([$nom]);
-            if ($stmt->fetch()) {
-                throw new Exception('Un département avec ce nom existe déjà');
-            }
-
-            $stmt = $this->conn->prepare("
-            INSERT INTO departements (nom, description)
-            VALUES (?, ?)
+        $stmt = $this->conn->prepare("
+            INSERT INTO departements (nom, description, responsable_nom, responsable_prenom)
+            VALUES (?, ?, ?, ?)
         ");
 
-            $stmt->execute([
-                $nom,
-                $data['description'] ?? null,
-            ]);
+        $stmt->execute([
+            $nom,
+            $data['description'] ?? null,
+            $data['responsable_nom'] ?? null,
+            $data['responsable_prenom'] ?? null
+        ]);
 
-            return $this->conn->lastInsertId();
+        return $this->conn->lastInsertId();
+    }
+
+    public function updateDepartement($id, $data)
+    {
+        if (empty($data['nom'])) {
+            throw new Exception('Le nom du département est requis');
         }
 
-        public function updateDepartement($id, $data)
-        {
-            if (empty($data['nom'])) {
-                throw new Exception('Le nom du département est requis');
-            }
+        $nom = trim($data['nom']);
 
-            $nom = trim($data['nom']);
+        // Vérifier unicité (excluant le département actuel)
+        $stmt = $this->conn->prepare("SELECT id FROM departements WHERE nom = ? AND id != ? AND actif = TRUE");
+        $stmt->execute([$nom, $id]);
+        if ($stmt->fetch()) {
+            throw new Exception('Un département avec ce nom existe déjà');
+        }
 
-            // Vérifier unicité (excluant le département actuel)
-            $stmt = $this->conn->prepare("SELECT id FROM departements WHERE nom = ? AND id != ? AND actif = TRUE");
-            $stmt->execute([$nom, $id]);
-            if ($stmt->fetch()) {
-                throw new Exception('Un département avec ce nom existe déjà');
-            }
-
-            $stmt = $this->conn->prepare("
+        $stmt = $this->conn->prepare("
             UPDATE departements
-            SET nom = ?, description = ?
+            SET nom = ?, description = ?, responsable_nom = ?, responsable_prenom = ?
             WHERE id = ? AND actif = TRUE
         ");
 
-            $result = $stmt->execute([
-                $nom,
-                $data['description'] ?? null,
-                $id,
-            ]);
+        $result = $stmt->execute([
+            $nom,
+            $data['description'] ?? null,
+            $data['responsable_nom'] ?? null,
+            $data['responsable_prenom'] ?? null,
+            $id
+        ]);
 
-            if ($stmt->rowCount() === 0) {
-                throw new Exception('Département non trouvé ou non modifiable');
-            }
-
-            return true;
+        if ($stmt->rowCount() === 0) {
+            throw new Exception('Département non trouvé ou non modifiable');
         }
+
+        return true;
+    }
+    public function getDepartementById($id)
+    {
+        $stmt = $this->conn->prepare("
+            SELECT d.*,
+                   COUNT(p.id) as nb_postes
+            FROM departements d
+            LEFT JOIN postes p ON d.id = p.departement_id AND p.actif = TRUE
+            WHERE d.id = ? AND d.actif = TRUE
+            GROUP BY d.id
+        ");
+        $stmt->execute([$id]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
 
         public function deleteDepartement($id)
         {
@@ -535,6 +554,9 @@
             return true;
         }
     }
+    
+
+
 
     class NiveauManager
     {
@@ -783,6 +805,27 @@
                     Utils::logActivity($conn, 'DELETE_DEPARTEMENT', 'departements', $input['id'], $input);
                     Utils::sendJsonResponse(['success' => true, 'message' => 'Département supprimé avec succès']);
                     break;
+
+                    case 'get_departement_details':
+    $input = json_decode(file_get_contents('php://input'), true);
+    if (!$input || !isset($input['id'])) {
+        Utils::sendJsonResponse(['success' => false, 'message' => 'ID du département manquant']);
+        break;
+    }
+    
+    $departement = $departementManager->getDepartementById($input['id']);
+    if ($departement) {
+        Utils::sendJsonResponse([
+            'success' => true, 
+            'departement' => $departement
+        ]);
+    } else {
+        Utils::sendJsonResponse([
+            'success' => false, 
+            'message' => 'Département non trouvé'
+        ]);
+    }
+    break;
 
                 // === GESTION DES POSTES SUPÉRIEURS (ADMIN SEULEMENT) ===
                 case 'get_postes_superieurs':
@@ -1331,13 +1374,18 @@
                                 </div>
                                 <div class="mb-3">
                                     <label for="departement_id" class="form-label">Département</label>
-                                    <select class="form-select" id="departement_id" name="departement_id">
+                                    <select class="form-select" id="departement_id" name="departement_id" onchange="onDepartementChange()">
                                         <option value="">Sélectionnez un département</option>
                                         <?php foreach ($departements as $dept): ?>
                                             <option value="<?php echo $dept['id']; ?>"><?php echo htmlspecialchars($dept['nom']); ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
+                                <div class="mb-3">
+                                <label for="responsable_departement" class="form-label">Responsable de département</label>
+                                <input type="text" class="form-control" id="responsable_departement" name="responsable_departement" readonly placeholder="Sélectionnez d'abord un département">
+                                <small class="form-text text-muted">Ce champ se remplit automatiquement selon le département sélectionné</small>
+                            </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
@@ -1470,47 +1518,62 @@
     </div>
 
     <!-- Modal de gestion des départements -->
-    <div class="modal fade" id="departementsModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Gestion des Départements</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <!-- Formulaire d'ajout/modification de département -->
-                    <div class="card mb-4">
-                        <div class="card-header">
-                            <h6 class="mb-0">Ajouter/Modifier un département</h6>
-                        </div>
-                        <div class="card-body">
-                            <form id="departementForm">
-                                <input type="hidden" id="departementId" name="id">
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label for="departementNom" class="form-label">Nom du département *</label>
-                                            <input type="text" class="form-control" id="departementNom" name="nom" required>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label for="departementDescription" class="form-label">Description</label>
-                                            <input type="text" class="form-control" id="departementDescription" name="description">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="d-flex gap-2">
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-save me-2"></i>Enregistrer
-                                    </button>
-                                    <button type="button" onclick="clearDepartementForm()" class="btn btn-secondary">
-                                        <i class="fas fa-times me-2"></i>Annuler
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
+   <div class="modal fade" id="departementsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Gestion des Départements</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Formulaire d'ajout/modification de département -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">Ajouter/Modifier un département</h6>
                     </div>
+                    <div class="card-body">
+                        <form id="departementForm">
+                            <input type="hidden" id="departementId" name="id">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="departementNom" class="form-label">Nom du département *</label>
+                                        <input type="text" class="form-control" id="departementNom" name="nom" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="departementDescription" class="form-label">Description</label>
+                                        <input type="text" class="form-control" id="departementDescription" name="description">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="responsableNom" class="form-label">Nom du responsable</label>
+                                        <input type="text" class="form-control" id="responsableNom" name="responsable_nom">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="responsablePrenom" class="form-label">Prénom du responsable</label>
+                                        <input type="text" class="form-control" id="responsablePrenom" name="responsable_prenom">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save me-2"></i>Enregistrer
+                                </button>
+                                <button type="button" onclick="clearDepartementForm()" class="btn btn-secondary">
+                                    <i class="fas fa-times me-2"></i>Annuler
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
                     <!-- Liste des départements existants -->
                     <div>
@@ -1725,16 +1788,19 @@ function makeRequest(action, data = {}, method = 'POST') {
         }
     }
 
-    // Fonctions pour les modales
-    function openAddModal() {
-        document.getElementById('modalTitle').textContent = 'Ajouter un poste';
-        document.getElementById('posteForm').reset();
-        document.getElementById('posteId').value = '';
-        document.getElementById('couleur').value = '#3B82F6';
+   function openAddModal() {
+    document.getElementById('modalTitle').textContent = 'Ajouter un poste';
+    document.getElementById('posteForm').reset();
+    document.getElementById('posteId').value = '';
+    document.getElementById('couleur').value = '#3B82F6';
+    
+    // Vider le champ responsable de département
+    document.getElementById('responsable_departement').value = '';
+    document.getElementById('responsable_departement').placeholder = 'Sélectionnez d\'abord un département';
 
-        const modal = new bootstrap.Modal(document.getElementById('posteModal'));
-        modal.show();
-    }
+    const modal = new bootstrap.Modal(document.getElementById('posteModal'));
+    modal.show();
+}
 
     function closeModal() {
     const modal = bootstrap.Modal.getInstance(document.getElementById('posteModal'));
@@ -1791,60 +1857,69 @@ function makeRequest(action, data = {}, method = 'POST') {
 }
 
     // Fonctions pour la gestion des postes
-    function viewPoste(posteId) {
-        showLoading();
+   function viewPoste(posteId) {
+    showLoading();
 
-        // Recherche des informations du poste
-        const poste = postes.find(p => p.id == posteId);
-        if (!poste) {
-            hideLoading();
-            showNotification('Poste non trouvé', 'error');
-            return;
-        }
+    const poste = postes.find(p => p.id == posteId);
+    if (!poste) {
+        hideLoading();
+        showNotification('Poste non trouvé', 'error');
+        return;
+    }
 
-        // Construction du contenu HTML pour les détails du poste
-        let detailsHtml = `
-            <div class="mb-4">
-                <div class="d-flex align-items-center mb-3">
-                    <span class="color-indicator me-2" style="background-color: ${poste.couleur || '#3B82F6'}"></span>
-                    <h4 class="mb-0">${escapeHtml(poste.nom)}</h4>
-                    <span class="badge bg-secondary ms-2">${poste.type_contrat || 'CDI'}</span>
-                </div>
-
-                ${poste.description ? `<p class="text-muted">${escapeHtml(poste.description)}</p>` : ''}
+    // Construction du contenu HTML avec responsable de département
+    let detailsHtml = `
+        <div class="mb-4">
+            <div class="d-flex align-items-center mb-3">
+                <span class="color-indicator me-2" style="background-color: ${poste.couleur || '#3B82F6'}"></span>
+                <h4 class="mb-0">${escapeHtml(poste.nom)}</h4>
+                <span class="badge bg-secondary ms-2">${poste.type_contrat || 'CDI'}</span>
             </div>
+            ${poste.description ? `<p class="text-muted">${escapeHtml(poste.description)}</p>` : ''}
+        </div>
 
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="detail-section">
-                        <h5 class="mb-3">Informations générales</h5>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="detail-section">
+                    <h5 class="mb-3">Informations générales</h5>
 
-                        <div class="mb-2 d-flex">
-                            <span class="info-label">Département:</span>
-                            <span>${poste.departement_nom ? escapeHtml(poste.departement_nom) : 'Non assigné'}</span>
-                        </div>
+                    <div class="mb-2 d-flex">
+                        <span class="info-label">Département:</span>
+                        <span>${poste.departement_nom ? escapeHtml(poste.departement_nom) : 'Non assigné'}</span>
+                    </div>
 
-                        <div class="mb-2 d-flex">
-                            <span class="info-label">Niveau hiérarchique:</span>
-                            <span>${poste.niveau_libelle || 'Non défini'}</span>
-                        </div>
+                    <!-- NOUVEAU: Affichage du responsable de département -->
+                    <div class="mb-2 d-flex">
+                        <span class="info-label">Responsable département:</span>
+                        <span>${(() => {
+                            if (poste.departement_responsable_nom || poste.departement_responsable_prenom) {
+                                return escapeHtml(`${poste.departement_responsable_prenom || ''} ${poste.departement_responsable_nom || ''}`.trim());
+                            }
+                            return 'Non défini';
+                        })()}</span>
+                    </div>
 
-                        <div class="mb-2 d-flex">
-                            <span class="info-label">Poste supérieur:</span>
-                            <span>${poste.poste_superieur_nom ? escapeHtml(poste.poste_superieur_nom) : 'Aucun'}</span>
-                        </div>
+                    <div class="mb-2 d-flex">
+                        <span class="info-label">Niveau hiérarchique:</span>
+                        <span>${poste.niveau_libelle || 'Non défini'}</span>
+                    </div>
 
-                        <div class="mb-2 d-flex">
-                            <span class="info-label">Heures/semaine:</span>
-                            <span>${poste.heures_travail || '35'}h</span>
-                        </div>
+                    <div class="mb-2 d-flex">
+                        <span class="info-label">Poste supérieur:</span>
+                        <span>${poste.poste_superieur_nom ? escapeHtml(poste.poste_superieur_nom) : 'Aucun'}</span>
+                    </div>
 
-                        <div class="mb-2 d-flex">
-                            <span class="info-label">Salaire:</span>
-                            <span class="fw-bold text-success">${formatNumber(poste.salaire || 0)} FCFA</span>
-                        </div>
+                    <div class="mb-2 d-flex">
+                        <span class="info-label">Heures/semaine:</span>
+                        <span>${poste.heures_travail || '35'}h</span>
+                    </div>
+
+                    <div class="mb-2 d-flex">
+                        <span class="info-label">Salaire:</span>
+                        <span class="fw-bold text-success">${formatNumber(poste.salaire || 0)} FCFA</span>
                     </div>
                 </div>
+            </div>
 
                 <div class="col-md-6">
                     <div class="detail-section">
@@ -1950,33 +2025,93 @@ function makeRequest(action, data = {}, method = 'POST') {
         viewModal.show();
     }
 
-    function editPoste(posteId) {
-        const poste = postes.find(p => p.id == posteId);
-        if (!poste) {
-            showNotification('Poste non trouvé', 'error');
-            return;
-        }
-
-        document.getElementById('modalTitle').textContent = 'Modifier le poste';
-
-        // Remplir le formulaire avec les données du poste
-        const fields = [
-            'id', 'nom', 'description', 'salaire', 'couleur', 'type_contrat',
-            'niveau_hierarchique', 'poste_superieur_id', 'competences_requises',
-            'nombre_postes_prevus', 'duree_contrat', 'heures_travail', 'avantages',
-            'code_paie', 'categorie_paie', 'regime_social', 'taux_cotisation', 'departement_id'
-        ];
-
-        fields.forEach(field => {
-            const element = document.getElementById(field === 'id' ? 'posteId' : field);
-            if (element && poste[field] !== undefined) {
-                element.value = poste[field] || '';
-            }
-        });
-
-        const modal = new bootstrap.Modal(document.getElementById('posteModal'));
-        modal.show();
+function onDepartementChange() {
+    const departementSelect = document.getElementById('departement_id');
+    const responsableInput = document.getElementById('responsable_departement');
+    
+    if (!departementSelect.value) {
+        responsableInput.value = '';
+        responsableInput.placeholder = 'Sélectionnez d\'abord un département';
+        return;
     }
+    
+    // Afficher un loading
+    responsableInput.value = 'Chargement...';
+    responsableInput.disabled = true;
+    
+    // Requête pour récupérer les détails du département
+    fetch('?action=get_departement_details', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: departementSelect.value })
+    })
+    .then(response => response.json())
+    .then(data => {
+        responsableInput.disabled = false;
+        
+        if (data.success && data.departement) {
+            const dept = data.departement;
+            let responsableText = '';
+            
+            if (dept.responsable_nom || dept.responsable_prenom) {
+                responsableText = `${dept.responsable_prenom || ''} ${dept.responsable_nom || ''}`.trim();
+            }
+            
+            responsableInput.value = responsableText;
+            responsableInput.placeholder = responsableText ? '' : 'Aucun responsable défini';
+        } else {
+            responsableInput.value = '';
+            responsableInput.placeholder = 'Erreur lors du chargement';
+            showNotification('Erreur lors du chargement des informations du département', 'error');
+        }
+    })
+    .catch(error => {
+        responsableInput.disabled = false;
+        responsableInput.value = '';
+        responsableInput.placeholder = 'Erreur de connexion';
+        console.error('Erreur:', error);
+        showNotification('Erreur de connexion', 'error');
+    });
+}
+
+  function editPoste(posteId) {
+    const poste = postes.find(p => p.id == posteId);
+    if (!poste) {
+        showNotification('Poste non trouvé', 'error');
+        return;
+    }
+
+    document.getElementById('modalTitle').textContent = 'Modifier le poste';
+
+    // Remplir tous les champs existants
+    const fields = [
+        'id', 'nom', 'description', 'salaire', 'couleur', 'type_contrat',
+        'niveau_hierarchique', 'poste_superieur_id', 'competences_requises',
+        'nombre_postes_prevus', 'duree_contrat', 'heures_travail', 'avantages',
+        'code_paie', 'categorie_paie', 'regime_social', 'taux_cotisation', 'departement_id'
+    ];
+
+    fields.forEach(field => {
+        const element = document.getElementById(field === 'id' ? 'posteId' : field);
+        if (element && poste[field] !== undefined) {
+            element.value = poste[field] || '';
+        }
+    });
+
+    // Remplir le champ responsable de département
+    let responsableText = '';
+    if (poste.departement_responsable_nom || poste.departement_responsable_prenom) {
+        responsableText = `${poste.departement_responsable_prenom || ''} ${poste.departement_responsable_nom || ''}`.trim();
+    }
+    document.getElementById('responsable_departement').value = responsableText;
+
+    const modal = new bootstrap.Modal(document.getElementById('posteModal'));
+    modal.show();
+}
+
+
 function deletePoste(posteId) {
     const poste = postes.find(p => p.id == posteId);
     if (!poste) return;
@@ -2113,21 +2248,20 @@ function duplicatePoste(posteId) {
         document.getElementById('departementFilter').value = '';
         location.reload();
     }
+function updatePostesGrid(postesData) {
+    const grid = document.getElementById('postesGrid');
+    const noResults = document.getElementById('noResults');
 
-    function updatePostesGrid(postesData) {
-        const grid = document.getElementById('postesGrid');
-        const noResults = document.getElementById('noResults');
+    if (postesData.length === 0) {
+        grid.innerHTML = '';
+        noResults.classList.remove('d-none');
+        return;
+    }
 
-        if (postesData.length === 0) {
-            grid.innerHTML = '';
-            noResults.classList.remove('d-none');
-            return;
-        }
+    noResults.classList.add('d-none');
 
-        noResults.classList.add('d-none');
-
-        let gridHtml = '';
-        postesData.forEach(poste => {
+    let gridHtml = '';
+    postesData.forEach(poste => {
             const percentage = poste.nombre_postes_prevus > 0
                 ? Math.min(100, (poste.nb_employes / poste.nombre_postes_prevus) * 100)
                 : 0;
@@ -2138,14 +2272,19 @@ function duplicatePoste(posteId) {
                     ? '<span class="badge bg-warning text-dark">Partiel</span>'
                     : '<span class="badge bg-danger">Vacant</span>');
 
-            gridHtml += `
-                <div class="col">
-                    <div class="card h-100 shadow-sm">
-                        <div class="card-header d-flex justify-content-between align-items-center" style="border-left: 4px solid ${poste.couleur || '#3B82F6'}">
-                            <h5 class="card-title mb-0">${escapeHtml(poste.nom)}</h5>
-                            <span class="badge bg-secondary">${poste.type_contrat || 'CDI'}</span>
-                        </div>
-                        <div class="card-body">
+              let responsableText = 'Non défini';
+        if (poste.departement_responsable_nom || poste.departement_responsable_prenom) {
+            responsableText = `${poste.departement_responsable_prenom || ''} ${poste.departement_responsable_nom || ''}`.trim();
+        }
+
+        gridHtml += `
+            <div class="col">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-header d-flex justify-content-between align-items-center" style="border-left: 4px solid ${poste.couleur || '#3B82F6'}">
+                        <h5 class="card-title mb-0">${escapeHtml(poste.nom)}</h5>
+                        <span class="badge bg-secondary">${poste.type_contrat || 'CDI'}</span>
+                    </div>
+                    <div class="card-body">
                             <p class="card-text text-muted">${poste.description ? escapeHtml(poste.description.substring(0, 100)) + (poste.description.length > 100 ? '...' : '') : 'Aucune description'}</p>
 
                             <div class="mb-3">
@@ -2177,7 +2316,16 @@ function duplicatePoste(posteId) {
                                          aria-valuemax="100"></div>
                                 </div>
                             </div>
+ <div class="mb-3">
+                            <small class="text-muted">Département:</small>
+                            <div>${poste.departement_nom ? escapeHtml(poste.departement_nom) : 'Non assigné'}</div>
+                        </div>
 
+                        <!-- NOUVEAU: Responsable de département -->
+                        <div class="mb-3">
+                            <small class="text-muted">Responsable:</small>
+                            <div class="fw-bold">${escapeHtml(responsableText)}</div>
+                        </div>
                             <div class="d-flex justify-content-between align-items-center">
                                 ${statusBadge}
 
@@ -2333,57 +2481,69 @@ function duplicatePoste(posteId) {
     }
 
     function renderDepartements(departements) {
-        const container = document.getElementById('departementsList');
-        container.innerHTML = '';
+    const container = document.getElementById('departementsList');
+    container.innerHTML = '';
 
-        if (departements.length === 0) {
-            container.innerHTML = `
-                <div class="col-12 text-center text-muted py-4">
-                    <i class="fas fa-building fs-1 mb-2"></i>
-                    <p>Aucun département défini.</p>
-                </div>
-            `;
-            return;
+    if (departements.length === 0) {
+        container.innerHTML = `
+            <div class="col-12 text-center text-muted py-4">
+                <i class="fas fa-building fs-1 mb-2"></i>
+                <p>Aucun département défini.</p>
+            </div>
+        `;
+        return;
+    }
+
+    departements.forEach(dept => {
+        const col = document.createElement('div');
+        col.className = 'col';
+        
+        // Construire le nom du responsable
+        let responsableText = 'Aucun responsable';
+        if (dept.responsable_nom || dept.responsable_prenom) {
+            responsableText = `${dept.responsable_prenom || ''} ${dept.responsable_nom || ''}`.trim();
         }
-
-        departements.forEach(dept => {
-            const col = document.createElement('div');
-            col.className = 'col';
-            col.innerHTML = `
-                <div class="card h-100">
-                    <div class="card-body">
-                        <h5 class="card-title">${escapeHtml(dept.nom)}</h5>
-                        ${dept.description ? `<p class="card-text">${escapeHtml(dept.description)}</p>` : ''}
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="badge bg-primary">${dept.nb_postes || 0} poste(s)</span>
-                            <div class="btn-group">
-                                <button onclick="editDepartement(${dept.id})" class="btn btn-sm btn-outline-primary">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button onclick="deleteDepartement(${dept.id})" class="btn btn-sm btn-outline-danger">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
+        
+        col.innerHTML = `
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">${escapeHtml(dept.nom)}</h5>
+                    ${dept.description ? `<p class="card-text">${escapeHtml(dept.description)}</p>` : ''}
+                    <div class="mb-2">
+                        <small class="text-muted">Responsable:</small>
+                        <div class="fw-bold">${escapeHtml(responsableText)}</div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="badge bg-primary">${dept.nb_postes || 0} poste(s)</span>
+                        <div class="btn-group">
+                            <button onclick="editDepartement(${dept.id})" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="deleteDepartement(${dept.id})" class="btn btn-sm btn-outline-danger">
+                                <i class="fas fa-trash"></i>
+                            </button>
                         </div>
                     </div>
                 </div>
-            `;
-            container.appendChild(col);
-        });
+            </div>
+        `;
+        container.appendChild(col);
+    });
+}
+
+function editDepartement(departementId) {
+    const dept = departements.find(d => d.id == departementId);
+    if (!dept) {
+        showNotification('Département non trouvé', 'error');
+        return;
     }
 
-    function editDepartement(departementId) {
-        const dept = departements.find(d => d.id == departementId);
-        if (!dept) {
-            showNotification('Département non trouvé', 'error');
-            return;
-        }
-
-        document.getElementById('departementId').value = dept.id;
-        document.getElementById('departementNom').value = dept.nom;
-        document.getElementById('departementDescription').value = dept.description || '';
-    }
-
+    document.getElementById('departementId').value = dept.id;
+    document.getElementById('departementNom').value = dept.nom;
+    document.getElementById('departementDescription').value = dept.description || '';
+    document.getElementById('responsableNom').value = dept.responsable_nom || '';
+    document.getElementById('responsablePrenom').value = dept.responsable_prenom || '';
+}
     function deleteDepartement(departementId) {
         const dept = departements.find(d => d.id == departementId);
         if (!dept) return;
@@ -2415,10 +2575,12 @@ function duplicatePoste(posteId) {
         };
     }
 
-    function clearDepartementForm() {
-        document.getElementById('departementForm').reset();
-        document.getElementById('departementId').value = '';
-    }
+   function clearDepartementForm() {
+    document.getElementById('departementForm').reset();
+    document.getElementById('departementId').value = '';
+    document.getElementById('responsableNom').value = '';
+    document.getElementById('responsablePrenom').value = '';
+}
 
     // Fonctions pour la gestion de la hiérarchie
     function loadHierarchie() {
