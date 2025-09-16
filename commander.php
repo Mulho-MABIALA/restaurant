@@ -2,6 +2,7 @@
 require_once 'config.php';
 require 'vendor/autoload.php';
 session_start();
+
 // Ajouter ce code après session_start() dans commander.php
 
 // Gestionnaire pour la synchronisation du panier localStorage
@@ -39,6 +40,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
     }
     exit;
 }
+
+// Gestion de la newsletter après soumission du modal
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['newsletter_choice'])) {
+    header('Content-Type: application/json');
+    
+    try {
+        $email = $_POST['email'];
+        $choice = $_POST['newsletter_choice'];
+        
+        if ($choice == 'oui') {
+            // Vérifier si l'email existe déjà
+            $stmt = $conn->prepare("SELECT * FROM newsletter WHERE email = ?");
+            $stmt->execute([$email]);
+            
+            if ($stmt->rowCount() == 0) {
+                // Insérer dans la newsletter
+                $stmt = $conn->prepare("INSERT INTO newsletter (email, date_inscription) VALUES (?, NOW())");
+                $stmt->execute([$email]);
+            }
+        }
+        
+        echo json_encode(['success' => true]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+    exit;
+}
+
 // Initialisation sécurisée des variables
 $total = 0;
 $produits = [];
@@ -68,7 +97,7 @@ if (!empty($_SESSION['panier']) && is_array($_SESSION['panier'])) {
     }
 }
 
-// Si le panier de session est vide, essayer de récupérer depuis localStorage via JavaScript
+// Si le panier de session est empty, essayer de récupérer depuis localStorage via JavaScript
 if (empty($produits)) {
     // On laissera JavaScript récupérer le panier du localStorage
     $useLocalStorage = true;
@@ -88,19 +117,15 @@ use Dompdf\Options;
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && !isset($_POST['newsletter_choice'])) {
     $nom = trim($_POST['nom']);
     $email = trim($_POST['email']);
     $telephone = trim($_POST['telephone']);
     $adresse = trim($_POST['adresse']);
     $mode_retrait = $_POST['mode_retrait'] ?? '';
     $num_table = trim($_POST['num_table'] ?? '');
-    $stmt = $conn->prepare("SELECT statut_paiement FROM commandes WHERE id = ?");
-$stmt->execute([$commande_id]);
-$commande_info = $stmt->fetch();
-$statut_paiement = $commande_info['statut_paiement']; 
- }
-    if (empty($nom) || empty($email) || empty($adresse)) {
+    
+    if (empty($nom) || empty($adresse)) {
         $erreur = "Veuillez remplir tous les champs obligatoires.";
     } else {
         // CORRECTION 1: Récupérer les produits AVANT de commencer la transaction
@@ -160,8 +185,8 @@ $statut_paiement = $commande_info['statut_paiement'];
                 $stmt = $conn->prepare("INSERT INTO commandes 
     (nom_client, email, telephone, adresse, mode_retrait, num_table, total, statut_paiement, date_commande, statut, vu_admin, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, 'impaye', NOW(), 'En cours', 0, NOW())");
-$stmt->execute([$nom, $email, $telephone, $adresse, $mode_retrait, $num_table, $total]);
-$commande_id = $conn->lastInsertId();
+                $stmt->execute([$nom, $email, $telephone, $adresse, $mode_retrait, $num_table, $total]);
+                $commande_id = $conn->lastInsertId();
                 // Debug
                 error_log("Commande ID créé: " . $commande_id);
 
@@ -192,8 +217,8 @@ $commande_id = $conn->lastInsertId();
                 $_SESSION['panier'] = [];
                 unset($_SESSION['panier']);
 
-                // Template HTML pour l'email (votre code existant...)
-               $emailTemplate = "
+                // Template HTML pour l'email
+                $emailTemplate = "
 <!DOCTYPE html>
 <html lang='fr'>
 <head>
@@ -523,39 +548,54 @@ $emailTemplate .= "
     </div>
             </html>";
 
-            // Envoi de l'e-mail
-            $mail = new PHPMailer(true);
+                // Envoi de l'e-mail même si on affiche le modal newsletter
+                if (!empty($email)) {
+                    $mail = new PHPMailer(true);
 
-            try {
-                $mail->isSMTP();
-                $mail->Host = 'smtp.gmail.com';
-                $mail->SMTPAuth = true;
-                $mail->Username = 'mulhomabiala29@gmail.com'; // Ton adresse
-                $mail->Password = 'khli pyzj ihte qdgu'; // Mot de passe application Gmail
-                $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-                $mail->Port = 587;
+                    try {
+                        $mail->isSMTP();
+                        $mail->Host = 'smtp.gmail.com';
+                        $mail->SMTPAuth = true;
+                        $mail->Username = 'mulhomabiala29@gmail.com'; // Ton adresse
+                        $mail->Password = 'khli pyzj ihte qdgu'; // Mot de passe application Gmail
+                        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+                        $mail->Port = 587;
 
-                $mail->setFrom('mulhomabiala29@gmail.com', 'Nom du Restaurant');
-                $mail->addAddress($email, $nom);
+                        $mail->setFrom('mulhomabiala29@gmail.com', 'Nom du Restaurant');
+                        $mail->addAddress($email, $nom);
 
-                $mail->isHTML(true);
-                $mail->Subject = 'Reçu impayé - Commande #' . str_pad($commande_id, 6, '0', STR_PAD_LEFT) . ' en attente de paiement';
-                $mail->Body = $emailTemplate;
+                        $mail->isHTML(true);
+                        $mail->Subject = 'Reçu impayé - Commande #' . str_pad($commande_id, 6, '0', STR_PAD_LEFT) . ' en attente de paiement';
+                        $mail->Body = $emailTemplate;
 
-                $mail->send();
-            } catch (Exception $e) {
-                error_log("Erreur lors de l'envoi du mail : {$mail->ErrorInfo}");
+                        $mail->send();
+                        error_log("Email envoyé avec succès à: $email");
+                    } catch (Exception $e) {
+                        error_log("Erreur lors de l'envoi du mail : {$mail->ErrorInfo}");
+                    }
+                }
+
+                // Vérifier si un email a été fourni pour afficher le modal newsletter
+                if (!empty($email)) {
+                    // Stocker les informations de la commande pour le modal
+                    $_SESSION['commande_id'] = $commande_id;
+                    $_SESSION['commande_email'] = $email;
+                    $_SESSION['commande_nom'] = $nom;
+                    
+                    // Afficher le modal au lieu de rediriger immédiatement
+                    $showNewsletterModal = true;
+                } else {
+                    // Pas d'email, rediriger directement
+                    header("Location: confirmation.php?commande=$commande_id");
+                    exit;
+                }
+
+            } catch (PDOException $e) {
+                if ($transactionActive) {
+                    $conn->rollBack();
+                }
+                die("Erreur lors de l'enregistrement de la commande : " . $e->getMessage());
             }
-
-            // Redirection vers la page de confirmation
-            header("Location: confirmation.php?commande=$commande_id");
-            exit;
-
-        } catch (PDOException $e) {
-            if ($transactionActive) {
-                $conn->rollBack();
-            }
-            die("Erreur lors de l'enregistrement de la commande : " . $e->getMessage());
         }
     }
 }
@@ -624,7 +664,7 @@ $emailTemplate .= "
                         </div>
                     <?php endif; ?>
                     
-                    <form method="POST" class="space-y-6">
+                    <form method="POST" class="space-y-6" id="commandeForm">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div class="md:col-span-2">
                                 <label for="nom" class="block text-sm font-semibold text-gray-700 mb-2">
@@ -645,14 +685,14 @@ $emailTemplate .= "
                             
                             <div>
                                 <label for="email" class="block text-sm font-semibold text-gray-700 mb-2">
-                                    Adresse email <span class="text-red-500">*</span>
+                                    Adresse email
                                 </label>
                                 <div class="relative">
                                     <input type="email" 
                                            id="email" 
                                            name="email" 
-                                           required
                                            value="<?= isset($_POST['email']) ? htmlspecialchars($_POST['email']) : '' ?>"
+                                           placeholder="Votre adresse email vous permettra uniquement de recevoir le reçu de votre commande dans votre boîte mail."
                                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors pl-10 bg-gray-50 focus:bg-white">
                                     <svg class="w-5 h-5 text-gray-400 absolute left-3 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"></path>
@@ -694,23 +734,23 @@ $emailTemplate .= "
                                 </svg>
                             </div>
                         </div>
-<div>
-    <label for="num_table" class="block text-sm font-semibold text-gray-700 mb-2">
-        Numéro de table
-    </label>
-    <div class="relative">
-        <input type="number" 
-               id="num_table" 
-               name="num_table" 
-               min="1"
-               value="<?= isset($_POST['num_table']) ? htmlspecialchars($_POST['num_table']) : '' ?>"
-               placeholder="Entrez votre numéro de table"
-               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors pl-10 bg-gray-50 focus:bg-white">
-        <svg class="w-5 h-5 text-gray-400 absolute left-3 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
-        </svg>
-    </div>
-</div>
+                        <div>
+                            <label for="num_table" class="block text-sm font-semibold text-gray-700 mb-2">
+                                Numéro de table
+                            </label>
+                            <div class="relative">
+                                <input type="number" 
+                                       id="num_table" 
+                                       name="num_table" 
+                                       min="1"
+                                       value="<?= isset($_POST['num_table']) ? htmlspecialchars($_POST['num_table']) : '' ?>"
+                                       placeholder="Entrez votre numéro de table"
+                                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors pl-10 bg-gray-50 focus:bg-white">
+                                <svg class="w-5 h-5 text-gray-400 absolute left-3 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                                </svg>
+                            </div>
+                        </div>
                         <button type="submit" 
                                 class="w-full bg-gradient-to-r from-primary to-primary-dark text-white font-bold py-4 px-6 rounded-lg hover:from-primary-dark hover:to-primary transform hover:scale-[1.02] transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center space-x-2">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -792,6 +832,24 @@ $emailTemplate .= "
             </div>
         </div>
     </div>
+
+    <!-- Modal Newsletter -->
+    <?php if (isset($showNewsletterModal) && $showNewsletterModal): ?>
+    <div id="newsletterModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold mb-4">Souhaitez-vous recevoir également des informations du restaurant ?</h3>
+            <p class="text-gray-600 mb-6">Réductions, événements, nouveautés...</p>
+            <div class="flex justify-between">
+                <button type="button" id="newsletterNon" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-6 rounded">
+                    Non
+                </button>
+                <button type="button" id="newsletterOui" class="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-6 rounded">
+                    Oui
+                </button>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
 
 <script>
 // Variables globales pour gérer le panier
@@ -944,7 +1002,7 @@ function setupFormHandler() {
         } else {
             console.warn('Aucune donnée de panier à envoyer');
             
-            // Optionnel : empêcher la soumission si le panier est vide
+            // Optionnel : empêcher la soumission si le panier est empty
             e.preventDefault();
             alert('Votre panier est vide. Veuillez ajouter des articles avant de commander.');
             return false;
@@ -963,6 +1021,50 @@ function clearCartStorage() {
     }
 }
 
+// Gestion du modal newsletter
+function setupNewsletterModal() {
+    const modal = document.getElementById('newsletterModal');
+    if (!modal) return;
+    
+    const btnOui = document.getElementById('newsletterOui');
+    const btnNon = document.getElementById('newsletterNon');
+    
+    const email = '<?php echo $_SESSION['commande_email'] ?? ''; ?>';
+    const commandeId = '<?php echo $_SESSION['commande_id'] ?? ''; ?>';
+    
+    function handleNewsletterChoice(choice) {
+        // Envoyer le choix au serveur
+        fetch('commander.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'newsletter_choice=' + choice + '&email=' + encodeURIComponent(email)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Rediriger vers la page de confirmation
+                window.location.href = 'confirmation.php?commande=' + commandeId;
+            } else {
+                alert('Erreur lors du traitement de votre choix. Veuillez réessayer.');
+            }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            alert('Erreur de connexion. Veuillez réessayer.');
+        });
+    }
+    
+    btnOui.addEventListener('click', function() {
+        handleNewsletterChoice('oui');
+    });
+    
+    btnNon.addEventListener('click', function() {
+        handleNewsletterChoice('non');
+    });
+}
+
 // Initialisation au chargement de la page
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Commander.php - Initialisation...');
@@ -975,6 +1077,7 @@ document.addEventListener('DOMContentLoaded', function() {
     <?php endif; ?>
     
     setupFormHandler();
+    setupNewsletterModal();
 });
 
 // Debug : afficher les données disponibles

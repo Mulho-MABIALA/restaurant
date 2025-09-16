@@ -1,21 +1,22 @@
 <?php
-require_once '../config.php';
-require_once 'phpqrcode/qrlib.php';
+    require_once '../config.php';
+    require_once 'phpqrcode/qrlib.php';
 
-// GESTIONNAIRE D'EMPLOYÉS
-class EmployeeManager  
+    // GESTIONNAIRE D'EMPLOYÉS
+    class EmployeeManager
+    {
+        private $conn;
+
+        public function __construct(PDO $connection)
+        {
+            $this->conn = $connection;
+        }
+
+  public function getAllEmployees(): array
 {
-    private $conn;
-    
-    public function __construct(PDO $connection) {
-        $this->conn = $connection;
-    }
-    
-   
-public function getAllEmployees(): array {
     try {
         $stmt = $this->conn->query("
-            SELECT e.*, 
+            SELECT e.*,
                    p.nom as poste_nom,
                    p.couleur as poste_couleur,
                    p.salaire as poste_salaire,
@@ -34,220 +35,283 @@ public function getAllEmployees(): array {
                    ps.nom as poste_superieur_nom,
                    d.nom as departement_nom,
                    d.couleur as departement_couleur,
-                   d.id as departement_id
-            FROM employes e 
-            LEFT JOIN postes p ON e.poste_id = p.id 
+                   d.id as departement_id,
+                   e.num_secu,
+                   e.num_identite,
+                   e.type_identite,
+                   e.situation_familiale,
+                   e.nombre_enfants,
+                   e.iban,
+                   e.nom_banque,
+                   e.titulaire_compte,
+                   e.bic
+            FROM employes e
+            LEFT JOIN postes p ON e.poste_id = p.id
             LEFT JOIN postes ps ON p.poste_superieur_id = ps.id
             LEFT JOIN departements d ON p.departement_id = d.id
             ORDER BY e.statut DESC, e.nom, e.prenom
         ");
+
+        if (!$stmt) {
+            error_log("Erreur: Impossible d'exécuter la requête getAllEmployees");
+            return [];
+        }
+
+        $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
+        if ($result === false) {
+            error_log("Erreur: fetchAll a retourné false dans getAllEmployees");
+            return [];
+        }
+
+        error_log("getAllEmployees: " . count($result) . " employés récupérés avec succès");
+        return $result;
+
     } catch (PDOException $e) {
         error_log("Erreur SQL getAllEmployees: " . $e->getMessage());
+        error_log("Code erreur: " . $e->getCode());
+        return [];
+    } catch (Exception $e) {
+        error_log("Erreur générale getAllEmployees: " . $e->getMessage());
         return [];
     }
 }
 
-    public function reactivateEmployee(int $employee_id): array {
+        public function reactivateEmployee(int $employee_id): array
+        {
+            try {
+                $stmt = $this->conn->prepare("SELECT statut, nom, prenom FROM employes WHERE id = ?");
+                $stmt->execute([$employee_id]);
+                $employee = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if (! $employee) {
+                    throw new Exception('Employé non trouvé');
+                }
+
+                if ($employee['statut'] !== 'inactif') {
+                    throw new Exception('Cet employé est déjà actif');
+                }
+
+                $stmt = $this->conn->prepare("UPDATE employes SET statut = 'actif' WHERE id = ?");
+                $stmt->execute([$employee_id]);
+
+                if ($stmt->rowCount() === 0) {
+                    throw new Exception('Erreur lors de la réactivation');
+                }
+
+                $this->logActivity('REACTIVATE_EMPLOYEE', 'employes', $employee_id, [
+                    'statut' => 'actif',
+                    'nom'    => $employee['nom'],
+                    'prenom' => $employee['prenom'],
+                ]);
+
+                return [
+                    'success' => true,
+                    'message' => 'Employé ' . $employee['prenom'] . ' ' . $employee['nom'] . ' réactivé avec succès',
+                ];
+
+            } catch (Exception $e) {
+                return ['success' => false, 'message' => $e->getMessage()];
+            }
+        }
+
+       public function getEmployeeById(int $id): ?array
+{
     try {
-        $stmt = $this->conn->prepare("SELECT statut, nom, prenom FROM employes WHERE id = ?");
-        $stmt->execute([$employee_id]);
-        $employee = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if (!$employee) {
-            throw new Exception('Employé non trouvé');
-        }
-        
-        if ($employee['statut'] !== 'inactif') {
-            throw new Exception('Cet employé est déjà actif');
-        }
-        
-        $stmt = $this->conn->prepare("UPDATE employes SET statut = 'actif' WHERE id = ?");
-        $stmt->execute([$employee_id]);
-        
-        if ($stmt->rowCount() === 0) {
-            throw new Exception('Erreur lors de la réactivation');
-        }
-        
-        $this->logActivity('REACTIVATE_EMPLOYEE', 'employes', $employee_id, [
-            'statut' => 'actif',
-            'nom' => $employee['nom'],
-            'prenom' => $employee['prenom']
-        ]);
-        
-        return [
-            'success' => true, 
-            'message' => 'Employé ' . $employee['prenom'] . ' ' . $employee['nom'] . ' réactivé avec succès'
-        ];
-        
-    } catch (Exception $e) {
-        return ['success' => false, 'message' => $e->getMessage()];
+        $stmt = $this->conn->prepare("
+            SELECT e.*,
+                   p.nom as poste_nom,
+                   p.couleur as poste_couleur,
+                   p.salaire as poste_salaire,
+                   p.type_contrat,
+                   p.duree_contrat,
+                   p.niveau_hierarchique,
+                   p.competences_requises,
+                   p.avantages,
+                   p.code_paie,
+                   p.categorie_paie,
+                   p.regime_social,
+                   p.taux_cotisation,
+                   p.salaire_min,
+                   p.salaire_max,
+                   p.heures_travail as heures_par_mois,
+                   e.num_secu,
+                   e.num_identite,
+                   e.type_identite,
+                   e.situation_familiale,
+                   e.nombre_enfants,
+                   e.iban,
+                   e.nom_banque,
+                   e.titulaire_compte,
+                   e.bic
+                   /* SUPPRIMER: e.niveau_etude, e.langues, e.competences, e.formations, e.experiences */
+            FROM employes e
+            LEFT JOIN postes p ON e.poste_id = p.id
+            WHERE e.id = ?
+        ");
+        $stmt->execute([$id]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ?: null;
+
+    } catch (PDOException $e) {
+        error_log("Erreur SQL getEmployeeById: " . $e->getMessage());
+        return null;
     }
 }
+        public function permanentDeleteEmployee(int $employee_id): array
+        {
+            try {
+                $this->conn->beginTransaction();
 
-    public function getEmployeeById(int $id): ?array {
-        try {
-            $stmt = $this->conn->prepare("
-                SELECT e.*, 
-                       p.nom as poste_nom,
-                       p.couleur as poste_couleur,
-                       p.salaire as poste_salaire,
-                       p.type_contrat,
-                       p.duree_contrat,
-                       p.niveau_hierarchique,
-                       p.competences_requises,
-                       p.avantages,
-                       p.code_paie,
-                       p.categorie_paie,
-                       p.regime_social,
-                       p.taux_cotisation,
-                       p.salaire_min,
-                       p.salaire_max,
-                       p.heures_travail as heures_par_mois
-                FROM employes e 
-                LEFT JOIN postes p ON e.poste_id = p.id 
-                WHERE e.id = ?
-            ");
-            $stmt->execute([$id]);
-            $result = $stmt->fetch(PDO::FETCH_ASSOC);
-            return $result ?: null;
-            
-        } catch (PDOException $e) {
-            error_log("Erreur SQL getEmployeeById: " . $e->getMessage());
-            return null;
-        }
-    }
+                $stmt = $this->conn->prepare("SELECT statut FROM employes WHERE id = ?");
+                $stmt->execute([$employee_id]);
+                $employee = $stmt->fetch();
 
-    public function permanentDeleteEmployee(int $employee_id): array {
-        try {
-            $this->conn->beginTransaction();
-            
-            $stmt = $this->conn->prepare("SELECT statut FROM employes WHERE id = ?");
-            $stmt->execute([$employee_id]);
-            $employee = $stmt->fetch();
-            
-            if (!$employee) {
-                throw new Exception('Employé non trouvé');
+                if (! $employee) {
+                    throw new Exception('Employé non trouvé');
+                }
+
+                if ($employee['statut'] !== 'inactif') {
+                    throw new Exception('Seuls les employés inactifs peuvent être supprimés définitivement');
+                }
+
+                $this->conn->prepare("DELETE FROM presences WHERE employe_id = ?")->execute([$employee_id]);
+                $this->conn->prepare("DELETE FROM bulletins_paie WHERE employe_id = ?")->execute([$employee_id]);
+
+                $stmt = $this->conn->prepare("DELETE FROM employes WHERE id = ?");
+                $stmt->execute([$employee_id]);
+
+                $this->logActivity('PERMANENT_DELETE_EMPLOYEE', 'employes', $employee_id, ['action' => 'suppression_definitive']);
+
+                $this->conn->commit();
+                return ['success' => true, 'message' => 'Employé supprimé définitivement'];
+
+            } catch (Exception $e) {
+                $this->conn->rollBack();
+                return ['success' => false, 'message' => $e->getMessage()];
             }
-            
-            if ($employee['statut'] !== 'inactif') {
-                throw new Exception('Seuls les employés inactifs peuvent être supprimés définitivement');
-            }
-            
-            $this->conn->prepare("DELETE FROM presences WHERE employe_id = ?")->execute([$employee_id]);
-            $this->conn->prepare("DELETE FROM bulletins_paie WHERE employe_id = ?")->execute([$employee_id]);
-            
-            $stmt = $this->conn->prepare("DELETE FROM employes WHERE id = ?");
-            $stmt->execute([$employee_id]);
-            
-            $this->logActivity('PERMANENT_DELETE_EMPLOYEE', 'employes', $employee_id, ['action' => 'suppression_definitive']);
-            
-            $this->conn->commit();
-            return ['success' => true, 'message' => 'Employé supprimé définitivement'];
-            
-        } catch (Exception $e) {
-            $this->conn->rollBack();
-            return ['success' => false, 'message' => $e->getMessage()];
         }
-    }
-public function getStatistics(): array {
+       public function getStatistics(): array
+{
     $stats = [];
-    
+
     try {
-        // Total employés actifs
+        // Total employés actifs - avec gestion d'erreur
         $stmt = $this->conn->query("SELECT COUNT(*) as total FROM employes WHERE statut = 'actif'");
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        $stats['total_actifs'] = $result ? (int)$result['total'] : 0;
-        
-        // Présents aujourd'hui - Correction de la requête
+        $result = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : null;
+        $stats['total_actifs'] = $result ? (int) $result['total'] : 0;
+
+        // Présents aujourd'hui - Requête sécurisée
         $stmt = $this->conn->query("
-            SELECT COUNT(DISTINCT p.employe_id) as presents 
+            SELECT COUNT(DISTINCT p.employe_id) as presents
             FROM presences p
             INNER JOIN employes e ON p.employe_id = e.id
-            WHERE DATE(p.heure_arrivee) = CURDATE() 
-            AND p.heure_arrivee IS NOT NULL 
+            WHERE DATE(p.heure_arrivee) = CURDATE()
+            AND p.heure_arrivee IS NOT NULL
             AND e.statut = 'actif'
         ");
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        $stats['presents_aujourd_hui'] = $result ? (int)$result['presents'] : 0;
-        
-        // Nouveaux employés ce mois
-        $stmt = $this->conn->query("SELECT COUNT(*) as total FROM employes WHERE DATE_FORMAT(date_embauche, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m') AND statut = 'actif'");
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        $stats['nouveaux_ce_mois'] = $result ? (int)$result['total'] : 0;
-        
-        // Total admins
-        $stmt = $this->conn->query("SELECT COUNT(*) as total FROM employes WHERE is_admin = 1 AND statut = 'actif'");
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        $stats['total_admins'] = $result ? (int)$result['total'] : 0;
-        
-        // Absents aujourd'hui - Correction de la requête
+        $result = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : null;
+        $stats['presents_aujourd_hui'] = $result ? (int) $result['presents'] : 0;
+
+        // Nouveaux employés ce mois - sécurisé
         $stmt = $this->conn->query("
-            SELECT COUNT(*) as absents 
+            SELECT COUNT(*) as total 
+            FROM employes 
+            WHERE DATE_FORMAT(date_embauche, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m') 
+            AND statut = 'actif'
+        ");
+        $result = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : null;
+        $stats['nouveaux_ce_mois'] = $result ? (int) $result['total'] : 0;
+
+        // Total admins - sécurisé
+        $stmt = $this->conn->query("SELECT COUNT(*) as total FROM employes WHERE is_admin = 1 AND statut = 'actif'");
+        $result = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : null;
+        $stats['total_admins'] = $result ? (int) $result['total'] : 0;
+
+        // Absents aujourd'hui - Requête sécurisée
+        $stmt = $this->conn->query("
+            SELECT COUNT(*) as absents
             FROM employes e
             LEFT JOIN presences p ON e.id = p.employe_id AND DATE(p.heure_arrivee) = CURDATE()
-            WHERE e.statut = 'actif' 
+            WHERE e.statut = 'actif'
             AND p.employe_id IS NULL
         ");
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        $stats['absents_aujourd_hui'] = $result ? (int)$result['absents'] : 0;
-        
-        // Retards aujourd'hui
+        $result = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : null;
+        $stats['absents_aujourd_hui'] = $result ? (int) $result['absents'] : 0;
+
+        // Retards aujourd'hui - sécurisé
         $stmt = $this->conn->query("
             SELECT COUNT(*) as retards
             FROM presences p
             INNER JOIN employes e ON p.employe_id = e.id
-            WHERE DATE(p.heure_arrivee) = CURDATE() 
+            WHERE DATE(p.heure_arrivee) = CURDATE()
             AND TIME(p.heure_arrivee) > e.heure_debut
             AND e.statut = 'actif'
         ");
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        $stats['retards_aujourd_hui'] = $result ? (int)$result['retards'] : 0;
-        
-        // Par type de contrat
-        $stmt = $this->conn->query("
-            SELECT p.type_contrat, COUNT(e.id) as count 
-            FROM employes e 
-            LEFT JOIN postes p ON e.poste_id = p.id 
-            WHERE e.statut = 'actif' 
-            GROUP BY p.type_contrat
-        ");
-        $stats['par_contrat'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        // Total inactifs
+        $result = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : null;
+        $stats['retards_aujourd_hui'] = $result ? (int) $result['retards'] : 0;
+
+        // Par type de contrat - avec gestion d'erreur
+        try {
+            $stmt = $this->conn->query("
+                SELECT p.type_contrat, COUNT(e.id) as count
+                FROM employes e
+                LEFT JOIN postes p ON e.poste_id = p.id
+                WHERE e.statut = 'actif'
+                GROUP BY p.type_contrat
+            ");
+            $stats['par_contrat'] = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        } catch (PDOException $e) {
+            error_log("Erreur par_contrat: " . $e->getMessage());
+            $stats['par_contrat'] = [];
+        }
+
+        // Total inactifs - sécurisé
         $stmt = $this->conn->query("SELECT COUNT(*) as total FROM employes WHERE statut = 'inactif'");
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        $stats['total_inactifs'] = $result ? (int)$result['total'] : 0;
-        
+        $result = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : null;
+        $stats['total_inactifs'] = $result ? (int) $result['total'] : 0;
+
         // Debug - Log des statistiques
-        error_log("Statistiques calculées: " . json_encode($stats));
-        
+        error_log("Statistiques calculées avec succès: " . json_encode($stats));
+
         return $stats;
-        
+
     } catch (PDOException $e) {
         error_log("Erreur SQL getStatistics: " . $e->getMessage());
         // Retourner des valeurs par défaut en cas d'erreur
         return [
-            'total_actifs' => 0,
+            'total_actifs'         => 0,
             'presents_aujourd_hui' => 0,
-            'nouveaux_ce_mois' => 0,
-            'total_admins' => 0,
-            'absents_aujourd_hui' => 0,
-            'retards_aujourd_hui' => 0,
-            'par_contrat' => [],
-            'total_inactifs' => 0
+            'nouveaux_ce_mois'     => 0,
+            'total_admins'         => 0,
+            'absents_aujourd_hui'  => 0,
+            'retards_aujourd_hui'  => 0,
+            'par_contrat'          => [],
+            'total_inactifs'       => 0,
+        ];
+    } catch (Exception $e) {
+        error_log("Erreur générale getStatistics: " . $e->getMessage());
+        return [
+            'total_actifs'         => 0,
+            'presents_aujourd_hui' => 0,
+            'nouveaux_ce_mois'     => 0,
+            'total_admins'         => 0,
+            'absents_aujourd_hui'  => 0,
+            'retards_aujourd_hui'  => 0,
+            'par_contrat'          => [],
+            'total_inactifs'       => 0,
         ];
     }
 }
 
-    public function getPresenceDetailsForEmployee(int $employee_id, string $date = null): array {
-        if (!$date) {
-            $date = date('Y-m-d');
-        }
-        
-        $stmt = $this->conn->prepare("
+
+        public function getPresenceDetailsForEmployee(int $employee_id, string $date = null): array
+        {
+            if (! $date) {
+                $date = date('Y-m-d');
+            }
+
+            $stmt = $this->conn->prepare("
             SELECT p.*, e.nom, e.prenom, e.heure_debut as heure_prevue_debut, e.heure_fin as heure_prevue_fin
             FROM presences p
             INNER JOIN employes e ON p.employe_id = e.id
@@ -255,543 +319,647 @@ public function getStatistics(): array {
             ORDER BY p.heure_arrivee DESC
             LIMIT 1
         ");
-        $stmt->execute([$employee_id, $date]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if (!$result) {
-            return ['status' => 'absent', 'message' => 'Aucune présence enregistrée'];
-        }
-        
-        $heure_arrivee = new DateTime($result['heure_arrivee']);
-        $heure_prevue = new DateTime($date . ' ' . $result['heure_prevue_debut']);
-        
-        if ($heure_arrivee > $heure_prevue) {
-            $retard = $heure_arrivee->diff($heure_prevue);
-            $result['status'] = 'retard';
-            $result['retard_minutes'] = ($retard->h * 60) + $retard->i;
-            $result['message'] = 'En retard de ' . $result['retard_minutes'] . ' minutes';
-        } else {
-            $result['status'] = 'a_temps';
-            $result['message'] = 'À l\'heure';
-        }
-        
-        if ($result['heure_depart']) {
-            $result['status'] .= '_parti';
-            $result['message'] .= ' - Parti à ' . date('H:i', strtotime($result['heure_depart']));
-        } else {
-            $result['message'] .= ' - Encore au travail';
-        }
-        
-        return $result;
-    }
+            $stmt->execute([$employee_id, $date]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    public function markArrival(int $employee_id): array {
-        try {
-            $today = date('Y-m-d');
-            $now = date('Y-m-d H:i:s');
-            
-            $stmt = $this->conn->prepare("SELECT * FROM employes WHERE id = ? AND statut = 'actif'");
-            $stmt->execute([$employee_id]);
-            $employee = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if (!$employee) {
-                return ['success' => false, 'message' => 'Employé non trouvé ou inactif'];
+            if (! $result) {
+                return ['status' => 'absent', 'message' => 'Aucune présence enregistrée'];
             }
-            
-            $stmt = $this->conn->prepare("
-                SELECT id, heure_arrivee FROM presences 
-                WHERE employe_id = ? AND DATE(heure_arrivee) = ?
-            ");
-            $stmt->execute([$employee_id, $today]);
-            $existing = $stmt->fetch();
-            
-            if ($existing && $existing['heure_arrivee']) {
-                return [
-                    'success' => false, 
-                    'message' => 'Présence déjà enregistrée pour aujourd\'hui à ' . 
-                               date('H:i', strtotime($existing['heure_arrivee']))
-                ];
-            }
-            
-            if ($existing) {
-                $stmt = $this->conn->prepare("
-                    UPDATE presences 
-                    SET heure_arrivee = ?, statut = 'present' 
-                    WHERE id = ?
-                ");
-                $stmt->execute([$now, $existing['id']]);
-            } else {
-                $stmt = $this->conn->prepare("
-                    INSERT INTO presences (employe_id, heure_arrivee, date_presence, statut) 
-                    VALUES (?, ?, ?, 'present')
-                ");
-                $stmt->execute([$employee_id, $now, $today]);
-            }
-            
-            $heure_prevue = new DateTime($today . ' ' . $employee['heure_debut']);
-            $heure_arrivee = new DateTime($now);
-            $retard_minutes = 0;
-            
+
+            $heure_arrivee = new DateTime($result['heure_arrivee']);
+            $heure_prevue  = new DateTime($date . ' ' . $result['heure_prevue_debut']);
+
             if ($heure_arrivee > $heure_prevue) {
-                $diff = $heure_arrivee->diff($heure_prevue);
-                $retard_minutes = ($diff->h * 60) + $diff->i;
+                $retard                   = $heure_arrivee->diff($heure_prevue);
+                $result['status']         = 'retard';
+                $result['retard_minutes'] = ($retard->h * 60) + $retard->i;
+                $result['message']        = 'En retard de ' . $result['retard_minutes'] . ' minutes';
+            } else {
+                $result['status']  = 'a_temps';
+                $result['message'] = 'À l\'heure';
             }
-            
-            return [
-                'success' => true,
-                'message' => 'Présence enregistrée avec succès',
-                'heure_arrivee' => date('H:i', strtotime($now)),
-                'retard_minutes' => $retard_minutes,
-                'employee' => $employee
-            ];
-            
-        } catch (Exception $e) {
-            error_log("Erreur markArrival: " . $e->getMessage());
-            return ['success' => false, 'message' => 'Erreur lors de l\'enregistrement'];
-        }
-    }
 
-    public function markDeparture(int $employee_id): array {
-        try {
-            $today = date('Y-m-d');
-            $now = date('Y-m-d H:i:s');
-            
-            $stmt = $this->conn->prepare("
-                SELECT p.*, e.nom, e.prenom 
+            if ($result['heure_depart']) {
+                $result['status'] .= '_parti';
+                $result['message'] .= ' - Parti à ' . date('H:i', strtotime($result['heure_depart']));
+            } else {
+                $result['message'] .= ' - Encore au travail';
+            }
+
+            return $result;
+        }
+
+        public function markDeparture(int $employee_id): array
+        {
+            try {
+                $today = date('Y-m-d');
+                $now   = date('Y-m-d H:i:s');
+
+                $stmt = $this->conn->prepare("
+                SELECT p.*, e.nom, e.prenom
                 FROM presences p
                 INNER JOIN employes e ON p.employe_id = e.id
                 WHERE p.employe_id = ? AND DATE(p.heure_arrivee) = ? AND p.heure_arrivee IS NOT NULL
             ");
-            $stmt->execute([$employee_id, $today]);
-            $presence = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if (!$presence) {
-                return ['success' => false, 'message' => 'Aucune arrivée enregistrée pour aujourd\'hui'];
-            }
-            
-            if ($presence['heure_depart']) {
-                return [
-                    'success' => false, 
-                    'message' => 'Départ déjà enregistré à ' . date('H:i', strtotime($presence['heure_depart']))
-                ];
-            }
-            
-            $stmt = $this->conn->prepare("
-                UPDATE presences 
-                SET heure_depart = ?, statut = 'parti' 
+                $stmt->execute([$employee_id, $today]);
+                $presence = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if (! $presence) {
+                    return ['success' => false, 'message' => 'Aucune arrivée enregistrée pour aujourd\'hui'];
+                }
+
+                if ($presence['heure_depart']) {
+                    return [
+                        'success' => false,
+                        'message' => 'Départ déjà enregistré à ' . date('H:i', strtotime($presence['heure_depart'])),
+                    ];
+                }
+
+                $stmt = $this->conn->prepare("
+                UPDATE presences
+                SET heure_depart = ?, statut = 'parti'
                 WHERE id = ?
             ");
-            $stmt->execute([$now, $presence['id']]);
-            
-            $arrivee = new DateTime($presence['heure_arrivee']);
-            $depart = new DateTime($now);
-            $duree = $arrivee->diff($depart);
-            $heures_travaillees = $duree->h + ($duree->i / 60);
-            
-            return [
-                'success' => true,
-                'message' => 'Départ enregistré avec succès',
-                'heure_depart' => date('H:i', strtotime($now)),
-                'duree_travaillee' => round($heures_travaillees, 2),
-                'employee' => ['nom' => $presence['nom'], 'prenom' => $presence['prenom']]
-            ];
-            
-        } catch (Exception $e) {
-            error_log("Erreur markDeparture: " . $e->getMessage());
-            return ['success' => false, 'message' => 'Erreur lors de l\'enregistrement du départ'];
-        }
-    }
+                $stmt->execute([$now, $presence['id']]);
 
-    public function getTodayAttendance(): array {
-        try {
-            $stmt = $this->conn->query("
+                $arrivee            = new DateTime($presence['heure_arrivee']);
+                $depart             = new DateTime($now);
+                $duree              = $arrivee->diff($depart);
+                $heures_travaillees = $duree->h + ($duree->i / 60);
+
+                return [
+                    'success'          => true,
+                    'message'          => 'Départ enregistré avec succès',
+                    'heure_depart'     => date('H:i', strtotime($now)),
+                    'duree_travaillee' => round($heures_travaillees, 2),
+                    'employee'         => ['nom' => $presence['nom'], 'prenom' => $presence['prenom']],
+                ];
+
+            } catch (Exception $e) {
+                error_log("Erreur markDeparture: " . $e->getMessage());
+                return ['success' => false, 'message' => 'Erreur lors de l\'enregistrement du départ'];
+            }
+        }
+
+        public function getTodayAttendance(): array
+        {
+            try {
+                $stmt = $this->conn->query("
                 SELECT e.id, e.nom, e.prenom, e.photo, e.heure_debut, e.heure_fin,
                        p.nom as poste_nom, p.couleur as poste_couleur,
                        pr.heure_arrivee, pr.heure_depart,
-                       CASE 
+                       CASE
                            WHEN pr.heure_arrivee IS NULL THEN 'absent'
                            WHEN pr.heure_depart IS NOT NULL THEN 'parti'
                            WHEN TIME(pr.heure_arrivee) > e.heure_debut THEN 'retard'
                            ELSE 'present'
                        END as statut_presences,
-                       CASE 
-                           WHEN pr.heure_arrivee IS NOT NULL AND TIME(pr.heure_arrivee) > e.heure_debut 
-                           THEN TIMESTAMPDIFF(MINUTE, 
-                                CONCAT(DATE(pr.heure_arrivee), ' ', e.heure_debut), 
+                       CASE
+                           WHEN pr.heure_arrivee IS NOT NULL AND TIME(pr.heure_arrivee) > e.heure_debut
+                           THEN TIMESTAMPDIFF(MINUTE,
+                                CONCAT(DATE(pr.heure_arrivee), ' ', e.heure_debut),
                                 pr.heure_arrivee)
                            ELSE 0
                        END as retard_minutes
-                FROM employes e 
-                LEFT JOIN postes p ON e.poste_id = p.id 
+                FROM employes e
+                LEFT JOIN postes p ON e.poste_id = p.id
                 LEFT JOIN presences pr ON e.id = pr.employe_id AND DATE(pr.heure_arrivee) = CURDATE()
                 WHERE e.statut = 'actif'
-                ORDER BY 
-                    CASE 
+                ORDER BY
+                    CASE
                         WHEN pr.heure_arrivee IS NULL THEN 0
                         WHEN pr.heure_depart IS NULL THEN 1
                         ELSE 2
                     END,
                     pr.heure_arrivee ASC
             ");
-            
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-        } catch (PDOException $e) {
-            error_log("Erreur getTodayAttendance: " . $e->getMessage());
-            return [];
-        }
-    }
 
-    public function addEmployee(array $data): array {
-        try {
-            $this->validateRequiredFields($data, ['nom', 'prenom', 'email', 'date_embauche']);
-            $this->checkEmailUniqueness($data['email']);
-            $photo_filename = $this->handlePhotoUpload();
-            $employee_id = $this->insertEmployee($data, $photo_filename);
-            $numeric_code = $this->generateAndSaveQRCode($employee_id, $data);
+                return $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            $this->logActivity('CREATE_EMPLOYEE', 'employes', $employee_id, [
-                'nom' => $data['nom'], 
-                'prenom' => $data['prenom'],
-                'code_numerique' => $numeric_code
-            ]);
-
-            return [
-                'success' => true,
-                'message' => 'Employé ajouté avec succès',
-                'employee_id' => $employee_id,
-                'numeric_code' => $numeric_code
-            ];
-            
-        } catch (Exception $e) {
-            return ['success' => false, 'message' => $e->getMessage()];
-        }
-    }
-
-    public function updateEmployee(array $data): array {
-        try {
-            if (empty($data['id'])) {
-                throw new Exception('ID employé requis');
+            } catch (PDOException $e) {
+                error_log("Erreur getTodayAttendance: " . $e->getMessage());
+                return [];
             }
-            
-            $employee_id = $data['id'];
-            $current_employee = $this->getEmployeeById($employee_id);
-            
-            if (!$current_employee) {
-                throw new Exception('Employé non trouvé');
-            }
-            
-            $this->checkEmailUniqueness($data['email'], $employee_id);
-            $photo_filename = $this->handlePhotoUpload($current_employee['photo']);
-            $this->updateEmployeeData($employee_id, $data, $photo_filename);
-            
-            $this->logActivity('UPDATE_EMPLOYEE', 'employes', $employee_id, [
-                'nom' => $data['nom'], 
-                'prenom' => $data['prenom']
-            ]);
-            
-            return ['success' => true, 'message' => 'Employé modifié avec succès'];
-            
-        } catch (Exception $e) {
-            return ['success' => false, 'message' => $e->getMessage()];
         }
-    }
 
-    public function deactivateEmployee(int $employee_id): array {
-        try {
-            $stmt = $this->conn->prepare("UPDATE employes SET statut = 'inactif' WHERE id = ?");
-            $stmt->execute([$employee_id]);
-            
-            if ($stmt->rowCount() === 0) {
-                throw new Exception('Employé non trouvé');
-            }
-            
-            $this->logActivity('DEACTIVATE_EMPLOYEE', 'employes', $employee_id, ['statut' => 'inactif']);
-            
-            return ['success' => true, 'message' => 'Employé désactivé avec succès'];
-            
-        } catch (Exception $e) {
-            return ['success' => false, 'message' => $e->getMessage()];
-        }
-    }
+      public function addEmployee(array $data): array
+{
+    try {
+        $this->conn->beginTransaction();
+        $this->checkEmailUniqueness($data['email']);
+        $this->validateRequiredFields($data, ['nom', 'prenom', 'email', 'date_embauche']);
 
-    public function getTypesContrat(): array {
+        $photo_filename = $this->handlePhotoUpload();
+        $cv_filename = $this->handleDocumentUpload('cv');
+        $contrat_filename = $this->handleDocumentUpload('contrat');
+        $piece_identite_filename = $this->handleDocumentUpload('piece_identite');
+
+        $employee_id = $this->insertEmployee($data, $photo_filename, $cv_filename, $contrat_filename, $piece_identite_filename);
+
+        $numeric_code = $this->generateAndSaveQRCode($employee_id, $data);
+
+        $this->logActivity('CREATE_EMPLOYEE', 'employes', $employee_id, [
+            'nom' => $data['nom'],
+            'prenom' => $data['prenom'],
+            'code_numerique' => $numeric_code,
+        ]);
+
+        $this->conn->commit();
         return [
-            'CDI' => 'Contrat à Durée Indéterminée',
-            'CDD' => 'Contrat à Durée Déterminée',
-            'Stage' => 'Stage',
-            'Apprentissage' => 'Contrat d\'Apprentissage',
-            'Freelance' => 'Freelance/Consultant',
-            'Temps_partiel' => 'Temps Partiel'
+            'success' => true,
+            'message' => 'Employé ajouté avec succès',
+            'employee_id' => $employee_id,
+            'numeric_code' => $numeric_code,
         ];
+    } catch (Exception $e) {
+        $this->conn->rollBack();
+        error_log("Erreur addEmployee: " . $e->getMessage());
+        return ['success' => false, 'message' => 'Erreur: ' . $e->getMessage()];
     }
+}
 
-    private function validateRequiredFields(array $data, array $required_fields): void {
-        foreach ($required_fields as $field) {
-            if (empty($data[$field])) {
-                throw new Exception("Le champ $field est requis");
+
+        public function updateEmployee(array $data): array
+        {
+            try {
+                if (empty($data['id'])) {
+                    throw new Exception('ID employé requis');
+                }
+
+                $employee_id      = $data['id'];
+                $current_employee = $this->getEmployeeById($employee_id);
+
+                if (! $current_employee) {
+                    throw new Exception('Employé non trouvé');
+                }
+
+                $this->checkEmailUniqueness($data['email'], $employee_id);
+                $photo_filename = $this->handlePhotoUpload($current_employee['photo']);
+                $this->updateEmployeeData($employee_id, $data, $photo_filename);
+
+                $this->logActivity('UPDATE_EMPLOYEE', 'employes', $employee_id, [
+                    'nom'    => $data['nom'],
+                    'prenom' => $data['prenom'],
+                ]);
+
+                return ['success' => true, 'message' => 'Employé modifié avec succès'];
+
+            } catch (Exception $e) {
+                return ['success' => false, 'message' => $e->getMessage()];
             }
         }
-    }
 
-    private function checkEmailUniqueness(string $email, int $exclude_id = null): void {
-        $sql = "SELECT id FROM employes WHERE email = ? AND statut != 'inactif'";
-        $params = [$email];
-        
-        if ($exclude_id) {
-            $sql .= " AND id != ?";
-            $params[] = $exclude_id;
-        }
-        
-        $stmt = $this->conn->prepare($sql);
-        $stmt->execute($params);
-        
-        if ($stmt->fetch()) {
-            throw new Exception('Cet email est déjà utilisé par un autre employé actif');
-        }
-    }
+        public function deactivateEmployee(int $employee_id): array
+        {
+            try {
+                $stmt = $this->conn->prepare("UPDATE employes SET statut = 'inactif' WHERE id = ?");
+                $stmt->execute([$employee_id]);
 
-    private function handlePhotoUpload(string $current_photo = 'default-avatar.png'): string {
-        if (!isset($_FILES['photo']) || $_FILES['photo']['error'] !== UPLOAD_ERR_OK) {
-            return $current_photo;
-        }
-        
-        $upload_dir = 'uploads/photos/';
-        if (!is_dir($upload_dir)) {
-            mkdir($upload_dir, 0755, true);
-        }
-        
-        $file_ext = strtolower(pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION));
-        $allowed_exts = ['jpg', 'jpeg', 'png', 'gif'];
-        
-        if (!in_array($file_ext, $allowed_exts) || $_FILES['photo']['size'] > 5000000) {
-            throw new Exception('Format de photo non valide ou taille trop importante');
-        }
-        
-        $photo_filename = uniqid() . '.' . $file_ext;
-        $upload_path = $upload_dir . $photo_filename;
-        
-        if (!move_uploaded_file($_FILES['photo']['tmp_name'], $upload_path)) {
-            throw new Exception('Erreur lors de l\'upload de la photo');
-        }
-        
-        if ($current_photo !== 'default-avatar.png') {
-            $old_photo = $upload_dir . $current_photo;
-            if (file_exists($old_photo)) {
-                unlink($old_photo);
+                if ($stmt->rowCount() === 0) {
+                    throw new Exception('Employé non trouvé');
+                }
+
+                $this->logActivity('DEACTIVATE_EMPLOYEE', 'employes', $employee_id, ['statut' => 'inactif']);
+
+                return ['success' => true, 'message' => 'Employé désactivé avec succès'];
+
+            } catch (Exception $e) {
+                return ['success' => false, 'message' => $e->getMessage()];
             }
         }
-        
-        return $photo_filename;
+
+        public function getTypesContrat(): array
+        {
+            return [
+                'CDI'           => 'Contrat à Durée Indéterminée',
+                'CDD'           => 'Contrat à Durée Déterminée',
+                'Stage'         => 'Stage',
+                'Apprentissage' => 'Contrat d\'Apprentissage',
+                'Freelance'     => 'Freelance/Consultant',
+                'Temps_partiel' => 'Temps Partiel',
+            ];
+        }
+
+  private function validateRequiredFields(array $data, array $required_fields): void
+{
+    // Validation des champs de base seulement
+    $basic_required = ['nom', 'prenom', 'email', 'date_embauche'];
+    
+    foreach ($basic_required as $field) {
+        if (empty($data[$field])) {
+            throw new Exception("Le champ $field est requis");
+        }
+    }
+    
+    // Validation email
+    if (!empty($data['email']) && !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
+        throw new Exception("Format d'email invalide");
+    }
+    
+    // Validations optionnelles (uniquement si les champs sont fournis)
+    if (!empty($data['num_secu']) && !preg_match('/^[0-9]{15}$/', $data['num_secu'])) {
+        throw new Exception("Le numéro de sécurité sociale doit contenir exactement 15 chiffres");
+    }
+    
+    if (!empty($data['iban']) && strlen(str_replace(' ', '', $data['iban'])) < 15) {
+        throw new Exception("L'IBAN semble invalide");
+    }
+}
+
+        private function checkEmailUniqueness(string $email, int $exclude_id = null): void
+        {
+            // Nettoyer l'email
+            $email = trim(strtolower($email));
+
+            if (empty($email)) {
+                throw new Exception('Email requis');
+            }
+
+            $sql    = "SELECT id, nom, prenom FROM employes WHERE LOWER(TRIM(email)) = ? AND statut = 'actif'";
+            $params = [$email];
+
+            if ($exclude_id) {
+                $sql .= " AND id != ?";
+                $params[] = $exclude_id;
+            }
+
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute($params);
+            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($existing) {
+                throw new Exception("Cet email est déjà utilisé par {$existing['prenom']} {$existing['nom']} (ID: {$existing['id']})");
+            }
+        }
+
+        private function handlePhotoUpload(string $current_photo = 'default-avatar.png'): string
+        {
+            if (! isset($_FILES['photo']) || $_FILES['photo']['error'] !== UPLOAD_ERR_OK) {
+                return $current_photo;
+            }
+
+            $upload_dir = 'uploads/photos/';
+            if (! is_dir($upload_dir)) {
+                mkdir($upload_dir, 0755, true);
+            }
+
+            $file_ext     = strtolower(pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION));
+            $allowed_exts = ['jpg', 'jpeg', 'png', 'gif'];
+
+            if (! in_array($file_ext, $allowed_exts) || $_FILES['photo']['size'] > 5000000) {
+                throw new Exception('Format de photo non valide ou taille trop importante');
+            }
+
+            $photo_filename = uniqid() . '.' . $file_ext;
+            $upload_path    = $upload_dir . $photo_filename;
+
+            if (! move_uploaded_file($_FILES['photo']['tmp_name'], $upload_path)) {
+                throw new Exception('Erreur lors de l\'upload de la photo');
+            }
+
+            if ($current_photo !== 'default-avatar.png') {
+                $old_photo = $upload_dir . $current_photo;
+                if (file_exists($old_photo)) {
+                    unlink($old_photo);
+                }
+            }
+
+            return $photo_filename;
+        }
+
+      private function handleDocumentUpload(string $fieldName, string $currentFile = null): string
+{
+    if (!isset($_FILES[$fieldName]) || $_FILES[$fieldName]['error'] !== UPLOAD_ERR_OK) {
+        return $currentFile;
     }
 
-    private function insertEmployee(array $data, string $photo_filename): int {
-        $salaire = !empty($data['salaire']) ? (int) $data['salaire'] : null;
-        
-        $stmt = $this->conn->prepare("
-            INSERT INTO employes (nom, prenom, email, telephone, poste_id, salaire, date_embauche, 
-                                  heure_debut, heure_fin, photo, is_admin, statut) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        
-        $stmt->execute([
-            $data['nom'],
-            $data['prenom'],
-            $data['email'],
-            $data['telephone'] ?? null,
-            $data['poste_id'] ?? null,
-            $salaire,
-            $data['date_embauche'],
-            $data['heure_debut'] ?? '08:00:00',
-            $data['heure_fin'] ?? '17:00:00',
-            $photo_filename,
-            isset($data['is_admin']) ? 1 : 0,
-            $data['statut'] ?? 'actif'
-        ]);
-        
-        return $this->conn->lastInsertId();
+    $upload_dir = 'uploads/documents/';
+    if (!is_dir($upload_dir)) {
+        mkdir($upload_dir, 0755, true);
     }
 
-    private function updateEmployeeData(int $employee_id, array $data, string $photo_filename): void {
-        $salaire = !empty($data['salaire']) ? (int) $data['salaire'] : null;
-        
-        $stmt = $this->conn->prepare("
-            UPDATE employes 
-            SET nom = ?, prenom = ?, email = ?, telephone = ?, poste_id = ?, salaire = ?, 
-                date_embauche = ?, heure_debut = ?, heure_fin = ?, photo = ?, 
-                is_admin = ?, statut = ?
-            WHERE id = ?
-        ");
-        
-        $stmt->execute([
-            $data['nom'],
-            $data['prenom'],
-            $data['email'],
-            $data['telephone'] ?? null,
-            $data['poste_id'] ?? null,
-            $salaire,
-            $data['date_embauche'],
-            $data['heure_debut'] ?? '08:00:00',
-            $data['heure_fin'] ?? '17:00:00',
-            $photo_filename,
-            isset($data['is_admin']) ? 1 : 0,
-            $data['statut'] ?? 'actif',
-            $employee_id
-        ]);
+    $file_ext = strtolower(pathinfo($_FILES[$fieldName]['name'], PATHINFO_EXTENSION));
+    $allowed_exts = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
+
+    if (!in_array($file_ext, $allowed_exts) || $_FILES[$fieldName]['size'] > 10000000) {
+        throw new Exception('Format de document non valide ou taille trop importante (max 10MB)');
     }
 
-    private function generateAndSaveQRCode(int $employee_id, array $data): string {
-        $numeric_code = QRCodeGenerator::generateNumericCode($employee_id, $this->conn);
-        
-        $qr_data = json_encode([
-            'type' => 'employee_badge',
-            'id' => (int)$employee_id,
-            'code' => $numeric_code,
-            'nom' => trim($data['nom']),
-            'prenom' => trim($data['prenom']),
-            'email' => $data['email'],
-            'poste_id' => $data['poste_id'] ?? null,
-            'timestamp' => time(),
-            'version' => '1.0'
-        ], JSON_UNESCAPED_UNICODE);
-        
-        $qr_filename = QRCodeGenerator::generateQRCode($employee_id, $numeric_code, $qr_data);
-        
-        $stmt = $this->conn->prepare("UPDATE employes SET qr_code = ?, qr_data = ?, code_numerique = ? WHERE id = ?");
-        $stmt->execute([$qr_filename, $qr_data, $numeric_code, $employee_id]);
-        
-        return $numeric_code;
+    $filename = uniqid() . '_' . $fieldName . '.' . $file_ext;
+    $upload_path = $upload_dir . $filename;
+
+    if (!move_uploaded_file($_FILES[$fieldName]['tmp_name'], $upload_path)) {
+        throw new Exception('Erreur lors de l\'upload du document');
     }
 
-    private function logActivity(string $action, string $table, int $record_id, array $details): void {
-        $stmt = $this->conn->prepare("
-            INSERT INTO logs_activite (action, table_concernee, id_enregistrement, details) 
+    // Supprimer l'ancien fichier s'il existe
+    if ($currentFile && file_exists($upload_dir . $currentFile)) {
+        unlink($upload_dir . $currentFile);
+    }
+
+    return $filename;
+}
+private function insertEmployee(array $data, string $photo_filename, string $cv_filename = null, string $contrat_filename = null, string $piece_identite_filename = null): int
+{
+    $salaire = !empty($data['salaire']) ? (int) $data['salaire'] : null;
+
+    $stmt = $this->conn->prepare("
+        INSERT INTO employes (
+            nom, prenom, email, telephone, poste_id, salaire, date_embauche,
+            heure_debut, heure_fin, photo, is_admin, statut,
+            date_naissance, lieu_naissance, nationalite, sexe,
+            contact_urgence_nom, contact_urgence_relation, contact_urgence_telephone,
+            adresse, num_secu, num_identite, type_identite, situation_familiale,
+            nombre_enfants, iban, nom_banque, titulaire_compte, bic,
+            cv, contrat, piece_identite, code_numerique
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ");
+
+    $stmt->execute([
+        $data['nom'] ?? '',
+        $data['prenom'] ?? '',
+        $data['email'] ?? '',
+        $data['telephone'] ?? null,
+        $data['poste_id'] ?? null,
+        $salaire,
+        $data['date_embauche'] ?? '',
+        $data['heure_debut'] ?? '08:00:00',
+        $data['heure_fin'] ?? '17:00:00',
+        $photo_filename,
+        isset($data['is_admin']) ? 1 : 0,
+        $data['statut'] ?? 'actif',
+        $data['date_naissance'] ?? null,
+        $data['lieu_naissance'] ?? null,
+        $data['nationalite'] ?? null,
+        $data['sexe'] ?? null,
+        $data['contact_urgence_nom'] ?? null,
+        $data['contact_urgence_relation'] ?? null,
+        $data['contact_urgence_telephone'] ?? null,
+        $data['adresse'] ?? null,
+        $data['num_secu'] ?? null,
+        $data['num_identite'] ?? null,
+        $data['type_identite'] ?? null,
+        $data['situation_familiale'] ?? null,
+        $data['nombre_enfants'] ?? 0,
+        $data['iban'] ?? null,
+        $data['nom_banque'] ?? null,
+        $data['titulaire_compte'] ?? null,
+        $data['bic'] ?? null,
+        $cv_filename,           // 30
+        $contrat_filename,      // 31
+        $piece_identite_filename, // 32
+        null                    // 33 - code_numerique sera mis à jour plus tard
+    ]);
+
+    return $this->conn->lastInsertId();
+}
+
+  private function updateEmployeeData(int $employee_id, array $data, string $photo_filename): void
+{
+    $salaire = !empty($data['salaire']) ? (int) $data['salaire'] : null;
+
+    // AJOUTEZ LES COLONNES MANQUANTES DANS LA REQUÊTE
+    $stmt = $this->conn->prepare("
+        UPDATE employes
+        SET nom = ?, prenom = ?, email = ?, telephone = ?, poste_id = ?, salaire = ?,
+            date_embauche = ?, heure_debut = ?, heure_fin = ?, photo = ?,
+            is_admin = ?, statut = ?,
+            date_naissance = ?, lieu_naissance = ?, nationalite = ?, sexe = ?,
+            contact_urgence_nom = ?, contact_urgence_relation = ?, contact_urgence_telephone = ?,
+            adresse = ?, num_secu = ?, num_identite = ?, type_identite = ?, situation_familiale = ?,
+            nombre_enfants = ?, iban = ?, nom_banque = ?, titulaire_compte = ?, bic = ?,
+            niveau_etude = ?, langues = ?, competences = ?, formations = ?, experiences = ?,
+            cv = ?, contrat = ?, piece_identite = ?, code_numerique = ?
+        WHERE id = ?
+    ");
+
+    $stmt->execute([
+        $data['nom'],
+        $data['prenom'],
+        $data['email'],
+        $data['telephone'] ?? null,
+        $data['poste_id'] ?? null,
+        $salaire,
+        $data['date_embauche'],
+        $data['heure_debut'] ?? '08:00:00',
+        $data['heure_fin'] ?? '17:00:00',
+        $photo_filename,
+        isset($data['is_admin']) ? 1 : 0,
+        $data['statut'] ?? 'actif',
+        $data['date_naissance'] ?? null,
+        $data['lieu_naissance'] ?? null,
+        $data['nationalite'] ?? null,
+        $data['sexe'] ?? null,
+        $data['contact_urgence_nom'] ?? null,
+        $data['contact_urgence_relation'] ?? null,
+        $data['contact_urgence_telephone'] ?? null,
+        $data['adresse'] ?? null,
+        $data['num_secu'] ?? null,
+        $data['num_identite'] ?? null,
+        $data['type_identite'] ?? null,
+        $data['situation_familiale'] ?? null,
+        $data['nombre_enfants'] ?? 0,
+        $data['iban'] ?? null,
+        $data['nom_banque'] ?? null,
+        $data['titulaire_compte'] ?? null,
+        $data['bic'] ?? null,
+        $data['niveau_etude'] ?? null,
+        $data['langues'] ?? null,
+        $data['competences'] ?? null,
+        $data['formations'] ?? null,
+        $data['experiences'] ?? null,
+        $data['cv'] ?? null,
+        $data['contrat'] ?? null,
+        $data['piece_identite'] ?? null,
+        $data['code_numerique'] ?? null,  // AJOUTEZ CETTE LIGNE
+        $employee_id,
+    ]);
+}
+
+        private function generateAndSaveQRCode(int $employee_id, array $data): string
+        {
+            $numeric_code = QRCodeGenerator::generateNumericCode($employee_id, $this->conn);
+
+            $qr_data = json_encode([
+                'type'      => 'employee_badge',
+                'id'        => (int) $employee_id,
+                'code'      => $numeric_code,
+                'nom'       => trim($data['nom']),
+                'prenom'    => trim($data['prenom']),
+                'email'     => $data['email'],
+                'poste_id'  => $data['poste_id'] ?? null,
+                'timestamp' => time(),
+                'version'   => '1.0',
+            ], JSON_UNESCAPED_UNICODE);
+
+            $qr_filename = QRCodeGenerator::generateQRCode($employee_id, $numeric_code, $qr_data);
+
+            $stmt = $this->conn->prepare("UPDATE employes SET qr_code = ?, qr_data = ?, code_numerique = ? WHERE id = ?");
+            $stmt->execute([$qr_filename, $qr_data, $numeric_code, $employee_id]);
+
+            return $numeric_code;
+        }
+
+        private function logActivity(string $action, string $table, int $record_id, array $details): void
+        {
+            $stmt = $this->conn->prepare("
+            INSERT INTO logs_activite (action, table_concernee, id_enregistrement, details)
             VALUES (?, ?, ?, ?)
         ");
-        $stmt->execute([$action, $table, $record_id, json_encode($details)]);
+            $stmt->execute([$action, $table, $record_id, json_encode($details)]);
+        }
     }
-}
 
-class QRCodeGenerator {
-    public static function generateNumericCode(int $employee_id, PDO $conn): string {
-        $max_attempts = 10;
-        $attempt = 0;
-        
-        do {
-            $date_prefix = date('Ymd');
-            $id_part = str_pad($employee_id, 4, '0', STR_PAD_LEFT);
-            $random_part = str_pad(rand(10, 99), 2, '0', STR_PAD_LEFT);
-            $numeric_code = $date_prefix . $id_part . $random_part;
-            
-            $stmt = $conn->prepare("SELECT id FROM employes WHERE code_numerique = ?");
-            $stmt->execute([$numeric_code]);
-            
-            if (!$stmt->fetch()) {
-                return $numeric_code;
-            }
-            
-            $attempt++;
-        } while ($attempt < $max_attempts);
-        
-        return $date_prefix . $id_part . str_pad(rand(100, 999), 3, '0', STR_PAD_LEFT);
-    }
-    
-    public static function generateQRCode(int $employee_id, string $numeric_code, string $qr_data): string {
-        $qr_dir = 'qrcodes/';
-        if (!is_dir($qr_dir)) {
-            mkdir($qr_dir, 0755, true);
-        }
-        
-        $qr_filename = 'employee_' . $employee_id . '_' . $numeric_code . '.png';
-        $qr_path = $qr_dir . $qr_filename;
-        
-        try {
-            QRcode::png($qr_data, $qr_path, QR_ECLEVEL_H, 10, 2);
-            
-            if (extension_loaded('gd')) {
-                self::optimizeQRImage($qr_path);
-            }
-            
-        } catch (Exception $e) {
-            error_log("Erreur génération QR: " . $e->getMessage());
-            QRcode::png($numeric_code, $qr_path, QR_ECLEVEL_M, 8, 2);
-        }
-        
-        return $qr_filename;
-    }
-    
-    private static function optimizeQRImage(string $qr_path): void {
-        try {
-            $source = imagecreatefrompng($qr_path);
-            if (!$source) return;
-            
-            $width = imagesx($source);
-            $height = imagesy($source);
-            $target_size = 400;
-            
-            $new_image = imagecreatetruecolor($target_size, $target_size);
-            $white = imagecolorallocate($new_image, 255, 255, 255);
-            imagefill($new_image, 0, 0, $white);
-            
-            imagecopyresampled(
-                $new_image, $source,
-                0, 0, 0, 0,
-                $target_size, $target_size,
-                $width, $height
-            );
-            
-            imagesavealpha($new_image, true);
-            imagepng($new_image, $qr_path, 0);
-            
-            imagedestroy($source);
-            imagedestroy($new_image);
-            
-        } catch (Exception $e) {
-            error_log("Erreur optimisation QR: " . $e->getMessage());
-        }
-    }
-}
+    class QRCodeGenerator
+    {
+        public static function generateNumericCode(int $employee_id, PDO $conn): string
+        {
+            $max_attempts = 20;
+            $attempt      = 0;
 
-class PayrollManager {
-    private $conn;
-    
-    public function __construct(PDO $connection) {
-        $this->conn = $connection;
+            do {
+                // Générer un nombre aléatoire de 5 chiffres (10000 à 99999)
+                $numeric_code = str_pad(rand(10000, 99999), 5, '0', STR_PAD_LEFT);
+
+                // Vérifier l'unicité
+                $stmt = $conn->prepare("SELECT id FROM employes WHERE code_numerique = ?");
+                $stmt->execute([$numeric_code]);
+
+                if (! $stmt->fetch()) {
+                    return $numeric_code;
+                }
+
+                $attempt++;
+                // Attendre entre les tentatives pour éviter les collisions
+                if ($attempt < $max_attempts) {
+                    usleep(100000); // 100ms
+                }
+
+            } while ($attempt < $max_attempts);
+
+            // Fallback si échec
+            throw new Exception('Impossible de générer un code numérique unique de 5 chiffres après ' . $max_attempts . ' tentatives');
+        }
+
+        public static function generateQRCode(int $employee_id, string $numeric_code, string $qr_data): string
+        {
+            $qr_dir = 'qrcodes/';
+            if (! is_dir($qr_dir)) {
+                mkdir($qr_dir, 0755, true);
+            }
+
+            $qr_filename = 'employee_' . $employee_id . '_' . $numeric_code . '.png';
+            $qr_path     = $qr_dir . $qr_filename;
+
+            try {
+                QRcode::png($qr_data, $qr_path, QR_ECLEVEL_H, 10, 2);
+
+                if (extension_loaded('gd')) {
+                    self::optimizeQRImage($qr_path);
+                }
+
+            } catch (Exception $e) {
+                error_log("Erreur génération QR: " . $e->getMessage());
+                QRcode::png($numeric_code, $qr_path, QR_ECLEVEL_M, 8, 2);
+            }
+
+            return $qr_filename;
+        }
+
+        private static function optimizeQRImage(string $qr_path): void
+        {
+            try {
+                $source = imagecreatefrompng($qr_path);
+                if (! $source) {
+                    return;
+                }
+
+                $width       = imagesx($source);
+                $height      = imagesy($source);
+                $target_size = 400;
+
+                $new_image = imagecreatetruecolor($target_size, $target_size);
+                $white     = imagecolorallocate($new_image, 255, 255, 255);
+                imagefill($new_image, 0, 0, $white);
+
+                imagecopyresampled(
+                    $new_image, $source,
+                    0, 0, 0, 0,
+                    $target_size, $target_size,
+                    $width, $height
+                );
+
+                imagesavealpha($new_image, true);
+                imagepng($new_image, $qr_path, 0);
+
+                imagedestroy($source);
+                imagedestroy($new_image);
+
+            } catch (Exception $e) {
+                error_log("Erreur optimisation QR: " . $e->getMessage());
+            }
+        }
     }
-    
-    public function calculerSalaireNet(int $employe_id, string $mois_annee): array {
+
+    class PayrollManager
+    {
+        private $conn;
+
+        public function __construct(PDO $connection)
+        {
+            $this->conn = $connection;
+        }
+
+       public function calculerSalaireNet(int $employe_id, string $mois_annee): array
+{
+    try {
         $stmt = $this->conn->prepare("
-            SELECT e.*, 
-                   p.salaire AS salaire_poste, 
-                   p.taux_cotisation, 
-                   p.categorie_paie, 
+            SELECT e.*,
+                   p.salaire AS salaire_poste,
+                   p.taux_cotisation,
+                   p.categorie_paie,
                    p.regime_social,
-                   p.nom as poste_nom
+                   p.nom as poste_nom,
+                   d.nom as departement_nom
             FROM employes e
             LEFT JOIN postes p ON e.poste_id = p.id
-            WHERE e.id = ?
+            LEFT JOIN departements d ON p.departement_id = d.id
+            WHERE e.id = ? AND e.statut = 'actif'
         ");
         $stmt->execute([$employe_id]);
         $data = $stmt->fetch(PDO::FETCH_ASSOC);
-        
+
         if (!$data) {
-            throw new Exception("Employé non trouvé.");
+            throw new Exception("Employé non trouvé ou inactif.");
         }
-        
+
+        // Calcul du salaire avec gestion des valeurs nulles
         $salaire_brut = $data['salaire'] ?: ($data['salaire_poste'] ?: 0);
-        $primes_individuelles = 0;
-        $absences_jours = 0;
-        $retenues_diverses = 0;
-        $cotisations_supplementaires = 0;
         
+        if ($salaire_brut <= 0) {
+            throw new Exception("Aucun salaire défini pour cet employé.");
+        }
+
+        // Calculs des différents éléments
+        $primes_individuelles = 0; // À développer selon les règles métier
+        $absences_jours = 0; // À développer avec système de congés/absences
+        $retenues_diverses = 0; // À développer selon les règles métier
+        $cotisations_supplementaires = 0; // À développer selon les règles métier
+
+        // Calcul des retenues pour absences
         $retenues_absences = ($absences_jours * $salaire_brut) / 30;
-        $salaire_brut_apres_absences = $salaire_brut - $retenues_absences + $primes_individuelles;
         
+        // Salaire brut après ajustements
+        $salaire_brut_apres_absences = $salaire_brut - $retenues_absences + $primes_individuelles;
+
+        // Calcul des cotisations
         $taux_cotisations = ($data['taux_cotisation'] ?: 0) + $cotisations_supplementaires;
         $cotisations = $salaire_brut_apres_absences * ($taux_cotisations / 100);
-        
+
+        // Salaire net final
         $salaire_net = $salaire_brut_apres_absences - $cotisations - $retenues_diverses;
-        
+
         return [
             'salaire_brut' => $salaire_brut,
             'salaire_brut_apres_absences' => $salaire_brut_apres_absences,
@@ -799,7 +967,7 @@ class PayrollManager {
             'retenues_absences' => $retenues_absences,
             'cotisations' => $cotisations,
             'retenues_diverses' => $retenues_diverses,
-            'salaire_net' => $salaire_net,
+            'salaire_net' => max(0, $salaire_net), // Éviter les salaires négatifs
             'mois_annee' => $mois_annee,
             'employe_id' => $employe_id,
             'poste_id' => $data['poste_id'],
@@ -807,308 +975,1052 @@ class PayrollManager {
             'regime_social' => $data['regime_social'],
             'nom' => $data['nom'],
             'prenom' => $data['prenom'],
-            'poste_nom' => $data['poste_nom']
-        ];
-    }
-
-    public function genererBulletinPaie(array $details): string {
-        if (!class_exists('TCPDF')) {
-            return $this->genererBulletinHTML($details);
-        }
-        
-        require_once '../vendor/autoload.php';
-        
-        $pdf = new TCPDF();
-        $pdf->SetCreator('Système de Gestion RH');
-        $pdf->SetAuthor('Restaurant Management System');
-        $pdf->SetTitle('Bulletin de Paie - ' . $details['nom'] . ' ' . $details['prenom']);
-        $pdf->AddPage();
-        
-        $pdf->SetFont('helvetica', 'B', 16);
-        $pdf->Cell(0, 10, 'BULLETIN DE PAIE', 0, 1, 'C');
-        $pdf->Cell(0, 10, strtoupper($details['nom'] . ' ' . $details['prenom']), 0, 1, 'C');
-        $pdf->Cell(0, 10, 'Poste: ' . ($details['poste_nom'] ?: 'Non défini'), 0, 1, 'C');
-        $pdf->Cell(0, 10, 'Mois: ' . date('F Y', strtotime($details['mois_annee'] . '-01')), 0, 1, 'C');
-        $pdf->Ln(10);
-        
-        $pdf->SetFont('helvetica', 'B', 12);
-        $pdf->Cell(0, 8, 'DETAILS DU SALAIRE', 0, 1, 'L');
-        $pdf->SetFont('helvetica', '', 10);
-        
-        $lignes = [
-            ['Salaire brut de base:', $details['salaire_brut']],
-            ['Primes individuelles:', $details['primes']],
-            ['Retenues pour absences:', -$details['retenues_absences']],
-            ['Cotisations sociales:', -$details['cotisations']],
-            ['Autres retenues:', -$details['retenues_diverses']]
+            'poste_nom' => $data['poste_nom'],
+            'departement_nom' => $data['departement_nom'],
+            'taux_cotisations' => $taux_cotisations
         ];
         
-        foreach ($lignes as $ligne) {
-            $pdf->Cell(100, 6, $ligne[0], 0, 0, 'L');
-            $montant = ($ligne[1] < 0 ? '-' : '') . number_format(abs($ligne[1]), 0, ',', ' ') . ' FCFA';
-            $pdf->Cell(0, 6, $montant, 0, 1, 'R');
-        }
-        
-        $pdf->Ln(5);
-        $pdf->SetFont('helvetica', 'B', 12);
-        $pdf->Cell(100, 8, 'SALAIRE NET A PAYER:', 0, 0, 'L');
-        $pdf->SetFont('helvetica', 'B', 14);
-        $pdf->SetTextColor(0, 128, 0);
-        $pdf->Cell(0, 8, number_format($details['salaire_net'], 0, ',', ' ') . ' FCFA', 0, 1, 'R');
-        $pdf->SetTextColor(0, 0, 0);
-        
-        return $pdf->Output('', 'S');
+    } catch (PDOException $e) {
+        error_log("Erreur SQL calculerSalaireNet: " . $e->getMessage());
+        throw new Exception("Erreur de base de données: " . $e->getMessage());
     }
+}
 
-    private function genererBulletinHTML(array $details): string {
-        $html = "
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset='UTF-8'>
-            <title>Bulletin de Paie</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 20px; }
-                .header { text-align: center; margin-bottom: 30px; }
-                .details { margin: 20px 0; }
-                .line { display: flex; justify-content: space-between; padding: 5px 0; }
-                .total { font-weight: bold; color: green; font-size: 18px; border-top: 2px solid #000; padding-top: 10px; }
-            </style>
-        </head>
-        <body>
+
+        public function genererBulletinPaie(array $details): string
+        {
+            if (! class_exists('TCPDF')) {
+                return $this->genererBulletinHTML($details);
+            }
+
+            require_once '../vendor/autoload.php';
+            $pdf = new TCPDF();
+            $pdf->SetCreator('Système de Gestion RH');
+            $pdf->SetAuthor('Restaurant Management System');
+            $pdf->SetTitle('Bulletin de Paie - ' . $details['nom'] . ' ' . $details['prenom']);
+            $pdf->AddPage();
+
+            $pdf->SetFont('helvetica', 'B', 16);
+            $pdf->Cell(0, 10, 'BULLETIN DE PAIE', 0, 1, 'C');
+            $pdf->Cell(0, 10, strtoupper($details['nom'] . ' ' . $details['prenom']), 0, 1, 'C');
+            $pdf->Cell(0, 10, 'Poste: ' . ($details['poste_nom'] ?: 'Non défini'), 0, 1, 'C');
+            $pdf->Cell(0, 10, 'Mois: ' . date('F Y', strtotime($details['mois_annee'] . '-01')), 0, 1, 'C');
+            $pdf->Ln(10);
+
+            $pdf->SetFont('helvetica', 'B', 12);
+            $pdf->Cell(0, 8, 'DETAILS DU SALAIRE', 0, 1, 'L');
+            $pdf->SetFont('helvetica', '', 10);
+
+            $lignes = [
+                ['Salaire brut de base:', $details['salaire_brut']],
+                ['Primes individuelles:', $details['primes']],
+                ['Retenues pour absences:', -$details['retenues_absences']],
+                ['Cotisations sociales:', -$details['cotisations']],
+                ['Autres retenues:', -$details['retenues_diverses']],
+            ];
+
+            foreach ($lignes as $ligne) {
+                $pdf->Cell(100, 6, $ligne[0], 0, 0, 'L');
+                $montant = ($ligne[1] < 0 ? '-' : '') . number_format(abs($ligne[1]), 0, ',', ' ') . ' FCFA';
+                $pdf->Cell(0, 6, $montant, 0, 1, 'R');
+            }
+
+            $pdf->Ln(5);
+            $pdf->SetFont('helvetica', 'B', 12);
+            $pdf->Cell(100, 8, 'SALAIRE NET A PAYER:', 0, 0, 'L');
+            $pdf->SetFont('helvetica', 'B', 14);
+            $pdf->SetTextColor(0, 128, 0);
+            $pdf->Cell(0, 8, number_format($details['salaire_net'], 0, ',', ' ') . ' FCFA', 0, 1, 'R');
+            $pdf->SetTextColor(0, 0, 0);
+
+            return $pdf->Output('', 'S');
+        }
+
+     private function genererBulletinHTML(array $details): string
+{
+    $date_generation = date('d/m/Y à H:i');
+    $mois_libelle = date('F Y', strtotime($details['mois_annee'] . '-01'));
+    
+    $html = "
+    <!DOCTYPE html>
+    <html lang='fr'>
+    <head>
+        <meta charset='UTF-8'>
+        <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+        <title>Bulletin de Paie - {$details['prenom']} {$details['nom']}</title>
+        <style>
+            body { 
+                font-family: Arial, sans-serif; 
+                margin: 20px; 
+                background-color: #f8f9fa;
+            }
+            .container {
+                max-width: 800px;
+                margin: 0 auto;
+                background: white;
+                padding: 30px;
+                border-radius: 8px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }
+            .header { 
+                text-align: center; 
+                margin-bottom: 30px; 
+                border-bottom: 3px solid #007bff;
+                padding-bottom: 20px;
+            }
+            .company-info {
+                text-align: center;
+                margin-bottom: 20px;
+                color: #666;
+            }
+            .employee-info {
+                background-color: #f8f9fa;
+                padding: 15px;
+                border-radius: 5px;
+                margin-bottom: 20px;
+            }
+            .details { 
+                margin: 20px 0; 
+            }
+            .line { 
+                display: flex; 
+                justify-content: space-between; 
+                padding: 8px 0; 
+                border-bottom: 1px solid #eee;
+            }
+            .line:last-child {
+                border-bottom: none;
+            }
+            .line.total { 
+                font-weight: bold; 
+                color: #28a745; 
+                font-size: 18px; 
+                border-top: 2px solid #007bff; 
+                padding-top: 15px; 
+                margin-top: 15px;
+                background-color: #e8f5e8;
+                padding: 15px;
+                border-radius: 5px;
+            }
+            .section-title {
+                font-size: 18px;
+                font-weight: bold;
+                color: #333;
+                margin: 20px 0 10px 0;
+                padding-bottom: 5px;
+                border-bottom: 2px solid #007bff;
+            }
+            .highlight {
+                background-color: #fff3cd;
+                padding: 2px 5px;
+                border-radius: 3px;
+            }
+            .footer {
+                margin-top: 30px;
+                text-align: center;
+                font-size: 12px;
+                color: #666;
+                border-top: 1px solid #ddd;
+                padding-top: 15px;
+            }
+            .amount {
+                font-weight: bold;
+                font-family: 'Courier New', monospace;
+            }
+        </style>
+    </head>
+    <body>
+        <div class='container'>
+            <div class='company-info'>
+                <h2>RESTAURANT MULHO</h2>
+                <p>Système de Gestion des Ressources Humaines</p>
+            </div>
+            
             <div class='header'>
                 <h1>BULLETIN DE PAIE</h1>
                 <h2>" . strtoupper($details['nom'] . ' ' . $details['prenom']) . "</h2>
-                <p>Poste: " . ($details['poste_nom'] ?: 'Non défini') . "</p>
-                <p>Mois: " . date('F Y', strtotime($details['mois_annee'] . '-01')) . "</p>
             </div>
-            
+
+            <div class='employee-info'>
+                <div style='display: grid; grid-template-columns: 1fr 1fr; gap: 20px;'>
+                    <div>
+                        <strong>Employé:</strong> {$details['prenom']} {$details['nom']}<br>
+                        <strong>Poste:</strong> " . ($details['poste_nom'] ?: 'Non défini') . "<br>
+                        <strong>Département:</strong> " . ($details['departement_nom'] ?: 'Non assigné') . "
+                    </div>
+                    <div>
+                        <strong>Période:</strong> <span class='highlight'>{$mois_libelle}</span><br>
+                        <strong>Catégorie:</strong> " . ($details['categorie_paie'] ?: 'Standard') . "<br>
+                        <strong>Régime social:</strong> " . ($details['regime_social'] ?: 'Général') . "
+                    </div>
+                </div>
+            </div>
+
             <div class='details'>
-                <h3>DETAILS DU SALAIRE</h3>
+                <h3 class='section-title'>ÉLÉMENTS DE RÉMUNÉRATION</h3>
+                
                 <div class='line'>
                     <span>Salaire brut de base:</span>
-                    <span>" . number_format($details['salaire_brut'], 0, ',', ' ') . " FCFA</span>
-                </div>
+                    <span class='amount'>" . number_format($details['salaire_brut'], 0, ',', ' ') . " FCFA</span>
+                </div>";
+                
+    if ($details['primes'] > 0) {
+        $html .= "
                 <div class='line'>
-                    <span>Primes individuelles:</span>
-                    <span>" . number_format($details['primes'], 0, ',', ' ') . " FCFA</span>
-                </div>
+                    <span>Primes et indemnités:</span>
+                    <span class='amount' style='color: #28a745;'>+" . number_format($details['primes'], 0, ',', ' ') . " FCFA</span>
+                </div>";
+    }
+    
+    if ($details['retenues_absences'] > 0) {
+        $html .= "
                 <div class='line'>
                     <span>Retenues pour absences:</span>
-                    <span>-" . number_format($details['retenues_absences'], 0, ',', ' ') . " FCFA</span>
-                </div>
+                    <span class='amount' style='color: #dc3545;'>-" . number_format($details['retenues_absences'], 0, ',', ' ') . " FCFA</span>
+                </div>";
+    }
+    
+    $html .= "
+                <h3 class='section-title'>COTISATIONS SOCIALES</h3>
+                
                 <div class='line'>
-                    <span>Cotisations sociales:</span>
-                    <span>-" . number_format($details['cotisations'], 0, ',', ' ') . " FCFA</span>
-                </div>
+                    <span>Cotisations sociales ({$details['taux_cotisations']}%):</span>
+                    <span class='amount' style='color: #dc3545;'>-" . number_format($details['cotisations'], 0, ',', ' ') . " FCFA</span>
+                </div>";
+                
+    if ($details['retenues_diverses'] > 0) {
+        $html .= "
                 <div class='line'>
                     <span>Autres retenues:</span>
-                    <span>-" . number_format($details['retenues_diverses'], 0, ',', ' ') . " FCFA</span>
-                </div>
+                    <span class='amount' style='color: #dc3545;'>-" . number_format($details['retenues_diverses'], 0, ',', ' ') . " FCFA</span>
+                </div>";
+    }
+    
+    $html .= "
                 <div class='line total'>
-                    <span>SALAIRE NET A PAYER:</span>
-                    <span>" . number_format($details['salaire_net'], 0, ',', ' ') . " FCFA</span>
+                    <span>SALAIRE NET À PAYER:</span>
+                    <span class='amount'>" . number_format($details['salaire_net'], 0, ',', ' ') . " FCFA</span>
                 </div>
             </div>
-        </body>
-        </html>";
-        
-        return $html;
-    }
+            
+            <div class='footer'>
+                <p><strong>Document généré le:</strong> {$date_generation}</p>
+                <p>Ce bulletin de paie est un document officiel. Conservez-le précieusement.</p>
+                <p><em>Restaurant Mulho - Système de Gestion RH</em></p>
+            </div>
+        </div>
+    </body>
+    </html>";
 
-    public function enregistrerBulletinPaie(array $details): int {
-        $stmt = $this->conn->prepare("
+    return $html;
+}
+
+
+        public function enregistrerBulletinPaie(array $details): int
+        {
+            $stmt = $this->conn->prepare("
             INSERT INTO bulletins_paie
             (employe_id, poste_id, mois_annee, salaire_brut, cotisations, salaire_net, primes, retenues, statut)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'valide')
         ");
-        $stmt->execute([
-            $details['employe_id'],
-            $details['poste_id'],
-            $details['mois_annee'] . '-01',
-            $details['salaire_brut_apres_absences'],
-            $details['cotisations'],
-            $details['salaire_net'],
-            $details['primes'],
-            $details['retenues_absences'] + $details['retenues_diverses']
-        ]);
-        return $this->conn->lastInsertId();
-    }
-
-    public function genererBulletinsPourTous(string $mois_annee): array {
-        $resultats = [];
-        $stmt = $this->conn->prepare("SELECT id FROM employes WHERE statut = 'actif'");
-        $stmt->execute();
-        $employes = $stmt->fetchAll(PDO::FETCH_COLUMN);
-        
-        foreach ($employes as $employe_id) {
-            try {
-                $details = $this->calculerSalaireNet($employe_id, $mois_annee);
-                $bulletin_id = $this->enregistrerBulletinPaie($details);
-                $resultats[$employe_id] = [
-                    'success' => true,
-                    'bulletin_id' => $bulletin_id,
-                    'salaire_net' => $details['salaire_net']
-                ];
-            } catch (Exception $e) {
-                $resultats[$employe_id] = [
-                    'success' => false,
-                    'message' => $e->getMessage()
-                ];
-            }
+            $stmt->execute([
+                $details['employe_id'],
+                $details['poste_id'],
+                $details['mois_annee'] . '-01',
+                $details['salaire_brut_apres_absences'],
+                $details['cotisations'],
+                $details['salaire_net'],
+                $details['primes'],
+                $details['retenues_absences'] + $details['retenues_diverses'],
+            ]);
+            return $this->conn->lastInsertId();
         }
-        
-        return $resultats;
-    }
-}
 
-class DepartementManager {
-    private $conn;
-    
-    public function __construct(PDO $connection) {
-        $this->conn = $connection;
+        public function genererBulletinsPourTous(string $mois_annee): array
+        {
+            $resultats = [];
+            $stmt      = $this->conn->prepare("SELECT id FROM employes WHERE statut = 'actif'");
+            $stmt->execute();
+            $employes = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+            foreach ($employes as $employe_id) {
+                try {
+                    $details                = $this->calculerSalaireNet($employe_id, $mois_annee);
+                    $bulletin_id            = $this->enregistrerBulletinPaie($details);
+                    $resultats[$employe_id] = [
+                        'success'     => true,
+                        'bulletin_id' => $bulletin_id,
+                        'salaire_net' => $details['salaire_net'],
+                    ];
+                } catch (Exception $e) {
+                    $resultats[$employe_id] = [
+                        'success' => false,
+                        'message' => $e->getMessage(),
+                    ];
+                }
+            }
+
+            return $resultats;
+        }
     }
-public function getAllDepartements(): array {
-    try {
-        $stmt = $this->conn->query("
-            SELECT d.*, 
+
+    class DepartementManager
+    {
+        private $conn;
+
+        public function __construct(PDO $connection)
+        {
+            $this->conn = $connection;
+        }
+        public function getAllDepartements(): array
+        {
+            try {
+                $stmt = $this->conn->query("
+            SELECT d.*,
                    COUNT(DISTINCT p.id) as nombre_postes,
                    COUNT(DISTINCT e.id) as nombre_employes
-            FROM departements d 
+            FROM departements d
             LEFT JOIN postes p ON d.id = p.departement_id AND p.actif = 1
             LEFT JOIN employes e ON p.id = e.poste_id AND e.statut = 'actif'
-            WHERE d.actif = 1 
+            WHERE d.actif = 1
             GROUP BY d.id
             ORDER BY d.nom
         ");
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+                return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            } catch (PDOException $e) {
+                error_log("Erreur SQL getAllDepartements: " . $e->getMessage());
+                return [];
+            }
+        }
+    }
+    class ReportingManager
+    {
+        private $conn;
+
+        public function __construct(PDO $connection)
+        {
+            $this->conn = $connection;
+        }
+
+private function getTotalEmployesSecure(): int
+{
+    try {
+        $stmt = $this->conn->query("SELECT COUNT(*) as total FROM employes");
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ? (int) $result['total'] : 0;
     } catch (PDOException $e) {
-        error_log("Erreur SQL getAllDepartements: " . $e->getMessage());
+        error_log("Erreur getTotalEmployesSecure: " . $e->getMessage());
+        return 0;
+    }
+}
+
+private function getNouveauxEmployesMoisSecure(): int
+{
+    try {
+        $stmt = $this->conn->query("
+            SELECT COUNT(*) as total 
+            FROM employes 
+            WHERE DATE_FORMAT(date_embauche, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m') 
+            AND statut = 'actif'
+        ");
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ? (int) $result['total'] : 0;
+    } catch (PDOException $e) {
+        error_log("Erreur getNouveauxEmployesMoisSecure: " . $e->getMessage());
+        return 0;
+    }
+}
+
+private function getTauxPresenceMoisSecure(): float
+{
+    try {
+        $stmt = $this->conn->query("
+            SELECT
+                COUNT(DISTINCT e.id) as total_employes,
+                COUNT(DISTINCT p.employe_id) as employes_presents
+            FROM employes e
+            LEFT JOIN presences p ON e.id = p.employe_id
+                AND DATE_FORMAT(p.heure_arrivee, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
+            WHERE e.statut = 'actif'
+        ");
+
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($result && $result['total_employes'] > 0) {
+            return round(($result['employes_presents'] / $result['total_employes']) * 100, 2);
+        }
+
+        return 0.0;
+    } catch (PDOException $e) {
+        error_log("Erreur getTauxPresenceMoisSecure: " . $e->getMessage());
+        return 0.0;
+    }
+}
+
+private function getMoyenneRetardsSecure(): float
+{
+    try {
+        $stmt = $this->conn->query("
+            SELECT AVG(retard_minutes) as moyenne_retards
+            FROM (
+                SELECT TIMESTAMPDIFF(MINUTE, CONCAT(DATE(p.heure_arrivee), ' ', e.heure_debut), p.heure_arrivee) as retard_minutes
+                FROM presences p
+                INNER JOIN employes e ON p.employe_id = e.id
+                WHERE DATE_FORMAT(p.heure_arrivee, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
+                AND TIMESTAMPDIFF(MINUTE, CONCAT(DATE(p.heure_arrivee), ' ', e.heure_debut), p.heure_arrivee) > 0
+            ) as retards
+        ");
+
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result && $result['moyenne_retards'] ? round((float) $result['moyenne_retards'], 2) : 0.0;
+    } catch (PDOException $e) {
+        error_log("Erreur getMoyenneRetardsSecure: " . $e->getMessage());
+        return 0.0;
+    }
+}
+
+private function getMasseSalarialeMensuelleSecure(): float
+{
+    try {
+        $stmt = $this->conn->query("
+            SELECT COALESCE(SUM(COALESCE(e.salaire, p.salaire, 0)), 0) as masse_salariale
+            FROM employes e
+            LEFT JOIN postes p ON e.poste_id = p.id
+            WHERE e.statut = 'actif'
+        ");
+
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return (float) ($result['masse_salariale'] ?? 0);
+    } catch (PDOException $e) {
+        error_log("Erreur getMasseSalarialeMensuelleSecure: " . $e->getMessage());
+        return 0.0;
+    }
+}
+
+private function getSalaireMoyenSecure(): float
+{
+    try {
+        $stmt = $this->conn->query("
+            SELECT COALESCE(AVG(COALESCE(e.salaire, p.salaire, 0)), 0) as salaire_moyen
+            FROM employes e
+            LEFT JOIN postes p ON e.poste_id = p.id
+            WHERE e.statut = 'actif' 
+            AND (e.salaire > 0 OR p.salaire > 0)
+        ");
+
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return round((float) ($result['salaire_moyen'] ?? 0), 2);
+    } catch (PDOException $e) {
+        error_log("Erreur getSalaireMoyenSecure: " . $e->getMessage());
+        return 0.0;
+    }
+}
+
+private function getDefaultStats(): array
+{
+    return [
+        'total_employes'         => 0,
+        'employes_actifs'        => 0,
+        'employes_inactifs'      => 0,
+        'nouveaux_employes_mois' => 0,
+        'taux_presence'          => 0.0,
+        'moyenne_retards'        => 0.0,
+        'masse_salariale_mensuelle' => 0.0,
+        'salaire_moyen'             => 0.0,
+        'repartition_departements'  => [],
+        'repartition_contrats'      => [],
+    ];
+}
+    public function getDashboardStats(): array
+{
+    $stats = [];
+    
+    try {
+        // Statistiques de base - avec gestion d'erreur améliorée
+        $stats['total_employes']         = $this->getTotalEmployesSecure();
+        $stats['employes_actifs']        = $this->getEmployesActifs();
+        $stats['employes_inactifs']      = $this->getEmployesInactifs();
+        $stats['nouveaux_employes_mois'] = $this->getNouveauxEmployesMoisSecure();
+
+        // Statistiques de présence - avec gestion d'erreur
+        $stats['taux_presence']   = $this->getTauxPresenceMoisSecure();
+        $stats['moyenne_retards'] = $this->getMoyenneRetardsSecure();
+
+        // Statistiques financières - avec valeurs par défaut
+        $stats['masse_salariale_mensuelle'] = $this->getMasseSalarialeMensuelleSecure();
+        $stats['salaire_moyen']             = $this->getSalaireMoyenSecure();
+
+        // Répartitions - avec gestion d'erreur
+        $stats['repartition_departements'] = $this->getRepartitionParDepartement();
+        $stats['repartition_contrats'] = $this->getRepartitionContrats();
+
+        return $stats;
+        
+    } catch (PDOException $e) {
+        error_log("Erreur SQL getDashboardStats: " . $e->getMessage());
+        // Retourner des valeurs par défaut plutôt que d'échouer
+        return $this->getDefaultStats();
+    } catch (Exception $e) {
+        error_log("Erreur générale getDashboardStats: " . $e->getMessage());
+        return $this->getDefaultStats();
+    }
+}
+
+       public function generateCustomReport(string $type, array $filters = []): array
+{
+    try {
+        switch ($type) {
+            case 'presences':
+                return $this->generatePresenceReport($filters);
+            case 'salaires':
+                return $this->generateSalaryReport($filters);
+            case 'effectifs':
+                return $this->generateWorkforceReport($filters);
+            case 'turnover':
+                return $this->generateTurnoverReport($filters);
+            default:
+                throw new Exception('Type de rapport non supporté: ' . $type);
+        }
+    } catch (Exception $e) {
+        error_log("Erreur generateCustomReport: " . $e->getMessage());
         return [];
     }
 }
+
+        private function getTotalEmployes(): int
+        {
+            $stmt = $this->conn->query("SELECT COUNT(*) as total FROM employes");
+            return (int) $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+        }
+
+        private function getEmployesActifs(): int
+        {
+            $stmt = $this->conn->query("SELECT COUNT(*) as total FROM employes WHERE statut = 'actif'");
+            return (int) $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+        }
+
+        private function getEmployesInactifs(): int
+        {
+            $stmt = $this->conn->query("SELECT COUNT(*) as total FROM employes WHERE statut = 'inactif'");
+            return (int) $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+        }
+
+        private function getNouveauxEmployesMois(): int
+        {
+            $stmt = $this->conn->query("SELECT COUNT(*) as total FROM employes WHERE DATE_FORMAT(date_embauche, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m') AND statut = 'actif'");
+            return (int) $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+        }
+
+        private function getTauxPresenceMois(): float
+        {
+            $stmt = $this->conn->query("
+            SELECT
+                COUNT(DISTINCT e.id) as total_employes,
+                COUNT(DISTINCT p.employe_id) as employes_presents
+            FROM employes e
+            LEFT JOIN presences p ON e.id = p.employe_id
+                AND DATE_FORMAT(p.heure_arrivee, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
+            WHERE e.statut = 'actif'
+        ");
+
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($result && $result['total_employes'] > 0) {
+                return round(($result['employes_presents'] / $result['total_employes']) * 100, 2);
+            }
+
+            return 0;
+        }
+
+        private function getMoyenneRetards(): float
+        {
+            $stmt = $this->conn->query("
+            SELECT AVG(retard_minutes) as moyenne_retards
+            FROM (
+                SELECT TIMESTAMPDIFF(MINUTE, CONCAT(DATE(p.heure_arrivee), ' ', e.heure_debut), p.heure_arrivee) as retard_minutes
+                FROM presences p
+                INNER JOIN employes e ON p.employe_id = e.id
+                WHERE DATE_FORMAT(p.heure_arrivee, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
+                AND TIMESTAMPDIFF(MINUTE, CONCAT(DATE(p.heure_arrivee), ' ', e.heure_debut), p.heure_arrivee) > 0
+            ) as retards
+        ");
+
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $result ? round((float) $result['moyenne_retards'], 2) : 0;
+        }
+
+        private function getMasseSalarialeMensuelle(): float
+        {
+            $stmt = $this->conn->query("
+            SELECT COALESCE(SUM(e.salaire), 0) as masse_salariale
+            FROM employes e
+            WHERE e.statut = 'actif'
+        ");
+
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            return (float) $result['masse_salariale'];
+        }
+
+        private function getSalaireMoyen(): float
+        {
+            $stmt = $this->conn->query("
+            SELECT COALESCE(AVG(e.salaire), 0) as salaire_moyen
+            FROM employes e
+            WHERE e.statut = 'actif' AND e.salaire > 0
+        ");
+
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            return round((float) $result['salaire_moyen'], 2);
+        }
+
+        private function getRepartitionParDepartement(): array
+        {
+            $stmt = $this->conn->query("
+            SELECT
+                d.nom,
+                COUNT(e.id) as count
+            FROM employes e
+            LEFT JOIN postes p ON e.poste_id = p.id
+            LEFT JOIN departements d ON p.departement_id = d.id
+            WHERE e.statut = 'actif'
+            GROUP BY d.id, d.nom
+            ORDER BY d.nom
+        ");
+
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        private function getRepartitionContrats(): array
+        {
+            $stmt = $this->conn->query("
+            SELECT
+                p.type_contrat,
+                COUNT(e.id) as count
+            FROM employes e
+            LEFT JOIN postes p ON e.poste_id = p.id
+            WHERE e.statut = 'actif'
+            GROUP BY p.type_contrat
+            ORDER BY p.type_contrat
+        ");
+
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        private function generatePresenceReport(array $filters): array
+        {
+            $query = "
+            SELECT
+                e.nom,
+                e.prenom,
+                d.nom as departement,
+                COUNT(p.id) as jours_presence,
+                SUM(CASE WHEN TIME(p.heure_arrivee) > e.heure_debut THEN 1 ELSE 0 END) as jours_retard,
+                AVG(TIMESTAMPDIFF(MINUTE, CONCAT(DATE(p.heure_arrivee), ' ', e.heure_debut), p.heure_arrivee)) as retard_moyen_minutes
+            FROM employes e
+            LEFT JOIN presences p ON e.id = p.employe_id
+            LEFT JOIN postes po ON e.poste_id = po.id
+            LEFT JOIN departements d ON po.departement_id = d.id
+            WHERE e.statut = 'actif'
+        ";
+
+            $params = [];
+
+            if (! empty($filters['date_debut'])) {
+                $query .= " AND DATE(p.heure_arrivee) >= ?";
+                $params[] = $filters['date_debut'];
+            }
+
+            if (! empty($filters['date_fin'])) {
+                $query .= " AND DATE(p.heure_arrivee) <= ?";
+                $params[] = $filters['date_fin'];
+            }
+
+            if (! empty($filters['departement_id'])) {
+                $query .= " AND d.id = ?";
+                $params[] = $filters['departement_id'];
+            }
+
+            $query .= " GROUP BY e.id ORDER BY e.nom, e.prenom";
+
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute($params);
+
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+private function generateSalaryReport(array $filters): array
+{
+    $query = "
+        SELECT
+            e.id,
+            e.nom,
+            e.prenom,
+            d.nom as departement,
+            p.nom as poste,
+            p.type_contrat,
+            COALESCE(e.salaire, p.salaire, 0) as salaire_brut,
+            COALESCE(p.taux_cotisation, 0) as taux_cotisation,
+            COALESCE((e.salaire * p.taux_cotisation / 100), (p.salaire * p.taux_cotisation / 100), 0) as cotisations,
+            COALESCE(
+                (e.salaire - (e.salaire * p.taux_cotisation / 100)), 
+                (p.salaire - (p.salaire * p.taux_cotisation / 100)), 
+                0
+            ) as salaire_net,
+            e.date_embauche,
+            e.statut,
+            COUNT(DISTINCT bp.id) as bulletins_generes,
+            MAX(bp.mois_annee) as dernier_bulletin
+        FROM employes e
+        LEFT JOIN postes p ON e.poste_id = p.id
+        LEFT JOIN departements d ON p.departement_id = d.id
+        LEFT JOIN bulletins_paie bp ON e.id = bp.employe_id
+        WHERE e.statut = 'actif'
+    ";
+
+    $params = [];
+
+    if (!empty($filters['date_debut'])) {
+        $query .= " AND bp.mois_annee >= ?";
+        $params[] = $filters['date_debut'] . '-01';
+    }
+
+    if (!empty($filters['date_fin'])) {
+        $query .= " AND bp.mois_annee <= ?";
+        $params[] = $filters['date_fin'] . '-01';
+    }
+
+    if (!empty($filters['departement_id'])) {
+        $query .= " AND d.id = ?";
+        $params[] = $filters['departement_id'];
+    }
+
+    $query .= " GROUP BY e.id ORDER BY d.nom, e.nom, e.prenom";
+
+    try {
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute($params);
+        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Si aucune donnée de bulletin, on récupère quand même les employés actifs
+        if (empty($results)) {
+            $querySimple = "
+                SELECT
+                    e.id,
+                    e.nom,
+                    e.prenom,
+                    d.nom as departement,
+                    p.nom as poste,
+                    p.type_contrat,
+                    COALESCE(e.salaire, p.salaire, 0) as salaire_brut,
+                    COALESCE(p.taux_cotisation, 0) as taux_cotisation,
+                    COALESCE((e.salaire * p.taux_cotisation / 100), (p.salaire * p.taux_cotisation / 100), 0) as cotisations,
+                    COALESCE(
+                        (e.salaire - (e.salaire * p.taux_cotisation / 100)), 
+                        (p.salaire - (p.salaire * p.taux_cotisation / 100)), 
+                        0
+                    ) as salaire_net,
+                    e.date_embauche,
+                    e.statut,
+                    0 as bulletins_generes,
+                    NULL as dernier_bulletin
+                FROM employes e
+                LEFT JOIN postes p ON e.poste_id = p.id
+                LEFT JOIN departements d ON p.departement_id = d.id
+                WHERE e.statut = 'actif'
+            ";
+            
+            $paramsSimple = [];
+            
+            if (!empty($filters['departement_id'])) {
+                $querySimple .= " AND d.id = ?";
+                $paramsSimple[] = $filters['departement_id'];
+            }
+            
+            $querySimple .= " ORDER BY d.nom, e.nom, e.prenom";
+            
+            $stmt = $this->conn->prepare($querySimple);
+            $stmt->execute($paramsSimple);
+            $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+        
+        return $results;
+        
+    } catch (PDOException $e) {
+        error_log("Erreur generateSalaryReport: " . $e->getMessage());
+        return [];
+    }
 }
 
-class PosteManager {
-    private $conn;
-    
-    public function __construct(PDO $connection) {
-        $this->conn = $connection;
+
+private function generateWorkforceReport(array $filters): array
+{
+    $query = "
+        SELECT
+            d.nom as departement,
+            p.type_contrat,
+            COUNT(e.id) as nombre_employes,
+            AVG(COALESCE(e.salaire, p.salaire, 0)) as salaire_moyen,
+            MIN(e.date_embauche) as plus_ancien,
+            MAX(e.date_embauche) as plus_recent,
+            COUNT(CASE WHEN e.sexe = 'M' THEN 1 END) as hommes,
+            COUNT(CASE WHEN e.sexe = 'F' THEN 1 END) as femmes,
+            AVG(
+                CASE 
+                    WHEN e.date_naissance IS NOT NULL 
+                    THEN TIMESTAMPDIFF(YEAR, e.date_naissance, CURDATE())
+                    ELSE NULL 
+                END
+            ) as age_moyen
+        FROM employes e
+        LEFT JOIN postes p ON e.poste_id = p.id
+        LEFT JOIN departements d ON p.departement_id = d.id
+        WHERE e.statut = 'actif'
+    ";
+
+    $params = [];
+
+    if (!empty($filters['date_debut'])) {
+        $query .= " AND e.date_embauche >= ?";
+        $params[] = $filters['date_debut'];
     }
-    
-    public function getAllPostes(): array {
-        $stmt = $this->conn->query("
-            SELECT p.*, 
-                   ps.nom as poste_superieur_nom
-            FROM postes p 
-            LEFT JOIN postes ps ON p.poste_superieur_id = ps.id 
-            WHERE p.actif = 1 
-            ORDER BY p.niveau_hierarchique ASC, p.nom
-        ");
+
+    if (!empty($filters['date_fin'])) {
+        $query .= " AND e.date_embauche <= ?";
+        $params[] = $filters['date_fin'];
+    }
+
+    if (!empty($filters['departement_id'])) {
+        $query .= " AND d.id = ?";
+        $params[] = $filters['departement_id'];
+    }
+
+    $query .= " GROUP BY d.id, d.nom, p.type_contrat 
+                HAVING COUNT(e.id) > 0
+                ORDER BY d.nom, p.type_contrat";
+
+    try {
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Erreur generateWorkforceReport: " . $e->getMessage());
+        return [];
     }
-    
-    public function getPosteById(int $id): ?array {
-        $stmt = $this->conn->prepare("
-            SELECT p.*, 
+}
+
+     private function generateTurnoverReport(array $filters): array
+{
+    $query = "
+        SELECT
+            d.nom as departement,
+            COUNT(CASE WHEN e.statut = 'actif' THEN 1 END) as effectif_actuel,
+            COUNT(CASE WHEN e.statut = 'inactif' THEN 1 END) as departs,
+            COUNT(CASE WHEN e.date_embauche BETWEEN ? AND ? THEN 1 END) as embauches_periode,
+            COUNT(CASE WHEN e.statut = 'inactif' AND e.date_depart BETWEEN ? AND ? THEN 1 END) as departs_periode,
+            AVG(
+                CASE 
+                    WHEN e.statut = 'inactif' AND e.date_depart IS NOT NULL
+                    THEN TIMESTAMPDIFF(MONTH, e.date_embauche, e.date_depart)
+                    WHEN e.statut = 'actif'
+                    THEN TIMESTAMPDIFF(MONTH, e.date_embauche, CURDATE())
+                    ELSE NULL
+                END
+            ) as duree_moyenne
+        FROM employes e
+        LEFT JOIN postes p ON e.poste_id = p.id
+        LEFT JOIN departements d ON p.departement_id = d.id
+        WHERE 1=1
+    ";
+
+    $params = [
+        $filters['date_debut'] ?? date('Y-m-01'),
+        $filters['date_fin'] ?? date('Y-m-t'),
+        $filters['date_debut'] ?? date('Y-m-01'),
+        $filters['date_fin'] ?? date('Y-m-t'),
+    ];
+
+    if (!empty($filters['departement_id'])) {
+        $query .= " AND d.id = ?";
+        $params[] = $filters['departement_id'];
+    }
+
+    $query .= " GROUP BY d.id, d.nom ORDER BY d.nom";
+
+    try {
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Erreur generateTurnoverReport: " . $e->getMessage());
+        return [];
+    }
+}
+    }
+    class PosteManager
+    {
+        private $conn;
+
+        public function __construct(PDO $connection)
+        {
+            $this->conn = $connection;
+        }
+
+        public function getAllPostes(): array
+        {
+            $stmt = $this->conn->query("
+            SELECT p.*,
                    ps.nom as poste_superieur_nom
-            FROM postes p 
-            LEFT JOIN postes ps ON p.poste_superieur_id = ps.id 
+                    FROM postes p
+                    LEFT JOIN postes ps ON p.poste_superieur_id = ps.id
+                    WHERE p.actif = 1
+                    ORDER BY p.niveau_hierarchique ASC, p.nom
+        ");
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        public function getPosteById(int $id): ?array
+        {
+            $stmt = $this->conn->prepare("
+            SELECT p.*,
+                   ps.nom as poste_superieur_nom
+            FROM postes p
+            LEFT JOIN postes ps ON p.poste_superieur_id = ps.id
             WHERE p.id = ? AND p.actif = 1
         ");
-        $stmt->execute([$id]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $result ?: null;
-    }
-    
-    public function getTypesContrat(): array {
-        return [
-            'CDI' => 'Contrat à Durée Indéterminée',
-            'CDD' => 'Contrat à Durée Déterminée',
-            'Stage' => 'Stage',
-            'Apprentissage' => 'Contrat d\'Apprentissage',
-            'Freelance' => 'Freelance/Consultant',
-            'Temps_partiel' => 'Temps Partiel'
-        ];
-    }
-}
+            $stmt->execute([$id]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $result ?: null;
+        }
 
-class APIHandler {
-    private $employeeManager;
-    private $posteManager;
-    private $payrollManager;
-    
-    public function __construct(PDO $conn) {
-        $this->employeeManager = new EmployeeManager($conn);
-        $this->posteManager = new PosteManager($conn);
-        $this->payrollManager = new PayrollManager($conn);
-    }
-    
-    private function getEmployeesWithPresence(): void {
-        try {
-            $employees = $this->employeeManager->getAllEmployeesWithPresenceStatus();
-            echo json_encode(['success' => true, 'employees' => $employees]);
-        } catch (Exception $e) {
-            echo json_encode(['success' => false, 'message' => 'Erreur lors du chargement des employés avec présence']);
+        public function getTypesContrat(): array
+        {
+            return [
+                'CDI'           => 'Contrat à Durée Indéterminée',
+                'CDD'           => 'Contrat à Durée Déterminée',
+                'Stage'         => 'Stage',
+                'Apprentissage' => 'Contrat d\'Apprentissage',
+                'Freelance'     => 'Freelance/Consultant',
+                'Temps_partiel' => 'Temps Partiel',
+            ];
         }
     }
 
-    private function getDepartements(): void {
-        try {
-            $departementManager = new DepartementManager($this->conn);
-            $departements = $departementManager->getAllDepartements();
-            echo json_encode(['success' => true, 'departements' => $departements]);
-        } catch (Exception $e) {
-            echo json_encode(['success' => false, 'message' => 'Erreur lors du chargement des départements']);
+    class APIHandler
+    {
+        private $employeeManager;
+        private $posteManager;
+        private $payrollManager;
+        private $reportingManager;
+        private $conn;
+
+        public function __construct(PDO $conn)
+        {
+            $this->conn             = $conn;
+            $this->employeeManager  = new EmployeeManager($conn);
+            $this->posteManager     = new PosteManager($conn);
+            $this->payrollManager   = new PayrollManager($conn);
+            $this->reportingManager = new ReportingManager($conn);
         }
+
+        private function getEmployeesWithPresence(): void
+        {
+            try {
+                $employees = $this->employeeManager->getAllEmployeesWithPresenceStatus();
+                echo json_encode(['success' => true, 'employees' => $employees]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => 'Erreur lors du chargement des employés avec présence']);
+            }
+        }
+
+        private function getDepartements(): void
+        {
+            try {
+                $departementManager = new DepartementManager($this->conn);
+                $departements       = $departementManager->getAllDepartements();
+                echo json_encode(['success' => true, 'departements' => $departements]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => 'Erreur lors du chargement des départements']);
+            }
+        }
+
+        private function reactivateEmployee(): void
+        {
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
+                return;
+            }
+
+            $input = json_decode(file_get_contents('php://input'), true);
+
+            if (empty($input['id'])) {
+                echo json_encode(['success' => false, 'message' => 'ID employé requis']);
+                return;
+            }
+
+            try {
+                $result = $this->employeeManager->reactivateEmployee($input['id']);
+                echo json_encode($result);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => 'Erreur lors de la réactivation: ' . $e->getMessage()]);
+            }
+        }
+
+        private function permanentDeleteEmployee(): void
+        {
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
+                return;
+            }
+
+            $input = json_decode(file_get_contents('php://input'), true);
+
+            if (empty($input['id'])) {
+                echo json_encode(['success' => false, 'message' => 'ID employé requis']);
+                return;
+            }
+
+            $result = $this->employeeManager->permanentDeleteEmployee($input['id']);
+            echo json_encode($result);
+        }
+
+        private function getDashboardStats(): void
+        {
+            try {
+                $stats = $this->reportingManager->getDashboardStats();
+                echo json_encode(['success' => true, 'stats' => $stats]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            }
+        }
+
+        private function generateReport(): void
+        {
+            try {
+                $input   = json_decode(file_get_contents('php://input'), true);
+                $type    = $input['type'] ?? '';
+                $filters = $input['filters'] ?? [];
+
+                $report = $this->reportingManager->generateCustomReport($type, $filters);
+                echo json_encode(['success' => true, 'report' => $report]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            }
+        }
+
+      public function handleRequest(): void
+{
+    $action = $_GET['action'] ?? $_POST['ajax_action'] ?? '';
+
+    // Log de l'action demandée pour debug
+    error_log("Action demandée: " . $action);
+
+    // Actions qui ne nécessitent pas de header JSON
+    $non_json_actions = ['generer_bulletin'];
+
+    if (!in_array($action, $non_json_actions)) {
+        header('Content-Type: application/json');
     }
 
-    private function reactivateEmployee(): void {
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
-        return;
-    }
-    
-    $input = json_decode(file_get_contents('php://input'), true);
-    
-    if (empty($input['id'])) {
-        echo json_encode(['success' => false, 'message' => 'ID employé requis']);
-        return;
-    }
-    
     try {
-        $result = $this->employeeManager->reactivateEmployee($input['id']);
-        echo json_encode($result);
-    } catch (Exception $e) {
-        echo json_encode(['success' => false, 'message' => 'Erreur lors de la réactivation: ' . $e->getMessage()]);
-    }
-}
-
-    private function permanentDeleteEmployee(): void {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
-            return;
-        }
-        
-        $input = json_decode(file_get_contents('php://input'), true);
-        
-        if (empty($input['id'])) {
-            echo json_encode(['success' => false, 'message' => 'ID employé requis']);
-            return;
-        }
-        
-        $result = $this->employeeManager->permanentDeleteEmployee($input['id']);
-        echo json_encode($result);
-    }
-
-    public function handleRequest(): void {
-        $action = $_GET['action'] ?? $_POST['ajax_action'] ?? '';
-        
-        if (in_array($action, ['generer_bulletin'])) {
-        } else {
-            header('Content-Type: application/json');
-        }
-        
         switch ($action) {
             case 'get_employees':
                 $this->getEmployees();
@@ -1133,7 +2045,7 @@ class APIHandler {
                 break;
             case 'generer_bulletin':
                 $this->genererBulletin();
-                break;            
+                break;
             case 'get_employees_with_presences':
                 $this->getEmployeesWithPresence();
                 break;
@@ -1142,6 +2054,12 @@ class APIHandler {
                 break;
             case 'generer_tous_bulletins':
                 $this->genererTousBulletins();
+                break;
+            case 'get_dashboard_stats':
+                $this->getDashboardStats();
+                break;
+            case 'generate_report':
+                $this->generateReport();
                 break;
             case 'reactivate_employee':
                 $this->reactivateEmployee();
@@ -1154,346 +2072,307 @@ class APIHandler {
                 break;
             default:
                 header('Content-Type: application/json');
-                echo json_encode(['success' => false, 'message' => 'Action non reconnue']);
+                echo json_encode([
+                    'success' => false, 
+                    'message' => 'Action non reconnue: ' . $action,
+                    'debug' => ['action' => $action, 'get' => $_GET, 'post_keys' => array_keys($_POST)]
+                ]);
         }
-        exit;
-    }
-
-    private function getTodayAttendance(): void {
-        try {
-            $attendance = $this->employeeManager->getTodayAttendance();
-            echo json_encode(['success' => true, 'attendance' => $attendance]);
-        } catch (Exception $e) {
-            echo json_encode(['success' => false, 'message' => 'Erreur lors du chargement des présences']);
-        }
-    }
-
-   // Modifiez également votre méthode getEmployees pour une meilleure gestion d'erreur
-private function getEmployees(): void {
-    try {
-        $employees = $this->employeeManager->getAllEmployees();
-        
-        // Debug: vérifiez ce qui est retourné
-        error_log("Nombre d'employés récupérés: " . count($employees));
-        
-        echo json_encode([
-            'success' => true, 
-            'employees' => $employees,
-            'count' => count($employees)
-        ]);
     } catch (Exception $e) {
-        error_log("Erreur getEmployees: " . $e->getMessage());
+        error_log("Erreur dans handleRequest pour action $action: " . $e->getMessage());
+        header('Content-Type: application/json');
         echo json_encode([
             'success' => false, 
-            'message' => 'Erreur lors du chargement des employés: ' . $e->getMessage()
+            'message' => 'Erreur serveur: ' . $e->getMessage(),
+            'action' => $action
         ]);
     }
-}
-    private function getStatistics(): void {
-        try {
-            $statistics = $this->employeeManager->getStatistics();
-            echo json_encode(['success' => true, 'statistics' => $statistics]);
-        } catch (Exception $e) {
-            echo json_encode(['success' => false, 'message' => 'Erreur lors du chargement des statistiques']);
-        }
-    }
     
-    private function getPostes(): void {
-        try {
-            $postes = $this->posteManager->getAllPostes();
-            echo json_encode(['success' => true, 'postes' => $postes]);
-        } catch (Exception $e) {
-            echo json_encode(['success' => false, 'message' => 'Erreur lors du chargement des postes']);
-        }
-    }
-    
-    private function getPosteDetails(): void {
-        try {
-            $poste_id = $_GET['id'] ?? null;
-            if (!$poste_id) {
-                echo json_encode(['success' => false, 'message' => 'ID poste requis']);
-                return;
-            }
-            
-            $poste = $this->posteManager->getPosteById($poste_id);
-            if (!$poste) {
-                echo json_encode(['success' => false, 'message' => 'Poste non trouvé']);
-                return;
-            }
-            
-            echo json_encode(['success' => true, 'poste' => $poste]);
-        } catch (Exception $e) {
-            echo json_encode(['success' => false, 'message' => 'Erreur lors du chargement du poste']);
-        }
-    }
-    
-    private function addEmployee(): void {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
-            return;
-        }
-        
-        $result = $this->employeeManager->addEmployee($_POST);
-        echo json_encode($result);
-    }
-    
-    private function updateEmployee(): void {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
-            return;
-        }
-        
-        $result = $this->employeeManager->updateEmployee($_POST);
-        echo json_encode($result);
-    }
-    
-    private function deleteEmployee(): void {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
-            return;
-        }
-        
-        $input = json_decode(file_get_contents('php://input'), true);
-        
-        if (empty($input['id'])) {
-            echo json_encode(['success' => false, 'message' => 'ID employé requis']);
-            return;
-        }
-        
-        $result = $this->employeeManager->deactivateEmployee($input['id']);
-        echo json_encode($result);
-    }
-    
-    private function genererBulletin(): void {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
-            return;
-        }
-
-        try {
-            $employe_id = $_POST['employe_id'] ?? null;
-            $mois_annee = $_POST['mois_annee'] ?? null;
-
-            if (!$employe_id || !$mois_annee) {
-                header('Content-Type: application/json');
-                echo json_encode(['success' => false, 'message' => 'Employé et mois requis']);
-                return;
-            }
-
-            $employee = $this->employeeManager->getEmployeeById($employe_id);
-            if (!$employee) {
-                header('Content-Type: application/json');
-                echo json_encode(['success' => false, 'message' => 'Employé non trouvé']);
-                return;
-            }
-
-            $details = $this->payrollManager->calculerSalaireNet($employe_id, $mois_annee);
-            $pdf_content = $this->payrollManager->genererBulletinPaie($details);
-            $bulletin_id = $this->payrollManager->enregistrerBulletinPaie($details);
-
-            if (strpos($pdf_content, '<!DOCTYPE html') !== false) {
-                header('Content-Type: text/html; charset=UTF-8');
-                header('Content-Disposition: attachment; filename="bulletin_' . $employee['nom'] . '_' . $mois_annee . '.html"');
-            } else {
-                header('Content-Type: application/pdf');
-                header('Content-Disposition: attachment; filename="bulletin_' . $employee['nom'] . '_' . $mois_annee . '.pdf"');
-            }
-            
-            header('Content-Length: ' . strlen($pdf_content));
-            echo $pdf_content;
-
-        } catch (Exception $e) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
+    exit;
     }
 
-    private function genererTousBulletins(): void {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
-            return;
+        private function getTodayAttendance(): void
+        {
+            try {
+                $attendance = $this->employeeManager->getTodayAttendance();
+                echo json_encode(['success' => true, 'attendance' => $attendance]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => 'Erreur lors du chargement des présences']);
+            }
         }
 
-        try {
-            $mois_annee = $_POST['mois_annee'] ?? null;
+        // Modifiez également votre méthode getEmployees pour une meilleure gestion d'erreur
+        private function getEmployees(): void
+        {
+            try {
+                $employees = $this->employeeManager->getAllEmployees();
 
-            if (!$mois_annee) {
-                echo json_encode(['success' => false, 'message' => 'Mois requis']);
-                return;
-            }
+                // Debug: vérifiez ce qui est retourné
+                error_log("Nombre d'employés récupérés: " . count($employees));
 
-            $resultats = $this->payrollManager->genererBulletinsPourTous($mois_annee);
-            
-            $count_success = count(array_filter($resultats, function($r) { return $r['success']; }));
-            $count_total = count($resultats);
-
-            if ($count_success > 0) {
                 echo json_encode([
-                    'success' => true, 
-                    'message' => "Bulletins générés avec succès",
-                    'count' => $count_success,
-                    'total' => $count_total,
-                    'details' => $resultats
+                    'success'   => true,
+                    'employees' => $employees,
+                    'count'     => count($employees),
                 ]);
-            } else {
-                echo json_encode(['success' => false, 'message' => 'Aucun bulletin généré']);
+            } catch (Exception $e) {
+                error_log("Erreur getEmployees: " . $e->getMessage());
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Erreur lors du chargement des employés: ' . $e->getMessage(),
+                ]);
+            }
+        }
+        private function getStatistics(): void
+        {
+            try {
+                $statistics = $this->employeeManager->getStatistics();
+                echo json_encode(['success' => true, 'statistics' => $statistics]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => 'Erreur lors du chargement des statistiques']);
+            }
+        }
+
+        private function getPostes(): void
+        {
+            try {
+                $postes = $this->posteManager->getAllPostes();
+                echo json_encode(['success' => true, 'postes' => $postes]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => 'Erreur lors du chargement des postes']);
+            }
+        }
+
+        private function getPosteDetails(): void
+        {
+            try {
+                $poste_id = $_GET['id'] ?? null;
+                if (! $poste_id) {
+                    echo json_encode(['success' => false, 'message' => 'ID poste requis']);
+                    return;
+                }
+
+                $poste = $this->posteManager->getPosteById($poste_id);
+                if (! $poste) {
+                    echo json_encode(['success' => false, 'message' => 'Poste non trouvé']);
+                    return;
+                }
+
+                echo json_encode(['success' => true, 'poste' => $poste]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => 'Erreur lors du chargement du poste']);
+            }
+        }
+
+        private function addEmployee(): void
+        {
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
+                return;
             }
 
-        } catch (Exception $e) {
-            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            $result = $this->employeeManager->addEmployee($_POST);
+            echo json_encode($result);
         }
+
+        private function updateEmployee(): void
+        {
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
+                return;
+            }
+
+            $result = $this->employeeManager->updateEmployee($_POST);
+            echo json_encode($result);
+        }
+
+        private function deleteEmployee(): void
+        {
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
+                return;
+            }
+
+            $input = json_decode(file_get_contents('php://input'), true);
+
+            if (empty($input['id'])) {
+                echo json_encode(['success' => false, 'message' => 'ID employé requis']);
+                return;
+            }
+
+            $result = $this->employeeManager->deactivateEmployee($input['id']);
+            echo json_encode($result);
+        }
+
+       private function genererBulletin(): void
+{
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
+        return;
+    }
+
+    try {
+        $employe_id = $_POST['employe_id'] ?? null;
+        $mois_annee = $_POST['mois_annee'] ?? null;
+
+        // Validation des paramètres
+        if (!$employe_id || !$mois_annee) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Employé et mois requis']);
+            return;
+        }
+
+        // Vérifier que l'employé existe et est actif
+        $employee = $this->employeeManager->getEmployeeById($employe_id);
+        if (!$employee) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Employé non trouvé']);
+            return;
+        }
+
+        if ($employee['statut'] !== 'actif') {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Cet employé n\'est pas actif']);
+            return;
+        }
+
+        // Calculer les détails du salaire
+        $details = $this->payrollManager->calculerSalaireNet($employe_id, $mois_annee);
+        
+        // Générer le bulletin
+        $pdf_content = $this->payrollManager->genererBulletinPaie($details);
+        
+        // Enregistrer le bulletin en base
+        $bulletin_id = $this->payrollManager->enregistrerBulletinPaie($details);
+
+        // Définir le nom du fichier
+        $filename = 'bulletin_' . $employee['nom'] . '_' . $employee['prenom'] . '_' . $mois_annee;
+        $filename = preg_replace('/[^a-zA-Z0-9_-]/', '', $filename); // Nettoyer le nom de fichier
+
+        // Déterminer le type de contenu et l'extension
+        if (strpos($pdf_content, '<!DOCTYPE html') !== false) {
+            header('Content-Type: text/html; charset=UTF-8');
+            header('Content-Disposition: attachment; filename="' . $filename . '.html"');
+        } else {
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: attachment; filename="' . $filename . '.pdf"');
+        }
+
+        header('Content-Length: ' . strlen($pdf_content));
+        header('Cache-Control: no-cache, must-revalidate');
+        header('Expires: Sat, 26 Jul 1997 05:00:00 GMT');
+        
+        echo $pdf_content;
+
+    } catch (Exception $e) {
+        error_log("Erreur génération bulletin: " . $e->getMessage());
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()]);
     }
 }
+public function verifierPrerequisPaie(int $employe_id): array
+{
+    try {
+        $stmt = $this->conn->prepare("
+            SELECT e.nom, e.prenom, e.statut, e.salaire,
+                   p.salaire as salaire_poste, p.taux_cotisation,
+                   e.iban, e.titulaire_compte
+            FROM employes e
+            LEFT JOIN postes p ON e.poste_id = p.id
+            WHERE e.id = ?
+        ");
+        $stmt->execute([$employe_id]);
+        $employee = $stmt->fetch(PDO::FETCH_ASSOC);
 
-if (isset($_GET['action']) || ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action']))) {
-    $apiHandler = new APIHandler($conn);
+        if (!$employee) {
+            return ['valid' => false, 'errors' => ['Employé non trouvé']];
+        }
+
+        $errors = [];
+
+        if ($employee['statut'] !== 'actif') {
+            $errors[] = 'L\'employé n\'est pas actif';
+        }
+
+        $salaire = $employee['salaire'] ?: $employee['salaire_poste'];
+        if (!$salaire || $salaire <= 0) {
+            $errors[] = 'Aucun salaire défini pour cet employé';
+        }
+
+        if (!$employee['iban']) {
+            $errors[] = 'IBAN manquant pour le virement';
+        }
+
+        if (!$employee['titulaire_compte']) {
+            $errors[] = 'Nom du titulaire du compte manquant';
+        }
+
+        return [
+            'valid' => empty($errors),
+            'errors' => $errors,
+            'employee' => $employee
+        ];
+
+    } catch (PDOException $e) {
+        error_log("Erreur verifierPrerequisPaie: " . $e->getMessage());
+        return ['valid' => false, 'errors' => ['Erreur de base de données']];
+    }
+}
+        private function genererTousBulletins(): void
+        {
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
+                return;
+            }
+
+            try {
+                $mois_annee = $_POST['mois_annee'] ?? null;
+
+                if (! $mois_annee) {
+                    echo json_encode(['success' => false, 'message' => 'Mois requis']);
+                    return;
+                }
+
+                $resultats = $this->payrollManager->genererBulletinsPourTous($mois_annee);
+
+                $count_success = count(array_filter($resultats, function ($r) {return $r['success'];}));
+                $count_total = count($resultats);
+
+                if ($count_success > 0) {
+                    echo json_encode([
+                        'success' => true,
+                        'message' => "Bulletins générés avec succès",
+                        'count'   => $count_success,
+                        'total'   => $count_total,
+                        'details' => $resultats,
+                    ]);
+                } else {
+                    echo json_encode(['success' => false, 'message' => 'Aucun bulletin généré']);
+                }
+
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            }
+        }
+    }
+   $apiHandler = new APIHandler($conn);
+if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
     $apiHandler->handleRequest();
+    exit; // Important pour éviter l'affichage du HTML après une requête API
 }
-try {
-    $posteManager = new PosteManager($conn);
-    $postes = $posteManager->getAllPostes();
-    
-    $employeeManager = new EmployeeManager($conn);
-    $employes = $employeeManager->getAllEmployees();
-    
-    // Charger les départements
-    $departementManager = new DepartementManager($conn);
-    $departements = $departementManager->getAllDepartements();
-} catch (Exception $e) {
-    $postes = [];
-    $employes = [];
-    $departements = [];
-    error_log("Erreur lors du chargement des données: " . $e->getMessage());
-}
-
-try {
-    $posteManager = new PosteManager($conn);
-    $postes = $posteManager->getAllPostes();
-    
-    $employeeManager = new EmployeeManager($conn);
-    $employes = $employeeManager->getAllEmployees();
-} catch (Exception $e) {
-    $postes = [];
-    $employes = [];
-    error_log("Erreur lors du chargement des données: " . $e->getMessage());
-}
-
 ?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8"> 
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>restaurant Mulho</title>
     <link rel="icon" type="image/x-icon" href="../assets/img/logo.jpg">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        .fade-in { animation: fadeIn 0.3s ease-in; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
-        .notification { position: fixed; top: 20px; right: 20px; z-index: 1000; }
-        .contract-badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; }
-        .contract-cdi { background-color: #dcfce7; color: #166534; }
-        .contract-cdd { background-color: #fef3c7; color: #92400e; }
-        .contract-stage { background-color: #dbeafe; color: #1e40af; }
-        .contract-apprentissage { background-color: #fce7f3; color: #be185d; }
-        .contract-freelance { background-color: #f3e8ff; color: #7c3aed; }
-        .contract-temps_partiel { background-color: #e0f2fe; color: #0277bd; }
-    </style>
-    <style>
-/* 4. AMÉLIORATION DES BORDURES DU TABLEAU */
-.table-visible-borders table {
-    border-collapse: separate !important;
-    border-spacing: 0;
-    border: 2px solid #d1d5db;
-    border-radius: 8px;
-}
-
-.table-visible-borders th {
-    border-right: 2px solid #d1d5db !important;
-    border-bottom: 3px solid #d1d5db !important;
-    background-color: #f9fafb;
-    font-weight: 600;
-}
-
-.table-visible-borders th:last-child {
-    border-right: none !important;
-}
-
-.table-visible-borders td {
-    border-right: 1px solid #e5e7eb !important;
-    border-bottom: 1px solid #e5e7eb !important;
-}
-
-.table-visible-borders td:last-child {
-    border-right: none !important;
-}
-
-.table-visible-borders tbody tr:last-child td {
-    border-bottom: none !important;
-}
-
-.table-visible-borders tbody tr:hover {
-    background-color: #f3f4f6;
-}
-
-/* Amélioration des badges de département */
-.departement-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 4px 8px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: 500;
-    border: 1px solid;
-    min-width: 80px;
-    justify-content: center;
-}
-  /* Animation pour le modal */
-    .modal-fade-in {
-        animation: modalFadeIn 0.3s ease-out;
-    }
-    
-    @keyframes modalFadeIn {
-        from { opacity: 0; transform: translateY(-20px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    
-    /* Style pour le tableau d'historique */
-    .presence-table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-    
-    .presence-table th, .presence-table td {
-        padding: 10px;
-        text-align: left;
-        border-bottom: 1px solid #e5e7eb;
-    }
-    
-    .presence-table th {
-        background-color: #f9fafb;
-        font-weight: 600;
-    }
-    
-    .presence-table tr:hover {
-        background-color: #f3f4f6;
-    }
-    
-    .status-present {
-        color: #10b981;
-    }
-    
-    .status-absent {
-        color: #ef4444;
-    }
-    
-    .status-retard {
-        color: #f59e0b;
-    }
-</style>
+    <!-- <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> -->
+    <link rel="stylesheet" href="employe.css">
 </head>
 <body class="bg-gray-50 min-h-screen">
     <!-- Navigation -->
@@ -1517,7 +2396,7 @@ try {
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
             <!-- Employés Actifs -->
-            <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale">
+            <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale stat-card-actifs">
                 <div class="flex items-center">
                     <div class="p-3 rounded-full bg-blue-100 text-blue-600">
                         <i class="fas fa-users text-xl"></i>
@@ -1528,9 +2407,9 @@ try {
                     </div>
                 </div>
             </div>
-            
+
             <!-- Présents Aujourd'hui -->
-            <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale">
+           <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale border-2 border-gray-200">
                 <div class="flex items-center">
                     <div class="p-3 rounded-full bg-green-100 text-green-600">
                         <i class="fas fa-check-circle text-xl"></i>
@@ -1541,9 +2420,9 @@ try {
                     </div>
                 </div>
             </div>
-            
+
             <!-- Absents -->
-            <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale">
+           <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale border-2 border-gray-200">
                 <div class="flex items-center">
                     <div class="p-3 rounded-full bg-red-100 text-red-600">
                         <i class="fas fa-times-circle text-xl"></i>
@@ -1554,9 +2433,9 @@ try {
                     </div>
                 </div>
             </div>
-            
+
             <!-- En Retard -->
-            <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale">
+           <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale border-2 border-gray-200">
                 <div class="flex items-center">
                     <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
                         <i class="fas fa-clock text-xl"></i>
@@ -1567,7 +2446,7 @@ try {
                     </div>
                 </div>
             </div>
-            <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale">
+           <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale border-2 border-gray-200">
                 <div class="flex items-center">
                     <div class="p-3 rounded-full bg-gray-100 text-gray-600">
                         <i class="fas fa-user-slash text-xl"></i>
@@ -1579,7 +2458,7 @@ try {
                 </div>
             </div>
             <!-- Administrateurs -->
-            <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale">
+           <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale border-2 border-gray-200">
                 <div class="flex items-center">
                     <div class="p-3 rounded-full bg-orange-100 text-orange-600">
                         <i class="fas fa-crown text-xl"></i>
@@ -1591,29 +2470,142 @@ try {
                 </div>
             </div>
         </div>
+<!-- Section Tableau de Bord Avancé -->
+<div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale stat-card-actifs">
+    <h2 class="text-xl font-semibold mb-6">Tableau de Bord RH Avancé</h2>
 
-       <div class="bg-white rounded-lg shadow-md p-6 mb-6 card-shadow">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="bg-blue-50 p-4 rounded-lg">
+            <div class="flex items-center">
+                <div class="p-2 rounded-full bg-blue-100 text-blue-600 mr-3">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-blue-600">Effectif Total</p>
+                    <p class="text-2xl font-bold" id="totalEmployes">0</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-green-50 p-4 rounded-lg">
+            <div class="flex items-center">
+                <div class="p-2 rounded-full bg-green-100 text-green-600 mr-3">
+                    <i class="fas fa-user-check"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-green-600">Taux de Présence</p>
+                    <p class="text-2xl font-bold" id="tauxPresence">0%</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-purple-50 p-4 rounded-lg">
+            <div class="flex items-center">
+                <div class="p-2 rounded-full bg-purple-100 text-purple-600 mr-3">
+                    <i class="fas fa-money-bill-wave"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-purple-600">Masse Salariale</p>
+                    <p class="text-2xl font-bold" id="masseSalariale">0 FCFA</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-orange-50 p-4 rounded-lg">
+            <div class="flex items-center">
+                <div class="p-2 rounded-full bg-orange-100 text-orange-600 mr-3">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-orange-600">Retard Moyen</p>
+                    <p class="text-2xl font-bold" id="retardMoyen">0 min</p>
+                </div>
+            </div>
+        </div>
+    </div>
+<div class="bg-gray-50 p-4 rounded-lg">
+    <h3 class="text-lg font-semibold mb-4">Générer un Rapport Personnalisé</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Type de Rapport</label>
+            <select id="reportType" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                <option value="presences">Présences et Retards</option>
+                <option value="salaires">Salaires et Coûts</option>
+                <option value="effectifs">Effectifs et Démographie</option>
+                <option value="turnover">Turnover et Rotation</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Date Début</label>
+            <input type="date" id="reportStartDate" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Date Fin</label>
+            <input type="date" id="reportEndDate" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+        </div>
+    </div>
+    <button onclick="generateCustomReport()" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+        <i class="fas fa-file-export mr-2"></i>Générer le Rapport
+    </button>
+
+    <!-- Indicateur de chargement -->
+    <div id="reportLoading" class="hidden mt-4 text-center">
+        <i class="fas fa-spinner fa-spin text-blue-500 text-2xl"></i>
+        <p class="text-gray-600">Génération du rapport en cours...</p>
+    </div>
+</div>
+
+<!-- Modal pour afficher les rapports -->
+<div id="reportModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-white rounded-lg max-w-6xl w-full max-h-screen overflow-y-auto">
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h3 id="reportModalTitle" class="text-lg font-semibold text-gray-900">Rapport Personnalisé</h3>
+                <button onclick="closeReportModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <div id="reportContent" class="mb-6">
+                    <!-- Le contenu du rapport sera chargé ici -->
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button onclick="exportReportToPDF()" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">
+                        <i class="fas fa-file-pdf mr-2"></i>Exporter en PDF
+                    </button>
+                    <button onclick="exportReportToExcel()" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+                        <i class="fas fa-file-excel mr-2"></i>Exporter en Excel
+                    </button>
+                    <button onclick="closeReportModal()" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+                        Fermer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+ <div class="bg-white rounded-lg shadow-md p-6 mb-6 card-shadow border-2 border-gray-200">
     <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
         <!-- Champ de recherche -->
         <div>
-            <input type="text" id="searchInput" placeholder="Rechercher par nom, email..." 
+            <input type="text" id="searchInput" placeholder="Rechercher par nom, email..."
                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
         </div>
-        
+
         <!-- Filtre département -->
         <div>
             <select id="filterDepartement" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                 <option value="">Tous les départements</option>
             </select>
         </div>
-        
+
         <!-- Filtre poste -->
         <div>
             <select id="filterPoste" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                 <option value="">Tous les postes</option>
             </select>
         </div>
-        
+
         <!-- Filtre contrat -->
         <div>
             <select id="filterContrat" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
@@ -1626,7 +2618,7 @@ try {
                 <option value="Temps_partiel">Temps Partiel</option>
             </select>
         </div>
-        
+
         <!-- Filtre statut -->
         <div>
             <select id="filterStatut" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
@@ -1637,7 +2629,7 @@ try {
                 <option value="inactif">Inactif</option>
             </select>
         </div>
-        
+
         <!-- NOUVEAU: Boutons d'action -->
         <div class="flex space-x-2">
             <button onclick="applyFilters()" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition duration-200">
@@ -1651,7 +2643,7 @@ try {
 </div>
 
         <!-- Section Génération des Bulletins de Paie -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6 card-shadow">
+       <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale stat-card-actifs">
             <h2 class="text-xl font-semibold mb-6">Génération des Bulletins de Paie</h2>
             <form id="genererBulletinForm" class="space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1690,7 +2682,7 @@ try {
         </div>
 
 <!-- 6. MODIFICATION DE LA SECTION TABLEAU POUR AJOUTER LES BORDURES -->
-<div id="tableView" class="bg-white rounded-lg shadow-md overflow-hidden card-shadow table-visible-borders">
+<div id="tableView" class="bg-white rounded-lg shadow-md overflow-hidden card-shadow table-visible-borders border-2 border-gray-200">
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
@@ -1705,6 +2697,7 @@ try {
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Présence</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salaire</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Heures/Mois</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documents</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
             </thead>
@@ -1714,6 +2707,7 @@ try {
         </table>
     </div>
 </div>
+
     </div>
 
     <!-- Modal Ajouter/Modifier Employé -->
@@ -1723,15 +2717,15 @@ try {
                 <div class="px-6 py-4 border-b border-gray-200">
                     <h3 id="modalTitle" class="text-lg font-semibold text-gray-900">Ajouter un employé</h3>
                 </div>
-                
+
                 <form id="employeeForm" class="p-6" enctype="multipart/form-data">
                     <input type="hidden" id="employeeId" name="id">
                     <input type="hidden" name="ajax_action" id="ajaxAction" value="add_employee">
-                    
+
                     <!-- Photo de profil -->
                     <div class="mb-6 text-center">
                         <div class="relative inline-block">
-                            <img id="photoPreview" src="uploads/photos/default-avatar.png" 
+                            <img id="photoPreview" src="uploads/photos/default-avatar.png"
                                  class="w-24 h-24 rounded-full border-4 border-gray-200 object-cover">
                             <label for="photo" class="absolute bottom-0 right-0 bg-blue-600 text-white rounded-full p-2 cursor-pointer hover:bg-blue-700">
                                 <i class="fas fa-camera text-sm"></i>
@@ -1744,29 +2738,213 @@ try {
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                         <div>
                             <label for="nom" class="block text-sm font-medium text-gray-700 mb-2">Nom *</label>
-                            <input type="text" id="nom" name="nom" required 
+                            <input type="text" id="nom" name="nom" required
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
-                        
+
                         <div>
                             <label for="prenom" class="block text-sm font-medium text-gray-700 mb-2">Prénom *</label>
-                            <input type="text" id="prenom" name="prenom" required 
+                            <input type="text" id="prenom" name="prenom" required
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
-                        
+
                         <div>
                             <label for="email" class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
-                            <input type="email" id="email" name="email" required 
+                            <input type="email" id="email" name="email" required
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
-                        
+
                         <div>
                             <label for="telephone" class="block text-sm font-medium text-gray-700 mb-2">Téléphone</label>
-                            <input type="tel" id="telephone" name="telephone" 
+                            <input type="tel" id="telephone" name="telephone"
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
                     </div>
+                    <!-- Dans la section "Informations personnelles" -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+    <!-- Ajouter ces nouveaux champs -->
+    <div>
+        <label for="date_naissance" class="block text-sm font-medium text-gray-700 mb-2">Date de naissance</label>
+        <input type="date" id="date_naissance" name="date_naissance"
+               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+    </div>
 
+    <div>
+        <label for="lieu_naissance" class="block text-sm font-medium text-gray-700 mb-2">Lieu de naissance</label>
+        <input type="text" id="lieu_naissance" name="lieu_naissance"
+               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+    </div>
+
+    <div>
+        <label for="nationalite" class="block text-sm font-medium text-gray-700 mb-2">Nationalité</label>
+        <input type="text" id="nationalite" name="nationalite"
+               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+    </div>
+
+    <div>
+        <label for="sexe" class="block text-sm font-medium text-gray-700 mb-2">Sexe</label>
+        <select id="sexe" name="sexe"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+            <option value="">Sélectionner</option>
+            <option value="M">Masculin</option>
+            <option value="F">Féminin</option>
+        </select>
+    </div>
+</div>
+
+<!-- Nouvelle section pour les contacts d'urgence -->
+<div class="mb-6">
+    <h4 class="text-md font-semibold text-gray-800 mb-3">Contact d'urgence</h4>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+            <label for="contact_urgence_nom" class="block text-sm font-medium text-gray-700 mb-2">Nom du contact</label>
+            <input type="text" id="contact_urgence_nom" name="contact_urgence_nom"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div>
+            <label for="contact_urgence_relation" class="block text-sm font-medium text-gray-700 mb-2">Relation</label>
+            <input type="text" id="contact_urgence_relation" name="contact_urgence_relation"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div>
+            <label for="contact_urgence_telephone" class="block text-sm font-medium text-gray-700 mb-2">Téléphone</label>
+            <input type="tel" id="contact_urgence_telephone" name="contact_urgence_telephone"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+        </div>
+    </div>
+</div>
+
+<!-- Section adresse -->
+<div class="mb-6">
+    <h4 class="text-md font-semibold text-gray-800 mb-3">Adresse</h4>
+    <div class="grid grid-cols-1 gap-4">
+        <div>
+            <label for="adresse" class="block text-sm font-medium text-gray-700 mb-2">Adresse complète</label>
+            <textarea id="adresse" name="adresse" rows="2"
+                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"></textarea>
+        </div>
+    </div>
+</div>
+<!-- Nouvelle section: Informations administratives -->
+<div class="mb-6">
+    <h4 class="text-md font-semibold text-gray-800 mb-3">Informations administratives</h4>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+            <label for="num_secu" class="block text-sm font-medium text-gray-700 mb-2">
+                Numéro de sécurité sociale *
+            </label>
+            <input type="text" id="num_secu" name="num_secu" required
+                   pattern="[0-9]{15}" title="15 chiffres requis"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+            <label for="num_identite" class="block text-sm font-medium text-gray-700 mb-2">
+                Numéro de pièce d'identité *
+            </label>
+            <input type="text" id="num_identite" name="num_identite" required
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+            <label for="type_identite" class="block text-sm font-medium text-gray-700 mb-2">
+                Type de pièce d'identité
+            </label>
+            <select id="type_identite" name="type_identite"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                <option value="CNI">Carte Nationale d'Identité</option>
+                <option value="passeport">Passeport</option>
+                <option value="titre_sejour">Titre de Séjour</option>
+                <option value="permis_conduire">Permis de Conduire</option>
+            </select>
+        </div>
+        <div>
+            <label for="situation_familiale" class="block text-sm font-medium text-gray-700 mb-2">
+                Situation familiale
+            </label>
+            <select id="situation_familiale" name="situation_familiale"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                <option value="celibataire">Célibataire</option>
+                <option value="marie">Marié(e)</option>
+                <option value="pacse">Pacsé(e)</option>
+                <option value="divorce">Divorcé(e)</option>
+                <option value="veuf">Veuf/Veuve</option>
+            </select>
+        </div>
+        <div>
+            <label for="nombre_enfants" class="block text-sm font-medium text-gray-700 mb-2">
+                Nombre d'enfants à charge
+            </label>
+            <input type="number" id="nombre_enfants" name="nombre_enfants" min="0" value="0"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+        </div>
+    </div>
+</div>
+
+<!-- Nouvelle section: Coordonnées bancaires -->
+<div class="mb-6">
+    <h4 class="text-md font-semibold text-gray-800 mb-3">Coordonnées bancaires</h4>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="md:col-span-2">
+            <label for="iban" class="block text-sm font-medium text-gray-700 mb-2">
+                IBAN *
+            </label>
+            <input type="text" id="iban" name="iban" required
+                   placeholder="FR76 XXXX XXXX XXXX XXXX XXXX XXX"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+            <label for="nom_banque" class="block text-sm font-medium text-gray-700 mb-2">
+                Nom de la banque
+            </label>
+            <input type="text" id="nom_banque" name="nom_banque"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+            <label for="titulaire_compte" class="block text-sm font-medium text-gray-700 mb-2">
+                Titulaire du compte *
+            </label>
+            <input type="text" id="titulaire_compte" name="titulaire_compte" required
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div class="md:col-span-2">
+            <label for="bic" class="block text-sm font-medium text-gray-700 mb-2">
+                Code BIC (optionnel)
+            </label>
+            <input type="text" id="bic" name="bic" placeholder="ABCDEFXX"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+        </div>
+    </div>
+</div>
+<!-- Nouvelle section: Documents à uploader -->
+<div class="mb-6">
+    <h4 class="text-md font-semibold text-gray-800 mb-3">Documents à uploader</h4>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="md:col-span-2">
+            <label for="cv" class="block text-sm font-medium text-gray-700 mb-2">
+                CV (PDF)
+            </label>
+            <input type="file" id="cv" name="cv" accept=".pdf,.doc,.docx"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div class="md:col-span-2">
+            <label for="contrat" class="block text-sm font-medium text-gray-700 mb-2">
+                Contrat de travail signé (PDF)
+            </label>
+            <input type="file" id="contrat" name="contrat" accept=".pdf"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div class="md:col-span-2">
+            <label for="piece_identite" class="block text-sm font-medium text-gray-700 mb-2">
+                Copie pièce d'identité (PDF/Image)
+            </label>
+            <input type="file" id="piece_identite" name="piece_identite" accept=".pdf,.jpg,.jpeg,.png"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+        </div>
+    </div>
+</div>
                     <!-- Informations professionnelles -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                         <div>
@@ -1776,13 +2954,13 @@ try {
                                 <option value="">Sélectionner un poste</option>
                             </select>
                         </div>
-                        
+
                         <div>
                             <label for="salaire" class="block text-sm font-medium text-gray-700 mb-2">
                                 Salaire (FCFA)
                                 <span id="salaireRange" class="text-xs text-gray-500"></span>
                             </label>
-                            <input type="number" id="salaire" name="salaire" min="0" step="1" 
+                            <input type="number" id="salaire" name="salaire" min="0" step="1"
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
                     </div>
@@ -1794,7 +2972,7 @@ try {
                             <input type="text" id="typeContrat" name="type_contrat" readonly
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700">
                         </div>
-                        
+
                         <div>
                             <label for="dureeContrat" class="block text-sm font-medium text-gray-700 mb-2">Durée du contrat</label>
                             <input type="text" id="dureeContrat" name="duree_contrat" readonly
@@ -1806,18 +2984,18 @@ try {
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                         <div>
                             <label for="dateEmbauche" class="block text-sm font-medium text-gray-700 mb-2">Date d'embauche *</label>
-                            <input type="date" id="dateEmbauche" name="date_embauche" required 
+                            <input type="date" id="dateEmbauche" name="date_embauche" required
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
-                        
+
                         <div>
                             <label for="heureDebut" class="block text-sm font-medium text-gray-700 mb-2">Heure début</label>
-                            <input type="time" id="heureDebut" name="heure_debut" value="08:00" 
+                            <input type="time" id="heureDebut" name="heure_debut" value="08:00"
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
                                                 <div>
                             <label for="heureFin" class="block text-sm font-medium text-gray-700 mb-2">Heure fin</label>
-                            <input type="time" id="heureFin" name="heure_fin" value="17:00" 
+                            <input type="time" id="heureFin" name="heure_fin" value="17:00"
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
                     </div>
@@ -1826,7 +3004,7 @@ try {
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                         <div>
                             <label for="statut" class="block text-sm font-medium text-gray-700 mb-2">Statut</label>
-                            <select id="statut" name="statut" 
+                            <select id="statut" name="statut"
                                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                                 <option value="actif">Actif</option>
                                 <option value="en_conge">En congé</option>
@@ -1834,10 +3012,10 @@ try {
                                 <option value="inactif">Inactif</option>
                             </select>
                         </div>
-                        
+
                         <div class="flex items-end">
                             <label class="flex items-center">
-                                <input type="checkbox" id="isAdmin" name="is_admin" value="1" 
+                                <input type="checkbox" id="isAdmin" name="is_admin" value="1"
                                        class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
                                 <span class="ml-2 text-sm text-gray-700">
                                     <i class="fas fa-crown text-yellow-500 mr-1"></i>
@@ -1879,11 +3057,11 @@ try {
                     </div>
 
                     <div class="mt-6 flex justify-end space-x-3">
-                        <button type="button" onclick="closeModal()" 
+                        <button type="button" onclick="closeModal()"
                                 class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition duration-200">
                             Annuler
                         </button>
-                        <button type="submit" 
+                        <button type="submit"
                                 class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-200">
                             <i class="fas fa-save mr-2"></i>Enregistrer
                         </button>
@@ -1905,7 +3083,7 @@ try {
                     <i class="fas fa-times text-xl"></i>
                 </button>
             </div>
-            
+
             <div class="p-6">
                 <div id="presenceHistoryContent" class="mb-6">
                     <!-- Le contenu sera chargé ici -->
@@ -1914,9 +3092,9 @@ try {
                         <p>Chargement de l'historique...</p>
                     </div>
                 </div>
-                
+
                 <div class="flex justify-end">
-                    <button onclick="closePresenceHistoryModal()" 
+                    <button onclick="closePresenceHistoryModal()"
                             class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition duration-200">
                         Fermer
                     </button>
@@ -1925,252 +3103,239 @@ try {
         </div>
     </div>
 </div>
-
+<div id="notification" class="notification hidden"></div>
     <script>
-        let employees = [];
-        let postes = [];
-        let departements = [];
+     // Variables globales
+let employees = [];
+let postes = [];
+let departements = [];
 
-        document.addEventListener('DOMContentLoaded', function() {
-            updateDepartementsSelect();
-    loadDepartements();
-    loadPostes();
-    loadEmployees();
-    loadStatistics();
-    
-    // SUPPRIMÉ: les événements de filtrage automatique
-    // Gardé seulement pour la recherche en temps réel
-    document.getElementById('searchInput').addEventListener('input', filterEmployees);
-    
-    document.getElementById('photo').addEventListener('change', previewPhoto);
-    document.getElementById('employeeForm').addEventListener('submit', saveEmployee);
-    
-    setTimeout(updateQuickStats, 1000);
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Initialisation de l\'application...');
+    initializeApplication();
 });
-        function loadDepartements() {
-            fetch('?action=get_departements')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        departements = data.departements;
-                        updateDepartementsSelect();
-                    }
-                })
-                .catch(error => console.error('Erreur:', error));
-        }
 
-   function updateDepartementsSelect() {
-    const filterDepartement = document.getElementById('filterDepartement');
-    
-    filterDepartement.innerHTML = '<option value="">Tous les départements</option>';
-    
-    // Utilisez les données PHP déjà chargées plutôt que de faire un appel AJAX
-    <?php foreach ($departements as $dept): ?>
-        filterDepartement.innerHTML += `<option value="<?php echo $dept['id']; ?>"><?php echo htmlspecialchars($dept['nom']); ?></option>`;
-    <?php endforeach; ?>
-}
-        function loadStatistics() {
-    fetch('?action=get_statistics')
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log('Statistiques reçues:', data); // Debug
-            if (data.success && data.statistics) {
-                const stats = data.statistics;
-                
-                // Mise à jour des statistiques avec vérification
-                updateElementText('totalActifs', stats.total_actifs || 0);
-                updateElementText('presentsAujourdhui', stats.presents_aujourd_hui || 0);
-                updateElementText('absentsAujourdhui', stats.absents_aujourd_hui || 0);
-                updateElementText('retardsAujourdhui', stats.retards_aujourd_hui || 0);
-                updateElementText('totalAdmins', stats.total_admins || 0);
-                updateElementText('totalInactifs', stats.total_inactifs || 0);
-                
-                console.log('Statistiques mises à jour avec succès');
-            } else {
-                console.error('Données statistiques invalides:', data);
-                showNotification(data.message || 'Erreur lors du chargement des statistiques', 'warning');
-            }
-        })
-        .catch(error => {
-            console.error('Erreur lors du chargement des statistiques:', error);
-            showNotification('Erreur de connexion lors du chargement des statistiques', 'error');
-        });
-}
-function updateElementText(elementId, value) {
-    const element = document.getElementById(elementId);
-    if (element) {
-        element.textContent = value;
-        console.log(`Élément ${elementId} mis à jour avec la valeur: ${value}`);
-    } else {
-        console.warn(`Élément ${elementId} non trouvé dans le DOM`);
+// Fonction d'initialisation principale
+async function initializeApplication() {
+    try {
+        console.log('Début de l\'initialisation...');
+        showNotification('Chargement de l\'application...', 'info');
+        
+        // Chargement séquentiel des données
+        await loadDepartements();
+        await loadPostes();
+        await loadEmployees();
+        await loadStatistics();
+        await loadDashboardStats();
+        
+        // Initialiser les événements
+        initializeEventListeners();
+        
+        // Mise à jour des statistiques rapides
+        setTimeout(updateQuickStats, 1000);
+        
+        hideNotification();
+        showNotification('Application chargée avec succès', 'success');
+        setTimeout(hideNotification, 2000);
+        
+        console.log('Application initialisée avec succès');
+    } catch (error) {
+        console.error('Erreur lors de l\'initialisation:', error);
+        hideNotification();
+        showNotification('Erreur lors de l\'initialisation: ' + error.message, 'error');
     }
 }
 
-// Ajoutez cette fonction de test pour diagnostiquer
-function testStatistics() {
-    console.log('Test des statistiques...');
-    fetch('?action=get_statistics')
-        .then(response => response.json())
-        .then(data => {
-            console.log('Réponse complète:', data);
-            if (data.success) {
-                console.log('Statistiques détaillées:', data.statistics);
-                Object.keys(data.statistics).forEach(key => {
-                    console.log(`${key}: ${data.statistics[key]}`);
-                });
-            } else {
-                console.error('Erreur dans la réponse:', data.message);
-            }
-        })
-        .catch(error => console.error('Erreur de test:', error));
-}
+// Initialisation des événements
+function initializeEventListeners() {
+    const searchInput = document.getElementById('searchInput');
+    const filterDepartement = document.getElementById('filterDepartement');
+    const filterPoste = document.getElementById('filterPoste');
+    const filterContrat = document.getElementById('filterContrat');
+    const filterStatut = document.getElementById('filterStatut');
+    const photoInput = document.getElementById('photo');
+    const employeeForm = document.getElementById('employeeForm');
+    const posteSelect = document.getElementById('poste');
+    
+    if (searchInput) searchInput.addEventListener('input', filterEmployees);
+    if (filterDepartement) filterDepartement.addEventListener('change', filterEmployees);
+    if (filterPoste) filterPoste.addEventListener('change', filterEmployees);
+    if (filterContrat) filterContrat.addEventListener('change', filterEmployees);
+    if (filterStatut) filterStatut.addEventListener('change', filterEmployees);
+    if (photoInput) photoInput.addEventListener('change', previewPhoto);
+    if (employeeForm) employeeForm.addEventListener('submit', saveEmployee);
+    if (posteSelect) posteSelect.addEventListener('change', updatePosteInfo);
 
-        function loadPostes() {
-            fetch('?action=get_postes')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        postes = data.postes;
-                        updatePostesSelects();
-                    }
-                })
-                .catch(error => console.error('Erreur:', error));
-        }
-
-        function updatePostesSelects() {
-            const filterPoste = document.getElementById('filterPoste');
-            const modalPoste = document.getElementById('poste');
-            
-            filterPoste.innerHTML = '<option value="">Tous les postes</option>';
-            modalPoste.innerHTML = '<option value="">Sélectionner un poste</option>';
-            
-            postes.forEach(poste => {
-                filterPoste.innerHTML += `<option value="${poste.id}">${poste.nom}</option>`;
-                modalPoste.innerHTML += `<option value="${poste.id}">${poste.nom} - ${poste.type_contrat || 'Non défini'}</option>`;
-            });
-        }
-
-        function updatePosteInfo() {
-            const posteId = document.getElementById('poste').value;
-            const posteInfo = document.getElementById('posteInfo');
-            
-            if (!posteId) {
-                posteInfo.classList.add('hidden');
-                document.getElementById('typeContrat').value = '';
-                document.getElementById('dureeContrat').value = '';
-                document.getElementById('salaire').value = '';
-                document.getElementById('salaireRange').textContent = '';
-                return;
-            }
-
-            fetch(`?action=get_poste_details&id=${posteId}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.poste) {
-                        const poste = data.poste;
-                        
-                        document.getElementById('typeContrat').value = poste.type_contrat || '';
-                        document.getElementById('dureeContrat').value = poste.duree_contrat || '';
-                        document.getElementById('salaire').value = poste.salaire || '';
-                        
-                        if (poste.salaire_min && poste.salaire_max) {
-                            document.getElementById('salaireRange').textContent = 
-                                `(${formatSalaire(poste.salaire_min)} - ${formatSalaire(poste.salaire_max)} FCFA)`;
-                        }
-                        
-                        document.getElementById('niveauHierarchique').textContent = poste.niveau_hierarchique || 'Non défini';
-                        document.getElementById('codePaie').textContent = poste.code_paie || 'Non défini';
-                        document.getElementById('categoriePaie').textContent = poste.categorie_paie || 'Non définie';
-                        document.getElementById('regimeSocial').textContent = poste.regime_social || 'Non défini';
-                        document.getElementById('competencesRequises').textContent = poste.competences_requises || 'Aucune spécifiée';
-                        document.getElementById('avantages').textContent = poste.avantages || 'Aucun spécifié';
-                        
-                        posteInfo.classList.remove('hidden');
-                    }
-                })
-                .catch(error => {
-                    console.error('Erreur:', error);
-                    posteInfo.classList.add('hidden');
-                });
-        }
-
-     function loadEmployees() {
-    // Changer l'action de 'get_employees_with_presences' à 'get_employees'
-    fetch('?action=get_employees')
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log('Données reçues:', data); // Debug
-            if (data.success && Array.isArray(data.employees)) {
-                employees = data.employees;
-                displayEmployees(employees);
-            } else {
-                console.error('Données employés invalides:', data);
-                showNotification(data.message || 'Erreur lors du chargement des employés', 'error');
-                employees = [];
-                displayEmployees([]);
-            }
-        })
-        .catch(error => {
-            console.error('Erreur:', error);
-            showNotification('Erreur de connexion lors du chargement des employés', 'error');
-            employees = [];
-            displayEmployees([]);
+    const employeeModal = document.getElementById('employeeModal');
+    if (employeeModal) {
+        employeeModal.addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
         });
+    }
 }
 
-        function viewPresenceHistory(employeeId) {
-            window.open(`presence_history.php?employee_id=${employeeId}`, '_blank');
-        }
-
-        function genererTousBulletins() {
-            const mois_annee = document.getElementById('mois_annee').value;
-            
-            if (!mois_annee) {
-                showNotification('Veuillez sélectionner un mois.', 'error');
-                return;
-            }
-            
-            if (!confirm(`Générer les bulletins de paie pour tous les employés actifs pour ${mois_annee} ?`)) {
-                return;
-            }
-            
-            showLoading();
-            
-            fetch('?action=generer_tous_bulletins', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `mois_annee=${mois_annee}`
-            })
+// Fonctions de chargement des données
+function loadDepartements() {
+    return new Promise((resolve) => {
+        console.log('Chargement des départements...');
+        fetch('?action=get_departements')
             .then(response => response.json())
             .then(data => {
-                hideLoading();
                 if (data.success) {
-                    showNotification(
-                        `${data.count}/${data.total} bulletins générés avec succès pour ${mois_annee}`, 
-                        'success'
-                    );
-                } else {
-                    showNotification(data.message || 'Erreur lors de la génération', 'error');
+                    departements = data.departements || [];
+                    updateDepartementsSelect();
                 }
+                resolve(data);
             })
             .catch(error => {
-                hideLoading();
-                console.error('Erreur:', error);
-                showNotification('Erreur lors de la génération des bulletins', 'error');
+                console.error('Erreur fetch départements:', error);
+                departements = [];
+                updateDepartementsSelect();
+                resolve({ success: false });
             });
-        }
+    });
+}
 
+function loadPostes() {
+    return new Promise((resolve) => {
+        console.log('Chargement des postes...');
+        fetch('?action=get_postes')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    postes = data.postes || [];
+                    updatePostesSelects();
+                }
+                resolve(data);
+            })
+            .catch(error => {
+                console.error('Erreur fetch postes:', error);
+                postes = [];
+                updatePostesSelects();
+                resolve({ success: false });
+            });
+    });
+}
+
+function loadEmployees() {
+    return new Promise((resolve) => {
+        console.log('Chargement des employés...');
+        
+        fetch('?action=get_employees')
+            .then(response => response.json())
+            .then(data => {
+                console.log('Données employés reçues:', data);
+                
+                if (data.success && Array.isArray(data.employees)) {
+                    employees = data.employees;
+                    displayEmployees(employees);
+                    updateEmployeeSelect(employees);
+                    console.log(`${employees.length} employés chargés`);
+                } else {
+                    console.error('Erreur:', data.message || 'Données invalides');
+                    employees = [];
+                    displayEmployees([]);
+                    updateEmployeeSelect([]);
+                }
+                resolve(data);
+            })
+            .catch(error => {
+                console.error('Erreur complète:', error);
+                employees = [];
+                displayEmployees([]);
+                updateEmployeeSelect([]);
+                resolve({ success: false });
+            });
+    });
+}
+
+function loadStatistics() {
+    return new Promise((resolve) => {
+        console.log('Chargement des statistiques...');
+        fetch('?action=get_statistics')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.statistics) {
+                    const stats = data.statistics;
+                    updateElementText('totalActifs', stats.total_actifs || 0);
+                    updateElementText('presentsAujourdhui', stats.presents_aujourd_hui || 0);
+                    updateElementText('absentsAujourdhui', stats.absents_aujourd_hui || 0);
+                    updateElementText('retardsAujourdhui', stats.retards_aujourd_hui || 0);
+                    updateElementText('totalAdmins', stats.total_admins || 0);
+                    updateElementText('totalInactifs', stats.total_inactifs || 0);
+                }
+                resolve(data);
+            })
+            .catch(error => {
+                console.error('Erreur lors du chargement des statistiques:', error);
+                resolve({ success: false });
+            });
+    });
+}
+
+function loadDashboardStats() {
+    return new Promise((resolve) => {
+        console.log('Chargement des statistiques du tableau de bord...');
+        
+        fetch('?action=get_dashboard_stats')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.stats) {
+                    updateDashboardStats(data.stats);
+                }
+                resolve(data);
+            })
+            .catch(error => {
+                console.error('Erreur fetch dashboard stats:', error);
+                resolve({ success: false });
+            });
+    });
+}
+
+// Fonctions de mise à jour des selects
+function updateDepartementsSelect() {
+    const filterDepartement = document.getElementById('filterDepartement');
+    if (filterDepartement) {
+        filterDepartement.innerHTML = '<option value="">Tous les départements</option>';
+        departements.forEach(dept => {
+            filterDepartement.innerHTML += `<option value="${dept.id}">${escapeHtml(dept.nom)}</option>`;
+        });
+    }
+}
+
+function updatePostesSelects() {
+    const filterPoste = document.getElementById('filterPoste');
+    const modalPoste = document.getElementById('poste');
+
+    if (filterPoste) {
+        filterPoste.innerHTML = '<option value="">Tous les postes</option>';
+        postes.forEach(poste => {
+            filterPoste.innerHTML += `<option value="${poste.id}">${escapeHtml(poste.nom)}</option>`;
+        });
+    }
+
+    if (modalPoste) {
+        modalPoste.innerHTML = '<option value="">Sélectionner un poste</option>';
+        postes.forEach(poste => {
+            modalPoste.innerHTML += `<option value="${poste.id}">${escapeHtml(poste.nom)} - ${escapeHtml(poste.type_contrat || 'Non défini')}</option>`;
+        });
+    }
+}
+
+function updateEmployeeSelect(employeesList) {
+    const employeSelect = document.getElementById('employe_id');
+    if (!employeSelect) return;
+    
+    employeSelect.innerHTML = '<option value="">Sélectionnez un employé</option>';
+    
+    employeesList.filter(emp => emp.statut === 'actif').forEach(employee => {
+        employeSelect.innerHTML += `<option value="${employee.id}">${escapeHtml(employee.nom)} ${escapeHtml(employee.prenom)} (${escapeHtml(employee.poste_nom || 'Aucun poste')})</option>`;
+    });
+}
+
+// Fonction d'affichage des employés
 function displayEmployees(employeesList) {
+    console.log('Affichage des employés:', employeesList.length, 'employés');
     displayTableView(employeesList);
 }
 
@@ -2182,11 +3347,11 @@ function displayTableView(employeesList) {
     }
     
     tbody.innerHTML = '';
-    
+
     if (!Array.isArray(employeesList) || employeesList.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="11" class="px-6 py-4 text-center text-gray-500">
+                <td colspan="12" class="px-6 py-4 text-center text-gray-500">
                     <i class="fas fa-users text-4xl mb-2"></i>
                     <p>Aucun employé trouvé</p>
                 </td>
@@ -2194,30 +3359,32 @@ function displayTableView(employeesList) {
         `;
         return;
     }
-    
+
     employeesList.forEach(employee => {
         const row = createEmployeeRow(employee);
         tbody.appendChild(row);
     });
+    
+    console.log(`${employeesList.length} lignes ajoutées au tableau`);
 }
+
 function createEmployeeRow(employee) {
     const row = document.createElement('tr');
-    row.className = employee.statut === 'inactif' 
-        ? 'hover:bg-gray-50 fade-in opacity-60 bg-gray-25' 
+    row.className = employee.statut === 'inactif'
+        ? 'hover:bg-gray-50 fade-in opacity-60 bg-gray-25'
         : 'hover:bg-gray-50 fade-in';
-    
-    // Gestion sécurisée des données de présence
+
+    // Gestion des données de présence
     let presenceClass = '';
     let presenceText = '';
     let presenceIcon = '';
-    
+
     if (employee.statut === 'inactif') {
         presenceClass = 'bg-gray-100 text-gray-600';
         presenceText = 'Inactif';
         presenceIcon = 'fas fa-user-slash';
     } else {
         const statutPresence = employee.statut_presences || 'absent';
-        
         switch(statutPresence) {
             case 'present':
                 presenceClass = 'bg-green-100 text-green-800';
@@ -2242,8 +3409,7 @@ function createEmployeeRow(employee) {
                 break;
         }
     }
-    
-    // Gestion sécurisée de l'heure d'arrivée
+
     let heureArriveeDisplay = '';
     if (employee.heure_arrivee && employee.statut !== 'inactif') {
         try {
@@ -2255,18 +3421,10 @@ function createEmployeeRow(employee) {
             console.warn('Erreur formatage heure arrivée:', e);
         }
     }
-    
-    // Gestion du département
-    const departementNom = employee.departement_nom || 'Non assigné';
-    const departementCouleur = employee.departement_couleur || '#6B7280';
-    
-    // Gestion du poste
-    const posteNom = employee.poste_nom || '<span class="missing-data">Non défini</span>';
-    const niveauHierarchique = employee.niveau_hierarchique || 'N/A';
-    
+
     row.innerHTML = `
         <td class="px-6 py-4 whitespace-nowrap">
-            <img src="uploads/photos/${employee.photo || 'default-avatar.png'}" 
+            <img src="uploads/photos/${employee.photo || 'default-avatar.png'}"
                  class="h-10 w-10 rounded-full object-cover ${employee.statut === 'inactif' ? 'grayscale' : ''}"
                  onerror="this.src='uploads/photos/default-avatar.png'">
         </td>
@@ -2279,21 +3437,21 @@ function createEmployeeRow(employee) {
         </td>
         <td class="px-6 py-4 whitespace-nowrap">
             <div class="flex items-center justify-center">
-                <span class="departement-badge" 
-                      style="background-color: ${departementCouleur}15; color: ${departementCouleur}; border-color: ${departementCouleur}40;">
+                <span class="departement-badge"
+                      style="background-color: ${employee.departement_couleur || '#6B7280'}15; color: ${employee.departement_couleur || '#6B7280'}; border-color: ${employee.departement_couleur || '#6B7280'}40;">
                     <i class="fas fa-building mr-2"></i>
-                    ${departementNom}
+                    ${employee.departement_nom || 'Non assigné'}
                 </span>
             </div>
         </td>
         <td class="px-6 py-4 whitespace-nowrap">
             <div class="flex items-center">
-                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" 
+                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
                       style="background-color: ${employee.poste_couleur || '#6B7280'}20; color: ${employee.poste_couleur || '#6B7280'};">
-                    ${posteNom}
+                    ${employee.poste_nom || '<span class="missing-data">Non défini</span>'}
                 </span>
             </div>
-            <div class="text-xs text-gray-500 mt-1">Niveau: ${niveauHierarchique}</div>
+            <div class="text-xs text-gray-500 mt-1">Niveau: ${employee.niveau_hierarchique || 'N/A'}</div>
         </td>
         <td class="px-6 py-4 whitespace-nowrap">
             <div class="flex flex-col space-y-1">
@@ -2334,6 +3492,28 @@ function createEmployeeRow(employee) {
             </div>
             <div class="text-xs text-gray-500">par mois</div>
         </td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm">
+            <div class="flex flex-col space-y-1">
+                ${employee.cv ? `
+                    <a href="uploads/documents/${employee.cv}" target="_blank"
+                       class="text-blue-600 hover:text-blue-800 text-xs flex items-center">
+                        <i class="fas fa-file-pdf mr-1 text-red-500"></i>CV
+                    </a>
+                ` : '<span class="text-red-500 text-xs">Manquant</span>'}
+                ${employee.contrat ? `
+                    <a href="uploads/documents/${employee.contrat}" target="_blank"
+                       class="text-blue-600 hover:text-blue-800 text-xs flex items-center">
+                        <i class="fas fa-file-contract mr-1 text-green-500"></i>Contrat
+                    </a>
+                ` : '<span class="text-red-500 text-xs">Manquant</span>'}
+                ${employee.piece_identite ? `
+                    <a href="uploads/documents/${employee.piece_identite}" target="_blank"
+                       class="text-blue-600 hover:text-blue-800 text-xs flex items-center">
+                        <i class="fas fa-id-card mr-1 text-purple-500"></i>Pièce ID
+                    </a>
+                ` : '<span class="text-red-500 text-xs">Manquant</span>'}
+            </div>
+        </td>
         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
             <div class="flex space-x-2">
                 <button onclick="viewEmployee(${employee.id})" class="text-blue-600 hover:text-blue-900" title="Voir détails">
@@ -2347,8 +3527,8 @@ function createEmployeeRow(employee) {
                         <i class="fas fa-qrcode"></i>
                     </button>
                     <button onclick="viewPresenceHistory(${employee.id})" class="text-indigo-600 hover:text-indigo-900" title="Historique présence">
-    <i class="fas fa-calendar-check"></i>
-</button>
+                        <i class="fas fa-calendar-check"></i>
+                    </button>
                     <button onclick="deleteEmployee(${employee.id})" class="text-red-600 hover:text-red-900" title="Désactiver">
                         <i class="fas fa-user-slash"></i>
                     </button>
@@ -2363,86 +3543,189 @@ function createEmployeeRow(employee) {
             </div>
         </td>
     `;
-    
+
     return row;
 }
 
+// Fonctions de filtrage
+function filterEmployees() {
+    if (!employees || employees.length === 0) {
+        console.log('Aucun employé à filtrer');
+        return;
+    }
 
-        function markArrival(employeeId) {
-            const employee = employees.find(e => e.id == employeeId);
-            const employeeName = employee ? `${employee.prenom} ${employee.nom}` : 'l\'employé';
-            
-            if (confirm(`Marquer l'arrivée de ${employeeName} maintenant ?`)) {
-                fetch('?action=mark_arrival', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ employee_id: employeeId })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        const message = data.retard_minutes > 0 
-                            ? `Arrivée enregistrée (${data.retard_minutes}min de retard) à ${data.heure_arrivee}`
-                            : `Arrivée enregistrée à l'heure (${data.heure_arrivee})`;
-                            
-                        showNotification(message, 'success');
-                        loadEmployees();
-                        loadStatistics();
-                    } else {
-                        showNotification(data.message || 'Erreur lors de l\'enregistrement', 'error');
-                    }
-                })
-                .catch(error => {
-                    console.error('Erreur:', error);
-                    showNotification('Erreur lors de l\'enregistrement de l\'arrivée', 'error');
-                });
+    const searchTerm = getElementValue('searchInput').toLowerCase();
+    const departementFilter = getElementValue('filterDepartement');
+    const posteFilter = getElementValue('filterPoste');
+    const contratFilter = getElementValue('filterContrat');
+    const statutFilter = getElementValue('filterStatut');
+
+    const filtered = employees.filter(employee => {
+        const matchesSearch = !searchTerm ||
+            (employee.nom && employee.nom.toLowerCase().includes(searchTerm)) ||
+            (employee.prenom && employee.prenom.toLowerCase().includes(searchTerm)) ||
+            (employee.email && employee.email.toLowerCase().includes(searchTerm));
+
+        const matchesDepartement = !departementFilter || employee.departement_id == departementFilter;
+        const matchesPoste = !posteFilter || employee.poste_id == posteFilter;
+        const matchesContrat = !contratFilter || employee.type_contrat === contratFilter;
+        const matchesStatut = !statutFilter || employee.statut === statutFilter;
+
+        return matchesSearch && matchesDepartement && matchesPoste && matchesContrat && matchesStatut;
+    });
+
+    console.log(`${filtered.length} employés trouvés sur ${employees.length}`);
+    displayEmployees(filtered);
+}
+
+function applyFilters() {
+    filterEmployees();
+    showNotification('Filtres appliqués', 'success');
+    setTimeout(hideNotification, 2000);
+}
+
+function resetFilters() {
+    ['searchInput', 'filterDepartement', 'filterPoste', 'filterContrat', 'filterStatut'].forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.value = '';
+        }
+    });
+
+    showNotification('Filtres réinitialisés', 'success');
+    setTimeout(() => {
+        displayEmployees(employees);
+        hideNotification();
+    }, 500);
+}
+
+// Fonctions modales
+function openAddModal() {
+    const modal = document.getElementById('employeeModal');
+    if (!modal) return;
+    
+    document.getElementById('modalTitle').textContent = 'Ajouter un employé';
+    document.getElementById('employeeForm').reset();
+    document.getElementById('employeeId').value = '';
+    document.getElementById('ajaxAction').value = 'add_employee';
+    document.getElementById('photoPreview').src = 'uploads/photos/default-avatar.png';
+    
+    modal.classList.remove('hidden');
+}
+
+function closeModal() {
+    const modal = document.getElementById('employeeModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function editEmployee(id) {
+    const employee = employees.find(e => e.id == id);
+    if (!employee) {
+        showNotification('Employé non trouvé', 'error');
+        return;
+    }
+
+    const modal = document.getElementById('employeeModal');
+    if (!modal) return;
+
+    document.getElementById('modalTitle').textContent = 'Modifier l\'employé';
+    document.getElementById('employeeId').value = employee.id;
+    document.getElementById('ajaxAction').value = 'update_employee';
+    
+    setElementValue('nom', employee.nom);
+    setElementValue('prenom', employee.prenom);
+    setElementValue('email', employee.email);
+    setElementValue('telephone', employee.telephone || '');
+    setElementValue('poste', employee.poste_id || '');
+    setElementValue('salaire', employee.salaire || '');
+    setElementValue('dateEmbauche', employee.date_embauche);
+    setElementValue('statut', employee.statut);
+    setElementValue('heureDebut', employee.heure_debut);
+    setElementValue('heureFin', employee.heure_fin);
+    
+    const isAdminCheckbox = document.getElementById('isAdmin');
+    if (isAdminCheckbox) {
+        isAdminCheckbox.checked = employee.is_admin == 1;
+    }
+
+    const photoPreview = document.getElementById('photoPreview');
+    if (photoPreview) {
+        photoPreview.src = `uploads/photos/${employee.photo || 'default-avatar.png'}`;
+    }
+
+    if (employee.poste_id) {
+        updatePosteInfo();
+    }
+
+    modal.classList.remove('hidden');
+}
+
+// Fonctions CRUD employés
+function saveEmployee(event) {
+    event.preventDefault();
+
+    const formData = new FormData(event.target);
+    showNotification('Enregistrement en cours...', 'info');
+
+    const action = formData.get('ajaxAction') || 'add_employee';
+    const url = `${window.location.pathname}?action=${action}`;
+
+    fetch(url, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        hideNotification();
+        if (data.success) {
+            showNotification('Employé sauvegardé avec succès!', 'success');
+            closeModal();
+            loadEmployees();
+            loadStatistics();
+        } else {
+            showNotification(data.message || 'Erreur lors de la sauvegarde', 'error');
+        }
+    })
+    .catch(error => {
+        hideNotification();
+        console.error('Erreur:', error);
+        showNotification('Erreur de communication avec le serveur', 'error');
+    });
+}
+
+function deleteEmployee(id) {
+    if (confirm('Êtes-vous sûr de vouloir DÉSACTIVER cet employé?')) {
+        fetch('?action=delete_employee', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ id: id })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('Employé désactivé avec succès!', 'success');
+                loadEmployees();
+                loadStatistics();
+            } else {
+                showNotification(data.message || 'Erreur lors de la désactivation', 'error');
             }
-        }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            showNotification('Erreur lors de la désactivation', 'error');
+        });
+    }
+}
 
-        function markDeparture(employeeId) {
-            const employee = employees.find(e => e.id == employeeId);
-            const employeeName = employee ? `${employee.prenom} ${employee.nom}` : 'l\'employé';
-            
-            if (confirm(`Marquer le départ de ${employeeName} maintenant ?`)) {
-                fetch('?action=mark_departure', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ employee_id: employeeId })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        showNotification(
-                            `Départ enregistré à ${data.heure_depart} (${data.duree_travaillee}h travaillées)`, 
-                            'success'
-                        );
-                        loadEmployees();
-                        loadStatistics();
-                    } else {
-                        showNotification(data.message || 'Erreur lors de l\'enregistrement du départ', 'error');
-                    }
-                })
-                .catch(error => {
-                    console.error('Erreur:', error);
-                    showNotification('Erreur lors de l\'enregistrement du départ', 'error');
-                });
-            }
-        }
-
-        function escapeHtml(text) {
-            if (!text) return '';
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-       function reactivateEmployee(id) {
+function reactivateEmployee(id) {
     if (confirm('Êtes-vous sûr de vouloir réactiver cet employé?')) {
-        // Utilisez la bonne action pour la réactivation
         fetch('?action=reactivate_employee', {
             method: 'POST',
             headers: {
@@ -2467,523 +3750,418 @@ function createEmployeeRow(employee) {
     }
 }
 
-
-        function permanentDeleteEmployee(id) {
-            if (confirm('ATTENTION: Êtes-vous sûr de vouloir SUPPRIMER DÉFINITIVEMENT cet employé? Cette action est irréversible.')) {
-                if (confirm('Dernière confirmation: Cette action va supprimer définitivement toutes les données de cet employé (présences, paies, etc.).')) {
-                    fetch('?action=permanent_delete_employee', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ id: id })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            showNotification('Employé supprimé définitivement', 'success');
-                            loadEmployees();
-                            loadStatistics();
-                        } else {
-                            showNotification(data.message || 'Erreur lors de la suppression', 'error');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Erreur:', error);
-                        showNotification('Erreur lors de la suppression', 'error');
-                    });
-                }
-            }
-        }
-        
-        function getStatusClass(statut) {
-            const classes = {
-                'actif': 'bg-green-100 text-green-800',
-                'en_conge': 'bg-yellow-100 text-yellow-800',
-                'absent': 'bg-red-100 text-red-800',
-                'inactif': 'bg-gray-100 text-gray-800'
-            };
-            return classes[statut] || 'bg-gray-100 text-gray-800';
-        }
-
-       function getStatusText(statut) {
-    // Conversion des valeurs de la base de données vers un format cohérent
-    if (!statut) return 'Inconnu';
-    
-    const statutLower = statut.toLowerCase().trim();
-    const texts = {
-        'actif': 'Actif',
-        'en_conge': 'En congé',
-        'absent': 'Absent',
-        'inactif': 'Inactif',
-        'present': 'Présent',
-        'retard': 'En retard',
-        'parti': 'Parti'
-    };
-    
-    return texts[statutLower] || 'Inconnu';
-}
-
-        function formatDate(dateString) {
-            if (!dateString) return '';
-            const date = new Date(dateString);
-            return date.toLocaleDateString('fr-FR');
-        }
-
-        function formatSalaire(salaire) {
-            if (!salaire) return '';
-            return parseInt(salaire).toLocaleString('fr-FR');
-        }
-
-      function filterEmployees() {
-    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-    const departementFilter = document.getElementById('filterDepartement').value;
-    const posteFilter = document.getElementById('filterPoste').value;
-    const contratFilter = document.getElementById('filterContrat').value;
-    const statutFilter = document.getElementById('filterStatut').value;
-    
-    console.log('Filtres appliqués:', {
-        searchTerm,
-        departementFilter,
-        posteFilter,
-        contratFilter,
-        statutFilter
-    }); // Debug
-    
-    const filtered = employees.filter(employee => {
-        const matchesSearch = !searchTerm || 
-            (employee.nom && employee.nom.toLowerCase().includes(searchTerm)) ||
-            (employee.prenom && employee.prenom.toLowerCase().includes(searchTerm)) ||
-            (employee.email && employee.email.toLowerCase().includes(searchTerm));
-        
-        // CORRECTION: utiliser departement_id au lieu de departement_id
-        const matchesDepartement = !departementFilter || employee.departement_id == departementFilter;
-        const matchesPoste = !posteFilter || employee.poste_id == posteFilter;
-        const matchesContrat = !contratFilter || employee.type_contrat === contratFilter;
-        const matchesStatut = !statutFilter || employee.statut === statutFilter;
-        
-        console.log(`Employé ${employee.nom}:`, {
-            matchesSearch,
-            matchesDepartement: `${employee.departement_id} == ${departementFilter} = ${matchesDepartement}`,
-            matchesPoste,
-            matchesContrat,
-            matchesStatut
-        }); // Debug
-        
-        return matchesSearch && matchesDepartement && matchesPoste && matchesContrat && matchesStatut;
-    });
-    
-    console.log(`${filtered.length} employés trouvés sur ${employees.length}`); // Debug
-    displayEmployees(filtered);
-}
-document.getElementById('presenceHistoryModal').addEventListener('click', function(e) {
-    if (e.target === this) {
-        closePresenceHistoryModal();
-    }
-});
-function applyFilters() {
-    showNotification('Application des filtres...', 'info');
-    setTimeout(() => {
-        filterEmployees();
-        hideNotification();
-    }, 500);
-}
-
-   function resetFilters() {
-    document.getElementById('searchInput').value = '';
-    document.getElementById('filterDepartement').value = '';
-    document.getElementById('filterPoste').value = '';
-    document.getElementById('filterContrat').value = '';
-    document.getElementById('filterStatut').value = '';
-    
-    showNotification('Filtres réinitialisés', 'success');
-    setTimeout(() => {
-        displayEmployees(employees);
-        hideNotification();
-    }, 500);
-}
-
-        function openAddModal() {
-            document.getElementById('modalTitle').textContent = 'Ajouter un employé';
-            document.getElementById('employeeForm').reset();
-            document.getElementById('employeeId').value = '';
-            document.getElementById('ajaxAction').value = 'add_employee';
-            document.getElementById('photoPreview').src = 'uploads/photos/default-avatar.png';
-            document.getElementById('posteInfo').classList.add('hidden');
-            document.getElementById('employeeModal').classList.remove('hidden');
-        }
-
-        function editEmployee(id) {
-            const employee = employees.find(e => e.id == id);
-            if (!employee) return;
-            
-            document.getElementById('modalTitle').textContent = 'Modifier l\'employé';
-            document.getElementById('employeeId').value = employee.id;
-            document.getElementById('ajaxAction').value = 'update_employee';
-            document.getElementById('nom').value = employee.nom;
-            document.getElementById('prenom').value = employee.prenom;
-            document.getElementById('email').value = employee.email;
-            document.getElementById('telephone').value = employee.telephone || '';
-            document.getElementById('poste').value = employee.poste_id || '';
-            document.getElementById('salaire').value = employee.salaire || '';
-            document.getElementById('dateEmbauche').value = employee.date_embauche;
-            document.getElementById('statut').value = employee.statut;
-            document.getElementById('heureDebut').value = employee.heure_debut;
-            document.getElementById('heureFin').value = employee.heure_fin;
-            document.getElementById('isAdmin').checked = employee.is_admin == 1;
-            document.getElementById('typeContrat').value = employee.type_contrat || '';
-            document.getElementById('dureeContrat').value = employee.duree_contrat || '';
-            document.getElementById('photoPreview').src = `uploads/photos/${employee.photo || 'default-avatar.png'}`;
-            
-            if (employee.poste_id) {
-                updatePosteInfo();
-            }
-            
-            document.getElementById('employeeModal').classList.remove('hidden');
-        }
-
-        function closeModal() {
-            document.getElementById('employeeModal').classList.add('hidden');
-        }
-
-        function previewPhoto(event) {
-            const file = event.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    document.getElementById('photoPreview').src = e.target.result;
-                };
-                reader.readAsDataURL(file);
-            }
-        }
-
-        function saveEmployee(event) {
-            event.preventDefault();
-            
-            const formData = new FormData(event.target);
-            
-            fetch(window.location.href, {
+function permanentDeleteEmployee(id) {
+    if (confirm('ATTENTION: Supprimer définitivement cet employé?')) {
+        if (confirm('Dernière confirmation: Cette action est irréversible.')) {
+            fetch('?action=permanent_delete_employee', {
                 method: 'POST',
-                body: formData
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ id: id })
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    showNotification('Employé sauvegardé avec succès!', 'success');
-                    closeModal();
+                    showNotification('Employé supprimé définitivement', 'success');
                     loadEmployees();
                     loadStatistics();
                 } else {
-                    showNotification(data.message || 'Erreur lors de la sauvegarde', 'error');
+                    showNotification(data.message || 'Erreur lors de la suppression', 'error');
                 }
             })
             .catch(error => {
                 console.error('Erreur:', error);
-                showNotification('Erreur lors de la sauvegarde', 'error');
+                showNotification('Erreur lors de la suppression', 'error');
             });
         }
+    }
+}
 
-        function viewEmployee(id) {
-            window.open(`employee_details.php?id=${id}`, '_blank');
+// Fonctions de génération de bulletins
+function genererBulletin() {
+    const employeId = document.getElementById('employe_id').value;
+    const moisAnnee = document.getElementById('mois_annee').value;
+
+    if (!employeId) {
+        showNotification('Veuillez sélectionner un employé', 'error');
+        return;
+    }
+
+    if (!moisAnnee) {
+        showNotification('Veuillez sélectionner un mois', 'error');
+        return;
+    }
+
+    showNotification('Génération du bulletin en cours...', 'info');
+
+    // Créer un formulaire pour le téléchargement
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '?action=generer_bulletin';
+    form.target = '_blank';
+
+    const employeInput = document.createElement('input');
+    employeInput.type = 'hidden';
+    employeInput.name = 'employe_id';
+    employeInput.value = employeId;
+    form.appendChild(employeInput);
+
+    const moisInput = document.createElement('input');
+    moisInput.type = 'hidden';
+    moisInput.name = 'mois_annee';
+    moisInput.value = moisAnnee;
+    form.appendChild(moisInput);
+
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+
+    setTimeout(() => {
+        hideNotification();
+        showNotification('Bulletin généré avec succès!', 'success');
+    }, 1000);
+}
+
+function genererTousBulletins() {
+    const moisAnnee = document.getElementById('mois_annee').value;
+
+    if (!moisAnnee) {
+        showNotification('Veuillez sélectionner un mois', 'error');
+        return;
+    }
+
+    if (!confirm(`Générer les bulletins de paie pour tous les employés actifs pour ${moisAnnee} ?`)) {
+        return;
+    }
+
+    showNotification('Génération des bulletins en cours...', 'info');
+
+    const formData = new FormData();
+    formData.append('mois_annee', moisAnnee);
+
+    fetch('?action=generer_tous_bulletins', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideNotification();
+        if (data.success) {
+            showNotification(`${data.count} bulletins générés sur ${data.total} employés`, 'success');
+        } else {
+            showNotification(data.message || 'Erreur lors de la génération des bulletins', 'error');
+        }
+    })
+    .catch(error => {
+        hideNotification();
+        console.error('Erreur:', error);
+        showNotification('Erreur lors de la génération des bulletins', 'error');
+    });
+}
+
+// Fonctions de génération de rapports
+function generateCustomReport() {
+    const type = getElementValue('reportType');
+    const startDate = getElementValue('reportStartDate');
+    const endDate = getElementValue('reportEndDate');
+
+    if (!startDate || !endDate) {
+        showNotification('Veuillez sélectionner une période de dates', 'error');
+        return;
+    }
+
+    if (startDate > endDate) {
+        showNotification('La date de début doit être antérieure à la date de fin', 'error');
+        return;
+    }
+
+    const reportLoading = document.getElementById('reportLoading');
+    if (reportLoading) {
+        reportLoading.classList.remove('hidden');
+    }
+
+    const filters = {
+        date_debut: startDate,
+        date_fin: endDate,
+        departement_id: getElementValue('filterDepartement') || ''
+    };
+
+    fetch('?action=generate_report', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ type, filters })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (reportLoading) {
+            reportLoading.classList.add('hidden');
         }
 
-        function generateBadge(id) {
-            window.open(`generate_badge.php?id=${id}`, '_blank');
+        if (data.success) {
+            displayReport(data.report, type, startDate, endDate);
+            showNotification('Rapport généré avec succès', 'success');
+        } else {
+            showNotification(data.message || 'Erreur lors de la génération du rapport', 'error');
         }
-
-        function deleteEmployee(id) {
-            if (confirm('Êtes-vous sûr de vouloir DÉSACTIVER cet employé? Il restera dans la base mais sera marqué comme inactif.')) {
-                fetch('?action=delete_employee', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ id: id })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        showNotification('Employé désactivé avec succès! Il est maintenant inactif.', 'success');
-                        loadEmployees();
-                        loadStatistics();
-                    } else {
-                        showNotification(data.message || 'Erreur lors de la désactivation', 'error');
-                    }
-                })
-                .catch(error => {
-                    console.error('Erreur:', error);
-                    showNotification('Erreur lors de la désactivation', 'error');
-                });
-            }
+    })
+    .catch(error => {
+        if (reportLoading) {
+            reportLoading.classList.add('hidden');
         }
+        console.error('Erreur:', error);
+        showNotification('Erreur de connexion lors de la génération du rapport', 'error');
+    });
+}
 
-        function genererBulletin() {
-            const employe_id = document.getElementById('employe_id').value;
-            const mois_annee = document.getElementById('mois_annee').value;
-
-            if (!employe_id || !mois_annee) {
-                showNotification('Veuillez sélectionner un employé et un mois.', 'error');
-                return;
-            }
-
-            showLoading();
-            
-            fetch('generer_bulletin.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `employe_id=${employe_id}&mois_annee=${mois_annee}`
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                hideLoading();
-                if (data.success) {
-                    try {
-                        const byteCharacters = atob(data.pdf);
-                        const byteNumbers = new Array(byteCharacters.length);
-                        for (let i = 0; i < byteCharacters.length; i++) {
-                            byteNumbers[i] = byteCharacters.charCodeAt(i);
-                        }
-                        const byteArray = new Uint8Array(byteNumbers);
-                        
-                        let mimeType, extension;
-                        if (data.type === 'html') {
-                            mimeType = 'text/html';
-                            extension = 'html';
-                        } else {
-                            mimeType = 'application/pdf';
-                            extension = 'pdf';
-                        }
-                        
-                        const blob = new Blob([byteArray], { type: mimeType });
-                        
-                        const url = window.URL.createObjectURL(blob);
-                        const link = document.createElement('a');
-                        link.href = url;
-                        
-                        const employeSelect = document.getElementById('employe_id');
-                        const employeText = employeSelect.options[employeSelect.selectedIndex].text;
-                        const employeName = employeText.split(' (')[0].replace(/\s+/g, '_');
-                        
-                        link.download = `bulletin_${employeName}_${mois_annee}.${extension}`;
-                        
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                        
-                        window.URL.revokeObjectURL(url);
-                        
-                        showNotification('Bulletin généré et téléchargé avec succès !', 'success');
-                        
-                    } catch (error) {
-                        console.error('Erreur lors du traitement du fichier:', error);
-                        showNotification('Erreur lors du traitement du fichier téléchargé', 'error');
-                    }
-                } else {
-                    showNotification(data.message || 'Erreur lors de la génération', 'error');
-                }
-            })
-            .catch(error => {
-                hideLoading();
-                console.error('Erreur:', error);
-                showNotification('Erreur lors de la génération du bulletin: ' + error.message, 'error');
-            });
-        }
-
-        function showNotification(message, type = 'info') {
-            const notification = document.getElementById('notification');
-            const colors = {
-                'success': 'bg-green-500',
-                'error': 'bg-red-500',
-                'warning': 'bg-yellow-500',
-                'info': 'bg-blue-500'
-            };
-            
-            notification.innerHTML = `
-                <div class="${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg flex items-center">
-                    <i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'times' : 'info'}-circle mr-2"></i>
-                    ${message}
-                    <button onclick="hideNotification()" class="ml-4 text-white hover:text-gray-200">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            `;
-            
-            notification.classList.remove('hidden');
-            
-            setTimeout(() => {
-                hideNotification();
-            }, 5000);
-        }
-
-        function hideNotification() {
-            document.getElementById('notification').classList.add('hidden');
-        }
-
-        function showLoading() {
-            showNotification('Traitement en cours...', 'info');
-        }
-
-        function hideLoading() {
-            hideNotification();
-        }                            
-        
-        document.getElementById('employeeModal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeModal();
-            }
-        });
-
-        function updateQuickActions(activeEmployees) {
-            const quickActionsDiv = document.getElementById('quickActions');
-            if (!quickActionsDiv) return;
-            
-            const absents = activeEmployees.filter(e => e.statut_presences === 'absent');
-            const presents = activeEmployees.filter(e => e.statut_presences === 'present' || e.statut_presences === 'retard');
-            
-            quickActionsDiv.innerHTML = '';
-            
-            if (absents.length === 0 && presents.length === 0) {
-                quickActionsDiv.innerHTML = '<p class="text-gray-500 col-span-full text-center">Aucune action rapide disponible</p>';
-                return;
-            }
-            
-            absents.slice(0, 6).forEach(employee => {
-                quickActionsDiv.innerHTML += `
-                    <button onclick="markArrival(${employee.id})" 
-                            class="flex items-center justify-between p-3 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors">
-                        <div class="flex items-center">
-                            <img src="uploads/photos/${employee.photo || 'default-avatar.png'}" 
-                                 class="h-8 w-8 rounded-full object-cover mr-3"
-                                 onerror="this.src='uploads/photos/default-avatar.png'">
-                            <span class="text-sm font-medium">${employee.prenom} ${employee.nom}</span>
-                        </div>
-                        <i class="fas fa-sign-in-alt text-green-600"></i>
-                    </button>
-                `;
-            });
-            
-            presents.slice(0, 6).forEach(employee => {
-                quickActionsDiv.innerHTML += `
-                    <button onclick="markDeparture(${employee.id})" 
-                            class="flex items-center justify-between p-3 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors">
-                        <div class="flex items-center">
-                            <img src="uploads/photos/${employee.photo || 'default-avatar.png'}" 
-                                 class="h-8 w-8 rounded-full object-cover mr-3"
-                                 onerror="this.src='uploads/photos/default-avatar.png'">
-                            <span class="text-sm font-medium">${employee.prenom} ${employee.nom}</span>
-                            <span class="ml-2 text-xs text-green-600">
-                                ${employee.presences_arrivee ? new Date(employee.presences_arrivee).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'}) : ''}
-                            </span>
-                        </div>
-                        <i class="fas fa-sign-out-alt text-orange-600"></i>
-                    </button>
-                `;
-            });
-            
-            if (absents.length > 6 || presents.length > 6) {
-                quickActionsDiv.innerHTML += `
-                    <div class="col-span-full text-center text-gray-500 text-sm">
-                        ... et ${(absents.length + presents.length) - 12} autres employés
-                    </div>
-                `;
-            }
-        }
-        // Fonction pour ouvrir le modal d'historique des présences
-function viewPresenceHistory(employeeId) {
-    // Afficher le modal
-    document.getElementById('presenceHistoryModal').classList.remove('hidden');
+function displayReport(reportData, reportType, startDate, endDate) {
+    const modal = document.getElementById('reportModal');
+    const modalTitle = document.getElementById('reportModalTitle');
+    const reportContent = document.getElementById('reportContent');
     
-    // Mettre à jour le titre avec le nom de l'employé
+    if (!modal || !modalTitle || !reportContent) {
+        console.error('Éléments du modal de rapport non trouvés');
+        return;
+    }
+
+    const titles = {
+        'presences': 'Rapport des Présences et Retards',
+        'salaires': 'Rapport des Salaires et Coûts',
+        'effectifs': 'Rapport des Effectifs et Démographie',
+        'turnover': 'Rapport du Turnover et Rotation'
+    };
+
+    modalTitle.textContent = titles[reportType] || 'Rapport Personnalisé';
+
+    const formattedStartDate = formatDateForDisplay(startDate);
+    const formattedEndDate = formatDateForDisplay(endDate);
+
+    let content = '';
+
+    if (!reportData || reportData.length === 0) {
+        content = `
+            <div class="text-center py-8">
+                <i class="fas fa-inbox text-gray-400 text-4xl mb-4"></i>
+                <p class="text-gray-500">Aucune donnée disponible pour la période sélectionnée</p>
+                <p class="text-sm text-gray-400">(Du ${formattedStartDate} au ${formattedEndDate})</p>
+            </div>
+        `;
+    } else {
+        switch (reportType) {
+            case 'presences':
+                content = generatePresenceReportContent(reportData, formattedStartDate, formattedEndDate);
+                break;
+            case 'salaires':
+                content = generateSalaryReportContent(reportData, formattedStartDate, formattedEndDate);
+                break;
+            case 'effectifs':
+                content = generateWorkforceReportContent(reportData, formattedStartDate, formattedEndDate);
+                break;
+            case 'turnover':
+                content = generateTurnoverReportContent(reportData, formattedStartDate, formattedEndDate);
+                break;
+            default:
+                content = '<p class="text-center py-4">Type de rapport non supporté</p>';
+        }
+    }
+
+    reportContent.innerHTML = content;
+    modal.classList.remove('hidden');
+}
+
+function closeReportModal() {
+    const modal = document.getElementById('reportModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+// Fonctions présence/historique
+function viewPresenceHistory(employeeId) {
+    const modal = document.getElementById('presenceHistoryModal');
+    if (!modal) return;
+
+    modal.classList.remove('hidden');
+
     const employee = employees.find(e => e.id == employeeId);
     if (employee) {
-        document.getElementById('presenceHistoryTitle').textContent = 
-            `Historique des présences - ${employee.prenom} ${employee.nom}`;
+        const title = document.getElementById('presenceHistoryTitle');
+        if (title) {
+            title.textContent = `Historique des présences - ${employee.prenom} ${employee.nom}`;
+        }
     }
-    
-    // Charger l'historique des présences
+
     loadPresenceHistory(employeeId);
 }
 
-// Fonction pour fermer le modal
 function closePresenceHistoryModal() {
-    document.getElementById('presenceHistoryModal').classList.add('hidden');
+    const modal = document.getElementById('presenceHistoryModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
 }
 
-// Fonction pour charger l'historique des présences
 function loadPresenceHistory(employeeId) {
     fetch(`get_presence_history.php?employee_id=${employeeId}`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Erreur réseau');
-            }
-            return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
             const contentDiv = document.getElementById('presenceHistoryContent');
-            
+            if (!contentDiv) return;
+
             if (data.success && data.history && data.history.length > 0) {
-                // Afficher l'historique des présences
                 contentDiv.innerHTML = `
                     <div class="mb-4">
                         <h4 class="text-md font-semibold text-gray-800">Historique des 30 derniers jours</h4>
                     </div>
                     <div class="overflow-x-auto">
-                        <table class="presence-table">
+                        <table class="presence-table min-w-full bg-white">
                             <thead>
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Arrivée</th>
-                                    <th>Départ</th>
-                                    <th>Heures travaillées</th>
-                                    <th>Statut</th>
-                                    <th>Retard</th>
+                                <tr class="bg-gray-50">
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Arrivée</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Départ</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Heures</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Retard</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody class="divide-y divide-gray-200">
                                 ${data.history.map(entry => `
-                                    <tr>
-                                        <td>${formatDate(entry.date)}</td>
-                                        <td>${formatTime(entry.heure_arrivee)}</td>
-                                        <td>${formatTime(entry.heure_depart)}</td>
-                                        <td>${entry.heures_travaillees ? entry.heures_travaillees + 'h' : '-'}</td>
-                                        <td class="${getStatusClass(entry.statut)}">${getStatusText(entry.statut)}</td>
-                                        <td>${entry.retard_minutes ? entry.retard_minutes + ' min' : '-'}</td>
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-4 py-3 text-sm">${formatDate(entry.date)}</td>
+                                        <td class="px-4 py-3 text-sm">${formatTime(entry.heure_arrivee)}</td>
+                                        <td class="px-4 py-3 text-sm">${formatTime(entry.heure_depart)}</td>
+                                        <td class="px-4 py-3 text-sm">${entry.heures_travaillees ? entry.heures_travaillees + 'h' : '-'}</td>
+                                        <td class="px-4 py-3">
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusClass(entry.statut)}">
+                                                ${getStatusText(entry.statut)}
+                                            </span>
+                                        </td>
+                                        <td class="px-4 py-3 text-sm ${entry.retard_minutes > 0 ? 'text-red-600' : 'text-gray-900'}">${entry.retard_minutes ? entry.retard_minutes + ' min' : '-'}</td>
                                     </tr>
                                 `).join('')}
                             </tbody>
                         </table>
                     </div>
-                    ${data.history.length >= 30 ? '<p class="text-sm text-gray-500 mt-4">* Affichage limité aux 30 derniers jours</p>' : ''}
                 `;
             } else {
-                // Aucun historique trouvé
                 contentDiv.innerHTML = `
                     <div class="text-center py-8">
                         <i class="fas fa-history text-gray-400 text-4xl mb-4"></i>
-                        <p class="text-gray-500">Aucun historique de présence trouvé pour cet employé.</p>
-                        ${data.message ? `<p class="text-sm text-gray-400">${data.message}</p>` : ''}
+                        <p class="text-gray-500">Aucun historique de présence trouvé.</p>
                     </div>
                 `;
             }
         })
         .catch(error => {
             console.error('Erreur:', error);
-            document.getElementById('presenceHistoryContent').innerHTML = `
-                <div class="text-center py-8">
-                    <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
-                    <p class="text-red-500">Erreur lors du chargement de l'historique.</p>
-                    <p class="text-gray-500 text-sm">Veuillez réessayer plus tard.</p>
-                </div>
-            `;
+            const contentDiv = document.getElementById('presenceHistoryContent');
+            if (contentDiv) {
+                contentDiv.innerHTML = `
+                    <div class="text-center py-8">
+                        <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
+                        <p class="text-red-500">Erreur lors du chargement de l'historique.</p>
+                    </div>
+                `;
+            }
         });
 }
 
-// Fonctions utilitaires pour le formatage
+// Fonctions utilitaires
+function updatePosteInfo() {
+    const posteId = document.getElementById('poste').value;
+    const posteInfo = document.getElementById('posteInfo');
+
+    if (!posteId) {
+        posteInfo.classList.add('hidden');
+        document.getElementById('typeContrat').value = '';
+        document.getElementById('dureeContrat').value = '';
+        document.getElementById('salaire').value = '';
+        return;
+    }
+
+    fetch(`?action=get_poste_details&id=${posteId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.poste) {
+                const poste = data.poste;
+
+                setElementValue('typeContrat', poste.type_contrat || '');
+                setElementValue('dureeContrat', poste.duree_contrat || '');
+                setElementValue('salaire', poste.salaire || '');
+
+                const salaireRange = document.getElementById('salaireRange');
+                if (salaireRange && poste.salaire_min && poste.salaire_max) {
+                    salaireRange.textContent = `(${formatSalaire(poste.salaire_min)} - ${formatSalaire(poste.salaire_max)} FCFA)`;
+                }
+
+                updateElementText('niveauHierarchique', poste.niveau_hierarchique || 'Non défini');
+                updateElementText('codePaie', poste.code_paie || 'Non défini');
+                updateElementText('categoriePaie', poste.categorie_paie || 'Non définie');
+                updateElementText('regimeSocial', poste.regime_social || 'Non défini');
+                updateElementText('competencesRequises', poste.competences_requises || 'Aucune spécifiée');
+                updateElementText('avantages', poste.avantages || 'Aucun spécifié');
+
+                posteInfo.classList.remove('hidden');
+            }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            posteInfo.classList.add('hidden');
+        });
+}
+
+function previewPhoto(event) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const photoPreview = document.getElementById('photoPreview');
+            if (photoPreview) {
+                photoPreview.src = e.target.result;
+            }
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+function viewEmployee(id) {
+    window.open(`employee_details.php?id=${id}`, '_blank');
+}
+
+function generateBadge(id) {
+    window.open(`generate_badge.php?id=${id}`, '_blank');
+}
+
+// Fonctions de formatage et utilitaires
+function updateElementText(elementId, value) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.textContent = value;
+    }
+}
+
+function updateDashboardStats(stats) {
+    updateElementText('totalEmployes', stats.total_employes || 0);
+    updateElementText('tauxPresence', (stats.taux_presence || 0) + '%');
+    updateElementText('masseSalariale', formatSalaire(stats.masse_salariale_mensuelle || 0) + ' FCFA');
+    updateElementText('retardMoyen', (stats.moyenne_retards || 0) + ' min');
+}
+
+function setElementValue(elementId, value) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.value = value || '';
+    }
+}
+
+function getElementValue(elementId) {
+    const element = document.getElementById(elementId);
+    return element ? element.value : '';
+}
+
 function formatDate(dateString) {
     if (!dateString) return '-';
     try {
@@ -2996,29 +4174,286 @@ function formatDate(dateString) {
             day: 'numeric'
         });
     } catch (e) {
-        console.error('Erreur formatage date:', e);
         return '-';
     }
+}
+
+function formatDateForDisplay(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+
+    return `${day}/${month}/${year}`;
 }
 
 function formatTime(timeString) {
     if (!timeString) return '-';
     try {
-        // Pour le format time (HH:MM:SS)
         if (typeof timeString === 'string' && timeString.includes(':')) {
-            // Prendre seulement les heures et minutes
             const parts = timeString.split(':');
             if (parts.length >= 2) {
-                return `${parts[0]}:${parts[1]}`; // Retourne HH:MM
+                return `${parts[0]}:${parts[1]}`;
             }
         }
         return timeString;
     } catch (e) {
-        console.error('Erreur formatage heure:', e);
         return '-';
     }
 }
 
+function formatSalaire(montant) {
+    if (!montant) return '0';
+    return parseInt(montant).toLocaleString('fr-FR');
+}
+
+function getStatusClass(statut) {
+    const classes = {
+        'actif': 'bg-green-100 text-green-800',
+        'en_conge': 'bg-yellow-100 text-yellow-800',
+        'absent': 'bg-red-100 text-red-800',
+        'inactif': 'bg-gray-100 text-gray-800',
+        'present': 'bg-green-100 text-green-800',
+        'retard': 'bg-yellow-100 text-yellow-800',
+        'parti': 'bg-blue-100 text-blue-800'
+    };
+    return classes[statut] || 'bg-gray-100 text-gray-800';
+}
+
+function getStatusText(statut) {
+    if (!statut) return 'Inconnu';
+    const texts = {
+        'actif': 'Actif',
+        'en_conge': 'En congé',
+        'absent': 'Absent',
+        'inactif': 'Inactif',
+        'present': 'Présent',
+        'retard': 'En retard',
+        'parti': 'Parti'
+    };
+    return texts[statut.toLowerCase()] || 'Inconnu';
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function updateQuickStats() {
+    if (!employees || employees.length === 0) return;
+    const activeEmployees = employees.filter(e => e.statut === 'actif');
+    console.log(`${activeEmployees.length} employés actifs pour les actions rapides`);
+}
+
+// Fonctions de notification
+function showNotification(message, type = 'info') {
+    const notification = document.getElementById('notification');
+    if (!notification) return;
+
+    const colors = {
+        'success': 'bg-green-500',
+        'error': 'bg-red-500',
+        'warning': 'bg-yellow-500',
+        'info': 'bg-blue-500'
+    };
+
+    const icons = {
+        'success': 'check',
+        'error': 'times',
+        'warning': 'exclamation-triangle',
+        'info': 'info'
+    };
+
+    notification.innerHTML = `
+        <div class="${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg flex items-center justify-between">
+            <div class="flex items-center">
+                <i class="fas fa-${icons[type]}-circle mr-2"></i>
+                <span>${message}</span>
+            </div>
+            <button onclick="hideNotification()" class="ml-4 text-white hover:text-gray-200">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `;
+
+    notification.classList.remove('hidden');
+    setTimeout(hideNotification, 5000);
+}
+
+function hideNotification() {
+    const notification = document.getElementById('notification');
+    if (notification) {
+        notification.classList.add('hidden');
+    }
+}
+
+// Fonctions de génération de contenu de rapport (versions simplifiées)
+function generatePresenceReportContent(data, startDate, endDate) {
+    return `
+        <div class="mb-4">
+            <h4 class="text-md font-semibold text-gray-800">Rapport des Présences</h4>
+            <p class="text-sm text-gray-600">Du ${startDate} au ${endDate}</p>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full bg-white border">
+                <thead class="bg-gray-100">
+                    <tr>
+                        <th class="px-4 py-2 text-left">Employé</th>
+                        <th class="px-4 py-2 text-center">Présences</th>
+                        <th class="px-4 py-2 text-center">Retards</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${data.map(row => `
+                        <tr class="border-b">
+                            <td class="px-4 py-2">${escapeHtml(row.prenom || '')} ${escapeHtml(row.nom || '')}</td>
+                            <td class="px-4 py-2 text-center">${row.jours_presence || 0}</td>
+                            <td class="px-4 py-2 text-center">${row.jours_retard || 0}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function generateSalaryReportContent(data, startDate, endDate) {
+    return `
+        <div class="mb-4">
+            <h4 class="text-md font-semibold text-gray-800">Rapport des Salaires</h4>
+            <p class="text-sm text-gray-600">Du ${startDate} au ${endDate}</p>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full bg-white border">
+                <thead class="bg-gray-100">
+                    <tr>
+                        <th class="px-4 py-2 text-left">Employé</th>
+                        <th class="px-4 py-2 text-center">Salaire Brut</th>
+                        <th class="px-4 py-2 text-center">Salaire Net</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${data.map(row => `
+                        <tr class="border-b">
+                            <td class="px-4 py-2">${escapeHtml(row.nom || '')} ${escapeHtml(row.prenom || '')}</td>
+                            <td class="px-4 py-2 text-center">${formatSalaire(row.salaire_brut || 0)} FCFA</td>
+                            <td class="px-4 py-2 text-center">${formatSalaire(row.salaire_net || 0)} FCFA</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function generateWorkforceReportContent(data, startDate, endDate) {
+    return `
+        <div class="mb-4">
+            <h4 class="text-md font-semibold text-gray-800">Rapport des Effectifs</h4>
+            <p class="text-sm text-gray-600">Du ${startDate} au ${endDate}</p>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full bg-white border">
+                <thead class="bg-gray-100">
+                    <tr>
+                        <th class="px-4 py-2 text-left">Département</th>
+                        <th class="px-4 py-2 text-center">Effectif</th>
+                        <th class="px-4 py-2 text-center">Salaire Moyen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${data.map(row => `
+                        <tr class="border-b">
+                            <td class="px-4 py-2">${escapeHtml(row.departement || 'Non assigné')}</td>
+                            <td class="px-4 py-2 text-center">${row.nombre_employes || 0}</td>
+                            <td class="px-4 py-2 text-center">${formatSalaire(row.salaire_moyen || 0)} FCFA</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function generateTurnoverReportContent(data, startDate, endDate) {
+    return `
+        <div class="mb-4">
+            <h4 class="text-md font-semibold text-gray-800">Rapport du Turnover</h4>
+            <p class="text-sm text-gray-600">Du ${startDate} au ${endDate}</p>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full bg-white border">
+                <thead class="bg-gray-100">
+                    <tr>
+                        <th class="px-4 py-2 text-left">Département</th>
+                        <th class="px-4 py-2 text-center">Effectif</th>
+                        <th class="px-4 py-2 text-center">Départs</th>
+                        <th class="px-4 py-2 text-center">Taux Turnover</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${data.map(row => {
+                        const tauxTurnover = row.effectif_actuel > 0 ? Math.round((row.departs_periode / row.effectif_actuel) * 100) : 0;
+                        return `
+                            <tr class="border-b">
+                                <td class="px-4 py-2">${escapeHtml(row.departement || 'Non assigné')}</td>
+                                <td class="px-4 py-2 text-center">${row.effectif_actuel || 0}</td>
+                                <td class="px-4 py-2 text-center">${row.departs_periode || 0}</td>
+                                <td class="px-4 py-2 text-center">${tauxTurnover}%</td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+// Fonctions d'export (versions simplifiées)
+function exportReportToPDF() {
+    const reportContent = document.getElementById('reportContent');
+    if (!reportContent) {
+        showNotification('Aucun rapport à exporter', 'error');
+        return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Rapport RH - ${new Date().toLocaleDateString('fr-FR')}</title>
+            <meta charset="UTF-8">
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #f2f2f2; }
+                .text-center { text-align: center; }
+            </style>
+        </head>
+        <body>
+            <h1>Rapport RH - ${new Date().toLocaleDateString('fr-FR')}</h1>
+            ${reportContent.innerHTML}
+        </body>
+        </html>
+    `);
+    
+    printWindow.document.close();
+    setTimeout(() => {
+        printWindow.print();
+        showNotification('Impression du rapport lancée', 'success');
+    }, 500);
+}
+
+function exportReportToExcel() {
+    showNotification('Export Excel en cours de développement', 'info');
+}
     </script>
 </body>
 </html>

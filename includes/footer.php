@@ -113,7 +113,7 @@ try {
                         <h4 style="color: white; font-weight: 600; margin-bottom: 10px;">Adresse</h4>
                         <p style="color: #cbd5e0; margin: 5px 0;">Dakar, Medina</p>
                         <p style="color: #cbd5e0; margin: 5px 0;">Rue 27x24</p>
-                        <a class="btn-getstarted" href="admin/login.php" style="display: inline-block; margin-top: 15px; background: linear-gradient(135deg, #ec4899, #f97316); color: white; padding: 8px 20px; border-radius: 20px; text-decoration: none; font-size: 0.9rem;">Administration</a>
+                       
                     </div>
                 </div>
                 

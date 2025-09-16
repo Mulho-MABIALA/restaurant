@@ -518,7 +518,7 @@ function estBientot($date) {
     </style>
 </head>
 <body>
-    
+       <?php include('includes/navbar.php'); ?>
     <!-- Header -->
     <header >
            <sction class="events-footer">

@@ -948,8 +948,7 @@ try {
     
     
     <?php include('includes/navbar.php'); ?>
-    
-    <!-- Inclusion du carrousel -->
+
     <?php include('includes/carrousel.php'); ?>
 
     <!-- Particles Background -->
@@ -1064,7 +1063,6 @@ try {
             </div>
         </div>
     </section>
-    <?php include('evenements.php'); ?>
     <!-- Section Réserver une table -->
     <section id="book-a-table" class="book-a-table section">
         <div class="container section-title" data-aos="fade-up">
