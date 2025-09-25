@@ -49,7 +49,6 @@ class EmployeeManager {
         // Créer les données QR
         $qrData = [
             'type' => 'employee_badge',
-            'id' => (int)$employee['id'],
             'code' => $employee['code_numerique'],
             'nom' => $employee['nom'] ?? '',
             'prenom' => $employee['prenom'] ?? '',
@@ -63,37 +62,41 @@ class EmployeeManager {
     }
 
     public function getEmployeeById(int $id): ?array {
-    $stmt = $this->conn->prepare("
-        SELECT e.*, 
-               p.nom as poste_nom,
-               p.couleur as poste_couleur,
-               p.salaire as poste_salaire,
-               p.type_contrat,
-               p.duree_contrat,
-               p.niveau_hierarchique,
-               p.competences_requises,
-               p.avantages,
-               p.code_paie,
-               p.categorie_paie,
-               p.regime_social,
-               p.taux_cotisation,
-               p.salaire_min,
-               p.salaire_max,
-               p.heures_travail,
-               p.departement_id,
-               ps.nom as poste_superieur_nom,
-               d.nom as departement_nom,
-               d.description as departement_description
-        FROM employes e 
-        LEFT JOIN postes p ON e.poste_id = p.id 
-        LEFT JOIN postes ps ON p.poste_superieur_id = ps.id
-        LEFT JOIN departements d ON p.departement_id = d.id 
-        WHERE e.id = ?
-    ");
-    $stmt->execute([$id]);
-    $result = $stmt->fetch(PDO::FETCH_ASSOC);
-    return $result ?: null;
-}
+        $stmt = $this->conn->prepare("
+            SELECT e.*, 
+                   p.nom as poste_nom,
+                   p.description as poste_description,
+                   p.salaire_min as poste_salaire_min,
+                   p.salaire_max as poste_salaire_max,
+                   p.couleur as poste_couleur,
+                   p.salaire as poste_salaire,
+                   p.type_contrat as poste_type_contrat,
+                   p.duree_contrat as poste_duree_contrat,
+                   p.niveau_hierarchique,
+                   p.competences_requises,
+                   p.avantages as poste_avantages,
+                   p.code_paie,
+                   p.categorie_paie,
+                   p.regime_social,
+                   p.taux_cotisation,
+                   p.heures_travail,
+                   p.nombre_postes_prevus,
+                   p.actif as poste_actif,
+                   ps.nom as poste_superieur_nom,
+                   d.nom as departement_nom,
+                   d.description as departement_description,
+                   d.responsable_nom as departement_responsable_nom,
+                   d.responsable_prenom as departement_responsable_prenom
+            FROM employes e 
+            LEFT JOIN postes p ON e.poste_id = p.id 
+            LEFT JOIN postes ps ON p.poste_superieur_id = ps.id
+            LEFT JOIN departements d ON p.departement_id = d.id 
+            WHERE e.id = ?
+        ");
+        $stmt->execute([$id]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ?: null;
+    }
     
     /**
      * Récupère les horaires de la semaine pour un employé
@@ -400,17 +403,11 @@ try {
                 <button onclick="window.close()" class="text-gray-600 hover:text-gray-800 transition duration-200">
                     <i class="fas fa-arrow-left mr-2"></i>Retour
                 </button>
-                <div class="flex space-x-2">
-                    <button onclick="editEmployee()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition duration-200">
-                        <i class="fas fa-edit mr-2"></i>Modifier
-                    </button>
-                    <button onclick="generateBadge()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition duration-200">
-                        <i class="fas fa-qrcode mr-2"></i>Badge
-                    </button>
-                    <button onclick="generatePayslip()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition duration-200">
-                        <i class="fas fa-file-pdf mr-2"></i>Bulletin
-                    </button>
-                </div>
+               <div class="flex space-x-2">
+    <button onclick="generateBadge()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition duration-200">
+        <i class="fas fa-qrcode mr-2"></i>Badge
+    </button>
+</div>
             </div>
             
             <div class="flex items-center">
@@ -474,7 +471,9 @@ try {
                             <label class="block text-sm font-medium text-gray-700">Salaire</label>
                             <p class="mt-1 text-sm text-gray-900">
                                 <?php 
-                                if ($employee['salaire']) {
+                                if ($employee['salaire_individuel']) {
+                                    echo number_format($employee['salaire_individuel'], 0, ',', ' ') . ' FCFA (individuel)';
+                                } elseif ($employee['salaire']) {
                                     echo number_format($employee['salaire'], 0, ',', ' ') . ' FCFA';
                                 } elseif ($employee['poste_salaire']) {
                                     echo number_format($employee['poste_salaire'], 0, ',', ' ') . ' FCFA (salaire du poste)';
@@ -489,102 +488,198 @@ try {
                             <p class="mt-1 text-sm text-gray-900"><?php echo $employee['heure_debut'] . ' - ' . $employee['heure_fin']; ?></p>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">ID Employé</label>
-                            <p class="mt-1 text-sm text-gray-900 font-mono">#<?php echo str_pad($employee['id'], 4, '0', STR_PAD_LEFT); ?></p>
+                            <label class="block text-sm font-medium text-gray-700">Matricule</label>
+                            <p class="mt-1 text-sm text-gray-900 font-mono"><?php echo htmlspecialchars($employee['matricule'] ?? 'Non défini'); ?></p>
                         </div>
                     </div>
                 </div>
-<!-- Correction dans la section HTML - Informations du poste -->
-<?php if ($employee['poste_id']): ?>
-<div class="bg-white rounded-lg shadow-md p-6 card-shadow fade-in">
-    <h2 class="text-xl font-semibold text-gray-900 mb-4">
-        <i class="fas fa-briefcase mr-2 text-green-600"></i>Informations du poste
-    </h2>
-    
-    <!-- Section département corrigée -->
-    <?php if ($employee['departement_nom']): ?>
-    <div class="mb-4 p-4 rounded-lg border-l-4 border-gray-300 bg-gray-50">
-        <div class="flex items-center justify-between">
-            <div>
-                <h3 class="font-semibold text-gray-900">
-                    <i class="fas fa-building mr-2 text-gray-600"></i>
-                    Département: <?php echo htmlspecialchars($employee['departement_nom']); ?>
-                </h3>
-                <?php if ($employee['departement_description']): ?>
-                    <p class="text-sm text-gray-600 mt-1"><?php echo htmlspecialchars($employee['departement_description']); ?></p>
+
+                <!-- Informations administratives -->
+                <div class="bg-white rounded-lg shadow-md p-6 card-shadow fade-in">
+                    <h2 class="text-xl font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-id-card mr-2 text-blue-600"></i>Informations administratives
+                    </h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Numéro de sécurité sociale</label>
+                            <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['num_secu'] ?? 'Non renseigné'); ?></p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Type de pièce d'identité</label>
+                            <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['type_identite'] ?? 'Non renseigné'); ?></p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Numéro de pièce d'identité</label>
+                            <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['num_identite'] ?? 'Non renseigné'); ?></p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Situation familiale</label>
+                            <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['situation_familiale'] ?? 'Non renseigné'); ?></p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Nombre d'enfants</label>
+                            <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['nombre_enfants'] ?? '0'); ?></p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Numéro CNPS</label>
+                            <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['numero_cnps'] ?? 'Non renseigné'); ?></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informations bancaires -->
+                <div class="bg-white rounded-lg shadow-md p-6 card-shadow fade-in">
+                    <h2 class="text-xl font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-credit-card mr-2 text-green-600"></i>Informations bancaires
+                    </h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">IBAN</label>
+                            <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['iban'] ?? 'Non renseigné'); ?></p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">BIC</label>
+                            <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['bic'] ?? 'Non renseigné'); ?></p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Nom de la banque</label>
+                            <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['nom_banque'] ?? 'Non renseigné'); ?></p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Titulaire du compte</label>
+                            <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['titulaire_compte'] ?? 'Non renseigné'); ?></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informations du poste -->
+                <?php if ($employee['poste_id']): ?>
+                <div class="bg-white rounded-lg shadow-md p-6 card-shadow fade-in">
+                    <h2 class="text-xl font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-briefcase mr-2 text-green-600"></i>Informations du poste
+                    </h2>
+                    
+                    <!-- Section département -->
+                    <?php if ($employee['departement_nom']): ?>
+                    <div class="mb-4 p-4 rounded-lg border-l-4 border-gray-300 bg-gray-50">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="font-semibold text-gray-900">
+                                    <i class="fas fa-building mr-2 text-gray-600"></i>
+                                    Département: <?php echo htmlspecialchars($employee['departement_nom']); ?>
+                                </h3>
+                                <?php if ($employee['departement_description']): ?>
+                                    <p class="text-sm text-gray-600 mt-1"><?php echo htmlspecialchars($employee['departement_description']); ?></p>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                    <?php else: ?>
+                    <div class="mb-4 p-4 rounded-lg border-l-4 border-yellow-300 bg-yellow-50">
+                        <p class="text-sm text-yellow-800">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>
+                            Aucun département assigné à ce poste
+                        </p>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <?php if ($employee['poste_description']): ?>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700">Description du poste</label>
+                            <div class="mt-2 p-3 bg-gray-50 rounded-lg">
+                                <p class="text-sm text-gray-800"><?php echo nl2br(htmlspecialchars($employee['poste_description'])); ?></p>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Niveau hiérarchique</label>
+                            <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['niveau_hierarchique'] ?? 'Non défini'); ?></p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Code paie</label>
+                            <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['code_paie'] ?? 'Non défini'); ?></p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Catégorie paie</label>
+                            <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['categorie_paie'] ?? 'Non définie'); ?></p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Régime social</label>
+                            <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['regime_social'] ?? 'Non défini'); ?></p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Durée du contrat</label>
+                            <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['poste_duree_contrat'] ?? $employee['duree_contrat'] ?? 'Non spécifiée'); ?></p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Taux cotisation</label>
+                            <p class="mt-1 text-sm text-gray-900"><?php echo ($employee['taux_cotisation'] ?? 0) . '%'; ?></p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Salaire min/max du poste</label>
+                            <p class="mt-1 text-sm text-gray-900">
+                                <?php 
+                                if ($employee['poste_salaire_min'] && $employee['poste_salaire_max']) {
+                                    echo number_format($employee['poste_salaire_min'], 0, ',', ' ') . ' - ' . 
+                                         number_format($employee['poste_salaire_max'], 0, ',', ' ') . ' FCFA';
+                                } else {
+                                    echo 'Non défini';
+                                }
+                                ?>
+                            </p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Nombre de postes prévus</label>
+                            <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['nombre_postes_prevus'] ?? '1'); ?></p>
+                        </div>
+                        <?php if ($employee['poste_superieur_nom']): ?>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Poste supérieur</label>
+                            <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['poste_superieur_nom']); ?></p>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (isset($employee['heures_travail']) && $employee['heures_travail']): ?>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Heures/mois</label>
+                            <p class="mt-1 text-sm text-gray-900">
+                                <?php echo number_format($employee['heures_travail'], 0, ',', ' '); ?>h
+                            </p>
+                        </div>
+                        <?php endif; ?>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Statut du poste</label>
+                            <p class="mt-1 text-sm">
+                                <span class="px-2 py-1 rounded-full text-xs font-medium <?php 
+                                    echo $employee['poste_actif'] ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'; 
+                                ?>">
+                                    <?php echo $employee['poste_actif'] ? 'Actif' : 'Inactif'; ?>
+                                </span>
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <?php if ($employee['competences_requises']): ?>
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-700">Compétences requises</label>
+                        <div class="mt-2 p-3 bg-blue-50 rounded-lg">
+                            <p class="text-sm text-gray-800"><?php echo nl2br(htmlspecialchars($employee['competences_requises'])); ?></p>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <?php if ($employee['poste_avantages']): ?>
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-700">Avantages du poste</label>
+                        <div class="mt-2 p-3 bg-green-50 rounded-lg">
+                            <p class="text-sm text-gray-800"><?php echo nl2br(htmlspecialchars($employee['poste_avantages'])); ?></p>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                </div>
                 <?php endif; ?>
-            </div>
-        </div>
-    </div>
-    <?php else: ?>
-    <div class="mb-4 p-4 rounded-lg border-l-4 border-yellow-300 bg-yellow-50">
-        <p class="text-sm text-yellow-800">
-            <i class="fas fa-exclamation-triangle mr-2"></i>
-            Aucun département assigné à ce poste
-        </p>
-    </div>
-    <?php endif; ?>
-    
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-            <label class="block text-sm font-medium text-gray-700">Niveau hiérarchique</label>
-            <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['niveau_hierarchique'] ?? 'Non défini'); ?></p>
-        </div>
-        <div>
-            <label class="block text-sm font-medium text-gray-700">Code paie</label>
-            <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['code_paie'] ?? 'Non défini'); ?></p>
-        </div>
-        <div>
-            <label class="block text-sm font-medium text-gray-700">Catégorie paie</label>
-            <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['categorie_paie'] ?? 'Non définie'); ?></p>
-        </div>
-        <div>
-            <label class="block text-sm font-medium text-gray-700">Régime social</label>
-            <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['regime_social'] ?? 'Non défini'); ?></p>
-        </div>
-        <div>
-            <label class="block text-sm font-medium text-gray-700">Durée du contrat</label>
-            <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['duree_contrat'] ?? 'Non spécifiée'); ?></p>
-        </div>
-        <div>
-            <label class="block text-sm font-medium text-gray-700">Taux cotisation</label>
-            <p class="mt-1 text-sm text-gray-900"><?php echo ($employee['taux_cotisation'] ?? 0) . '%'; ?></p>
-        </div>
-        <?php if ($employee['poste_superieur_nom']): ?>
-        <div>
-            <label class="block text-sm font-medium text-gray-700">Poste supérieur</label>
-            <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['poste_superieur_nom']); ?></p>
-        </div>
-        <?php endif; ?>
-        <?php if (isset($employee['heures_travail']) && $employee['heures_travail']): ?>
-        <div>
-            <label class="block text-sm font-medium text-gray-700">Heures/mois</label>
-            <p class="mt-1 text-sm text-gray-900">
-                <?php echo number_format($employee['heures_travail'], 0, ',', ' '); ?>h
-            </p>
-        </div>
-        <?php endif; ?>
-    </div>
-    
-    <?php if ($employee['competences_requises']): ?>
-    <div class="mt-4">
-        <label class="block text-sm font-medium text-gray-700">Compétences requises</label>
-        <div class="mt-2 p-3 bg-gray-50 rounded-lg">
-            <p class="text-sm text-gray-800"><?php echo nl2br(htmlspecialchars($employee['competences_requises'])); ?></p>
-        </div>
-    </div>
-    <?php endif; ?>
-    
-    <?php if ($employee['avantages']): ?>
-    <div class="mt-4">
-        <label class="block text-sm font-medium text-gray-700">Avantages</label>
-        <div class="mt-2 p-3 bg-green-50 rounded-lg">
-            <p class="text-sm text-gray-800"><?php echo nl2br(htmlspecialchars($employee['avantages'])); ?></p>
-        </div>
-    </div>
-    <?php endif; ?>
-</div>
-<?php endif; ?>
+
                 <!-- Horaires de la semaine -->
                 <div class="bg-white rounded-lg shadow-md p-6 card-shadow fade-in">
                     <h2 class="text-xl font-semibold text-gray-900 mb-4">
@@ -716,16 +811,13 @@ try {
                         <button onclick="regenerateQR()" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
                             <i class="fas fa-sync-alt mr-2"></i>Régénérer QR
                         </button>
-                        <button onclick="downloadQR()" class="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
-                            <i class="fas fa-download mr-2"></i>Télécharger QR
-                        </button>
                         <button onclick="printBadge()" class="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
                             <i class="fas fa-print mr-2"></i>Imprimer Badge
                         </button>
                     </div>
                 </div>
 
-                <!-- Badge preview -->
+                <!-- Badge preview sans ID -->
                 <div class="bg-white rounded-lg shadow-md p-6 card-shadow fade-in">
                     <h3 class="text-lg font-semibold text-gray-900 mb-4">Aperçu du badge</h3>
                     <div id="badge-preview" class="border-2 border-indigo-500 rounded-lg p-4 bg-white" style="min-height: 120px;">
@@ -742,9 +834,11 @@ try {
                                 </div>
                                 <?php endif; ?>
                                 
+                                <?php if (!empty($employee['departement_nom'])): ?>
                                 <div class="text-xs text-gray-500 mb-1">
-                                    ID: <?= $employee['id'] ?>
+                                    <?= htmlspecialchars($employee['departement_nom']) ?>
                                 </div>
+                                <?php endif; ?>
                                 
                                 <div class="bg-gray-100 px-2 py-1 rounded text-xs font-mono" id="badge-code-display">
                                     <?= htmlspecialchars($employee['code_numerique'] ?? 'Génération...') ?>
@@ -865,6 +959,17 @@ try {
                                 Depuis le <?php echo date('d/m/Y', strtotime($employee['date_embauche'])); ?>
                             </span>
                         </div>
+
+                        <!-- Responsable du département -->
+                        <?php if ($employee['departement_responsable_nom'] || $employee['departement_responsable_prenom']): ?>
+                        <div class="flex items-center">
+                            <i class="fas fa-user-tie text-orange-600 mr-3 w-4"></i>
+                            <span class="text-sm text-gray-600">
+                                Responsable département: 
+                                <?php echo htmlspecialchars(($employee['departement_responsable_prenom'] ?? '') . ' ' . ($employee['departement_responsable_nom'] ?? '')); ?>
+                            </span>
+                        </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -874,7 +979,7 @@ try {
     <!-- Zone de notification -->
     <div id="notification" class="fixed top-4 right-4 z-50 hidden"></div>
 
-    <!-- Badge imprimable (masqué par défaut) -->
+    <!-- Badge imprimable (masqué par défaut) - Sans ID -->
     <div id="printable-badge" class="hidden">
         <div class="badge-container" style="width: 85mm; height: 54mm; border: 2px solid #4F46E5; border-radius: 8px; padding: 8px; background: white; margin: 10mm;">
             <div class="flex items-center justify-between h-full">
@@ -890,9 +995,11 @@ try {
                     </div>
                     <?php endif; ?>
                     
+                    <?php if (!empty($employee['departement_nom'])): ?>
                     <div class="text-xs text-gray-500 mb-1">
-                        ID: <?= $employee['id'] ?>
+                        <?= htmlspecialchars($employee['departement_nom']) ?>
                     </div>
+                    <?php endif; ?>
                     
                     <div class="bg-gray-100 px-2 py-1 rounded text-xs font-mono" id="print-badge-code">
                         <?= htmlspecialchars($employee['code_numerique'] ?? 'Génération...') ?>
@@ -1010,18 +1117,6 @@ try {
             }, 100);
         }
         
-        // Téléchargement du QR Code
-        function downloadQR() {
-            const canvas = document.getElementById('qr-code-canvas');
-            const link = document.createElement('a');
-            link.download = 'qr_<?php echo $employee['nom']; ?>_<?php echo $employee['prenom']; ?>.png';
-            link.href = canvas.toDataURL();
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            showNotification('QR Code téléchargé', 'success');
-        }
-        
         // Impression du badge
         function printBadge() {
             // Mettre à jour le QR Code d'impression
@@ -1083,45 +1178,9 @@ try {
                 console.error('Erreur QR impression:', error);
             }
         }
-        
-        // Fonctions principales existantes
-        function editEmployee() {
-            if (window.opener && window.opener.editEmployee) {
-                window.opener.editEmployee(employeeId);
-                window.close();
-            } else {
-                window.open(`admin_gestion.php?edit=${employeeId}`, '_blank');
-            }
-        }
 
         function generateBadge() {
             window.open(`generate_badge.php?id=${employeeId}`, '_blank');
-        }
-
-        function generatePayslip() {
-            const mois = prompt("Entrez le mois pour le bulletin (YYYY-MM):", new Date().toISOString().slice(0, 7));
-            if (mois) {
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = 'admin_gestion.php?action=generer_bulletin';
-                form.target = '_blank';
-                
-                const employeInput = document.createElement('input');
-                employeInput.type = 'hidden';
-                employeInput.name = 'employe_id';
-                employeInput.value = employeeId;
-                
-                const moisInput = document.createElement('input');
-                moisInput.type = 'hidden';
-                moisInput.name = 'mois_annee';
-                moisInput.value = mois;
-                
-                form.appendChild(employeInput);
-                form.appendChild(moisInput);
-                document.body.appendChild(form);
-                form.submit();
-                document.body.removeChild(form);
-            }
         }
 
         function marquerPresence(type = 'entree') {
@@ -1237,141 +1296,13 @@ try {
             hideNotification();
         }
 
-        // Raccourcis clavier
-        document.addEventListener('keydown', function(e) {
-            if (e.ctrlKey || e.metaKey) {
-                switch(e.key) {
-                    case 'e':
-                        e.preventDefault();
-                        editEmployee();
-                        break;
-                    case 'i':
-                        e.preventDefault();
-                        marquerPresence('entree');
-                        break;
-                    case 'o':
-                        e.preventDefault();
-                        marquerPresence('sortie');
-                        break;
-                    case 'b':
-                        e.preventDefault();
-                        generateBadge();
-                        break;
-                    case 'q':
-                        e.preventDefault();
-                        regenerateQR();
-                        break;
-                    case 'p':
-                        e.preventDefault();
-                        printBadge();
-                        break;
-                }
-            }
-        });
-
-        // Auto-refresh des statistiques toutes les 5 minutes
-        setInterval(() => {
-            refreshStatistics();
-        }, 300000);
-
-        // Animation d'entrée pour les cartes
-        document.addEventListener('DOMContentLoaded', function() {
-            const cards = document.querySelectorAll('.fade-in');
-            cards.forEach((card, index) => {
-                setTimeout(() => {
-                    card.style.opacity = '1';
-                    card.style.transform = 'translateY(0)';
-                }, index * 100);
-            });
-        });
-
-        // Fonction pour planifier les horaires (à implémenter selon vos besoins)
+        // Fonction pour planifier les horaires
         function planifierHoraires() {
             if (window.opener && window.opener.planifierHoraires) {
                 window.opener.planifierHoraires(employeeId);
             } else {
-                // Rediriger vers la page de planification des horaires
                 window.open(`planning.php?employee_id=${employeeId}`, '_blank');
             }
-        }
-
-        // Gestion des erreurs globales
-        window.addEventListener('error', function(e) {
-            console.error('Erreur JavaScript:', e.error);
-            showNotification('Une erreur inattendue s\'est produite', 'error');
-        });
-
-        // Gestion de la visibilité de la page pour optimiser les performances
-        document.addEventListener('visibilitychange', function() {
-            if (document.visibilityState === 'visible') {
-                // Actualiser les données quand l'utilisateur revient sur l'onglet
-                refreshStatistics();
-            }
-        });
-
-        // Validation des données avant envoi
-        function validateEmployeeData() {
-            const requiredFields = ['nom', 'prenom', 'email'];
-            const employee = <?php echo json_encode($employee); ?>;
-            
-            for (let field of requiredFields) {
-                if (!employee[field] || employee[field].trim() === '') {
-                    showNotification(`Le champ ${field} est requis`, 'warning');
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        // Export des données de l'employé
-        function exportEmployeeData() {
-            const employee = <?php echo json_encode($employee); ?>;
-            const data = {
-                employee: employee,
-                statistics: <?php echo json_encode($statistics); ?>,
-                qr_data: currentQRData,
-                export_date: new Date().toISOString()
-            };
-            
-            const dataStr = JSON.stringify(data, null, 2);
-            const dataBlob = new Blob([dataStr], {type: 'application/json'});
-            
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(dataBlob);
-            link.download = `employee_${employeeId}_data.json`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            
-            showNotification('Données exportées avec succès', 'success');
-        }
-
-        // Fonction utilitaire pour formater les dates
-        function formatDate(dateString) {
-            const date = new Date(dateString);
-            return date.toLocaleDateString('fr-FR', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
-        }
-
-        // Fonction utilitaire pour formater les heures
-        function formatTime(timeString) {
-            if (!timeString) return '-';
-            const [hours, minutes] = timeString.split(':');
-            return `${hours}:${minutes}`;
-        }
-
-        // Gestion du mode sombre (si implémenté)
-        function toggleDarkMode() {
-            document.documentElement.classList.toggle('dark');
-            localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
-        }
-
-        // Charger le mode sombre sauvegardé
-        if (localStorage.getItem('darkMode') === 'true') {
-            document.documentElement.classList.add('dark');
         }
 
         // Fonction pour copier le code numérique dans le presse-papiers
@@ -1388,32 +1319,16 @@ try {
         document.getElementById('numeric-code-display').addEventListener('click', copyNumericCode);
         document.getElementById('badge-code-display').addEventListener('click', copyNumericCode);
 
-        // Fonction pour partager les informations de l'employé
-        function shareEmployee() {
-            if (navigator.share) {
-                navigator.share({
-                    title: 'Informations Employé',
-                    text: `<?php echo htmlspecialchars($employee['prenom'] . ' ' . $employee['nom']); ?> - <?php echo htmlspecialchars($employee['poste_nom'] ?? ''); ?>`,
-                    url: window.location.href
-                }).then(() => {
-                    showNotification('Partagé avec succès', 'success');
-                }).catch(() => {
-                    showNotification('Erreur lors du partage', 'error');
-                });
-            } else {
-                // Fallback: copier l'URL dans le presse-papiers
-                navigator.clipboard.writeText(window.location.href).then(() => {
-                    showNotification('Lien copié dans le presse-papiers', 'success');
-                }).catch(() => {
-                    showNotification('Partage non supporté', 'error');
-                });
-            }
-        }
-
-        // Console log pour debug (à supprimer en production)
-        console.log('Employee Details Page Loaded for Employee ID:', employeeId);
-        console.log('Current QR Data:', currentQRData);
-        console.log('Employee Data:', <?php echo json_encode($employee); ?>);
+        // Animation d'entrée pour les cartes
+        document.addEventListener('DOMContentLoaded', function() {
+            const cards = document.querySelectorAll('.fade-in');
+            cards.forEach((card, index) => {
+                setTimeout(() => {
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 100);
+            });
+        });
     </script>
 </body>
 </html>

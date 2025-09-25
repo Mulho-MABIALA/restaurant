@@ -30,7 +30,186 @@
             return 0;
         }
     }
+function getAllProductsWithCategories($conn) {
+    try {
+        $stmt = $conn->prepare("
+            SELECT p.*, c.nom as nom_categorie, c.couleur as couleur_categorie
+            FROM plats p 
+            LEFT JOIN categories c ON p.categorie_id = c.id 
+            ORDER BY c.nom, p.nom
+        ");
+        $stmt->execute();
+        $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Vérifiez que la requête retourne des résultats
+        if ($result === false) {
+            throw new Exception("Erreur lors de l'exécution de la requête produits");
+        }
+        
+        return $result;
+    } catch (PDOException $e) {
+        throw new Exception("Erreur base de données produits: " . $e->getMessage());
+    }
+}
 
+// Fonction pour récupérer toutes les catégories
+function getAllCategories($conn) {
+    try {
+        $stmt = $conn->prepare("SELECT * FROM categories ORDER BY nom");
+        $stmt->execute();
+        $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        if ($result === false) {
+            throw new Exception("Erreur lors de l'exécution de la requête catégories");
+        }
+        
+        return $result;
+    } catch (PDOException $e) {
+        throw new Exception("Erreur base de données catégories: " . $e->getMessage());
+    }
+}
+// ===== GESTION AJAX POUR CRÉER UNE COMMANDE MANUELLE =====
+if (isset($_POST['action']) && $_POST['action'] === 'creer_commande_manuelle') {
+    header('Content-Type: application/json');
+    
+    try {
+        $nom_client = $_POST['nom_client'] ?? '';
+        $email = $_POST['email'] ?? '';
+        $telephone = $_POST['telephone'] ?? '';
+        $num_table = $_POST['num_table'] ?? '';
+        $produits = json_decode($_POST['produits'] ?? '[]', true);
+        $remise_type = $_POST['remise_type'] ?? 'aucune'; // 'pourcentage', 'montant', 'aucune'
+        $remise_valeur = floatval($_POST['remise_valeur'] ?? 0);
+        $total_original = floatval($_POST['total_original'] ?? 0);
+        $total_final = floatval($_POST['total_final'] ?? 0);
+        
+        // Validation des données - simplifiée
+        if (empty($num_table) || empty($produits)) {
+            echo json_encode(['success' => false, 'message' => 'Veuillez renseigner le numéro de table et sélectionner des produits']);
+            exit;
+        }
+        
+        // Générer des valeurs par défaut si vides
+        if (empty($nom_client)) {
+            $nom_client = "Table " . $num_table;
+        }
+        if (empty($telephone)) {
+            $telephone = "0000000000";
+        }
+        
+        // Calculer la remise
+        $remise_montant = 0;
+        if ($remise_type === 'pourcentage' && $remise_valeur > 0) {
+            $remise_montant = ($total_original * $remise_valeur) / 100;
+        } elseif ($remise_type === 'montant' && $remise_valeur > 0) {
+            $remise_montant = $remise_valeur;
+        }
+        
+        // Commencer une transaction
+        $conn->beginTransaction();
+        
+        // Insérer la commande
+        $stmt = $conn->prepare("
+            INSERT INTO commandes (
+                nom_client, email, telephone, num_table, 
+                total, statut, statut_paiement, vu_admin, 
+                type_commande, remise_type, remise_valeur, remise_montant,
+                created_at, date_commande
+            ) VALUES (
+                :nom_client, :email, :telephone, :num_table,
+                :total, 'En cours', 'Impayé', 0,
+                'manuelle', :remise_type, :remise_valeur, :remise_montant,
+                NOW(), NOW()
+            )
+        ");
+        
+        $result = $stmt->execute([
+            'nom_client' => $nom_client,
+            'email' => $email,
+            'telephone' => $telephone,
+            'num_table' => $num_table,
+            'total' => $total_final,
+            'remise_type' => $remise_type,
+            'remise_valeur' => $remise_valeur,
+            'remise_montant' => $remise_montant
+        ]);
+        
+        if (!$result) {
+            throw new Exception('Erreur lors de l\'insertion de la commande');
+        }
+        
+        $commande_id = $conn->lastInsertId();
+        
+        // Insérer les détails de la commande (si vous avez une table commande_details)
+        foreach ($produits as $produit) {
+            $stmt_detail = $conn->prepare("
+                INSERT INTO commande_details (
+                    commande_id, plat_id, nom_plat, 
+                    prix_unitaire, quantite, total
+                ) VALUES (
+                    :commande_id, :plat_id, :nom_plat,
+                    :prix_unitaire, :quantite, :total
+                )
+            ");
+            
+            $stmt_detail->execute([
+                'commande_id' => $commande_id,
+                'plat_id' => $produit['id'],
+                'nom_plat' => $produit['nom'],
+                'prix_unitaire' => $produit['prix'],
+                'quantite' => $produit['quantite'],
+                'total' => $produit['prix'] * $produit['quantite']
+            ]);
+        }
+        
+        // Valider la transaction
+        $conn->commit();
+        
+        echo json_encode([
+            'success' => true, 
+            'message' => 'Commande créée avec succès',
+            'commande_id' => $commande_id
+        ]);
+        
+    } catch (Exception $e) {
+        $conn->rollback();
+        echo json_encode(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()]);
+    }
+    exit;
+}
+
+// ===== GESTION AJAX POUR RÉCUPÉRER LES PRODUITS =====
+if (isset($_POST['action']) && $_POST['action'] === 'get_produits') {
+    header('Content-Type: application/json');
+    
+    try {
+        $produits = getAllProductsWithCategories($conn);
+        $categories = getAllCategories($conn);
+        
+        // Log pour débogage (optionnel)
+        error_log("Nombre de produits récupérés: " . count($produits));
+        error_log("Nombre de catégories récupérées: " . count($categories));
+        
+        echo json_encode([
+            'success' => true,
+            'produits' => $produits,
+            'categories' => $categories
+        ]);
+    } catch (Exception $e) {
+        // Log l'erreur
+        error_log("Erreur lors de la récupération des produits: " . $e->getMessage());
+        
+        echo json_encode([
+            'success' => false, 
+            'message' => 'Erreur lors de la récupération des données: ' . $e->getMessage()
+        ]);
+    }
+    exit;
+}
+
+// Récupérer les produits et catégories pour le modal
+$produits_disponibles = getAllProductsWithCategories($conn);
+$categories_disponibles = getAllCategories($conn);
     // Mettre à jour le statut "vu" des anciennes commandes automatiquement
     updateOldOrdersVuStatus($conn);
 
@@ -133,7 +312,12 @@
     $filtre_paiement = $_GET['paiement'] ?? '';
 
     try {
-        $sql    = "SELECT * FROM commandes WHERE 1";
+        $sql = "SELECT *, 
+        CASE 
+            WHEN type_commande = 'manuelle' THEN CONCAT('[MANUELLE] ', nom_client)
+            ELSE nom_client 
+        END as nom_client_display 
+        FROM commandes WHERE 1";
         $params = [];
 
         if (! empty($search)) {
@@ -357,6 +541,450 @@
             transform: translateY(-1px);
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
         }
+
+        /* Styles pour le modal de commande manuelle */
+.category-btn {
+    transition: all 0.2s ease;
+}
+
+.category-btn.active {
+    background-color: #dc2626 !important;
+    color: white !important;
+    border-color: #dc2626 !important;
+}
+
+.category-btn:not(.active):hover {
+    background-color: #f3f4f6;
+    border-color: #d1d5db;
+}
+
+.produit-card {
+    transition: all 0.3s ease;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+}
+
+.produit-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.produit-image {
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+    background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+}
+
+.produit-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.btn-ajouter {
+    transition: all 0.2s ease;
+}
+
+.btn-ajouter:hover {
+    transform: scale(1.05);
+}
+
+.panier-item {
+    animation: slideIn 0.3s ease-out;
+    transition: all 0.3s ease;
+}
+
+.panier-item.removing {
+    animation: slideOut 0.3s ease-in;
+    transform: translateX(100%);
+    opacity: 0;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideOut {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+}
+
+.quantite-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.quantite-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 1px solid #d1d5db;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 12px;
+}
+
+.quantite-btn:hover {
+    background: #f3f4f6;
+    border-color: #9ca3af;
+}
+
+.quantite-btn:active {
+    transform: scale(0.95);
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+    .w-96 {
+        width: 350px;
+    }
+}
+
+@media (max-width: 768px) {
+    #commandeManuelleModal .max-w-7xl {
+        max-width: 100%;
+        margin: 0;
+        height: 100vh;
+        max-height: 100vh;
+        border-radius: 0;
+    }
+    
+    .w-96 {
+        width: 100%;
+        order: 2;
+    }
+    
+    #commandeManuelleModal .flex {
+        flex-direction: column;
+    }
+}
+
+/* Styles pour le modal de commande manuelle */
+.category-btn {
+    transition: all 0.2s ease;
+}
+
+.category-btn.active {
+    background-color: #dc2626 !important;
+    color: white !important;
+    border-color: #dc2626 !important;
+}
+
+.category-btn:not(.active):hover {
+    background-color: #f3f4f6;
+    border-color: #d1d5db;
+}
+
+.produit-card {
+    transition: all 0.3s ease;
+    border-radius: 16px;
+    overflow: hidden;
+    position: relative;
+    border: 2px solid transparent;
+}
+
+.produit-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.08);
+    border-color: #e5e7eb;
+}
+
+.produit-image {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 12px;
+    position: relative;
+}
+
+.produit-placeholder {
+    width: 100%;
+    height: 140px;
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.produit-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    backdrop-filter: blur(10px);
+}
+
+.produit-quantity-badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: #dc2626;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+    min-width: 24px;
+    text-align: center;
+}
+
+.btn-ajouter {
+    transition: all 0.2s ease;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 13px;
+    padding: 8px 16px;
+    width: 100%;
+    border: 2px solid transparent;
+}
+
+.btn-ajouter:hover {
+    transform: scale(1.02);
+    border-color: #059669;
+}
+
+.btn-ajouter.added {
+    background-color: #059669 !important;
+    border-color: #059669 !important;
+}
+
+/* Amélioration des cartes produits */
+.produit-info {
+    padding: 12px;
+    background: white;
+}
+
+.produit-nom {
+    font-weight: 600;
+    font-size: 14px;
+    color: #1f2937;
+    margin-bottom: 4px;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.produit-prix {
+    font-weight: 700;
+    font-size: 16px;
+    color: #059669;
+}
+
+.panier-item {
+    animation: slideIn 0.3s ease-out;
+    transition: all 0.3s ease;
+}
+
+.panier-item.removing {
+    animation: slideOut 0.3s ease-in;
+    transform: translateX(100%);
+    opacity: 0;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideOut {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+}
+
+.quantite-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.quantite-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 1px solid #d1d5db;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 12px;
+}
+
+.quantite-btn:hover {
+    background: #f3f4f6;
+    border-color: #9ca3af;
+}
+
+.quantite-btn:active {
+    transform: scale(0.95);
+}
+
+/* Grid responsive pour produits */
+.produits-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 16px;
+    padding: 20px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+    .w-96 {
+        width: 350px;
+    }
+    
+    .produits-grid {
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    #commandeManuelleModal .max-w-7xl {
+        max-width: 100%;
+        margin: 0;
+        height: 100vh;
+        max-height: 100vh;
+        border-radius: 0;
+    }
+    
+    .w-96 {
+        width: 100%;
+        order: 2;
+    }
+    
+    #commandeManuelleModal .flex {
+        flex-direction: column;
+    }
+    
+    .produits-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 12px;
+        padding: 16px;
+    }
+}
+
+ /* Ajoutez ces styles pour améliorer l'affichage */
+    .produit-card {
+        transition: all 0.3s ease;
+    }
+    
+    .produit-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+    
+    .produit-image {
+        height: 160px;
+        object-fit: cover;
+        width: 100%;
+    }
+    
+    .produit-placeholder {
+        height: 160px;
+        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .produit-badge {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    
+    .produit-quantity-badge {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: #dc2626;
+        color: white;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: bold;
+    }
+    
+    .panier-item {
+        animation: slideIn 0.3s ease-out;
+    }
+    
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+    
+    .quantite-btn {
+        transition: all 0.2s ease;
+    }
+    
+    .quantite-btn:hover {
+        background: #e5e7eb !important;
+    } 
     </style>
 </head>
 <body>
@@ -371,6 +999,13 @@
                     <div>
                         <h1 class="text-3xl font-bold text-gray-800">Gestion des Commandes</h1>
                     </div>
+                    <div class="mb-6">
+    <button onclick="openCommandeManuelleModal()" 
+            class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-700 text-white font-semibold rounded-lg shadow-lg hover:from-green-700 hover:to-emerald-800 transform hover:scale-105 transition-all duration-200">
+        <i class="fas fa-plus-circle mr-3 text-lg"></i>
+        Nouvelle commande manuelle
+    </button>
+</div>
                 </div>
             </header>
 
@@ -519,7 +1154,9 @@
                        placeholder="Recherche par nom, email ou téléphone..."
                        value="<?php echo e($search)?>"
                        class="block w-full pl-10 pr-3 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors text-base">
+                       
             </div>
+            
         </div>
 
         <div class="md:col-span-3">
@@ -634,7 +1271,14 @@
                 <div class="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center mr-3">
                     <span class="text-white font-medium text-sm"><?php echo strtoupper(substr(e($cmd['nom_client']), 0, 1))?></span>
                 </div>
-                <span class="text-base font-medium text-gray-800"><?php echo e($cmd['nom_client'])?></span>
+                <span class="text-base font-medium text-gray-800">
+    <?php if (($cmd['type_commande'] ?? 'en_ligne') === 'manuelle'): ?>
+        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2">
+            <i class="fas fa-user-edit mr-1"></i>MANUELLE
+        </span>
+    <?php endif; ?>
+    <?php echo e($cmd['nom_client'])?>
+</span>
             </div>
         </td>
         <td class="px-6 py-4 table-cell">
@@ -850,549 +1494,1112 @@ endforeach; ?>
         </div>
     </div>
 
+  <!-- ===== MODAL DE COMMANDE MANUELLE (à ajouter avant </body>) ===== -->
+<div id="commandeManuelleModal" class="fixed inset-0 bg-black/50 modal-overlay flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-7xl h-full max-h-[95vh] m-4 flex flex-col overflow-hidden">
+        <!-- Header du modal -->
+        <div class="bg-gradient-to-r from-green-600 to-emerald-700 text-white p-6 flex items-center justify-between">
+            <div class="flex items-center">
+                <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mr-4">
+                    <i class="fas fa-shopping-cart text-xl"></i>
+                </div>
+                <div>
+                    <h2 class="text-2xl font-bold">Nouvelle commande manuelle</h2>
+                    <p class="text-green-100">Sélectionnez les produits pour créer une commande</p>
+                </div>
+            </div>
+            <button onclick="closeCommandeManuelleModal()" class="text-white/80 hover:text-white transition-colors">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+
+        <!-- Contenu principal -->
+        <div class="flex-1 flex overflow-hidden">
+            <!-- Panel gauche - Produits -->
+            <div class="flex-1 flex flex-col border-r border-gray-200">
+                <!-- Barre de recherche et navigation -->
+                <div class="p-6 border-b border-gray-200 bg-gray-50">
+
+                    <!-- Barre de recherche -->
+                    <div class="relative mb-6">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-search text-gray-400"></i>
+                        </div>
+                        <input type="text" 
+                               id="searchProduits" 
+                               placeholder="Recherche" 
+                               class="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-base">
+                        <button class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                            <i class="fas fa-times text-gray-400 hover:text-gray-600 cursor-pointer hidden" id="clearSearch"></i>
+                        </button>
+                    </div>
+
+                    <!-- Navigation par catégories -->
+                    <div class="flex flex-wrap gap-3" id="categoriesNav">
+                        <button class="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-blue-100 text-blue-800 border border-blue-200 category-btn active" data-category="all">
+                            <i class="fas fa-th-large mr-2"></i>
+                            Tous
+                        </button>
+                        <!-- Les catégories seront ajoutées dynamiquement -->
+                    </div>
+                </div>
+
+                <!-- Grille des produits -->
+                <div class="flex-1 overflow-auto p-6">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" id="produitsGrid">
+                        <!-- Les produits seront chargés dynamiquement -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panel droit - Panier -->
+            <div class="w-96 flex flex-col bg-gray-50">
+                <!-- Header du panier -->
+                <div class="p-6 border-b border-gray-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold text-gray-800">Récapitulatif</h3>
+                        <span class="bg-green-100 text-green-800 text-sm font-medium px-3 py-1 rounded-full" id="itemCount">0 article</span>
+                    </div>
+                    
+                    <!-- Informations client -->
+                    <div class="space-y-3">
+                        <div class="relative">
+                            <input type="number" id="numTable" placeholder="N° de table *" min="1" 
+                                   class="w-full px-3 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-center font-bold text-lg">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-table text-gray-400"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Liste des articles -->
+                <div class="flex-1 overflow-auto p-6">
+                    <div id="panierItems" class="space-y-3">
+                        <!-- Message panier vide -->
+                        <div id="panierVide" class="text-center py-12">
+                            <div class="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <i class="fas fa-shopping-cart text-gray-400 text-xl"></i>
+                            </div>
+                            <p class="text-gray-500">Aucun article sélectionné</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section remise et total -->
+                <div class="border-t border-gray-200 p-6 space-y-4">
+                    <!-- Options de remise -->
+                    <div class="space-y-3">
+                        <label class="block text-sm font-medium text-gray-700">Remise</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button onclick="toggleRemiseType('pourcentage')" id="btnRemisePourcentage" 
+                                    class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors">
+                                <i class="fas fa-percent mr-2"></i>%
+                            </button>
+                            <button onclick="toggleRemiseType('montant')" id="btnRemiseMontant" 
+                                    class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors">
+                                <i class="fas fa-coins mr-2"></i>FCFA
+                            </button>
+                        </div>
+                        <input type="number" id="remiseValeur" placeholder="Valeur de la remise" min="0" step="0.01"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 hidden">
+                    </div>
+
+                    <!-- Totaux -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Sous-total :</span>
+                            <span id="sousTotal">0 FCFA</span>
+                        </div>
+                        <div class="flex justify-between text-sm text-green-600" id="ligneRemise" style="display: none;">
+                            <span>Remise :</span>
+                            <span id="montantRemise">-0 FCFA</span>
+                        </div>
+                        <div class="flex justify-between text-lg font-bold border-t pt-2">
+                            <span>Total :</span>
+                            <span id="totalFinal" class="text-green-600">0 FCFA</span>
+                        </div>
+                    </div>
+
+                    <!-- Boutons d'action -->
+                    <div class="grid grid-cols-2 gap-3 pt-4">
+                        <button onclick="viderPanier()" 
+                                class="px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                            <i class="fas fa-trash mr-2"></i>Vider
+                        </button>
+                        <button onclick="effectuerPaiement()" id="btnPayer"
+                                class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium">
+                            Enregistrer
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
     <!-- Toast Notification Container -->
     <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-4"></div>
 
     <!-- Scripts -->
-
-    <script>
-        let commandeToDelete = null;
-        let commandeToEdit = null;
-        let currentClientName = null;
-
-
-        // Fonction pour ouvrir le modal de modification
-         {
-    commandeToEdit = id;
-    const modal = document.getElementById('editModal');
+     <script>
+    let commandeToDelete = null;
+    let commandeToEdit = null;
+    let currentClientName = null;
     
-    // Récupérer le numéro de commande visuel depuis le tableau
-    const row = document.getElementById('commande-' + id);
-    let numeroCommande = id; // Fallback sur l'ID si pas trouvé
-    
-    if (row) {
-        const numeroElement = row.querySelector('.numero-commande');
-        if (numeroElement) {
-            numeroCommande = numeroElement.textContent;
-        }
-    }
+    // Variables globales pour la commande manuelle - INITIALISATION CORRECTE
+    let produits = [];
+    let categories = [];
+    let panier = [];
+    let remiseType = 'aucune';
+    let remiseValeur = 0;
 
-    // Récupérer les données de la commande via AJAX
-    fetch(window.location.href, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: `action=get_commande&id=${id}`
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            const commande = data.data;
-
-            // Remplir le formulaire avec le numéro visuel
-            document.getElementById('editCommandeId').value = commande.id;
-            document.getElementById('editCommandeInfo').textContent = `N°${numeroCommande} - ${commande.nom_client}`;
-            document.getElementById('editStatut').value = commande.statut;
-            document.getElementById('editStatutPaiement').value = commande.statut_paiement || 'Impayé';
-            document.getElementById('editVuAdmin').checked = commande.vu_admin == 1;
-
-            // Afficher le modal
-            modal.classList.remove('hidden');
-        } else {
-            showToast('Erreur: ' + data.message, 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Erreur:', error);
-        showToast('Erreur de connexion', 'error');
-    });
-}
-
-        // Fonction pour fermer le modal de modification
-        function closeEditModal() {
-            const modal = document.getElementById('editModal');
-            modal.classList.add('hidden');
-            commandeToEdit = null;
-        }
-
-       // Gestionnaire de soumission du formulaire de modification - MISE À JOUR
-document.getElementById('editForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-
-    if (!commandeToEdit) return;
-
-    const saveBtn = document.getElementById('saveEditBtn');
-    const originalText = saveBtn.innerHTML;
-
-    // Animation de chargement
-    saveBtn.innerHTML = `
-        <i class="fas fa-spinner fa-spin mr-2"></i>
-        Enregistrement...
-    `;
-    saveBtn.disabled = true;
-
-    // Récupérer les données du formulaire
-    const formData = new FormData(this);
-    formData.append('action', 'modifier');
-
-    // Requête AJAX
-    fetch(window.location.href, {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Mettre à jour l'affichage dans le tableau
-            updateTableRow(commandeToEdit, formData);
-
-            // Mettre à jour les statistiques automatiquement
-            setTimeout(() => {
-                updateStats();
-            }, 500);
-
-            showToast('Commande modifiée avec succès!', 'success');
-            closeEditModal();
-        } else {
-            showToast('Erreur: ' + data.message, 'error');
-        }
-
-        saveBtn.innerHTML = originalText;
-        saveBtn.disabled = false;
-    })
-    .catch(error => {
-        console.error('Erreur:', error);
-        showToast('Erreur de connexion', 'error');
-        saveBtn.innerHTML = originalText;
-        saveBtn.disabled = false;
-    });
-});
-
-// Fonction pour supprimer la commande via AJAX - MISE À JOUR
-function deleteCommande() {
-    if (!commandeToDelete) return;
-
-    const confirmBtn = document.getElementById('confirmDeleteBtn');
-    const originalText = confirmBtn.innerHTML;
-
-    // Animation de chargement
-    confirmBtn.innerHTML = `
-        <i class="fas fa-spinner fa-spin mr-2"></i>
-        Suppression...
-    `;
-    confirmBtn.disabled = true;
-
-    // Sauvegarder l'ID de la commande à supprimer
-    const commandeId = commandeToDelete;
-
-    // Requête AJAX
-    fetch(window.location.href, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: `action=supprimer&id=${commandeId}`
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Animation de suppression de la ligne
-            const row = document.getElementById('commande-' + commandeId);
-            if (row) {
-                row.style.opacity = '0';
-                row.style.transform = 'translateX(-100%)';
-
-                setTimeout(() => {
-                    row.remove();
-                    // Renumeroter les commandes après suppression
-                    renumberCommandes();
-                    // Mettre à jour les statistiques automatiquement
-                    updateStats();
-                }, 300);
-            }
-
-            showToast('Commande supprimée avec succès!', 'success');
-            closeDeleteModal();
-        } else {
-            showToast('Erreur: ' + data.message, 'error');
-        }
-
-        // Restaurer le bouton dans tous les cas
-        confirmBtn.innerHTML = originalText;
-        confirmBtn.disabled = false;
-    })
-    .catch(error => {
-        console.error('Erreur:', error);
-        showToast('Erreur de connexion', 'error');
-        confirmBtn.innerHTML = originalText;
-        confirmBtn.disabled = false;
-    });
-}
-
-        // Fonction pour mettre à jour une ligne du tableau
-        function updateTableRow(commandeId, formData) {
-            const row = document.getElementById('commande-' + commandeId);
-            if (!row) return;
-
-            // Mettre à jour le statut
-            const statutElement = document.getElementById('statut-' + commandeId);
-            const newStatut = formData.get('statut');
-
-            // Déterminer l'icône et la classe selon le statut
-            let statutClass = '';
-            let statutIcon = '';
-            switch(newStatut) {
-                case 'En cours':
-                    statutClass = 'bg-yellow-100 text-yellow-800';
-                    statutIcon = 'fas fa-clock';
-                    break;
-                case 'Livré':
-                case 'Terminée':
-                    statutClass = 'bg-green-100 text-green-800';
-                    statutIcon = 'fas fa-check-circle';
-                    break;
-                case 'Annulé':
-                    statutClass = 'bg-red-100 text-red-800';
-                    statutIcon = 'fas fa-times-circle';
-                    break;
-                case 'Préparation en cours':
-                    statutClass = 'bg-blue-100 text-blue-800';
-                    statutIcon = 'fas fa-utensils';
-                    break;
-                default:
-                    statutClass = 'bg-gray-100 text-gray-800';
-                    statutIcon = 'fas fa-question-circle';
-            }
-
-            statutElement.className = 'status-badge flex items-center ' + statutClass;
-            statutElement.innerHTML = `<i class="${statutIcon} mr-1 text-xs"></i>${newStatut}`;
-
-            // Mettre à jour le statut de paiement
-            const paiementElement = document.getElementById('paiement-' + commandeId);
-            const newPaiement = formData.get('statut_paiement');
-            const paiementClass = newPaiement === 'Payé' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800';
-            const paiementIcon = newPaiement === 'Payé' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle';
-
-            paiementElement.className = 'status-badge flex items-center ' + paiementClass;
-            paiementElement.innerHTML = `<i class="${paiementIcon} mr-1 text-xs"></i>${newPaiement}`;
-
-            // Mettre à jour le statut "vu"
-            const vuElement = document.getElementById('vu-' + commandeId);
-            const vuAdmin = formData.get('vu_admin') === '1';
-            if (vuAdmin) {
-                vuElement.className = 'status-badge bg-green-100 text-green-800 flex items-center';
-                vuElement.innerHTML = '<i class="fas fa-eye text-xs mr-1"></i>Consulté';
-            } else {
-                vuElement.className = 'status-badge bg-red-100 text-red-800 flex items-center';
-                vuElement.innerHTML = '<i class="fas fa-exclamation text-xs mr-1"></i>Nouveau';
-            }
-
-            // Animation de mise à jour
-            row.style.backgroundColor = '#f0fdf4';
-            setTimeout(() => {
-                row.style.backgroundColor = '';
-            }, 1000);
-        }
-
-       // Fonction pour supprimer la commande via AJAX - CORRECTED
-function deleteCommande() {
-    if (!commandeToDelete) return;
-
-    const confirmBtn = document.getElementById('confirmDeleteBtn');
-    const originalText = confirmBtn.innerHTML;
-
-    // Animation de chargement
-    confirmBtn.innerHTML = `
-        <i class="fas fa-spinner fa-spin mr-2"></i>
-        Suppression...
-    `;
-    confirmBtn.disabled = true;
-
-    // Sauvegarder l'ID de la commande à supprimer
-    const commandeId = commandeToDelete;
-
-    // Requête AJAX
-    fetch(window.location.href, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: `action=supprimer&id=${commandeId}`
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Animation de suppression de la ligne
-            const row = document.getElementById('commande-' + commandeId);
-            if (row) {
-                row.style.opacity = '0';
-                row.style.transform = 'translateX(-100%)';
-
-                setTimeout(() => {
-                    row.remove();
-                    updateStats();
-                    // Renumeroter les commandes après suppression
-                    renumberCommandes();
-                }, 300);
-            }
-
-            showToast('Commande supprimée avec succès!', 'success');
-            closeDeleteModal();
-        } else {
-            showToast('Erreur: ' + data.message, 'error');
-        }
-
-        // Restaurer le bouton dans tous les cas
-        confirmBtn.innerHTML = originalText;
-        confirmBtn.disabled = false;
-    })
-    .catch(error => {
-        console.error('Erreur:', error);
-        showToast('Erreur de connexion', 'error');
-        confirmBtn.innerHTML = originalText;
-        confirmBtn.disabled = false;
-    });
-}
-
-// Fonction pour fermer la modale de suppression - AMÉLIORÉE
-function closeDeleteModal() {
-    const modal = document.getElementById('deleteModal');
-    modal.classList.add('hidden');
-    
-    // IMPORTANT: Réinitialiser toutes les variables
-    commandeToDelete = null;
-    currentClientName = null;
-    
-    // Réinitialiser le contenu du modal pour éviter l'affichage des anciennes données
-    document.getElementById('deleteCommandeInfo').textContent = '';
-    
-    // Réinitialiser le bouton
-    const confirmBtn = document.getElementById('confirmDeleteBtn');
-    confirmBtn.innerHTML = 'Supprimer';
-    confirmBtn.disabled = false;
-}
-
-// Fonction pour afficher la modale de confirmation de suppression - AMÉLIORÉE
-function confirmDelete(id, nomClient) {
-    // Fermer d'abord tout modal ouvert (au cas où)
-    closeDeleteModal();
-    closeEditModal();
-    
-    // Récupérer le numéro de commande visuel depuis le tableau
-    const row = document.getElementById('commande-' + id);
-    let numeroCommande = id; // Fallback sur l'ID si pas trouvé
-    
-    if (row) {
-        const numeroElement = row.querySelector('.numero-commande');
-        if (numeroElement) {
-            numeroCommande = numeroElement.textContent;
-        }
-    }
-    
-    // Définir les nouvelles valeurs
-    commandeToDelete = id;
-    currentClientName = nomClient;
-    
-    const modal = document.getElementById('deleteModal');
-    // Utiliser le numéro visuel au lieu de l'ID
-    document.getElementById('deleteCommandeInfo').textContent = `Commande N°${numeroCommande} - ${nomClient}`;
-    
-    // S'assurer que le bouton est dans son état normal
-    const confirmBtn = document.getElementById('confirmDeleteBtn');
-    confirmBtn.innerHTML = 'Supprimer';
-    confirmBtn.disabled = false;
-    
-    modal.classList.remove('hidden');
-}
-// Fonction alternative : Modifier directement les boutons dans le tableau pour passer le numéro
-function updateActionButtons() {
-    // Cette fonction peut être appelée après le chargement ou après des modifications
-    const rows = document.querySelectorAll('#commandesTableBody tr:not([colspan])');
-    
-    rows.forEach(row => {
-        const numeroElement = row.querySelector('.numero-commande');
-        const modifierBtn = row.querySelector('button[onclick*="openEditModal"]');
-        const supprimerBtn = row.querySelector('button[onclick*="confirmDelete"]');
+    // Fonction pour ouvrir le modal de modification
+    function openEditModal(id, numeroAffichage) {
+        commandeToEdit = id;
+        const modal = document.getElementById('editModal');
         
-        if (numeroElement && modifierBtn && supprimerBtn) {
-            const numeroCommande = numeroElement.textContent;
-            const commandeId = row.id.replace('commande-', '');
-            
-            // Extraire le nom du client depuis le onclick actuel
-            const currentOnclick = supprimerBtn.getAttribute('onclick');
-            const nomClientMatch = currentOnclick.match(/'([^']+)'/);
-            const nomClient = nomClientMatch ? nomClientMatch[1] : 'Client';
-            
-            // Mettre à jour les attributs onclick pour inclure le numéro
-            modifierBtn.setAttribute('onclick', `openEditModalWithNumber(${commandeId}, '${numeroCommande}')`);
-            supprimerBtn.setAttribute('onclick', `confirmDeleteWithNumber(${commandeId}, '${nomClient}', '${numeroCommande}')`);
+        // Récupérer le numéro de commande visuel depuis le tableau
+        const row = document.getElementById('commande-' + id);
+        let numeroCommande = numeroAffichage || id;
+        
+        if (row) {
+            const numeroElement = row.querySelector('.numero-commande');
+            if (numeroElement) {
+                numeroCommande = numeroElement.textContent;
+            }
         }
-    });
-}
-// Fonction pour ouvrir le modal de modification - CORRIGÉE
-function openEditModal(id, numeroAffichage) {
-    commandeToEdit = id;
-    const modal = document.getElementById('editModal');
-    
-    // Récupérer le numéro de commande visuel depuis le tableau
-    const row = document.getElementById('commande-' + id);
-    let numeroCommande = numeroAffichage || id; // Utiliser le numéro fourni ou l'ID comme fallback
-    
-    if (row && !numeroAffichage) {
-        const numeroElement = row.querySelector('.numero-commande');
-        if (numeroElement) {
-            numeroCommande = numeroElement.textContent;
-        }
+
+        // Récupérer les données de la commande via AJAX
+        fetch('commandes.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `action=get_commande&id=${id}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const commande = data.data;
+
+                // Remplir le formulaire avec le numéro visuel
+                document.getElementById('editCommandeId').value = commande.id;
+                document.getElementById('editCommandeInfo').textContent = `N°${numeroCommande} - ${commande.nom_client}`;
+                document.getElementById('editStatut').value = commande.statut;
+                document.getElementById('editStatutPaiement').value = commande.statut_paiement || 'Impayé';
+                document.getElementById('editVuAdmin').checked = commande.vu_admin == 1;
+
+                // Afficher le modal
+                modal.classList.remove('hidden');
+            } else {
+                showToast('Erreur: ' + data.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            showToast('Erreur de connexion', 'error');
+        });
     }
 
-    // Récupérer les données de la commande via AJAX
-    fetch(window.location.href, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: `action=get_commande&id=${id}`
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            const commande = data.data;
+    // Fonction pour fermer le modal de modification
+    function closeEditModal() {
+        const modal = document.getElementById('editModal');
+        modal.classList.add('hidden');
+        commandeToEdit = null;
+    }
 
-            // Remplir le formulaire avec le numéro visuel
-            document.getElementById('editCommandeId').value = commande.id;
-            document.getElementById('editCommandeInfo').textContent = `N°${numeroCommande} - ${commande.nom_client}`;
-            document.getElementById('editStatut').value = commande.statut;
-            document.getElementById('editStatutPaiement').value = commande.statut_paiement || 'Impayé';
-            document.getElementById('editVuAdmin').checked = commande.vu_admin == 1;
+    // Gestionnaire de soumission du formulaire de modification
+    document.getElementById('editForm').addEventListener('submit', function(e) {
+        e.preventDefault();
 
-            // Afficher le modal
-            modal.classList.remove('hidden');
+        if (!commandeToEdit) return;
+
+        const saveBtn = document.getElementById('saveEditBtn');
+        const originalText = saveBtn.innerHTML;
+
+        // Animation de chargement
+        saveBtn.innerHTML = `
+            <i class="fas fa-spinner fa-spin mr-2"></i>
+            Enregistrement...
+        `;
+        saveBtn.disabled = true;
+
+        // Récupérer les données du formulaire
+        const formData = new FormData(this);
+        formData.append('action', 'modifier');
+
+        // Requête AJAX
+        fetch('commandes.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Mettre à jour l'affichage dans le tableau
+                updateTableRow(commandeToEdit, formData);
+
+                // Mettre à jour les statistiques automatiquement
+                setTimeout(() => {
+                    updateStats();
+                }, 500);
+
+                showToast('Commande modifiée avec succès!', 'success');
+                closeEditModal();
+            } else {
+                showToast('Erreur: ' + data.message, 'error');
+            }
+
+            saveBtn.innerHTML = originalText;
+            saveBtn.disabled = false;
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            showToast('Erreur de connexion', 'error');
+            saveBtn.innerHTML = originalText;
+            saveBtn.disabled = false;
+        });
+    });
+
+    // Fonction pour supprimer la commande via AJAX
+    function deleteCommande() {
+        if (!commandeToDelete) return;
+
+        const confirmBtn = document.getElementById('confirmDeleteBtn');
+        const originalText = confirmBtn.innerHTML;
+
+        // Animation de chargement
+        confirmBtn.innerHTML = `
+            <i class="fas fa-spinner fa-spin mr-2"></i>
+            Suppression...
+        `;
+        confirmBtn.disabled = true;
+
+        // Sauvegarder l'ID de la commande à supprimer
+        const commandeId = commandeToDelete;
+
+        // Requête AJAX
+        fetch('commandes.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `action=supprimer&id=${commandeId}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Animation de suppression de la ligne
+                const row = document.getElementById('commande-' + commandeId);
+                if (row) {
+                    row.style.opacity = '0';
+                    row.style.transform = 'translateX(-100%)';
+
+                    setTimeout(() => {
+                        row.remove();
+                        // Renumeroter les commandes après suppression
+                        renumberCommandes();
+                        // Mettre à jour les statistiques automatiquement
+                        updateStats();
+                    }, 300);
+                }
+
+                showToast('Commande supprimée avec succès!', 'success');
+                closeDeleteModal();
+            } else {
+                showToast('Erreur: ' + data.message, 'error');
+            }
+
+            // Restaurer le bouton dans tous les cas
+            confirmBtn.innerHTML = originalText;
+            confirmBtn.disabled = false;
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            showToast('Erreur de connexion', 'error');
+            confirmBtn.innerHTML = originalText;
+            confirmBtn.disabled = false;
+        });
+    }
+
+    // Fonction pour mettre à jour une ligne du tableau
+    function updateTableRow(commandeId, formData) {
+        const row = document.getElementById('commande-' + commandeId);
+        if (!row) return;
+
+        // Mettre à jour le statut
+        const statutElement = document.getElementById('statut-' + commandeId);
+        const newStatut = formData.get('statut');
+
+        // Déterminer l'icône et la classe selon le statut
+        let statutClass = '';
+        let statutIcon = '';
+        switch(newStatut) {
+            case 'En cours':
+                statutClass = 'bg-yellow-100 text-yellow-800';
+                statutIcon = 'fas fa-clock';
+                break;
+            case 'Livré':
+            case 'Terminée':
+                statutClass = 'bg-green-100 text-green-800';
+                statutIcon = 'fas fa-check-circle';
+                break;
+            case 'Annulé':
+                statutClass = 'bg-red-100 text-red-800';
+                statutIcon = 'fas fa-times-circle';
+                break;
+            case 'Préparation en cours':
+                statutClass = 'bg-blue-100 text-blue-800';
+                statutIcon = 'fas fa-utensils';
+                break;
+            default:
+                statutClass = 'bg-gray-100 text-gray-800';
+                statutIcon = 'fas fa-question-circle';
+        }
+
+        statutElement.className = 'status-badge flex items-center ' + statutClass;
+        statutElement.innerHTML = `<i class="${statutIcon} mr-1 text-xs"></i>${newStatut}`;
+
+        // Mettre à jour le statut de paiement
+        const paiementElement = document.getElementById('paiement-' + commandeId);
+        const newPaiement = formData.get('statut_paiement');
+        const paiementClass = newPaiement === 'Payé' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800';
+        const paiementIcon = newPaiement === 'Payé' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle';
+
+        paiementElement.className = 'status-badge flex items-center ' + paiementClass;
+        paiementElement.innerHTML = `<i class="${paiementIcon} mr-1 text-xs"></i>${newPaiement}`;
+
+        // Mettre à jour le statut "vu"
+        const vuElement = document.getElementById('vu-' + commandeId);
+        const vuAdmin = formData.get('vu_admin') === '1';
+        if (vuAdmin) {
+            vuElement.className = 'status-badge bg-green-100 text-green-800 flex items-center';
+            vuElement.innerHTML = '<i class="fas fa-eye text-xs mr-1"></i>Consulté';
         } else {
-            showToast('Erreur: ' + data.message, 'error');
+            vuElement.className = 'status-badge bg-red-100 text-red-800 flex items-center';
+            vuElement.innerHTML = '<i class="fas fa-exclamation text-xs mr-1"></i>Nouveau';
         }
-    })
-    .catch(error => {
-        console.error('Erreur:', error);
-        showToast('Erreur de connexion', 'error');
-    });
-}
 
-// Fonction pour confirmer la suppression - CORRIGÉE
-function confirmDelete(id, nomClient, numeroAffichage) {
-    // Fermer d'abord tout modal ouvert (au cas où)
-    closeDeleteModal();
-    closeEditModal();
-    
-    // Récupérer le numéro de commande visuel depuis le tableau
-    const row = document.getElementById('commande-' + id);
-    let numeroCommande = numeroAffichage || id; // Utiliser le numéro fourni ou l'ID comme fallback
-    
-    if (row && !numeroAffichage) {
-        const numeroElement = row.querySelector('.numero-commande');
-        if (numeroElement) {
-            numeroCommande = numeroElement.textContent;
+        // Animation de mise à jour
+        row.style.backgroundColor = '#f0fdf4';
+        setTimeout(() => {
+            row.style.backgroundColor = '';
+        }, 1000);
+    }
+
+    // Fonction pour ouvrir le modal de commande manuelle - CORRIGÉE
+    function openCommandeManuelleModal() {
+        const modal = document.getElementById('commandeManuelleModal');
+        modal.classList.remove('hidden');
+        
+        // Reset du panier
+        panier = [];
+        remiseType = 'aucune';
+        remiseValeur = 0;
+        
+        // Charger les produits et initialiser l'interface seulement après le chargement
+        chargerProduits().then((success) => {
+            if (success) {
+                updatePanierDisplay();
+                updateTotaux();
+                
+                // Clear form
+                document.getElementById('numTable').value = '';
+                document.getElementById('searchProduits').value = '';
+                document.getElementById('remiseValeur').value = '';
+                document.getElementById('remiseValeur').classList.add('hidden');
+                
+                // Reset remise buttons
+                document.getElementById('btnRemisePourcentage').classList.remove('bg-green-600', 'text-white');
+                document.getElementById('btnRemisePourcentage').classList.add('border-gray-300');
+                document.getElementById('btnRemiseMontant').classList.remove('bg-green-600', 'text-white');
+                document.getElementById('btnRemiseMontant').classList.add('border-gray-300');
+            }
+        });
+    }
+
+    // Fonction pour fermer le modal
+    function closeCommandeManuelleModal() {
+        const modal = document.getElementById('commandeManuelleModal');
+        modal.classList.add('hidden');
+    }
+
+    // Fonction pour charger les produits - CORRIGÉE
+    function chargerProduits() {
+        console.log("Tentative de chargement des produits...");
+        
+        return fetch('commandes.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'action=get_produits'
+        })
+        .then(response => {
+            console.log("Réponse reçue, status:", response.status);
+            if (!response.ok) {
+                throw new Error('Erreur réseau: ' + response.status);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log("Données reçues:", data);
+            if (data.success) {
+                produits = data.produits || [];
+                categories = data.categories || [];
+                console.log(`${produits.length} produits chargés, ${categories.length} catégories`);
+                
+                initializeCategories();
+                afficherProduits(produits);
+                return true;
+            } else {
+                throw new Error(data.message || 'Erreur inconnue du serveur');
+            }
+        })
+        .catch(error => {
+            console.error('Erreur détaillée:', error);
+            showToast('Erreur de chargement: ' + error.message, 'error');
+            // Afficher des produits vides pour éviter les erreurs
+            produits = [];
+            categories = [];
+            initializeCategories();
+            afficherProduits([]);
+            return false;
+        });
+    }
+
+    // Fonction pour initialiser les catégories
+    function initializeCategories() {
+        const categoriesNav = document.getElementById('categoriesNav');
+        
+        // Garder le bouton "Tous"
+        const btnTous = categoriesNav.querySelector('[data-category="all"]');
+        categoriesNav.innerHTML = '';
+        categoriesNav.appendChild(btnTous);
+        
+        // Ajouter les catégories
+        categories.forEach(cat => {
+            const categoryColors = {
+                'Burgers': { bg: 'bg-blue-100', text: 'text-blue-800', icon: 'fas fa-hamburger' },
+                'Asiatique': { bg: 'bg-red-100', text: 'text-red-800', icon: 'fas fa-utensils' },
+                'Italien': { bg: 'bg-green-100', text: 'text-green-800', icon: 'fas fa-pizza-slice' },
+                'Plats Froid': { bg: 'bg-cyan-100', text: 'text-cyan-800', icon: 'fas fa-snowflake' },
+                'Plats chauds': { bg: 'bg-purple-100', text: 'text-purple-800', icon: 'fas fa-fire' },
+                'Boissons': { bg: 'bg-orange-100', text: 'text-orange-800', icon: 'fas fa-glass-water' }
+            };
+            
+            const colorData = categoryColors[cat.nom] || { bg: 'bg-gray-100', text: 'text-gray-800', icon: 'fas fa-tag' };
+            
+            const button = document.createElement('button');
+            button.className = `inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${colorData.bg} ${colorData.text} border border-current category-btn`;
+            button.dataset.category = cat.id;
+            button.innerHTML = `<i class="${colorData.icon} mr-2"></i>${cat.nom}`;
+            button.onclick = () => filterByCategory(cat.id);
+            
+            categoriesNav.appendChild(button);
+        });
+    }
+
+    // Fonction pour filtrer par catégorie
+    function filterByCategory(categoryId) {
+        // Mettre à jour les boutons actifs
+        document.querySelectorAll('.category-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        if (categoryId === 'all') {
+            document.querySelector('[data-category="all"]').classList.add('active');
+            afficherProduits(produits);
+        } else {
+            document.querySelector(`[data-category="${categoryId}"]`).classList.add('active');
+            const produitsFiltres = produits.filter(p => p.categorie_id == categoryId);
+            afficherProduits(produitsFiltres);
         }
     }
-    
-    // Définir les nouvelles valeurs
-    commandeToDelete = id;
-    currentClientName = nomClient;
-    
-    const modal = document.getElementById('deleteModal');
-    // Utiliser le numéro visuel au lieu de l'ID
-    document.getElementById('deleteCommandeInfo').textContent = `Commande N°${numeroCommande} - ${nomClient}`;
-    
-    // S'assurer que le bouton est dans son état normal
-    const confirmBtn = document.getElementById('confirmDeleteBtn');
-    confirmBtn.innerHTML = 'Supprimer';
-    confirmBtn.disabled = false;
-    
-    modal.classList.remove('hidden');
-}
 
-        // Fonction pour renuméroter les commandes après suppression
-function renumberCommandes() {
-    const rows = document.querySelectorAll('#commandesTableBody tr:not([colspan])');
-    const totalRows = rows.length;
-    
-    rows.forEach((row, index) => {
-        const numeroElement = row.querySelector('.numero-commande');
-        if (numeroElement) {
-            // Numérotation inverse : la première ligne (index 0) aura le numéro le plus élevé
-            numeroElement.textContent = totalRows - index;
+    // Fonction pour afficher les produits
+   function afficherProduits(produitsToShow) {
+        const grid = document.getElementById('produitsGrid');
+        
+        // Vérifier que produitsToShow est un tableau
+        if (!Array.isArray(produitsToShow)) {
+            produitsToShow = [];
         }
-    });
-}
+        
+        if (produitsToShow.length === 0) {
+            grid.innerHTML = `
+                <div class="col-span-full text-center py-12">
+                    <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-search text-gray-400 text-xl"></i>
+                    </div>
+                    <p class="text-gray-500">Aucun produit disponible</p>
+                </div>
+            `;
+            return;
+        }
+        
+        grid.innerHTML = '';
+        produitsToShow.forEach(produit => {
+            // Vérifier si le produit est dans le panier
+            const itemInPanier = panier.find(item => item.id == produit.id);
+            const quantiteInPanier = itemInPanier ? itemInPanier.quantite : 0;
+            
+            const card = document.createElement('div');
+            card.className = 'produit-card bg-white shadow-sm border border-gray-100';
+            card.innerHTML = `
+                <div class="relative">
+                    ${produit.image_url ? 
+                        `<img src="../${produit.image_url}" alt="${produit.nom}" class="produit-image" onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.style.display='flex';">` 
+                        : ''
+                    }
+                    <div class="produit-placeholder" style="${produit.image_url ? 'display: none;' : ''}">
+                        <i class="fas fa-utensils text-gray-300 text-3xl"></i>
+                    </div>
+                    
+                    <div class="produit-badge">${parseInt(produit.prix)} FCFA</div>
+                    
+                    ${quantiteInPanier > 0 ? `<div class="produit-quantity-badge">${quantiteInPanier}</div>` : ''}
+                </div>
+                
+                <div class="produit-info p-3">
+                    <h3 class="produit-nom font-semibold text-gray-800 mb-2">${produit.nom}</h3>
+                    <div class="flex items-center justify-between">
+                        <span class="produit-prix font-bold text-green-600">${parseInt(produit.prix)} FCFA</span>
+                        <button onclick="ajouterAuPanier(${produit.id})" 
+                                class="btn-ajouter px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors ${quantiteInPanier > 0 ? 'bg-green-700' : ''}">
+                            <i class="fas fa-plus mr-1"></i>
+                            Ajouter
+                        </button>
+                    </div>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+    }
 
-        // Fonction pour afficher les notifications toast
-        function showToast(message, type = 'success') {
-            const container = document.getElementById('toastContainer');
-            const toast = document.createElement('div');
-            const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
-            const icon = type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle';
+    // Fonction pour ajouter un produit au panier - CORRIGÉE
+    function ajouterAuPanier(produitId) {
+        const produit = produits.find(p => p.id == produitId);
+        if (!produit) {
+            console.error("Produit non trouvé:", produitId);
+            return;
+        }
+        
+        const existingItemIndex = panier.findIndex(item => item.id == produitId);
+        
+        if (existingItemIndex >= 0) {
+            // Produit déjà dans le panier, augmenter la quantité
+            panier[existingItemIndex].quantite++;
+        } else {
+            // Nouveau produit, l'ajouter au panier
+            panier.push({
+                id: produit.id,
+                nom: produit.nom,
+                prix: parseFloat(produit.prix),
+                quantite: 1,
+                image: produit.image_url || null
+            });
+        }
+        
+        updatePanierDisplay();
+        updateTotaux();
+        updateProductBadges(); // Mettre à jour les badges sur les produits
+        
+        // Animation de feedback
+        showToast(`${produit.nom} ajouté au panier`, 'success');
+    }
 
-            toast.className = `${bgColor} text-white px-6 py-4 rounded-lg shadow-lg transform translate-x-full transition-all duration-300 font-medium max-w-sm`;
-            toast.innerHTML = `
-                <div class="flex items-center">
-                    <i class="${icon} mr-3"></i>
-                    <span>${message}</span>
-                    <button onclick="this.closest('div').remove()" class="ml-4 text-white/80 hover:text-white">
+    // Nouvelle fonction pour mettre à jour les badges des produits
+    function updateProductBadges() {
+        const productCards = document.querySelectorAll('.produit-card');
+        productCards.forEach(card => {
+            const productId = card.querySelector('button').onclick.toString().match(/ajouterAuPanier\((\d+)\)/)[1];
+            const itemInPanier = panier.find(item => item.id == productId);
+            const quantiteInPanier = itemInPanier ? itemInPanier.quantite : 0;
+            
+            // Mettre à jour le badge de quantité
+            const badge = card.querySelector('.produit-quantity-badge');
+            if (quantiteInPanier > 0) {
+                if (!badge) {
+                    const newBadge = document.createElement('div');
+                    newBadge.className = 'produit-quantity-badge';
+                    newBadge.textContent = quantiteInPanier;
+                    card.querySelector('.relative').appendChild(newBadge);
+                } else {
+                    badge.textContent = quantiteInPanier;
+                }
+                
+                // Changer l'apparence du bouton
+                const button = card.querySelector('.btn-ajouter');
+                button.classList.add('bg-green-700');
+                button.innerHTML = '<i class="fas fa-check mr-1"></i>Ajouté';
+            } else {
+                if (badge) {
+                    badge.remove();
+                }
+                
+                // Remettre le bouton à son état initial
+                const button = card.querySelector('.btn-ajouter');
+                button.classList.remove('bg-green-700');
+                button.innerHTML = '<i class="fas fa-plus mr-1"></i>Ajouter';
+            }
+        });
+    }
+
+    // Fonction pour mettre à jour l'affichage du panier - AMÉLIORÉE
+    function updatePanierDisplay() {
+        const panierItems = document.getElementById('panierItems');
+        const panierVide = document.getElementById('panierVide');
+        const itemCount = document.getElementById('itemCount');
+        
+        if (panier.length === 0) {
+            panierVide.style.display = 'block';
+            panierItems.innerHTML = '';
+            panierItems.appendChild(panierVide);
+            itemCount.textContent = '0 article';
+            return;
+        }
+        
+        panierVide.style.display = 'none';
+        const totalItems = panier.reduce((sum, item) => sum + item.quantite, 0);
+        itemCount.textContent = `${totalItems} article${totalItems > 1 ? 's' : ''}`;
+        
+        panierItems.innerHTML = '';
+        
+        panier.forEach((item, index) => {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'panier-item bg-white rounded-lg p-4 border border-gray-200 mb-3';
+            itemDiv.innerHTML = `
+                <div class="flex items-start justify-between mb-3">
+                    <div class="flex items-start">
+                        ${item.image ? 
+                            `<img src="../${item.image}" alt="${item.nom}" class="w-12 h-12 object-cover rounded-md mr-3" onerror="this.onerror=null; this.style.display='none';">` 
+                            : 
+                            `<div class="w-12 h-12 bg-gray-100 rounded-md flex items-center justify-center mr-3">
+                                <i class="fas fa-utensils text-gray-400"></i>
+                            </div>`
+                        }
+                        <div>
+                            <h4 class="font-medium text-gray-800">${item.nom}</h4>
+                            <p class="text-sm text-gray-500">${parseInt(item.prix)} FCFA l'unité</p>
+                        </div>
+                    </div>
+                    <button onclick="retirerDuPanier(${index})" class="text-red-500 hover:text-red-700 ml-2 mt-1">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
+                <div class="flex items-center justify-between">
+                    <div class="quantite-controls flex items-center">
+                        <button onclick="modifierQuantite(${index}, -1)" class="quantite-btn w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                            <i class="fas fa-minus text-gray-600"></i>
+                        </button>
+                        <span class="text-lg font-medium w-10 text-center mx-2">${item.quantite}</span>
+                        <button onclick="modifierQuantite(${index}, 1)" class="quantite-btn w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                            <i class="fas fa-plus text-gray-600"></i>
+                        </button>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-lg font-bold text-green-600">${parseInt(item.prix * item.quantite)} FCFA</div>
+                    </div>
+                </div>
             `;
+            panierItems.appendChild(itemDiv);
+        });
+    }
 
-            container.appendChild(toast);
-
-            setTimeout(() => {
-                toast.style.transform = 'translateX(0)';
-            }, 100);
-
-            setTimeout(() => {
-                if (toast.parentNode) {
-                    toast.style.transform = 'translateX(100%)';
-                    setTimeout(() => toast.remove(), 300);
-                }
-            }, 4000);
-        }
-
-        // Fonction pour mettre à jour les statistiques - AMÉLIORÉE
-function updateStats() {
-    const remainingRows = document.querySelectorAll('#commandesTableBody tr:not([colspan])');
-    const totalCommandes = remainingRows.length;
-
-    // Compter les nouvelles commandes, payées/impayées et aujourd'hui
-    let nouvellesCommandes = 0;
-    let commandesAujourdhui = 0;
-    let commandesPayees = 0;
-    let totalVentes = 0; // Calculer le total des ventes
-
-    const today = new Date().toISOString().split('T')[0]; // Format YYYY-MM-DD
-
-    remainingRows.forEach(row => {
-        // Compter les nouvelles (colonne "Vu")
-        const vuElement = row.querySelector('[id^="vu-"]');
-        if (vuElement && vuElement.textContent.includes('Nouveau')) {
-            nouvellesCommandes++;
-        }
-
-        // Compter les payées (colonne "Paiement")
-        const paiementElement = row.querySelector('[id^="paiement-"]');
-        if (paiementElement && paiementElement.textContent.includes('Payé')) {
-            commandesPayees++;
+    // Fonction pour modifier la quantité - CORRIGÉE
+    function modifierQuantite(index, delta) {
+        if (panier[index]) {
+            panier[index].quantite += delta;
             
-            // Extraire le montant pour les ventes (seulement les commandes payées)
-            const totalCell = row.cells[4]; // Colonne Total
-            if (totalCell) {
-                const montantText = totalCell.textContent;
-                const montant = parseInt(montantText.replace(/[^\d]/g, '')) || 0;
-                totalVentes += montant;
+            if (panier[index].quantite <= 0) {
+                // Supprimer l'article si la quantité devient 0
+                panier.splice(index, 1);
+            }
+            
+            updatePanierDisplay();
+            updateTotaux();
+            updateProductBadges(); // Mettre à jour les badges sur les produits
+        }
+    }
+
+    // Fonction pour retirer un item du panier - CORRIGÉE
+    function retirerDuPanier(index) {
+        if (panier[index]) {
+            const itemName = panier[index].nom;
+            panier.splice(index, 1);
+            
+            updatePanierDisplay();
+            updateTotaux();
+            updateProductBadges(); // Mettre à jour les badges sur les produits
+            
+            showToast(`${itemName} retiré du panier`, 'success');
+        }
+    }
+
+    // Fonction pour vider le panier
+    function viderPanier() {
+        if (panier.length === 0) return;
+        
+        if (confirm('Êtes-vous sûr de vouloir vider le panier ?')) {
+            panier = [];
+            updatePanierDisplay();
+            updateTotaux();
+            showToast('Panier vidé', 'success');
+        }
+    }
+
+    // Fonction pour gérer les types de remise
+    function toggleRemiseType(type) {
+        const btnPourcentage = document.getElementById('btnRemisePourcentage');
+        const btnMontant = document.getElementById('btnRemiseMontant');
+        const inputRemise = document.getElementById('remiseValeur');
+        
+        // Reset buttons
+        [btnPourcentage, btnMontant].forEach(btn => {
+            btn.classList.remove('bg-green-600', 'text-white');
+            btn.classList.add('border-gray-300');
+        });
+        
+        if (remiseType === type) {
+            // Désactiver la remise
+            remiseType = 'aucune';
+            inputRemise.classList.add('hidden');
+            inputRemise.value = '';
+            remiseValeur = 0;
+        } else {
+            // Activer le type de remise
+            remiseType = type;
+            inputRemise.classList.remove('hidden');
+            inputRemise.focus();
+            
+            if (type === 'pourcentage') {
+                btnPourcentage.classList.add('bg-green-600', 'text-white');
+                btnPourcentage.classList.remove('border-gray-300');
+                inputRemise.placeholder = 'Pourcentage (%)';
+                inputRemise.max = '100';
+            } else {
+                btnMontant.classList.add('bg-green-600', 'text-white');
+                btnMontant.classList.remove('border-gray-300');
+                inputRemise.placeholder = 'Montant (FCFA)';
+                inputRemise.removeAttribute('max');
             }
         }
+        
+        updateTotaux();
+    }
 
-        // Compter aujourd'hui (colonne Date)
-        const dateCell = row.cells[8]; // Colonne Date
+    // Fonction pour mettre à jour les totaux
+    function updateTotaux() {
+        const sousTotal = panier.reduce((sum, item) => sum + (item.prix * item.quantite), 0);
+        remiseValeur = parseFloat(document.getElementById('remiseValeur').value) || 0;
+        
+        let montantRemise = 0;
+        if (remiseType === 'pourcentage' && remiseValeur > 0) {
+            montantRemise = (sousTotal * Math.min(remiseValeur, 100)) / 100;
+        } else if (remiseType === 'montant' && remiseValeur > 0) {
+            montantRemise = Math.min(remiseValeur, sousTotal);
+        }
+        
+        const totalFinal = Math.max(0, sousTotal - montantRemise);
+        
+        // Mise à jour de l'affichage
+        document.getElementById('sousTotal').textContent = `${parseInt(sousTotal)} FCFA`;
+        document.getElementById('totalFinal').textContent = `${parseInt(totalFinal)} FCFA`;
+        
+        const ligneRemise = document.getElementById('ligneRemise');
+        const montantRemiseSpan = document.getElementById('montantRemise');
+        
+        if (montantRemise > 0) {
+            ligneRemise.style.display = 'flex';
+            montantRemiseSpan.textContent = `-${parseInt(montantRemise)} FCFA`;
+        } else {
+            ligneRemise.style.display = 'none';
+        }
+        
+        // Activer/désactiver le bouton payer
+        const btnPayer = document.getElementById('btnPayer');
+        if (panier.length === 0) {
+            btnPayer.disabled = true;
+            btnPayer.classList.add('opacity-50', 'cursor-not-allowed');
+        } else {
+            btnPayer.disabled = false;
+            btnPayer.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+    }
+
+    // Event listener pour la valeur de remise
+    document.addEventListener('DOMContentLoaded', function() {
+        const remiseInput = document.getElementById('remiseValeur');
+        if (remiseInput) {
+            remiseInput.addEventListener('input', updateTotaux);
+        }
+        
+        // Event listener pour la recherche
+        const searchInput = document.getElementById('searchProduits');
+        const clearSearch = document.getElementById('clearSearch');
+        
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                const query = this.value.toLowerCase().trim();
+                
+                if (query) {
+                    clearSearch.classList.remove('hidden');
+                    const produitsFiltres = produits.filter(p => 
+                        p.nom.toLowerCase().includes(query) || 
+                        (p.description && p.description.toLowerCase().includes(query))
+                    );
+                    afficherProduits(produitsFiltres);
+                    
+                    // Désactiver les filtres de catégorie pendant la recherche
+                    document.querySelectorAll('.category-btn').forEach(btn => {
+                        btn.classList.remove('active');
+                    });
+                } else {
+                    clearSearch.classList.add('hidden');
+                    afficherProduits(produits);
+                    document.querySelector('[data-category="all"]').classList.add('active');
+                }
+            });
+        }
+        
+        if (clearSearch) {
+            clearSearch.addEventListener('click', function() {
+                searchInput.value = '';
+                this.classList.add('hidden');
+                afficherProduits(produits);
+                document.querySelector('[data-category="all"]').classList.add('active');
+            });
+        }
+    });
+
+    // Fonction pour effectuer le paiement (enregistrer la commande)
+    function effectuerPaiement() {
+        const numTable = document.getElementById('numTable').value.trim();
+        
+        // Validation simplifiée - seulement le numéro de table
+        if (!numTable) {
+            showToast('Veuillez renseigner le numéro de table', 'error');
+            return;
+        }
+        
+        if (panier.length === 0) {
+            showToast('Le panier est vide', 'error');
+            return;
+        }
+        
+        const btnPayer = document.getElementById('btnPayer');
+        const originalText = btnPayer.innerHTML;
+        
+        // Animation de chargement
+        btnPayer.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Enregistrement...';
+        btnPayer.disabled = true;
+        
+        // Calculer les totaux
+        const sousTotal = panier.reduce((sum, item) => sum + (item.prix * item.quantite), 0);
+        let montantRemise = 0;
+        if (remiseType === 'pourcentage' && remiseValeur > 0) {
+            montantRemise = (sousTotal * Math.min(remiseValeur, 100)) / 100;
+        } else if (remiseType === 'montant' && remiseValeur > 0) {
+            montantRemise = Math.min(remiseValeur, sousTotal);
+        }
+        const totalFinal = Math.max(0, sousTotal - montantRemise);
+        
+        // Préparer les données avec des valeurs par défaut
+        const formData = new FormData();
+        formData.append('action', 'creer_commande_manuelle');
+        formData.append('nom_client', `Table ${numTable}`);
+        formData.append('email', '');
+        formData.append('telephone', '0000000000');
+        formData.append('num_table', numTable);
+        formData.append('produits', JSON.stringify(panier));
+        formData.append('remise_type', remiseType);
+        formData.append('remise_valeur', remiseValeur);
+        formData.append('total_original', sousTotal);
+        formData.append('total_final', totalFinal);
+        
+        // Envoi de la requête
+        fetch('commandes.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Commande créée avec succès !', 'success');
+                closeCommandeManuelleModal();
+                
+                // Recharger la page pour voir la nouvelle commande
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
+            } else {
+                showToast('Erreur: ' + data.message, 'error');
+                console.error('Erreur serveur:', data);
+            }
+            
+            btnPayer.innerHTML = originalText;
+            btnPayer.disabled = false;
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            showToast('Erreur de connexion', 'error');
+            btnPayer.innerHTML = originalText;
+            btnPayer.disabled = false;
+        });
+    }
+
+    // Fermer le modal en cliquant à l'extérieur
+    document.addEventListener('click', function(e) {
+        const modal = document.getElementById('commandeManuelleModal');
+        if (e.target === modal) {
+            closeCommandeManuelleModal();
+        }
+    });
+
+    // Fermer le modal avec Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            const modal = document.getElementById('commandeManuelleModal');
+            if (!modal.classList.contains('hidden')) {
+                closeCommandeManuelleModal();
+            }
+        }
+    });
+
+    // Fonction pour fermer la modale de suppression
+    function closeDeleteModal() {
+        const modal = document.getElementById('deleteModal');
+        modal.classList.add('hidden');
+        
+        // IMPORTANT: Réinitialiser toutes les variables
+        commandeToDelete = null;
+        currentClientName = null;
+        
+        // Réinitialiser le contenu du modal pour éviter l'affichage des anciennes données
+        document.getElementById('deleteCommandeInfo').textContent = '';
+        
+        // Réinitialiser le bouton
+        const confirmBtn = document.getElementById('confirmDeleteBtn');
+        confirmBtn.innerHTML = 'Supprimer';
+        confirmBtn.disabled = false;
+    }
+
+    // Fonction pour afficher la modale de confirmation de suppression
+    function confirmDelete(id, nomClient, numeroAffichage) {
+        // Fermer d'abord tout modal ouvert (au cas où)
+        closeDeleteModal();
+        closeEditModal();
+        
+        // Récupérer le numéro de commande visuel depuis le tableau
+        const row = document.getElementById('commande-' + id);
+        let numeroCommande = numeroAffichage || id;
+        
+        if (row && !numeroAffichage) {
+            const numeroElement = row.querySelector('.numero-commande');
+            if (numeroElement) {
+                numeroCommande = numeroElement.textContent;
+            }
+        }
+        
+        // Définir les nouvelles valeurs
+        commandeToDelete = id;
+        currentClientName = nomClient;
+        
+        const modal = document.getElementById('deleteModal');
+        // Utiliser le numéro visuel au lieu de l'ID
+        document.getElementById('deleteCommandeInfo').textContent = `Commande N°${numeroCommande} - ${nomClient}`;
+        
+        // S'assurer que le bouton est dans son état normal
+        const confirmBtn = document.getElementById('confirmDeleteBtn');
+        confirmBtn.innerHTML = 'Supprimer';
+        confirmBtn.disabled = false;
+        
+        modal.classList.remove('hidden');
+    }
+
+    // Fonction pour renuméroter les commandes après suppression
+    function renumberCommandes() {
+        const rows = document.querySelectorAll('#commandesTableBody tr:not([colspan])');
+        const totalRows = rows.length;
+        
+        rows.forEach((row, index) => {
+            const numeroElement = row.querySelector('.numero-commande');
+            if (numeroElement) {
+                // Numérotation inverse : la première ligne (index 0) aura le numéro le plus élevé
+                numeroElement.textContent = totalRows - index;
+            }
+        });
+    }
+
+    // Fonction pour afficher les notifications toast
+    function showToast(message, type = 'success') {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+        const icon = type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle';
+
+        toast.className = `${bgColor} text-white px-6 py-4 rounded-lg shadow-lg transform translate-x-full transition-all duration-300 font-medium max-w-sm`;
+        toast.innerHTML = `
+            <div class="flex items-center">
+                <i class="${icon} mr-3"></i>
+                <span>${message}</span>
+                <button onclick="this.closest('div').remove()" class="ml-4 text-white/80 hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+
+        container.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.transform = 'translateX(0)';
+        }, 100);
+
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => toast.remove(), 300);
+            }
+        }, 4000);
+    }
+
+    // Fonction pour mettre à jour les statistiques
+    function updateStats() {
+        const remainingRows = document.querySelectorAll('#commandesTableBody tr:not([colspan])');
+        const totalCommandes = remainingRows.length;
+
+        // Compter les nouvelles commandes, payées/impayées et aujourd'hui
+        let nouvellesCommandes = 0;
+        let commandesAujourdhui = 0;
+        let commandesPayees = 0;
+        let totalVentes = 0;
+
+        const today = new Date().toISOString().split('T')[0];
+
+        remainingRows.forEach(row => {
+            // Compter les nouvelles (colonne "Vu")
+            const vuElement = row.querySelector('[id^="vu-"]');
+            if (vuElement && vuElement.textContent.includes('Nouveau')) {
+                nouvellesCommandes++;
+            }
+
+            // Compter les payées (colonne "Paiement")
+            const paiementElement = row.querySelector('[id^="paiement-"]');
+            if (paiementElement && paiementElement.textContent.includes('Payé')) {
+                commandesPayees++;
+                
+                // Extraire le montant pour les ventes (seulement les commandes payées)
+                const totalCell = row.cells[4];
+                if (totalCell) {
+                    const montantText = totalCell.textContent;
+                    const montant = parseInt(montantText.replace(/[^\d]/g, '')) || 0;
+                    totalVentes += montant;
+                }
+            }
+
         if (dateCell) {
             const dateText = dateCell.textContent;
             // Vérifier si la date contient aujourd'hui

@@ -13,7 +13,7 @@ try {
     $idsCategorie = array_column($categories, 'id');
     $hasFilter = $filtreCategorie && in_array($filtreCategorie, $idsCategorie);
 
-    $query = "SELECT p.id, p.nom, p.description, p.prix, p.image, c.nom AS categorie_nom 
+    $query = "SELECT p.id, p.nom, p.description, p.prix, p.image, p.disponible, c.nom AS categorie_nom 
               FROM plats p
               LEFT JOIN categories c ON p.categorie_id = c.id";
     if ($hasFilter) {
@@ -37,6 +37,8 @@ try {
     // Statistiques
     $totalCategories = count($categories);
     $totalPlats = count($plats);
+    $platsDisponibles = count(array_filter($plats, fn($plat) => $plat['disponible'] == 1));
+    $platsBloqués = $totalPlats - $platsDisponibles;
     $platCountByCategory = array_reduce($plats, function($acc, $plat) {
         $acc[$plat['categorie_nom']] = ($acc[$plat['categorie_nom']] ?? 0) + 1;
         return $acc;
@@ -177,6 +179,26 @@ try {
             background: rgba(239, 68, 68, 0.2);
         }
         
+        .btn-block {
+            background: rgba(245, 158, 11, 0.1);
+            color: #d97706;
+            border-color: rgba(245, 158, 11, 0.2);
+        }
+        
+        .btn-block:hover {
+            background: rgba(245, 158, 11, 0.2);
+        }
+        
+        .btn-unblock {
+            background: rgba(16, 185, 129, 0.1);
+            color: #059669;
+            border-color: rgba(16, 185, 129, 0.2);
+        }
+        
+        .btn-unblock:hover {
+            background: rgba(16, 185, 129, 0.2);
+        }
+        
         .icon-wrapper {
             width: 48px;
             height: 48px;
@@ -269,46 +291,73 @@ try {
             border-radius: 16px;
             overflow: hidden;
         }
+        
         .number-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-    color: white;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 600;
-    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
-    border: 2px solid #e5e7eb;
-    transition: all 0.2s ease;
-}
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+            border: 2px solid #e5e7eb;
+            transition: all 0.2s ease;
+        }
 
-.number-badge:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
-}
+        .number-badge:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
+        }
 
-.number-badge.alt-1 {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
-}
+        .number-badge.alt-1 {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+        }
 
-.number-badge.alt-2 {
-    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-    box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);
-}
+        .number-badge.alt-2 {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);
+        }
 
-.number-badge.alt-3 {
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-    box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
-}
+        .number-badge.alt-3 {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
+        }
 
-.number-badge.alt-4 {
-    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
-}
+        .number-badge.alt-4 {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+        }
+        
+        .plat-blocked {
+            opacity: 0.6;
+            background: rgba(239, 68, 68, 0.05);
+        }
+        
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .status-available {
+            background: rgba(16, 185, 129, 0.1);
+            color: #059669;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+        
+        .status-blocked {
+            background: rgba(239, 68, 68, 0.1);
+            color: #dc2626;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
     </style>
 </head>
 
@@ -332,7 +381,7 @@ try {
                 </div>
 
                 <!-- Cartes statistiques modernes -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                     <!-- Total des plats -->
                     <div class="dashboard-card card-purple animate-fade-in">
                         <div class="flex items-center justify-between">
@@ -350,8 +399,42 @@ try {
                         </div>
                     </div>
                     
+                    <!-- Plats disponibles -->
+                    <div class="dashboard-card card-green animate-fade-in" style="animation-delay: 0.1s;">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-600 text-sm font-medium mb-1">Disponibles</p>
+                                <p class="text-3xl font-bold text-gray-900"><?= $platsDisponibles ?></p>
+                                <p class="text-sm text-green-600 flex items-center mt-2">
+                                    <i class="fas fa-check-circle mr-1"></i>
+                                    En service
+                                </p>
+                            </div>
+                            <div class="icon-wrapper icon-green">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Plats bloqués -->
+                    <div class="dashboard-card card-red animate-fade-in" style="animation-delay: 0.2s;">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-600 text-sm font-medium mb-1">Bloqués</p>
+                                <p class="text-3xl font-bold text-gray-900"><?= $platsBloqués ?></p>
+                                <p class="text-sm text-red-600 flex items-center mt-2">
+                                    <i class="fas fa-ban mr-1"></i>
+                                    Non disponibles
+                                </p>
+                            </div>
+                            <div class="icon-wrapper icon-red">
+                                <i class="fas fa-ban"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- Catégories -->
-                    <div class="dashboard-card card-blue animate-fade-in" style="animation-delay: 0.1s;">
+                    <div class="dashboard-card card-blue animate-fade-in" style="animation-delay: 0.3s;">
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-gray-600 text-sm font-medium mb-1">Catégories</p>
@@ -363,23 +446,6 @@ try {
                             </div>
                             <div class="icon-wrapper icon-blue">
                                 <i class="fas fa-tags"></i>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Statut système -->
-                    <div class="dashboard-card card-green animate-fade-in" style="animation-delay: 0.2s;">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-gray-600 text-sm font-medium mb-1">Statut système</p>
-                                <p class="text-xl font-bold text-green-600">En ligne</p>
-                                <p class="text-sm text-gray-600 flex items-center mt-2">
-                                    <div class="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-                                    Opérationnel
-                                </p>
-                            </div>
-                            <div class="icon-wrapper icon-green">
-                                <i class="fas fa-server"></i>
                             </div>
                         </div>
                     </div>
@@ -468,6 +534,9 @@ try {
                                         <i class="fas fa-tags mr-2"></i>Catégorie
                                     </th>
                                     <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden md:table-cell">
+                                        <i class="fas fa-info-circle mr-2"></i>Statut
+                                    </th>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden lg:table-cell">
                                         <i class="fas fa-image mr-2"></i>Image
                                     </th>
                                     <th class="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
@@ -477,104 +546,134 @@ try {
                             </thead>
                         
                             <tbody class="bg-white divide-y divide-gray-100">
-    <?php if (!empty($plats)): ?>
-        <?php foreach ($plats as $index => $plat): ?>
-        <?php 
-            $numeroLigne = $index + 1;
-            // Déterminer la classe de couleur basée sur le numéro
-            $colorClass = '';
-            switch($numeroLigne % 5) {
-                case 1: $colorClass = ''; break; // Bleu par défaut
-                case 2: $colorClass = 'alt-1'; break; // Vert
-                case 3: $colorClass = 'alt-2'; break; // Violet
-                case 4: $colorClass = 'alt-3'; break; // Orange
-                case 0: $colorClass = 'alt-4'; break; // Rouge
-            }
-        ?>
-        <tr>
-            <td class="px-6 py-4 whitespace-nowrap">
-                <div class="flex items-center justify-center">
-                    <div class="number-badge <?= $colorClass ?>">
-                        <?= $numeroLigne ?>
-                    </div>
-                </div>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-                <div class="font-semibold text-gray-900">
-                    <?= htmlspecialchars($plat['nom']) ?>
-                </div>
-            </td>
-            <td class="px-6 py-4">
-                <div class="text-gray-600 text-sm max-w-xs truncate">
-                    <?= htmlspecialchars($plat['description']) ?>
-                </div>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-                <span class="font-semibold text-gray-900">
-                    <?= number_format($plat['prix'], 0, ',', ' ') ?> FCFA
-                </span>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                <span class="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-medium">
-                    <?= htmlspecialchars($plat['categorie_nom'] ?? 'Non catégorisé') ?>
-                </span>
-            </td>
-        
-            <td class="px-6 py-4 whitespace-nowrap hidden md:table-cell">
-                <?php if (!empty($plat['image']) && file_exists('../uploads/' . $plat['image'])): ?>
-                    <img src="../uploads/<?= htmlspecialchars($plat['image']) ?>" 
-                         class="h-12 w-12 rounded-lg object-cover border border-gray-200" 
-                         alt="<?= htmlspecialchars($plat['nom']) ?>">
-                <?php else: ?>
-                    <div class="h-12 w-12 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
-                        <i class="fas fa-image text-gray-400"></i>
-                    </div>
-                <?php endif; ?>
-            </td>
+                                <?php if (!empty($plats)): ?>
+                                    <?php foreach ($plats as $index => $plat): ?>
+                                    <?php 
+                                        $numeroLigne = $index + 1;
+                                        $isBlocked = $plat['disponible'] == 0;
+                                        // Déterminer la classe de couleur basée sur le numéro
+                                        $colorClass = '';
+                                        switch($numeroLigne % 5) {
+                                            case 1: $colorClass = ''; break; // Bleu par défaut
+                                            case 2: $colorClass = 'alt-1'; break; // Vert
+                                            case 3: $colorClass = 'alt-2'; break; // Violet
+                                            case 4: $colorClass = 'alt-3'; break; // Orange
+                                            case 0: $colorClass = 'alt-4'; break; // Rouge
+                                        }
+                                    ?>
+                                    <tr class="<?= $isBlocked ? 'plat-blocked' : '' ?>">
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="flex items-center justify-center">
+                                                <div class="number-badge <?= $colorClass ?>">
+                                                    <?= $numeroLigne ?>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="font-semibold text-gray-900 <?= $isBlocked ? 'line-through' : '' ?>">
+                                                <?= htmlspecialchars($plat['nom']) ?>
+                                                <?php if ($isBlocked): ?>
+                                                    <i class="fas fa-ban text-red-500 ml-2" title="Plat non disponible"></i>
+                                                <?php endif; ?>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <div class="text-gray-600 text-sm max-w-xs truncate">
+                                                <?= htmlspecialchars($plat['description']) ?>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <span class="font-semibold text-gray-900">
+                                                <?= number_format($plat['prix'], 0, ',', ' ') ?> FCFA
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                                            <span class="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-medium">
+                                                <?= htmlspecialchars($plat['categorie_nom'] ?? 'Non catégorisé') ?>
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap hidden md:table-cell">
+                                            <?php if ($isBlocked): ?>
+                                                <span class="status-badge status-blocked">
+                                                    <i class="fas fa-ban mr-1"></i>Bloqué
+                                                </span>
+                                            <?php else: ?>
+                                                <span class="status-badge status-available">
+                                                    <i class="fas fa-check-circle mr-1"></i>Disponible
+                                                </span>
+                                            <?php endif; ?>
+                                        </td>
+                                        
+                                        <td class="px-6 py-4 whitespace-nowrap hidden lg:table-cell">
+                                            <?php if (!empty($plat['image']) && file_exists('../uploads/' . $plat['image'])): ?>
+                                                <img src="../uploads/<?= htmlspecialchars($plat['image']) ?>" 
+                                                     class="h-12 w-12 rounded-lg object-cover border border-gray-200 <?= $isBlocked ? 'grayscale' : '' ?>" 
+                                                     alt="<?= htmlspecialchars($plat['nom']) ?>">
+                                            <?php else: ?>
+                                                <div class="h-12 w-12 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
+                                                    <i class="fas fa-image text-gray-400"></i>
+                                                </div>
+                                            <?php endif; ?>
+                                        </td>
 
-            <td class="px-6 py-4 whitespace-nowrap">
-                <div class="flex items-center justify-center gap-2">
-                    <button onclick="openEditModal(<?= htmlspecialchars(json_encode($plat), ENT_QUOTES, 'UTF-8') ?>)"
-                           class="action-btn btn-edit">
-                        <i class="fas fa-edit"></i>
-                        <span class="hidden sm:inline">Modifier</span>
-                    </button>
-                    <button onclick="confirmDelete(<?= $plat['id'] ?>, '<?= addslashes($plat['nom']) ?>')" 
-                            class="action-btn btn-delete">
-                        <i class="fas fa-trash"></i>
-                        <span class="hidden sm:inline">Supprimer</span>
-                    </button>
-                </div>
-            </td>
-        </tr>
-        <?php endforeach; ?>
-    <?php else: ?>
-        <tr>
-            <td colspan="7" class="text-center py-12">
-                <div class="flex flex-col items-center gap-4">
-                    <div class="bg-gray-100 p-6 rounded-full">
-                        <i class="fas fa-utensils text-4xl text-gray-400"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-xl font-semibold text-gray-600 mb-2">Aucun plat trouvé</h3>
-                        <p class="text-gray-500">
-                            <?php if($filtreCategorie): ?>
-                                Aucun plat n'est disponible dans cette catégorie.
-                            <?php else: ?>
-                                Commencez par ajouter votre premier plat.
-                            <?php endif; ?>
-                        </p>
-                    </div>
-                    <?php if(!$filtreCategorie): ?>
-                        <a href="ajouter_plat.php" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors">
-                            <i class="fas fa-plus mr-2"></i>Ajouter le premier plat
-                        </a>
-                    <?php endif; ?>
-                </div>
-            </td>
-        </tr>
-    <?php endif; ?>
-</tbody>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="flex items-center justify-center gap-2 flex-wrap">
+                                                <button onclick="openEditModal(<?= htmlspecialchars(json_encode($plat), ENT_QUOTES, 'UTF-8') ?>)"
+                                                       class="action-btn btn-edit">
+                                                    <i class="fas fa-edit"></i>
+                                                    <span class="hidden sm:inline">Modifier</span>
+                                                </button>
+                                                
+                                                <?php if ($isBlocked): ?>
+                                                    <button onclick="togglePlatStatus(<?= $plat['id'] ?>, 'unblock', '<?= addslashes($plat['nom']) ?>')" 
+                                                            class="action-btn btn-unblock">
+                                                        <i class="fas fa-check-circle"></i>
+                                                        <span class="hidden sm:inline">Débloquer</span>
+                                                    </button>
+                                                <?php else: ?>
+                                                    <button onclick="togglePlatStatus(<?= $plat['id'] ?>, 'block', '<?= addslashes($plat['nom']) ?>')" 
+                                                            class="action-btn btn-block">
+                                                        <i class="fas fa-ban"></i>
+                                                        <span class="hidden sm:inline">Bloquer</span>
+                                                    </button>
+                                                <?php endif; ?>
+                                                
+                                                <button onclick="confirmDelete(<?= $plat['id'] ?>, '<?= addslashes($plat['nom']) ?>')" 
+                                                        class="action-btn btn-delete">
+                                                    <i class="fas fa-trash"></i>
+                                                    <span class="hidden sm:inline">Supprimer</span>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <tr>
+                                        <td colspan="8" class="text-center py-12">
+                                            <div class="flex flex-col items-center gap-4">
+                                                <div class="bg-gray-100 p-6 rounded-full">
+                                                    <i class="fas fa-utensils text-4xl text-gray-400"></i>
+                                                </div>
+                                                <div>
+                                                    <h3 class="text-xl font-semibold text-gray-600 mb-2">Aucun plat trouvé</h3>
+                                                    <p class="text-gray-500">
+                                                        <?php if($filtreCategorie): ?>
+                                                            Aucun plat n'est disponible dans cette catégorie.
+                                                        <?php else: ?>
+                                                            Commencez par ajouter votre premier plat.
+                                                        <?php endif; ?>
+                                                    </p>
+                                                </div>
+                                                <?php if(!$filtreCategorie): ?>
+                                                    <a href="ajouter_plat.php" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors">
+                                                        <i class="fas fa-plus mr-2"></i>Ajouter le premier plat
+                                                    </a>
+                                                <?php endif; ?>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <?php endif; ?>
+                            </tbody>
                         </table>
                     </div>
                 </div>
@@ -698,6 +797,108 @@ try {
                 }, index * 100);
             });
         });
+
+        // Fonction pour basculer le statut d'un plat (bloquer/débloquer)
+        function togglePlatStatus(id, action, nom) {
+            const actionText = action === 'block' ? 'bloquer' : 'débloquer';
+            const actionIcon = action === 'block' ? 'fa-ban' : 'fa-check-circle';
+            const actionColor = action === 'block' ? 'red' : 'green';
+            
+            // Créer une modal personnalisée
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+            modal.innerHTML = `
+                <div class="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl transform scale-95 transition-all duration-300 border-2 border-gray-200">
+                    <div class="text-center">
+                        <div class="bg-${actionColor}-100 p-4 rounded-2xl inline-block mb-4 border-2 border-${actionColor}-200">
+                            <i class="fas ${actionIcon} text-${actionColor}-600 text-3xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-gray-900 mb-2">Confirmer l'action</h3>
+                        <p class="text-gray-600 mb-6">
+                            Êtes-vous sûr de vouloir ${actionText} le plat <strong>"${nom}"</strong> ?
+                            <br><br>
+                            <span class="text-${actionColor}-600 text-sm">
+                                ${action === 'block' ? '⚠️ Le plat ne sera plus disponible pour les clients.' : '✅ Le plat redeviendra disponible pour les clients.'}
+                            </span>
+                        </p>
+                        <div class="flex gap-4">
+                            <button onclick="this.closest('.fixed').remove()" 
+                                    class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 px-6 rounded-lg font-semibold transition-colors border-2 border-gray-300">
+                                <i class="fas fa-times mr-2"></i>Annuler
+                            </button>
+                            <button onclick="executeToggleStatus(${id}, '${action}'); this.closest('.fixed').remove()" 
+                                    class="flex-1 bg-${actionColor}-600 hover:bg-${actionColor}-700 text-white py-3 px-6 rounded-lg font-semibold transition-colors border-2 border-${actionColor}-600">
+                                <i class="fas ${actionIcon} mr-2"></i>${actionText.charAt(0).toUpperCase() + actionText.slice(1)}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Animation d'entrée
+            setTimeout(() => {
+                modal.querySelector('.bg-white').style.transform = 'scale(1)';
+            }, 10);
+        }
+
+        // Fonction pour exécuter le changement de statut
+        function executeToggleStatus(id, action) {
+            // Envoyer la requête AJAX
+            fetch('toggle_plat_status.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `id=${id}&action=${action}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Afficher un message de succès
+                    showNotification(data.message, 'success');
+                    // Recharger la page après 1 seconde
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                } else {
+                    showNotification(data.message || 'Une erreur est survenue', 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('Erreur de connexion', 'error');
+            });
+        }
+
+        // Fonction pour afficher les notifications
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+            
+            notification.className = `fixed top-4 right-4 ${bgColor} text-white px-6 py-4 rounded-lg shadow-lg z-50 transform translate-x-full transition-transform duration-300`;
+            notification.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Animation d'entrée
+            setTimeout(() => {
+                notification.style.transform = 'translateX(0)';
+            }, 100);
+            
+            // Suppression automatique après 3 secondes
+            setTimeout(() => {
+                notification.style.transform = 'translateX(full)';
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 3000);
+        }
 
         // Fonction pour ouvrir le modal de modification
         function openEditModal(plat) {

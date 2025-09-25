@@ -941,7 +941,57 @@ try {
             animation: fadeInUp 1s ease forwards;
         }
     </style>
-  
+  <style>
+    .rating-stars {
+        display: inline-block;
+        unicode-bidi: bidi-override;
+        direction: rtl;
+    }
+    .rating-stars input {
+        display: none;
+    }
+    .rating-stars label {
+        display: inline-block;
+        padding: 0 3px;
+        font-size: 2rem;
+        color: #ddd;
+        cursor: pointer;
+        transition: color 0.3s;
+    }
+    .rating-stars input:checked ~ label,
+    .rating-stars label:hover,
+    .rating-stars label:hover ~ label {
+        color: #ffc107;
+    }
+    .rating-stars input:checked + label {
+        color: #ffc107;
+    }
+    
+    /* Style pour les cartes d'avis */
+    .avis-card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        transition: all 0.3s ease;
+    }
+    .avis-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px rgba(255, 107, 53, 0.15);
+    }
+    .avis-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+    .client-note {
+        color: #ffc107;
+        font-size: 1.2rem;
+    }
+</style>
 </head>
 
 <body class="index-page">
@@ -1108,7 +1158,72 @@ try {
             </div>
         </div>
     </section>
-
+<!-- ======= Avis Clients Section ======= -->
+<section id="avis" class="avis section">
+    <div class="container section-title" data-aos="fade-up">
+        <h2>Avis Clients</h2>
+        <p><span>Ce que disent</span> <span class="description-title">nos clients</span></p>
+    </div>
+    
+    <div class="container" data-aos="fade-up" data-aos-delay="100">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="glass-card p-4 mb-5">
+                    <h3 class="text-center mb-4" style="font-family: 'Playfair Display', serif; background: linear-gradient(135deg, var(--primary), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                        Laissez votre avis
+                    </h3>
+                    
+                    <form id="avis-form" method="post" class="php-email-form">
+                        <div class="row gy-4">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <input type="text" name="nom" class="form-control" placeholder="Votre nom" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <input type="email" class="form-control" name="email" placeholder="Votre email" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;">
+                                </div>
+                            </div>
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <textarea class="form-control" name="message" rows="5" placeholder="Votre avis" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;"></textarea>
+                                </div>
+                            </div>
+                            <div class="col-md-12">
+                                <div class="form-group text-center">
+                                    <label class="mb-2">Notez votre expérience</label>
+                                    <div class="rating-stars mb-3">
+                                        <input type="radio" id="star5" name="note" value="5" />
+                                        <label for="star5"><i class="fas fa-star"></i></label>
+                                        <input type="radio" id="star4" name="note" value="4" />
+                                        <label for="star4"><i class="fas fa-star"></i></label>
+                                        <input type="radio" id="star3" name="note" value="3" />
+                                        <label for="star3"><i class="fas fa-star"></i></label>
+                                        <input type="radio" id="star2" name="note" value="2" />
+                                        <label for="star2"><i class="fas fa-star"></i></label>
+                                        <input type="radio" id="star1" name="note" value="1" required />
+                                        <label for="star1"><i class="fas fa-star"></i></label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-center mt-3">
+                            <div class="loading" style="display: none;">Envoi en cours...</div>
+                            <div class="error-message" style="display: none;"></div>
+                            <div class="sent-message" style="display: none;">Merci pour votre avis ! Il sera publié après modération.</div>
+                            <button type="submit" class="cta-glow">Soumettre l'avis</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row" id="avis-container">
+            <!-- Les avis validés seront chargés ici via JavaScript -->
+        </div>
+    </div>
+</section>
     <!-- Section Contact -->
     <section id="contact" class="contact section">
         <div class="container section-title" data-aos="fade-up">
@@ -1304,6 +1419,74 @@ try {
             });
         }
     });
+
+    document.addEventListener('DOMContentLoaded', function() {
+    // Gestion de la soumission du formulaire d'avis
+    const avisForm = document.getElementById('avis-form');
+    if (avisForm) {
+        avisForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const loading = this.querySelector('.loading');
+            const errorMessage = this.querySelector('.error-message');
+            const sentMessage = this.querySelector('.sent-message');
+            
+            // Masquer les messages précédents
+            errorMessage.style.display = 'none';
+            sentMessage.style.display = 'none';
+            loading.style.display = 'block';
+            submitBtn.disabled = true;
+            
+            fetch('traitement_avis.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                loading.style.display = 'none';
+                
+                if (data.success) {
+                    sentMessage.style.display = 'block';
+                    avisForm.reset();
+                    // Recharger les avis après soumission
+                    chargerAvis();
+                } else {
+                    errorMessage.textContent = data.message || 'Une erreur est survenue';
+                    errorMessage.style.display = 'block';
+                }
+            })
+            .catch(error => {
+                loading.style.display = 'none';
+                errorMessage.textContent = 'Erreur de connexion';
+                errorMessage.style.display = 'block';
+                console.error('Erreur:', error);
+            })
+            .finally(() => {
+                submitBtn.disabled = false;
+            });
+        });
+    }
+    
+    // Charger les avis validés
+    function chargerAvis() {
+        fetch('get_avis.php')
+            .then(response => response.json())
+            .then(data => {
+                const container = document.getElementById('avis-container');
+                if (container && data.success) {
+                    container.innerHTML = data.html;
+                }
+            })
+            .catch(error => {
+                console.error('Erreur lors du chargement des avis:', error);
+            });
+    }
+    
+    // Charger les avis au chargement de la page
+    chargerAvis();
+});
     </script>
 
     <script>

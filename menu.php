@@ -63,15 +63,17 @@ try {
     // Récupérer les plats selon la catégorie ou tous
     if (isset($_GET['show_all']) && $_GET['show_all'] == 'true') {
         // Récupérer tous les plats groupés par catégorie
-        $stmt = $conn->query("SELECT p.*, c.nom as categorie_nom FROM plats p 
-                              JOIN categories c ON p.categorie_id = c.id 
-                              ORDER BY c.nom ASC, p.nom ASC");
+        // Récupérer tous les plats groupés par catégorie
+$stmt = $conn->query("SELECT p.*, p.disponible, c.nom as categorie_nom FROM plats p 
+                      JOIN categories c ON p.categorie_id = c.id 
+                      ORDER BY c.nom ASC, p.nom ASC");
         $tous_plats = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $plats = [];
         $show_all = true;
     } else {
         // Récupérer les plats de la catégorie sélectionnée
-        $stmt = $conn->prepare("SELECT * FROM plats WHERE categorie_id = :categorie_id");
+        // Récupérer les plats de la catégorie sélectionnée
+$stmt = $conn->prepare("SELECT *, disponible FROM plats WHERE categorie_id = :categorie_id");
         $stmt->execute([':categorie_id' => $categorie_id]);
         $plats = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $show_all = false;
@@ -1502,32 +1504,48 @@ if (compterAnnoncesActives('menu') > 0) {
                     <h2 class="category-title"><?= htmlspecialchars($nom_categorie) ?></h2>
                     <div class="menu-grid list-view">
                         <?php foreach ($plats_categorie as $plat): ?>
-                            <div class="menu-item" onclick="openOrderModal('<?= htmlspecialchars($plat['nom']) ?>', <?= $plat['prix'] ?>, '<?= htmlspecialchars($plat['image'] ?? '') ?>', '<?= htmlspecialchars($plat['description'] ?? '') ?>')">
-                                <button class="quick-add-btn" onclick="event.stopPropagation(); quickAddToCart('<?= htmlspecialchars($plat['nom']) ?>', <?= $plat['prix'] ?>, '<?= htmlspecialchars($plat['image'] ?? '') ?>', '<?= htmlspecialchars($plat['description'] ?? '') ?>')">
-                                    <i class="fas fa-plus"></i>
-                                </button>
-                                
-                                <?php if (!empty($plat['image'])): ?>
-                                    <img src="uploads/<?= htmlspecialchars($plat['image']) ?>" 
-                                         alt="<?= htmlspecialchars($plat['nom']) ?>" 
-                                         class="menu-item-image">
-                                <?php else: ?>
-                                    <div class="menu-item-placeholder">
-                                        <i class="fas fa-utensils"></i>
-                                    </div>
-                                <?php endif; ?>
-                                
-                                <div class="menu-item-content">
-                                    <div class="menu-item-header">
-                                        <div class="menu-item-name"><?= htmlspecialchars($plat['nom'] ?? 'Nom non disponible') ?></div>
-                                        <div class="menu-item-price"><?= number_format($plat['prix'] ?? 0, 0, ',', ' ') ?> F</div>
-                                    </div>
-                                    <?php if (!empty($plat['description'])): ?>
-                                        <div class="menu-item-description"><?= htmlspecialchars($plat['description']) ?></div>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
+    <?php $isAvailable = isset($plat['disponible']) && $plat['disponible'] == 1; ?>
+    
+    <div class="menu-item <?= !$isAvailable ? 'opacity-50' : '' ?>" 
+         <?= $isAvailable ? "onclick=\"openOrderModal('" . htmlspecialchars($plat['nom']) . "', " . $plat['prix'] . ", '" . htmlspecialchars($plat['image'] ?? '') . "', '" . htmlspecialchars($plat['description'] ?? '') . "')\"" : '' ?>>
+        
+        <?php if ($isAvailable): ?>
+            <button class="quick-add-btn" onclick="event.stopPropagation(); quickAddToCart('<?= htmlspecialchars($plat['nom']) ?>', <?= $plat['prix'] ?>, '<?= htmlspecialchars($plat['image'] ?? '') ?>', '<?= htmlspecialchars($plat['description'] ?? '') ?>')">
+                <i class="fas fa-plus"></i>
+            </button>
+        <?php else: ?>
+            <div class="quick-add-btn" style="background: #ef4444; cursor: not-allowed;">
+                <i class="fas fa-ban"></i>
+            </div>
+        <?php endif; ?>
+        
+        <?php if (!empty($plat['image'])): ?>
+            <img src="uploads/<?= htmlspecialchars($plat['image']) ?>" 
+                    alt="<?= htmlspecialchars($plat['nom']) ?>" 
+                    class="menu-item-image <?= !$isAvailable ? 'grayscale' : '' ?>"
+                    style="<?= !$isAvailable ? 'filter: grayscale(100%);' : '' ?>">
+        <?php else: ?>
+            <div class="menu-item-placeholder <?= !$isAvailable ? 'opacity-50' : '' ?>">
+                <i class="fas fa-utensils"></i>
+            </div>
+        <?php endif; ?>
+        
+        <div class="menu-item-content">
+            <div class="menu-item-header">
+                <div class="menu-item-name <?= !$isAvailable ? 'line-through text-gray-500' : '' ?>">
+                    <?= htmlspecialchars($plat['nom'] ?? 'Nom non disponible') ?>
+                    <?php if (!$isAvailable): ?>
+                        <span style="color: #ef4444; font-size: 0.8em;"> (Non disponible)</span>
+                    <?php endif; ?>
+                </div>
+                <div class="menu-item-price"><?= number_format($plat['prix'] ?? 0, 0, ',', ' ') ?> F</div>
+            </div>
+            <?php if (!empty($plat['description'])): ?>
+                <div class="menu-item-description"><?= htmlspecialchars($plat['description']) ?></div>
+            <?php endif; ?>
+        </div>
+    </div>
+<?php endforeach; ?>
                     </div>
                 </div>
             <?php endforeach; ?>
@@ -1558,33 +1576,49 @@ if (compterAnnoncesActives('menu') > 0) {
                 
                 <?php if (!empty($plats)): ?>
                     <div class="menu-grid list-view">
-                        <?php foreach ($plats as $plat): ?>
-                            <div class="menu-item" onclick="openOrderModal('<?= htmlspecialchars($plat['nom']) ?>', <?= $plat['prix'] ?>, '<?= htmlspecialchars($plat['image'] ?? '') ?>', '<?= htmlspecialchars($plat['description'] ?? '') ?>')">
-                                <button class="quick-add-btn" onclick="event.stopPropagation(); quickAddToCart('<?= htmlspecialchars($plat['nom']) ?>', <?= $plat['prix'] ?>, '<?= htmlspecialchars($plat['image'] ?? '') ?>', '<?= htmlspecialchars($plat['description'] ?? '') ?>')">
-                                    <i class="fas fa-plus"></i>
-                                </button>
-                                
-                                <?php if (!empty($plat['image'])): ?>
-                                    <img src="uploads/<?= htmlspecialchars($plat['image']) ?>" 
-                                         alt="<?= htmlspecialchars($plat['nom']) ?>" 
-                                         class="menu-item-image">
-                                <?php else: ?>
-                                    <div class="menu-item-placeholder">
-                                        <i class="fas fa-utensils"></i>
-                                    </div>
-                                <?php endif; ?>
-                                
-                                <div class="menu-item-content">
-                                    <div class="menu-item-header">
-                                        <div class="menu-item-name"><?= htmlspecialchars($plat['nom'] ?? 'Nom non disponible') ?></div>
-                                        <div class="menu-item-price"><?= number_format($plat['prix'] ?? 0, 0, ',', ' ') ?> F</div>
-                                    </div>
-                                    <?php if (!empty($plat['description'])): ?>
-                                        <div class="menu-item-description"><?= htmlspecialchars($plat['description']) ?></div>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
+                    <?php foreach ($plats as $plat): ?>
+    <?php $isAvailable = isset($plat['disponible']) && $plat['disponible'] == 1; ?>
+    
+    <div class="menu-item <?= !$isAvailable ? 'opacity-50' : '' ?>" 
+        <?= $isAvailable ? "onclick=\"openOrderModal('" . htmlspecialchars($plat['nom']) . "', " . $plat['prix'] . ", '" . htmlspecialchars($plat['image'] ?? '') . "', '" . htmlspecialchars($plat['description'] ?? '') . "')\"" : '' ?>>
+        
+        <?php if ($isAvailable): ?>
+            <button class="quick-add-btn" onclick="event.stopPropagation(); quickAddToCart('<?= htmlspecialchars($plat['nom']) ?>', <?= $plat['prix'] ?>, '<?= htmlspecialchars($plat['image'] ?? '') ?>', '<?= htmlspecialchars($plat['description'] ?? '') ?>')">
+                <i class="fas fa-plus"></i>
+            </button>
+        <?php else: ?>
+            <div class="quick-add-btn" style="background: #ef4444; cursor: not-allowed;">
+                <i class="fas fa-ban"></i>
+            </div>
+        <?php endif; ?>
+        
+        <?php if (!empty($plat['image'])): ?>
+            <img src="uploads/<?= htmlspecialchars($plat['image']) ?>" 
+                    alt="<?= htmlspecialchars($plat['nom']) ?>" 
+                    class="menu-item-image"
+                    style="<?= !$isAvailable ? 'filter: grayscale(100%);' : '' ?>">
+        <?php else: ?>
+            <div class="menu-item-placeholder">
+                <i class="fas fa-utensils"></i>
+            </div>
+        <?php endif; ?>
+        
+        <div class="menu-item-content">
+            <div class="menu-item-header">
+                <div class="menu-item-name <?= !$isAvailable ? 'line-through' : '' ?>" style="<?= !$isAvailable ? 'color: #6b7280;' : '' ?>">
+                    <?= htmlspecialchars($plat['nom'] ?? 'Nom non disponible') ?>
+                    <?php if (!$isAvailable): ?>
+                        <span style="color: #ef4444; font-size: 0.8em;"> (Non disponible)</span>
+                    <?php endif; ?>
+                </div>
+                <div class="menu-item-price"><?= number_format($plat['prix'] ?? 0, 0, ',', ' ') ?> F</div>
+            </div>
+            <?php if (!empty($plat['description'])): ?>
+                <div class="menu-item-description"><?= htmlspecialchars($plat['description']) ?></div>
+            <?php endif; ?>
+        </div>
+    </div>
+<?php endforeach; ?>
                     </div>
                 <?php else: ?>
                     <div class="empty-state">
@@ -1911,35 +1945,44 @@ function proceedToCheckoutWithAjax() {
             document.getElementById('orderModal').style.display = 'flex';
         }
 
-        // Ouvrir la modal avec les détails de l'item
         function openOrderModal(name, price, image, description) {
-            selectedItem = { 
-                name: name, 
-                price: price, 
-                image: image, 
-                description: description 
-            };
-            
-            // Update modal content
-            document.getElementById('orderItemName').textContent = name;
-            document.getElementById('orderItemPrice').textContent = price.toLocaleString() + ' FCFA';
-            document.getElementById('unitPrice').textContent = price.toLocaleString() + ' F';
-            
-            // Update image
-            const imageContainer = document.getElementById('orderItemImageContainer');
-            if (image && image.trim() !== '') {
-                imageContainer.innerHTML = `<img src="uploads/${image}" alt="${name}" class="order-item-image">`;
-            } else {
-                imageContainer.innerHTML = `<div class="order-item-placeholder"><i class="fas fa-utensils"></i></div>`;
-            }
-            
-            // Reset and update totals
-            currentQuantity = 1;
-            document.getElementById('quantityDisplay').textContent = '1';
-            document.getElementById('specialInstructions').value = '';
-            updateOrderSummary();
-            showOrderModal();
+    fetch('verifier_disponibilite.php?id=' + encodeURIComponent(name))
+    .then(response => response.json())
+    .then(data => {
+        if (!data.disponible) {
+            showToast('Ce plat n\'est plus disponible');
+            return;
         }
+        
+        selectedItem = { 
+            name: name, 
+            price: price, 
+            image: image, 
+            description: description 
+        };
+        
+        // Update modal content
+        document.getElementById('orderItemName').textContent = name;
+        document.getElementById('orderItemPrice').textContent = price.toLocaleString() + ' FCFA';
+        document.getElementById('unitPrice').textContent = price.toLocaleString() + ' F';
+        
+        // Update image
+        const imageContainer = document.getElementById('orderItemImageContainer');
+        if (image && image.trim() !== '') {
+            imageContainer.innerHTML = `<img src="uploads/${image}" alt="${name}" class="order-item-image">`;
+        } else {
+            imageContainer.innerHTML = `<div class="order-item-placeholder"><i class="fas fa-utensils"></i></div>`;
+        }
+        
+        // Reset and update totals
+        currentQuantity = 1;
+        document.getElementById('quantityDisplay').textContent = '1';
+        document.getElementById('specialInstructions').value = '';
+        updateOrderSummary();
+        showOrderModal();
+    }); // ferme le .then(data => {...})
+} // ✅ ferme enfin la fonction openOrderModal
+
 
         // Fermer la modal de commande
         function closeOrderModal() {

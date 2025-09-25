@@ -1,0 +1,96 @@
+$basic_template = '<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Newsletter</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; }
+        .container { max-width: 600px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 8px; }
+        .header { text-align: center; padding: 20px 0; border-bottom: 2px solid #007cba; }
+        .content { padding: 20px 0; line-height: 1.6; }
+        .footer { text-align: center; padding: 20px 0; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+        h1 { color: #007cba; }
+        .btn { display: inline-block; padding: 12px 24px; background-color: #007cba; color: white; text-decoration: none; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{COMPANY_NAME}</h1>
+            <p>Newsletter du {CURRENT_DATE}</p>
+        </div>
+        
+        <div class="content">
+            <h2>Bonjour {SUBSCRIBER_NAME},</h2>
+            
+            <p>Nous espérons que vous allez bien. Voici les dernières actualités de notre entreprise.</p>
+            
+            {CUSTOM_CONTENT}
+            
+            <p>Merci de votre fidélité et à bientôt !</p>
+            
+            <p style="text-align: center;">
+                <a href="#" class="btn">Visitez notre site</a>
+            </p>
+        </div>
+        
+        <div class="footer">
+            <p>Vous recevez cet email car vous êtes abonné à notre newsletter.</p>
+            <p><a href="{UNSUBSCRIBE_LINK}">Se désabonner</a> | {COMPANY_NAME}</p>
+        </div>
+    </div>
+</body>
+</html>';
+
+// ===== TEMPLATES/MODERN_TEMPLATE.HTML =====
+
+$modern_template = '<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Newsletter</title>
+    <style>
+        body { font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .container { max-width: 600px; margin: 20px auto; background-color: white; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 20px; text-align: center; }
+        .content { padding: 40px 30px; }
+        .footer { background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 14px; color: #6c757d; }
+        h1 { margin: 0; font-size: 28px; font-weight: 300; }
+        h2 { color: #495057; font-weight: 400; }
+        .btn { display: inline-block; padding: 15px 30px; background: linear-gradient(45deg, #667eea, #764ba2); color: white; text-decoration: none; border-radius: 25px; font-weight: 500; transition: transform 0.2s; }
+        .btn:hover { transform: translateY(-2px); }
+        .highlight-box { background-color: #f8f9fa; padding: 20px; border-left: 4px solid #667eea; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{COMPANY_NAME}</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Newsletter du {CURRENT_DATE}</p>
+        </div>
+        
+        <div class="content">
+            <h2>Bonjour {SUBSCRIBER_NAME} 👋</h2>
+            
+            <p>Nous sommes ravis de partager avec vous nos dernières nouveautés et actualités.</p>
+            
+            <div class="highlight-box">
+                {CUSTOM_CONTENT}
+            </div>
+            
+            <p>Restez connecté avec nous pour ne rien manquer de nos prochaines annonces !</p>
+            
+            <p style="text-align: center; margin-top: 30px;">
+                <a href="#" class="btn">Découvrir plus</a>
+            </p>
+        </div>
+        
+        <div class="footer">
+            <p>📧 Vous recevez cet email car vous êtes abonné à notre newsletter.</p>
+            <p><a href="{UNSUBSCRIBE_LINK}" style="color: #667eea;">Se désabonner</a> | © {COMPANY_NAME}</p>
+        </div>
+    </div>
+</body>
+</html>';

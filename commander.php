@@ -41,6 +41,57 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
     exit;
 }
 
+// Gestionnaire pour la vérification de géolocalisation
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['action'] == 'verify_location') {
+    header('Content-Type: application/json');
+    
+    try {
+        $user_lat = floatval($_POST['latitude']);
+        $user_lng = floatval($_POST['longitude']);
+        
+        // Coordonnées exactes de votre restaurant
+            
+        $restaurant_lat = 14.680604135736175;
+        $restaurant_lng = -17.447946884654932;
+        $allowed_radius = 150; 
+        
+        // Calculer la distance
+        $distance = calculateDistance($user_lat, $user_lng, $restaurant_lat, $restaurant_lng);
+        
+        $is_in_zone = $distance <= $allowed_radius;
+        
+        echo json_encode([
+            'success' => true,
+            'in_zone' => $is_in_zone,
+            'distance' => round($distance, 1),
+            'max_distance' => $allowed_radius,
+            'message' => $is_in_zone ? 
+                'Position confirmée au restaurant' : 
+                "Vous êtes à " . round($distance, 0) . "m du restaurant. Rapprochez-vous pour commander."
+        ]);
+        
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// Fonction pour calculer la distance entre deux points GPS
+function calculateDistance($lat1, $lng1, $lat2, $lng2) {
+    $R = 6371e3; // Rayon de la Terre en mètres
+    $phi1 = $lat1 * M_PI/180;
+    $phi2 = $lat2 * M_PI/180;
+    $delta_phi = ($lat2-$lat1) * M_PI/180;
+    $delta_lambda = ($lng2-$lng1) * M_PI/180;
+
+    $a = sin($delta_phi/2) * sin($delta_phi/2) +
+         cos($phi1) * cos($phi2) *
+         sin($delta_lambda/2) * sin($delta_lambda/2);
+    $c = 2 * atan2(sqrt($a), sqrt(1-$a));
+
+    return $R * $c;
+}
+
 // Gestion de la newsletter après soumission du modal
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['newsletter_choice'])) {
     header('Content-Type: application/json');
@@ -72,7 +123,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['newsletter_choice'])) 
 $total = 0;
 $produits = [];
 
-
 // Vérification et initialisation du panier
 if (!isset($_SESSION['panier']) || !is_array($_SESSION['panier'])) {
     $_SESSION['panier'] = [];
@@ -99,16 +149,9 @@ if (!empty($_SESSION['panier']) && is_array($_SESSION['panier'])) {
 
 // Si le panier de session est empty, essayer de récupérer depuis localStorage via JavaScript
 if (empty($produits)) {
-    // On laissera JavaScript récupérer le panier du localStorage
     $useLocalStorage = true;
 } else {
     $useLocalStorage = false;
-}
-
-if (isset($_SESSION['panier'])) {
-    unset($_SESSION['panier']);
-    // ou
-    $_SESSION['panier'] = [];
 }
 
 // Importation des classes nécessaires pour PDF et email
@@ -117,7 +160,7 @@ use Dompdf\Options;
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && !isset($_POST['newsletter_choice'])) {
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && !isset($_POST['newsletter_choice']) && !isset($_POST['action'])) {
     $nom = trim($_POST['nom']);
     $email = trim($_POST['email']);
     $telephone = trim($_POST['telephone']);
@@ -172,10 +215,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !isset($_POST['newsletter_choice']))
         if (empty($produits) || $total <= 0) {
             $erreur = "Erreur : Aucun produit trouvé dans votre panier. Veuillez retourner au menu.";
         } else {
-            // Debug - à supprimer après résolution
-            error_log("Produits à sauvegarder: " . print_r($produits, true));
-            error_log("Total calculé: " . $total);
-
             $transactionActive = false;
             try {
                 $conn->beginTransaction();
@@ -187,8 +226,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !isset($_POST['newsletter_choice']))
     VALUES (?, ?, ?, ?, ?, ?, ?, 'impaye', NOW(), 'En cours', 0, NOW())");
                 $stmt->execute([$nom, $email, $telephone, $adresse, $mode_retrait, $num_table, $total]);
                 $commande_id = $conn->lastInsertId();
-                // Debug
-                error_log("Commande ID créé: " . $commande_id);
 
                 // CORRECTION 5: Insertion des détails avec vérification
                 foreach ($produits as $plat) {
@@ -202,8 +239,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !isset($_POST['newsletter_choice']))
                     // Mise à jour du stock
                     $stmt = $conn->prepare("UPDATE plats SET stock = stock - ? WHERE id = ?");
                     $stmt->execute([$plat['quantite'], $plat['id']]);
-                    
-                    error_log("Détail inséré: " . $plat['nom'] . " x" . $plat['quantite'] . " = " . ($plat['prix'] * $plat['quantite']));
                 }
 
                 // Notification admin
@@ -217,9 +252,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !isset($_POST['newsletter_choice']))
                 $_SESSION['panier'] = [];
                 unset($_SESSION['panier']);
 
-                // Template HTML pour l'email
-                $emailTemplate = "
-<!DOCTYPE html>
+                // Template HTML pour l'email (même code qu'avant)
+                $emailTemplate = "<!DOCTYPE html>
 <html lang='fr'>
 <head>
     <meta charset='UTF-8'>
@@ -269,7 +303,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !isset($_POST['newsletter_choice']))
             color: #666;
             font-size: 14px;
         }
-        /* Nouveau style pour le statut impayé */
         .payment-status {
             background-color: #fef2f2;
             border: 2px solid #fecaca;
@@ -397,7 +430,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !isset($_POST['newsletter_choice']))
             font-weight: 600;
             font-size: 14px;
         }
-        /* Footer avec informations de paiement */
         .payment-footer {
             background-color: #f8f9fa;
             padding: 20px;
@@ -415,45 +447,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !isset($_POST['newsletter_choice']))
             font-size: 12px;
             line-height: 1.4;
         }
-        @media (max-width: 500px) {
-            .receipt-container {
-                margin: 0;
-                border-radius: 0;
-            }
-            body {
-                padding: 0;
-            }
-            .products-table {
-                font-size: 11px;
-            }
-            .products-table th,
-            .products-table td {
-                padding: 8px 4px;
-            }
-            .payment-status {
-                margin: 15px;
-                padding: 10px 12px;
-            }
-        }
     </style>
 </head>
 <body>
 <div class='receipt-container'>
-    <!-- Header avec cercle vert et titre -->
     <div class='header'>
         <div class='success-circle'>✓</div>
         <h1>Commande confirmée !</h1>
         <p>Merci pour votre commande !</p>
     </div>
     
-    <!-- Nouveau: Statut de paiement impayé -->
     <div class='payment-status'>
         <div class='status-icon'>⚠️</div>
         <h3>REÇU IMPAYÉ</h3>
         <p>Cette commande est en attente de paiement</p>
     </div>
     
-    <!-- Section détails de la commande -->
     <div class='details-section'>
         <div class='section-title'>Détails de la commande</div>
         
@@ -511,7 +520,6 @@ $emailTemplate .= "
         </div>
     </div>
     
-    <!-- Section produits commandés -->
     <div class='products-section'>
         <div class='section-title'>Produits commandés</div>
         
@@ -548,7 +556,7 @@ $emailTemplate .= "
     </div>
             </html>";
 
-                // Envoi de l'e-mail même si on affiche le modal newsletter
+                // Envoi de l'e-mail
                 if (!empty($email)) {
                     $mail = new PHPMailer(true);
 
@@ -556,8 +564,8 @@ $emailTemplate .= "
                         $mail->isSMTP();
                         $mail->Host = 'smtp.gmail.com';
                         $mail->SMTPAuth = true;
-                        $mail->Username = 'mulhomabiala29@gmail.com'; // Ton adresse
-                        $mail->Password = 'khli pyzj ihte qdgu'; // Mot de passe application Gmail
+                        $mail->Username = 'mulhomabiala29@gmail.com';
+                        $mail->Password = 'khli pyzj ihte qdgu';
                         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
                         $mail->Port = 587;
 
@@ -569,7 +577,6 @@ $emailTemplate .= "
                         $mail->Body = $emailTemplate;
 
                         $mail->send();
-                        error_log("Email envoyé avec succès à: $email");
                     } catch (Exception $e) {
                         error_log("Erreur lors de l'envoi du mail : {$mail->ErrorInfo}");
                     }
@@ -577,15 +584,12 @@ $emailTemplate .= "
 
                 // Vérifier si un email a été fourni pour afficher le modal newsletter
                 if (!empty($email)) {
-                    // Stocker les informations de la commande pour le modal
                     $_SESSION['commande_id'] = $commande_id;
                     $_SESSION['commande_email'] = $email;
                     $_SESSION['commande_nom'] = $nom;
                     
-                    // Afficher le modal au lieu de rediriger immédiatement
                     $showNewsletterModal = true;
                 } else {
-                    // Pas d'email, rediriger directement
                     header("Location: confirmation.php?commande=$commande_id");
                     exit;
                 }
@@ -623,6 +627,47 @@ $emailTemplate .= "
     </script>
 </head>
 <body class="bg-gray-50 min-h-screen">
+    <!-- Système de vérification géolocalisation -->
+    <div id="locationVerification" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display: none;">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4 text-center">
+            <div class="mb-4">
+                <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-bold mb-2">Vérification de position</h3>
+                <p class="text-gray-600 mb-4">Pour éviter les fausses commandes, nous devons vérifier que vous êtes bien dans le restaurant.</p>
+                <p class="text-sm font-medium text-blue-600">Cliquez "Autoriser" quand votre navigateur demande votre position.</p>
+            </div>
+            <div id="locationStatus" class="mb-4 p-3 rounded-lg" style="display: none;"></div>
+            <button id="startVerification" onclick="verifyLocation()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg">
+                Vérifier ma position
+            </button>
+        </div>
+    </div>
+
+    <!-- Page d'accès refusé -->
+    <div id="accessDenied" class="fixed inset-0 bg-red-50 flex items-center justify-center z-40" style="display: none;">
+        <div class="bg-white rounded-lg p-8 max-w-md w-full mx-4 text-center shadow-lg">
+            <div class="text-6xl mb-4">🚫</div>
+            <h2 class="text-2xl font-bold text-red-600 mb-4">Accès refusé</h2>
+            <div id="deniedMessage" class="text-gray-700 mb-6"></div>
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 text-left">
+                <strong class="block mb-2">Pour commander :</strong>
+                <ul class="text-sm space-y-1">
+                    <li>• Scannez le QR code sur votre table</li>
+                    <li>• Activez la géolocalisation</li>
+                    <li>• Restez dans le restaurant</li>
+                </ul>
+            </div>
+            <button onclick="location.reload()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg">
+                Réessayer
+            </button>
+        </div>
+    </div>
+
     <!-- Header -->
     <header class="bg-gradient-to-r from-primary to-primary-dark shadow-lg">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -640,7 +685,7 @@ $emailTemplate .= "
         </div>
     </header>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" id="mainContent" style="display: none;">
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
             <!-- Formulaire de commande -->
@@ -852,12 +897,192 @@ $emailTemplate .= "
     <?php endif; ?>
 
 <script>
-// Variables globales pour gérer le panier
+// ==========================================
+// CONFIGURATION RESTAURANT AVEC VOS COORDONNÉES
+// ==========================================
+const RESTAURANT_CONFIG = {
+    latitude: 14.680604135736175,
+    longitude: -17.447946884654932,
+    allowedRadius: 150,
+    name: "Muhlo Restaurant"
+};
+
+// ==========================================
+// SYSTÈME DE GÉOLOCALISATION
+// ==========================================
+
+let locationVerified = false;
+
+// Fonction principale de vérification de position
+function verifyLocation() {
+    console.log('🔍 Début de la vérification de position...');
+    
+    const statusDiv = document.getElementById('locationStatus');
+    statusDiv.style.display = 'block';
+    statusDiv.className = 'mb-4 p-3 rounded-lg bg-blue-50 text-blue-700';
+    statusDiv.innerHTML = '📡 Récupération de votre position GPS...';
+    
+    if (!navigator.geolocation) {
+        showAccessDenied('Votre navigateur ne supporte pas la géolocalisation');
+        return;
+    }
+    
+    navigator.geolocation.getCurrentPosition(
+        function(position) {
+            console.log('✅ Position obtenue:', position.coords);
+            
+            const userLat = position.coords.latitude;
+            const userLng = position.coords.longitude;
+            const accuracy = position.coords.accuracy;
+            
+            // Calculer la distance avec le restaurant
+            const distance = calculateDistance(
+                userLat, userLng,
+                RESTAURANT_CONFIG.latitude, 
+                RESTAURANT_CONFIG.longitude
+            );
+            
+            console.log(`📍 Distance du restaurant: ${distance.toFixed(1)}m`);
+            console.log(`🎯 Précision GPS: ${accuracy.toFixed(1)}m`);
+            console.log(`✅ Zone autorisée: ${RESTAURANT_CONFIG.allowedRadius}m`);
+            
+            // Vérifier si dans la zone autorisée
+            if (distance <= RESTAURANT_CONFIG.allowedRadius) {
+                // Accès autorisé
+                statusDiv.className = 'mb-4 p-3 rounded-lg bg-green-50 text-green-700';
+                statusDiv.innerHTML = `✅ Position confirmée ! (${distance.toFixed(0)}m du restaurant)`;
+                
+                setTimeout(() => {
+                    document.getElementById('locationVerification').style.display = 'none';
+                    document.getElementById('mainContent').style.display = 'block';
+                    locationVerified = true;
+                }, 2000);
+                
+            } else {
+                // Accès refusé
+                showAccessDenied(`Vous êtes à ${distance.toFixed(0)}m du restaurant. Rapprochez-vous pour commander.`);
+            }
+        },
+        function(error) {
+            console.error('❌ Erreur géolocalisation:', error);
+            let message = 'Erreur de géolocalisation';
+            
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    message = "Géolocalisation refusée. Vous devez autoriser l'accès à votre position pour commander.";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    message = "Position GPS non disponible. Vérifiez vos paramètres de localisation.";
+                    break;
+                case error.TIMEOUT:
+                    message = "Délai de géolocalisation dépassé. Réessayez.";
+                    break;
+            }
+            
+            statusDiv.className = 'mb-4 p-3 rounded-lg bg-red-50 text-red-700';
+            statusDiv.innerHTML = `❌ ${message}`;
+            
+            // Proposer alternative après 3 secondes
+            setTimeout(() => {
+                showAlternativeOptions();
+            }, 3000);
+        },
+        {
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 60000
+        }
+    );
+}
+
+// Calculer la distance entre deux points GPS (formule de Haversine)
+function calculateDistance(lat1, lng1, lat2, lng2) {
+    const R = 6371e3; // Rayon de la Terre en mètres
+    const φ1 = lat1 * Math.PI/180;
+    const φ2 = lat2 * Math.PI/180;
+    const Δφ = (lat2-lat1) * Math.PI/180;
+    const Δλ = (lng2-lng1) * Math.PI/180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    return R * c;
+}
+
+// Afficher la page d'accès refusé
+function showAccessDenied(message) {
+    document.getElementById('deniedMessage').innerHTML = message;
+    document.getElementById('locationVerification').style.display = 'none';
+    document.getElementById('accessDenied').style.display = 'flex';
+}
+
+// Proposer des alternatives en cas d'échec de géolocalisation
+function showAlternativeOptions() {
+    document.getElementById('locationVerification').innerHTML = `
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4 text-center">
+            <div class="text-4xl mb-4">⚠️</div>
+            <h3 class="text-xl font-bold mb-4">Problème de géolocalisation</h3>
+            <p class="text-gray-600 mb-6">Nous n'arrivons pas à vérifier votre position automatiquement.</p>
+            
+            <div class="space-y-3">
+                <button onclick="verifyLocation()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg">
+                    🔄 Réessayer la géolocalisation
+                </button>
+                
+                <button onclick="requestManualValidation()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg">
+                    👨‍🍳 Demander validation serveur
+                </button>
+                
+                <button onclick="location.href='menu.php'" class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg">
+                    ← Retour au menu
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+// Demande de validation manuelle par un serveur
+function requestManualValidation() {
+    alert("Appelez un serveur pour valider votre table. Montrez-lui cette page sur votre téléphone.");
+    
+    // Afficher un code temporaire à montrer au serveur
+    const validationCode = Math.floor(Math.random() * 9000) + 1000;
+    
+    document.getElementById('locationVerification').innerHTML = `
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4 text-center">
+            <div class="text-4xl mb-4">👨‍🍳</div>
+            <h3 class="text-xl font-bold mb-4">Validation serveur</h3>
+            <p class="text-gray-600 mb-4">Montrez ce code à un serveur :</p>
+            
+            <div class="bg-gray-100 text-3xl font-bold text-center py-8 rounded-lg mb-4">
+                ${validationCode}
+            </div>
+            
+            <p class="text-sm text-gray-500 mb-6">Le serveur validera que vous êtes bien dans le restaurant</p>
+            
+            <button onclick="manualValidationSuccess()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg">
+                ✅ Serveur a validé
+            </button>
+        </div>
+    `;
+}
+
+// Validation manuelle réussie
+function manualValidationSuccess() {
+    document.getElementById('locationVerification').style.display = 'none';
+    document.getElementById('mainContent').style.display = 'block';
+    locationVerified = true;
+}
+
+// ==========================================
+// GESTION DU PANIER (code existant)
+// ==========================================
+
 let cartFromLocalStorage = [];
 
-// Fonction pour charger le panier depuis localStorage ou sessionStorage
 function loadCartFromStorage() {
-    // Essayer sessionStorage d'abord (sauvegarde de menu.php)
     let cartItems = [];
     
     try {
@@ -870,7 +1095,6 @@ function loadCartFromStorage() {
         console.log('Pas de sessionStorage disponible');
     }
     
-    // Si pas trouvé, essayer localStorage (fallback)
     if (cartItems.length === 0) {
         try {
             const localCart = localStorage.getItem('cartItems');
@@ -886,17 +1110,13 @@ function loadCartFromStorage() {
     if (cartItems.length > 0) {
         cartFromLocalStorage = cartItems;
         displayCartItems(cartItems);
-        
-        // Envoyer immédiatement au serveur pour synchronisation
         syncCartWithServer(cartItems);
     } else {
-        // Aucun item dans le panier
         document.getElementById('emptyCartMessage').innerHTML = 
             '<p class="text-gray-500">Votre panier est vide</p><a href="menu.php" class="text-primary hover:underline">← Retour au menu</a>';
     }
 }
 
-// Fonction pour afficher les items du panier
 function displayCartItems(cartItems) {
     const orderSummary = document.getElementById('orderSummary');
     let total = 0;
@@ -931,21 +1151,16 @@ function displayCartItems(cartItems) {
     
     orderSummary.innerHTML = itemsHTML;
     
-    // Mettre à jour les totaux
     document.getElementById('subtotalAmount').textContent = total.toLocaleString() + ' FCFA';
     document.getElementById('totalAmount').textContent = total.toLocaleString() + ' FCFA';
     
-    // Masquer le message "panier vide"
     const emptyMessage = document.getElementById('emptyCartMessage');
     if (emptyMessage) {
         emptyMessage.style.display = 'none';
     }
 }
 
-// Fonction pour synchroniser avec le serveur
 function syncCartWithServer(cartItems) {
-    console.log('Synchronisation avec le serveur...', cartItems);
-    
     fetch('commander.php', {
         method: 'POST',
         headers: {
@@ -956,27 +1171,28 @@ function syncCartWithServer(cartItems) {
     .then(response => response.json())
     .then(data => {
         console.log('Panier synchronisé:', data);
-        if (!data.success) {
-            console.error('Erreur de synchronisation:', data.message);
-        }
     })
     .catch(error => {
-        console.error('Erreur lors de la synchronisation:', error);
+        console.error('Erreur sync:', error);
     });
 }
 
-// Gestionnaire de soumission du formulaire
 function setupFormHandler() {
     const form = document.querySelector('form[method="POST"]');
     if (!form) return;
     
     form.addEventListener('submit', function(e) {
+        // Vérifier si la géolocalisation a été validée
+        if (!locationVerified) {
+            e.preventDefault();
+            alert('Veuillez d\'abord vérifier votre position dans le restaurant');
+            return false;
+        }
+        
         console.log('Soumission du formulaire...');
         
-        // Récupérer les données du panier
         let cartItems = cartFromLocalStorage;
         
-        // Si pas de données, essayer de relire depuis le storage
         if (cartItems.length === 0) {
             try {
                 const sessionCart = sessionStorage.getItem('mulho_cart');
@@ -988,7 +1204,6 @@ function setupFormHandler() {
         }
         
         if (cartItems.length > 0) {
-            // Vérifier s'il y a déjà un champ cart_data
             let cartInput = form.querySelector('input[name="cart_data"]');
             if (!cartInput) {
                 cartInput = document.createElement('input');
@@ -997,12 +1212,7 @@ function setupFormHandler() {
                 form.appendChild(cartInput);
             }
             cartInput.value = JSON.stringify(cartItems);
-            
-            console.log('Données panier envoyées avec le formulaire:', cartItems);
         } else {
-            console.warn('Aucune donnée de panier à envoyer');
-            
-            // Optionnel : empêcher la soumission si le panier est empty
             e.preventDefault();
             alert('Votre panier est vide. Veuillez ajouter des articles avant de commander.');
             return false;
@@ -1010,18 +1220,6 @@ function setupFormHandler() {
     });
 }
 
-// Fonction pour vider le storage après commande réussie
-function clearCartStorage() {
-    try {
-        sessionStorage.removeItem('mulho_cart');
-        localStorage.removeItem('cartItems');
-        console.log('Panier vidé du stockage local');
-    } catch (e) {
-        console.log('Erreur lors du vidage du panier');
-    }
-}
-
-// Gestion du modal newsletter
 function setupNewsletterModal() {
     const modal = document.getElementById('newsletterModal');
     if (!modal) return;
@@ -1033,7 +1231,6 @@ function setupNewsletterModal() {
     const commandeId = '<?php echo $_SESSION['commande_id'] ?? ''; ?>';
     
     function handleNewsletterChoice(choice) {
-        // Envoyer le choix au serveur
         fetch('commander.php', {
             method: 'POST',
             headers: {
@@ -1044,7 +1241,6 @@ function setupNewsletterModal() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Rediriger vers la page de confirmation
                 window.location.href = 'confirmation.php?commande=' + commandeId;
             } else {
                 alert('Erreur lors du traitement de votre choix. Veuillez réessayer.');
@@ -1056,18 +1252,19 @@ function setupNewsletterModal() {
         });
     }
     
-    btnOui.addEventListener('click', function() {
-        handleNewsletterChoice('oui');
-    });
-    
-    btnNon.addEventListener('click', function() {
-        handleNewsletterChoice('non');
-    });
+    if (btnOui) btnOui.addEventListener('click', () => handleNewsletterChoice('oui'));
+    if (btnNon) btnNon.addEventListener('click', () => handleNewsletterChoice('non'));
 }
 
-// Initialisation au chargement de la page
+// ==========================================
+// INITIALISATION AU CHARGEMENT DE LA PAGE
+// ==========================================
+
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Commander.php - Initialisation...');
+    console.log('🚀 Commander.php - Initialisation avec géolocalisation...');
+    
+    // Démarrer immédiatement la vérification de position
+    document.getElementById('locationVerification').style.display = 'flex';
     
     <?php if ($useLocalStorage): ?>
         console.log('Chargement du panier depuis localStorage...');
@@ -1078,9 +1275,46 @@ document.addEventListener('DOMContentLoaded', function() {
     
     setupFormHandler();
     setupNewsletterModal();
+    
+    // Vérification périodique de la position toutes les 5 minutes
+    setInterval(() => {
+        if (locationVerified && navigator.geolocation) {
+            console.log('🔄 Vérification périodique de position...');
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    const distance = calculateDistance(
+                        position.coords.latitude,
+                        position.coords.longitude,
+                        RESTAURANT_CONFIG.latitude,
+                        RESTAURANT_CONFIG.longitude
+                    );
+                    
+                    if (distance > RESTAURANT_CONFIG.allowedRadius) {
+                        alert('Vous semblez avoir quitté le restaurant. La session va se terminer.');
+                        window.location.reload();
+                    }
+                },
+                function(error) {
+                    console.log('Erreur vérification périodique:', error);
+                }
+            );
+        }
+    }, 5 * 60 * 1000); // 5 minutes
 });
 
+// Fonction pour vider le panier après commande réussie
+function clearCartAfterOrder() {
+    try {
+        sessionStorage.removeItem('mulho_cart');
+        localStorage.removeItem('cartItems');
+        console.log('Panier vidé après commande');
+    } catch (error) {
+        console.error('Erreur lors du vidage du panier:', error);
+    }
+}
+
 // Debug : afficher les données disponibles
+console.log('Configuration restaurant:', RESTAURANT_CONFIG);
 console.log('Session Storage:', sessionStorage.getItem('mulho_cart'));
 console.log('Local Storage:', localStorage.getItem('cartItems'));
 </script>
@@ -1102,66 +1336,5 @@ console.log('Local Storage:', localStorage.getItem('cartItems'));
         </div>
     </footer>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.querySelector('form');
-    
-    form.addEventListener('submit', function(e) {
-        // Récupérer le panier du localStorage si nécessaire
-        const cartItems = JSON.parse(localStorage.getItem('cartItems') || '[]');
-        
-        if (cartItems.length > 0) {
-            // Créer un champ caché pour envoyer les données du panier
-            const cartInput = document.createElement('input');
-            cartInput.type = 'hidden';
-            cartInput.name = 'cart_data';
-            cartInput.value = JSON.stringify(cartItems);
-            form.appendChild(cartInput);
-            
-            console.log('Données panier envoyées:', cartItems);
-        }
-    });
-    
-    // Fonction pour synchroniser avec le serveur (comme dans votre code existant)
-    function updateServerCart(cartItems) {
-        fetch('commander.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: 'action=sync_cart&cart_data=' + encodeURIComponent(JSON.stringify(cartItems))
-        })
-        .then(response => response.json())
-        .then(data => {
-            console.log('Panier synchronisé:', data);
-        })
-        .catch(error => {
-            console.error('Erreur sync:', error);
-        });
-    }
-    
-    // Synchroniser au chargement de la page
-    const cartItems = JSON.parse(localStorage.getItem('cartItems') || '[]');
-    if (cartItems.length > 0) {
-        updateServerCart(cartItems);
-    }
-});
-</script>
-<script>
-// Vider le panier du sessionStorage après commande réussie
-function clearCartAfterOrder() {
-    try {
-        sessionStorage.removeItem('mulho_cart');
-        console.log('Panier vidé après commande');
-    } catch (error) {
-        console.error('Erreur lors du vidage du panier:', error);
-    }
-}
-
-// Appeler cette fonction après confirmation de la commande
-document.addEventListener('DOMContentLoaded', function() {
-    clearCartAfterOrder();
-});
-</script>
 </body>
 </html>

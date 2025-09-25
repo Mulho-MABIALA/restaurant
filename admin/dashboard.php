@@ -104,11 +104,12 @@ $taux_confirmation = $total_reservations > 0 ? round(($confirmées / $total_rese
 
 // ⭐ Derniers avis
 $avis = $conn->query("
-    SELECT client_nom, note, commentaire, date_envoi
+    SELECT nom, note, message, date_creation
     FROM avis
-    ORDER BY date_envoi DESC
+    ORDER BY date_creation DESC
     LIMIT 5
 ")->fetchAll(PDO::FETCH_ASSOC);
+
 
 // 🔔 Système de notifications amélioré
 $query_notifications = "
@@ -1070,53 +1071,63 @@ if ($admin_id > 0) {
                         </div>
                     </div>
 
-                    <!-- Avis Clients -->
-                    <div class="glass-card p-10 rounded-2xl card-hover animate-fade-in">
-                        <div class="flex items-center justify-between mb-8">
-                            <div class="flex items-center space-x-4">
-                                <div class="w-16 h-16 bg-warning-gradient rounded-2xl flex items-center justify-center shadow-2xl animate-float">
-                                    <i class="fas fa-star text-white text-2xl animate-spin-slow"></i>
-                                </div>
-                                <div>
-                                    <h2 class="text-2xl font-bold text-corporate">Avis Clients</h2>
-                                    <p class="text-text-secondary">Retours et évaluations</p>
-                                </div>
-                            </div>
-                            <a href="avis.php" class="text-corporate-amber hover:text-amber-300 font-semibold flex items-center group">
-                                Voir tout <i class="fas fa-arrow-right ml-2 group-hover:translate-x-1 transition-transform"></i>
-                            </a>
+                   <!-- ... code précédent ... -->
+
+<!-- Avis Clients -->
+<div class="glass-card p-10 rounded-2xl card-hover animate-fade-in">
+    <div class="flex items-center justify-between mb-8">
+        <div class="flex items-center space-x-4">
+            <div class="w-16 h-16 bg-warning-gradient rounded-2xl flex items-center justify-center shadow-2xl animate-float">
+                <i class="fas fa-star text-white text-2xl animate-spin-slow"></i>
+            </div>
+            <div>
+                <h2 class="text-2xl font-bold text-corporate">Avis Clients</h2>
+                <p class="text-text-secondary">Retours et évaluations</p>
+            </div>
+        </div>
+        <a href="avis.php" class="text-corporate-amber hover:text-amber-300 font-semibold flex items-center group">
+            Voir tout <i class="fas fa-arrow-right ml-2 group-hover:translate-x-1 transition-transform"></i>
+        </a>
+    </div>
+    
+    <div class="space-y-6">
+        <?php foreach($avis as $avis_item): 
+            // Vérification et valeurs par défaut pour éviter les erreurs
+            $client_nom = $avis_item['nom'] ?? 'Client inconnu';
+            $date_envoi = $avis_item['date_creation'] ?? date('Y-m-d H:i:s');
+            $commentaire = $avis_item['message'] ?? 'Aucun commentaire';
+            $note = $avis_item['note'] ?? 0;
+        ?>
+        <div class="group relative">
+            <div class="p-6 glass-morphism rounded-2xl hover:bg-white/10 transition-all duration-300 border border-white/10">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-12 h-12 bg-warning-gradient rounded-2xl flex items-center justify-center shadow-lg">
+                            <span class="text-white font-bold"><?= strtoupper(substr($client_nom, 0, 1)) ?></span>
                         </div>
-                        
-                        <div class="space-y-6">
-                            <?php foreach($avis as $avis_item): ?>
-                            <div class="group relative">
-                                <div class="p-6 glass-morphism rounded-2xl hover:bg-white/10 transition-all duration-300 border border-white/10">
-                                    <div class="flex items-center justify-between mb-4">
-                                        <div class="flex items-center space-x-4">
-                                            <div class="w-12 h-12 bg-warning-gradient rounded-2xl flex items-center justify-center shadow-lg">
-                                                <span class="text-white font-bold"><?= strtoupper(substr($avis_item['client_nom'], 0, 1)) ?></span>
-                                            </div>
-                                            <div>
-                                                <p class="font-bold text-text-primary"><?= htmlspecialchars($avis_item['client_nom']) ?></p>
-                                                <p class="text-text-secondary text-sm"><?= date('d/m/Y', strtotime($avis_item['date_envoi'])) ?></p>
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="flex items-center space-x-1 bg-corporate-amber/20 px-3 py-1 rounded-xl">
-                                            <?php for($i = 1; $i <= 5; $i++): ?>
-                                                <i class="fas fa-star text-sm <?= $i <= $avis_item['note'] ? 'text-corporate-amber' : 'text-white/30' ?>"></i>
-                                            <?php endfor; ?>
-                                        </div>
-                                    </div>
-                                    
-                                    <blockquote class="text-text-secondary leading-relaxed italic font-medium">
-                                        "<?= htmlspecialchars(substr($avis_item['commentaire'], 0, 150)) ?><?= strlen($avis_item['commentaire']) > 150 ? '...' : '' ?>"
-                                    </blockquote>
-                                </div>
-                            </div>
-                            <?php endforeach; ?>
+                        <div>
+                            <p class="font-bold text-text-primary"><?= htmlspecialchars($client_nom) ?></p>
+                            <p class="text-text-secondary text-sm"><?= date('d/m/Y', strtotime($date_envoi)) ?></p>
                         </div>
                     </div>
+                    
+                    <div class="flex items-center space-x-1 bg-corporate-amber/20 px-3 py-1 rounded-xl">
+                        <?php for($i = 1; $i <= 5; $i++): ?>
+                            <i class="fas fa-star text-sm <?= $i <= $note ? 'text-corporate-amber' : 'text-white/30' ?>"></i>
+                        <?php endfor; ?>
+                    </div>
+                </div>
+                
+                <blockquote class="text-text-secondary leading-relaxed italic font-medium">
+                    "<?= htmlspecialchars(substr($commentaire, 0, 150)) ?><?= strlen($commentaire) > 150 ? '...' : '' ?>"
+                </blockquote>
+            </div>
+        </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+
+<!-- ... code suivant ... -->
                 </div>
 
                 <!-- Section Export & Rapports -->

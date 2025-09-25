@@ -1,7 +1,16 @@
 <?php
+session_start();
+
     require_once '../config.php';
     require_once 'phpqrcode/qrlib.php';
+    require_once 'classes/PayrollCalculator.php';
+require_once 'classes/BulletinPDFGenerateur.php'; 
 
+// Rediriger si l'admin n'est pas connecté
+if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    header('Location: login.php');
+    exit;
+}
     // GESTIONNAIRE D'EMPLOYÉS
     class EmployeeManager
     {
@@ -17,7 +26,7 @@
     try {
         $stmt = $this->conn->query("
             SELECT e.*,
-                   p.nom as poste_nom,
+                p.nom as poste_nom,
                    p.couleur as poste_couleur,
                    p.salaire as poste_salaire,
                    p.type_contrat,
@@ -901,369 +910,6 @@ private function insertEmployee(array $data, string $photo_filename, string $cv_
             }
         }
     }
-
-    class PayrollManager
-    {
-        private $conn;
-
-        public function __construct(PDO $connection)
-        {
-            $this->conn = $connection;
-        }
-
-       public function calculerSalaireNet(int $employe_id, string $mois_annee): array
-{
-    try {
-        $stmt = $this->conn->prepare("
-            SELECT e.*,
-                   p.salaire AS salaire_poste,
-                   p.taux_cotisation,
-                   p.categorie_paie,
-                   p.regime_social,
-                   p.nom as poste_nom,
-                   d.nom as departement_nom
-            FROM employes e
-            LEFT JOIN postes p ON e.poste_id = p.id
-            LEFT JOIN departements d ON p.departement_id = d.id
-            WHERE e.id = ? AND e.statut = 'actif'
-        ");
-        $stmt->execute([$employe_id]);
-        $data = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$data) {
-            throw new Exception("Employé non trouvé ou inactif.");
-        }
-
-        // Calcul du salaire avec gestion des valeurs nulles
-        $salaire_brut = $data['salaire'] ?: ($data['salaire_poste'] ?: 0);
-        
-        if ($salaire_brut <= 0) {
-            throw new Exception("Aucun salaire défini pour cet employé.");
-        }
-
-        // Calculs des différents éléments
-        $primes_individuelles = 0; // À développer selon les règles métier
-        $absences_jours = 0; // À développer avec système de congés/absences
-        $retenues_diverses = 0; // À développer selon les règles métier
-        $cotisations_supplementaires = 0; // À développer selon les règles métier
-
-        // Calcul des retenues pour absences
-        $retenues_absences = ($absences_jours * $salaire_brut) / 30;
-        
-        // Salaire brut après ajustements
-        $salaire_brut_apres_absences = $salaire_brut - $retenues_absences + $primes_individuelles;
-
-        // Calcul des cotisations
-        $taux_cotisations = ($data['taux_cotisation'] ?: 0) + $cotisations_supplementaires;
-        $cotisations = $salaire_brut_apres_absences * ($taux_cotisations / 100);
-
-        // Salaire net final
-        $salaire_net = $salaire_brut_apres_absences - $cotisations - $retenues_diverses;
-
-        return [
-            'salaire_brut' => $salaire_brut,
-            'salaire_brut_apres_absences' => $salaire_brut_apres_absences,
-            'primes' => $primes_individuelles,
-            'retenues_absences' => $retenues_absences,
-            'cotisations' => $cotisations,
-            'retenues_diverses' => $retenues_diverses,
-            'salaire_net' => max(0, $salaire_net), // Éviter les salaires négatifs
-            'mois_annee' => $mois_annee,
-            'employe_id' => $employe_id,
-            'poste_id' => $data['poste_id'],
-            'categorie_paie' => $data['categorie_paie'],
-            'regime_social' => $data['regime_social'],
-            'nom' => $data['nom'],
-            'prenom' => $data['prenom'],
-            'poste_nom' => $data['poste_nom'],
-            'departement_nom' => $data['departement_nom'],
-            'taux_cotisations' => $taux_cotisations
-        ];
-        
-    } catch (PDOException $e) {
-        error_log("Erreur SQL calculerSalaireNet: " . $e->getMessage());
-        throw new Exception("Erreur de base de données: " . $e->getMessage());
-    }
-}
-
-
-        public function genererBulletinPaie(array $details): string
-        {
-            if (! class_exists('TCPDF')) {
-                return $this->genererBulletinHTML($details);
-            }
-
-            require_once '../vendor/autoload.php';
-            $pdf = new TCPDF();
-            $pdf->SetCreator('Système de Gestion RH');
-            $pdf->SetAuthor('Restaurant Management System');
-            $pdf->SetTitle('Bulletin de Paie - ' . $details['nom'] . ' ' . $details['prenom']);
-            $pdf->AddPage();
-
-            $pdf->SetFont('helvetica', 'B', 16);
-            $pdf->Cell(0, 10, 'BULLETIN DE PAIE', 0, 1, 'C');
-            $pdf->Cell(0, 10, strtoupper($details['nom'] . ' ' . $details['prenom']), 0, 1, 'C');
-            $pdf->Cell(0, 10, 'Poste: ' . ($details['poste_nom'] ?: 'Non défini'), 0, 1, 'C');
-            $pdf->Cell(0, 10, 'Mois: ' . date('F Y', strtotime($details['mois_annee'] . '-01')), 0, 1, 'C');
-            $pdf->Ln(10);
-
-            $pdf->SetFont('helvetica', 'B', 12);
-            $pdf->Cell(0, 8, 'DETAILS DU SALAIRE', 0, 1, 'L');
-            $pdf->SetFont('helvetica', '', 10);
-
-            $lignes = [
-                ['Salaire brut de base:', $details['salaire_brut']],
-                ['Primes individuelles:', $details['primes']],
-                ['Retenues pour absences:', -$details['retenues_absences']],
-                ['Cotisations sociales:', -$details['cotisations']],
-                ['Autres retenues:', -$details['retenues_diverses']],
-            ];
-
-            foreach ($lignes as $ligne) {
-                $pdf->Cell(100, 6, $ligne[0], 0, 0, 'L');
-                $montant = ($ligne[1] < 0 ? '-' : '') . number_format(abs($ligne[1]), 0, ',', ' ') . ' FCFA';
-                $pdf->Cell(0, 6, $montant, 0, 1, 'R');
-            }
-
-            $pdf->Ln(5);
-            $pdf->SetFont('helvetica', 'B', 12);
-            $pdf->Cell(100, 8, 'SALAIRE NET A PAYER:', 0, 0, 'L');
-            $pdf->SetFont('helvetica', 'B', 14);
-            $pdf->SetTextColor(0, 128, 0);
-            $pdf->Cell(0, 8, number_format($details['salaire_net'], 0, ',', ' ') . ' FCFA', 0, 1, 'R');
-            $pdf->SetTextColor(0, 0, 0);
-
-            return $pdf->Output('', 'S');
-        }
-
-     private function genererBulletinHTML(array $details): string
-{
-    $date_generation = date('d/m/Y à H:i');
-    $mois_libelle = date('F Y', strtotime($details['mois_annee'] . '-01'));
-    
-    $html = "
-    <!DOCTYPE html>
-    <html lang='fr'>
-    <head>
-        <meta charset='UTF-8'>
-        <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-        <title>Bulletin de Paie - {$details['prenom']} {$details['nom']}</title>
-        <style>
-            body { 
-                font-family: Arial, sans-serif; 
-                margin: 20px; 
-                background-color: #f8f9fa;
-            }
-            .container {
-                max-width: 800px;
-                margin: 0 auto;
-                background: white;
-                padding: 30px;
-                border-radius: 8px;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            }
-            .header { 
-                text-align: center; 
-                margin-bottom: 30px; 
-                border-bottom: 3px solid #007bff;
-                padding-bottom: 20px;
-            }
-            .company-info {
-                text-align: center;
-                margin-bottom: 20px;
-                color: #666;
-            }
-            .employee-info {
-                background-color: #f8f9fa;
-                padding: 15px;
-                border-radius: 5px;
-                margin-bottom: 20px;
-            }
-            .details { 
-                margin: 20px 0; 
-            }
-            .line { 
-                display: flex; 
-                justify-content: space-between; 
-                padding: 8px 0; 
-                border-bottom: 1px solid #eee;
-            }
-            .line:last-child {
-                border-bottom: none;
-            }
-            .line.total { 
-                font-weight: bold; 
-                color: #28a745; 
-                font-size: 18px; 
-                border-top: 2px solid #007bff; 
-                padding-top: 15px; 
-                margin-top: 15px;
-                background-color: #e8f5e8;
-                padding: 15px;
-                border-radius: 5px;
-            }
-            .section-title {
-                font-size: 18px;
-                font-weight: bold;
-                color: #333;
-                margin: 20px 0 10px 0;
-                padding-bottom: 5px;
-                border-bottom: 2px solid #007bff;
-            }
-            .highlight {
-                background-color: #fff3cd;
-                padding: 2px 5px;
-                border-radius: 3px;
-            }
-            .footer {
-                margin-top: 30px;
-                text-align: center;
-                font-size: 12px;
-                color: #666;
-                border-top: 1px solid #ddd;
-                padding-top: 15px;
-            }
-            .amount {
-                font-weight: bold;
-                font-family: 'Courier New', monospace;
-            }
-        </style>
-    </head>
-    <body>
-        <div class='container'>
-            <div class='company-info'>
-                <h2>RESTAURANT MULHO</h2>
-                <p>Système de Gestion des Ressources Humaines</p>
-            </div>
-            
-            <div class='header'>
-                <h1>BULLETIN DE PAIE</h1>
-                <h2>" . strtoupper($details['nom'] . ' ' . $details['prenom']) . "</h2>
-            </div>
-
-            <div class='employee-info'>
-                <div style='display: grid; grid-template-columns: 1fr 1fr; gap: 20px;'>
-                    <div>
-                        <strong>Employé:</strong> {$details['prenom']} {$details['nom']}<br>
-                        <strong>Poste:</strong> " . ($details['poste_nom'] ?: 'Non défini') . "<br>
-                        <strong>Département:</strong> " . ($details['departement_nom'] ?: 'Non assigné') . "
-                    </div>
-                    <div>
-                        <strong>Période:</strong> <span class='highlight'>{$mois_libelle}</span><br>
-                        <strong>Catégorie:</strong> " . ($details['categorie_paie'] ?: 'Standard') . "<br>
-                        <strong>Régime social:</strong> " . ($details['regime_social'] ?: 'Général') . "
-                    </div>
-                </div>
-            </div>
-
-            <div class='details'>
-                <h3 class='section-title'>ÉLÉMENTS DE RÉMUNÉRATION</h3>
-                
-                <div class='line'>
-                    <span>Salaire brut de base:</span>
-                    <span class='amount'>" . number_format($details['salaire_brut'], 0, ',', ' ') . " FCFA</span>
-                </div>";
-                
-    if ($details['primes'] > 0) {
-        $html .= "
-                <div class='line'>
-                    <span>Primes et indemnités:</span>
-                    <span class='amount' style='color: #28a745;'>+" . number_format($details['primes'], 0, ',', ' ') . " FCFA</span>
-                </div>";
-    }
-    
-    if ($details['retenues_absences'] > 0) {
-        $html .= "
-                <div class='line'>
-                    <span>Retenues pour absences:</span>
-                    <span class='amount' style='color: #dc3545;'>-" . number_format($details['retenues_absences'], 0, ',', ' ') . " FCFA</span>
-                </div>";
-    }
-    
-    $html .= "
-                <h3 class='section-title'>COTISATIONS SOCIALES</h3>
-                
-                <div class='line'>
-                    <span>Cotisations sociales ({$details['taux_cotisations']}%):</span>
-                    <span class='amount' style='color: #dc3545;'>-" . number_format($details['cotisations'], 0, ',', ' ') . " FCFA</span>
-                </div>";
-                
-    if ($details['retenues_diverses'] > 0) {
-        $html .= "
-                <div class='line'>
-                    <span>Autres retenues:</span>
-                    <span class='amount' style='color: #dc3545;'>-" . number_format($details['retenues_diverses'], 0, ',', ' ') . " FCFA</span>
-                </div>";
-    }
-    
-    $html .= "
-                <div class='line total'>
-                    <span>SALAIRE NET À PAYER:</span>
-                    <span class='amount'>" . number_format($details['salaire_net'], 0, ',', ' ') . " FCFA</span>
-                </div>
-            </div>
-            
-            <div class='footer'>
-                <p><strong>Document généré le:</strong> {$date_generation}</p>
-                <p>Ce bulletin de paie est un document officiel. Conservez-le précieusement.</p>
-                <p><em>Restaurant Mulho - Système de Gestion RH</em></p>
-            </div>
-        </div>
-    </body>
-    </html>";
-
-    return $html;
-}
-
-
-        public function enregistrerBulletinPaie(array $details): int
-        {
-            $stmt = $this->conn->prepare("
-            INSERT INTO bulletins_paie
-            (employe_id, poste_id, mois_annee, salaire_brut, cotisations, salaire_net, primes, retenues, statut)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'valide')
-        ");
-            $stmt->execute([
-                $details['employe_id'],
-                $details['poste_id'],
-                $details['mois_annee'] . '-01',
-                $details['salaire_brut_apres_absences'],
-                $details['cotisations'],
-                $details['salaire_net'],
-                $details['primes'],
-                $details['retenues_absences'] + $details['retenues_diverses'],
-            ]);
-            return $this->conn->lastInsertId();
-        }
-
-        public function genererBulletinsPourTous(string $mois_annee): array
-        {
-            $resultats = [];
-            $stmt      = $this->conn->prepare("SELECT id FROM employes WHERE statut = 'actif'");
-            $stmt->execute();
-            $employes = $stmt->fetchAll(PDO::FETCH_COLUMN);
-
-            foreach ($employes as $employe_id) {
-                try {
-                    $details                = $this->calculerSalaireNet($employe_id, $mois_annee);
-                    $bulletin_id            = $this->enregistrerBulletinPaie($details);
-                    $resultats[$employe_id] = [
-                        'success'     => true,
-                        'bulletin_id' => $bulletin_id,
-                        'salaire_net' => $details['salaire_net'],
-                    ];
-                } catch (Exception $e) {
-                    $resultats[$employe_id] = [
-                        'success' => false,
-                        'message' => $e->getMessage(),
-                    ];
-                }
-            }
-
-            return $resultats;
-        }
-    }
-
     class DepartementManager
     {
         private $conn;
@@ -1277,8 +923,8 @@ private function insertEmployee(array $data, string $photo_filename, string $cv_
             try {
                 $stmt = $this->conn->query("
             SELECT d.*,
-                   COUNT(DISTINCT p.id) as nombre_postes,
-                   COUNT(DISTINCT e.id) as nombre_employes
+                COUNT(DISTINCT p.id) as nombre_postes,
+                COUNT(DISTINCT e.id) as nombre_employes
             FROM departements d
             LEFT JOIN postes p ON d.id = p.departement_id AND p.actif = 1
             LEFT JOIN employes e ON p.id = e.poste_id AND e.statut = 'actif'
@@ -1906,9 +1552,9 @@ private function generateWorkforceReport(array $filters): array
 
     class APIHandler
     {
+        private $payrollCalculator;
         private $employeeManager;
         private $posteManager;
-        private $payrollManager;
         private $reportingManager;
         private $conn;
 
@@ -1917,8 +1563,9 @@ private function generateWorkforceReport(array $filters): array
             $this->conn             = $conn;
             $this->employeeManager  = new EmployeeManager($conn);
             $this->posteManager     = new PosteManager($conn);
-            $this->payrollManager   = new PayrollManager($conn);
             $this->reportingManager = new ReportingManager($conn);
+            $this->payrollCalculator = new PayrollCalculator($conn);
+            //$this->pdfGenerator = new BulletinPDFGenerateur($conn);
         }
 
         private function getEmployeesWithPresence(): void
@@ -2005,8 +1652,7 @@ private function generateWorkforceReport(array $filters): array
                 echo json_encode(['success' => false, 'message' => $e->getMessage()]);
             }
         }
-
-      public function handleRequest(): void
+    public function handleRequest(): void
 {
     $action = $_GET['action'] ?? $_POST['ajax_action'] ?? '';
 
@@ -2043,17 +1689,11 @@ private function generateWorkforceReport(array $filters): array
             case 'delete_employee':
                 $this->deleteEmployee();
                 break;
-            case 'generer_bulletin':
-                $this->genererBulletin();
-                break;
             case 'get_employees_with_presences':
                 $this->getEmployeesWithPresence();
                 break;
             case 'get_departements':
                 $this->getDepartements();
-                break;
-            case 'generer_tous_bulletins':
-                $this->genererTousBulletins();
                 break;
             case 'get_dashboard_stats':
                 $this->getDashboardStats();
@@ -2204,80 +1844,13 @@ private function generateWorkforceReport(array $filters): array
             echo json_encode($result);
         }
 
-       private function genererBulletin(): void
-{
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        header('Content-Type: application/json');
-        echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
-        return;
-    }
-
-    try {
-        $employe_id = $_POST['employe_id'] ?? null;
-        $mois_annee = $_POST['mois_annee'] ?? null;
-
-        // Validation des paramètres
-        if (!$employe_id || !$mois_annee) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'message' => 'Employé et mois requis']);
-            return;
-        }
-
-        // Vérifier que l'employé existe et est actif
-        $employee = $this->employeeManager->getEmployeeById($employe_id);
-        if (!$employee) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'message' => 'Employé non trouvé']);
-            return;
-        }
-
-        if ($employee['statut'] !== 'actif') {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'message' => 'Cet employé n\'est pas actif']);
-            return;
-        }
-
-        // Calculer les détails du salaire
-        $details = $this->payrollManager->calculerSalaireNet($employe_id, $mois_annee);
-        
-        // Générer le bulletin
-        $pdf_content = $this->payrollManager->genererBulletinPaie($details);
-        
-        // Enregistrer le bulletin en base
-        $bulletin_id = $this->payrollManager->enregistrerBulletinPaie($details);
-
-        // Définir le nom du fichier
-        $filename = 'bulletin_' . $employee['nom'] . '_' . $employee['prenom'] . '_' . $mois_annee;
-        $filename = preg_replace('/[^a-zA-Z0-9_-]/', '', $filename); // Nettoyer le nom de fichier
-
-        // Déterminer le type de contenu et l'extension
-        if (strpos($pdf_content, '<!DOCTYPE html') !== false) {
-            header('Content-Type: text/html; charset=UTF-8');
-            header('Content-Disposition: attachment; filename="' . $filename . '.html"');
-        } else {
-            header('Content-Type: application/pdf');
-            header('Content-Disposition: attachment; filename="' . $filename . '.pdf"');
-        }
-
-        header('Content-Length: ' . strlen($pdf_content));
-        header('Cache-Control: no-cache, must-revalidate');
-        header('Expires: Sat, 26 Jul 1997 05:00:00 GMT');
-        
-        echo $pdf_content;
-
-    } catch (Exception $e) {
-        error_log("Erreur génération bulletin: " . $e->getMessage());
-        header('Content-Type: application/json');
-        echo json_encode(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()]);
-    }
-}
 public function verifierPrerequisPaie(int $employe_id): array
 {
     try {
         $stmt = $this->conn->prepare("
             SELECT e.nom, e.prenom, e.statut, e.salaire,
-                   p.salaire as salaire_poste, p.taux_cotisation,
-                   e.iban, e.titulaire_compte
+                p.salaire as salaire_poste, p.taux_cotisation,
+                e.iban, e.titulaire_compte
             FROM employes e
             LEFT JOIN postes p ON e.poste_id = p.id
             WHERE e.id = ?
@@ -2319,43 +1892,7 @@ public function verifierPrerequisPaie(int $employe_id): array
         return ['valid' => false, 'errors' => ['Erreur de base de données']];
     }
 }
-        private function genererTousBulletins(): void
-        {
-            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-                echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
-                return;
-            }
-
-            try {
-                $mois_annee = $_POST['mois_annee'] ?? null;
-
-                if (! $mois_annee) {
-                    echo json_encode(['success' => false, 'message' => 'Mois requis']);
-                    return;
-                }
-
-                $resultats = $this->payrollManager->genererBulletinsPourTous($mois_annee);
-
-                $count_success = count(array_filter($resultats, function ($r) {return $r['success'];}));
-                $count_total = count($resultats);
-
-                if ($count_success > 0) {
-                    echo json_encode([
-                        'success' => true,
-                        'message' => "Bulletins générés avec succès",
-                        'count'   => $count_success,
-                        'total'   => $count_total,
-                        'details' => $resultats,
-                    ]);
-                } else {
-                    echo json_encode(['success' => false, 'message' => 'Aucun bulletin généré']);
-                }
-
-            } catch (Exception $e) {
-                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-            }
-        }
-    }
+}
    $apiHandler = new APIHandler($conn);
 if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
     $apiHandler->handleRequest();
@@ -2584,12 +2121,12 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
         </div>
     </div>
 </div>
- <div class="bg-white rounded-lg shadow-md p-6 mb-6 card-shadow border-2 border-gray-200">
+<div class="bg-white rounded-lg shadow-md p-6 mb-6 card-shadow border-2 border-gray-200">
     <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
         <!-- Champ de recherche -->
         <div>
             <input type="text" id="searchInput" placeholder="Rechercher par nom, email..."
-                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
         </div>
 
         <!-- Filtre département -->
@@ -2642,44 +2179,13 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
     </div>
 </div>
 
-        <!-- Section Génération des Bulletins de Paie -->
-       <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale stat-card-actifs">
-            <h2 class="text-xl font-semibold mb-6">Génération des Bulletins de Paie</h2>
-            <form id="genererBulletinForm" class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                        <label for="employe_id" class="block text-sm font-medium text-gray-700 mb-2">Employé</label>
-                        <select id="employe_id" name="employe_id" required
-                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
-                            <option value="">Sélectionnez un employé</option>
-                            <?php foreach ($employes as $employe): ?>
-                                <option value="<?php echo $employe['id']; ?>">
-                                    <?php echo htmlspecialchars($employe['nom'] . ' ' . $employe['prenom'] . ' (' . ($employe['poste_nom'] ?? 'Aucun poste') . ')'); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="mois_annee" class="block text-sm font-medium text-gray-700 mb-2">Mois</label>
-                        <input type="month" id="mois_annee" name="mois_annee" required
-                               value="<?php echo date('Y-m'); ?>"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
-                    </div>
-                    <div class="flex items-end">
-                        <button type="button" onclick="genererBulletin()"
-                                class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors">
-                            <i class="fas fa-file-pdf mr-2"></i>Générer Bulletin
-                        </button>
-                    </div>
-                </div>
-                <div class="mt-4">
-                    <button type="button" onclick="genererTousBulletins()"
-                            class="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition-colors">
-                        <i class="fas fa-file-pdf mr-2"></i>Générer pour tous les employés actifs
-                    </button>
-                </div>
-            </form>
-        </div>
+    <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale stat-card-actifs">
+    <h2 class="text-xl font-semibold mb-6">Génération des Bulletins de Paie</h2>
+    <p class="text-gray-600 mb-4">Gérez la paie, primes, congés et générez les bulletins professionnels.</p>
+    <a href="gestion_paie.php" class="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition-colors inline-flex items-center">
+        <i class="fas fa-calculator mr-2"></i>Accéder à la Gestion de Paie
+    </a>
+</div>
 
 <!-- 6. MODIFICATION DE LA SECTION TABLEAU POUR AJOUTER LES BORDURES -->
 <div id="tableView" class="bg-white rounded-lg shadow-md overflow-hidden card-shadow table-visible-borders border-2 border-gray-200">
@@ -2726,7 +2232,7 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
                     <div class="mb-6 text-center">
                         <div class="relative inline-block">
                             <img id="photoPreview" src="uploads/photos/default-avatar.png"
-                                 class="w-24 h-24 rounded-full border-4 border-gray-200 object-cover">
+                                class="w-24 h-24 rounded-full border-4 border-gray-200 object-cover">
                             <label for="photo" class="absolute bottom-0 right-0 bg-blue-600 text-white rounded-full p-2 cursor-pointer hover:bg-blue-700">
                                 <i class="fas fa-camera text-sm"></i>
                                 <input type="file" id="photo" name="photo" accept="image/*" class="hidden">
@@ -2739,25 +2245,25 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
                         <div>
                             <label for="nom" class="block text-sm font-medium text-gray-700 mb-2">Nom *</label>
                             <input type="text" id="nom" name="nom" required
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
 
                         <div>
                             <label for="prenom" class="block text-sm font-medium text-gray-700 mb-2">Prénom *</label>
                             <input type="text" id="prenom" name="prenom" required
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
 
                         <div>
                             <label for="email" class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
                             <input type="email" id="email" name="email" required
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
 
                         <div>
                             <label for="telephone" class="block text-sm font-medium text-gray-700 mb-2">Téléphone</label>
                             <input type="tel" id="telephone" name="telephone"
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
                     </div>
                     <!-- Dans la section "Informations personnelles" -->
@@ -2766,19 +2272,19 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
     <div>
         <label for="date_naissance" class="block text-sm font-medium text-gray-700 mb-2">Date de naissance</label>
         <input type="date" id="date_naissance" name="date_naissance"
-               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
     </div>
 
     <div>
         <label for="lieu_naissance" class="block text-sm font-medium text-gray-700 mb-2">Lieu de naissance</label>
         <input type="text" id="lieu_naissance" name="lieu_naissance"
-               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
     </div>
 
     <div>
         <label for="nationalite" class="block text-sm font-medium text-gray-700 mb-2">Nationalité</label>
         <input type="text" id="nationalite" name="nationalite"
-               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
     </div>
 
     <div>
@@ -2799,19 +2305,19 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
         <div>
             <label for="contact_urgence_nom" class="block text-sm font-medium text-gray-700 mb-2">Nom du contact</label>
             <input type="text" id="contact_urgence_nom" name="contact_urgence_nom"
-                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
         </div>
 
         <div>
             <label for="contact_urgence_relation" class="block text-sm font-medium text-gray-700 mb-2">Relation</label>
             <input type="text" id="contact_urgence_relation" name="contact_urgence_relation"
-                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
         </div>
 
         <div>
             <label for="contact_urgence_telephone" class="block text-sm font-medium text-gray-700 mb-2">Téléphone</label>
             <input type="tel" id="contact_urgence_telephone" name="contact_urgence_telephone"
-                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
         </div>
     </div>
 </div>
@@ -2823,7 +2329,7 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
         <div>
             <label for="adresse" class="block text-sm font-medium text-gray-700 mb-2">Adresse complète</label>
             <textarea id="adresse" name="adresse" rows="2"
-                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"></textarea>
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"></textarea>
         </div>
     </div>
 </div>
@@ -2836,15 +2342,15 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
                 Numéro de sécurité sociale *
             </label>
             <input type="text" id="num_secu" name="num_secu" required
-                   pattern="[0-9]{15}" title="15 chiffres requis"
-                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                pattern="[0-9]{15}" title="15 chiffres requis"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
         </div>
         <div>
             <label for="num_identite" class="block text-sm font-medium text-gray-700 mb-2">
                 Numéro de pièce d'identité *
             </label>
             <input type="text" id="num_identite" name="num_identite" required
-                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
         </div>
         <div>
             <label for="type_identite" class="block text-sm font-medium text-gray-700 mb-2">
@@ -2876,7 +2382,7 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
                 Nombre d'enfants à charge
             </label>
             <input type="number" id="nombre_enfants" name="nombre_enfants" min="0" value="0"
-                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
         </div>
     </div>
 </div>
@@ -2890,29 +2396,29 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
                 IBAN *
             </label>
             <input type="text" id="iban" name="iban" required
-                   placeholder="FR76 XXXX XXXX XXXX XXXX XXXX XXX"
-                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                placeholder="FR76 XXXX XXXX XXXX XXXX XXXX XXX"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
         </div>
         <div>
             <label for="nom_banque" class="block text-sm font-medium text-gray-700 mb-2">
                 Nom de la banque
             </label>
             <input type="text" id="nom_banque" name="nom_banque"
-                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
         </div>
         <div>
             <label for="titulaire_compte" class="block text-sm font-medium text-gray-700 mb-2">
                 Titulaire du compte *
             </label>
             <input type="text" id="titulaire_compte" name="titulaire_compte" required
-                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
         </div>
         <div class="md:col-span-2">
             <label for="bic" class="block text-sm font-medium text-gray-700 mb-2">
                 Code BIC (optionnel)
             </label>
             <input type="text" id="bic" name="bic" placeholder="ABCDEFXX"
-                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
         </div>
     </div>
 </div>
@@ -2925,7 +2431,7 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
                 CV (PDF)
             </label>
             <input type="file" id="cv" name="cv" accept=".pdf,.doc,.docx"
-                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
         </div>
 
         <div class="md:col-span-2">
@@ -2933,7 +2439,7 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
                 Contrat de travail signé (PDF)
             </label>
             <input type="file" id="contrat" name="contrat" accept=".pdf"
-                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
         </div>
 
         <div class="md:col-span-2">
@@ -2941,7 +2447,7 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
                 Copie pièce d'identité (PDF/Image)
             </label>
             <input type="file" id="piece_identite" name="piece_identite" accept=".pdf,.jpg,.jpeg,.png"
-                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
         </div>
     </div>
 </div>
@@ -2961,7 +2467,7 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
                                 <span id="salaireRange" class="text-xs text-gray-500"></span>
                             </label>
                             <input type="number" id="salaire" name="salaire" min="0" step="1"
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
                     </div>
 
@@ -2970,13 +2476,13 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
                         <div>
                             <label for="typeContrat" class="block text-sm font-medium text-gray-700 mb-2">Type de contrat</label>
                             <input type="text" id="typeContrat" name="type_contrat" readonly
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700">
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700">
                         </div>
 
                         <div>
                             <label for="dureeContrat" class="block text-sm font-medium text-gray-700 mb-2">Durée du contrat</label>
                             <input type="text" id="dureeContrat" name="duree_contrat" readonly
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700">
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700">
                         </div>
                     </div>
 
@@ -2985,18 +2491,18 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
                         <div>
                             <label for="dateEmbauche" class="block text-sm font-medium text-gray-700 mb-2">Date d'embauche *</label>
                             <input type="date" id="dateEmbauche" name="date_embauche" required
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
 
                         <div>
                             <label for="heureDebut" class="block text-sm font-medium text-gray-700 mb-2">Heure début</label>
                             <input type="time" id="heureDebut" name="heure_debut" value="08:00"
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
                                                 <div>
                             <label for="heureFin" class="block text-sm font-medium text-gray-700 mb-2">Heure fin</label>
                             <input type="time" id="heureFin" name="heure_fin" value="17:00"
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
                     </div>
 
@@ -3016,7 +2522,7 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
                         <div class="flex items-end">
                             <label class="flex items-center">
                                 <input type="checkbox" id="isAdmin" name="is_admin" value="1"
-                                       class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                    class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
                                 <span class="ml-2 text-sm text-gray-700">
                                     <i class="fas fa-crown text-yellow-500 mr-1"></i>
                                     Administrateur
@@ -3425,8 +2931,8 @@ function createEmployeeRow(employee) {
     row.innerHTML = `
         <td class="px-6 py-4 whitespace-nowrap">
             <img src="uploads/photos/${employee.photo || 'default-avatar.png'}"
-                 class="h-10 w-10 rounded-full object-cover ${employee.statut === 'inactif' ? 'grayscale' : ''}"
-                 onerror="this.src='uploads/photos/default-avatar.png'">
+                class="h-10 w-10 rounded-full object-cover ${employee.statut === 'inactif' ? 'grayscale' : ''}"
+                onerror="this.src='uploads/photos/default-avatar.png'">
         </td>
         <td class="px-6 py-4 whitespace-nowrap">
             <div class="text-sm font-medium ${employee.statut === 'inactif' ? 'text-gray-500' : 'text-gray-900'}">
@@ -3438,7 +2944,7 @@ function createEmployeeRow(employee) {
         <td class="px-6 py-4 whitespace-nowrap">
             <div class="flex items-center justify-center">
                 <span class="departement-badge"
-                      style="background-color: ${employee.departement_couleur || '#6B7280'}15; color: ${employee.departement_couleur || '#6B7280'}; border-color: ${employee.departement_couleur || '#6B7280'}40;">
+                    style="background-color: ${employee.departement_couleur || '#6B7280'}15; color: ${employee.departement_couleur || '#6B7280'}; border-color: ${employee.departement_couleur || '#6B7280'}40;">
                     <i class="fas fa-building mr-2"></i>
                     ${employee.departement_nom || 'Non assigné'}
                 </span>
@@ -3447,7 +2953,7 @@ function createEmployeeRow(employee) {
         <td class="px-6 py-4 whitespace-nowrap">
             <div class="flex items-center">
                 <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
-                      style="background-color: ${employee.poste_couleur || '#6B7280'}20; color: ${employee.poste_couleur || '#6B7280'};">
+                    style="background-color: ${employee.poste_couleur || '#6B7280'}20; color: ${employee.poste_couleur || '#6B7280'};">
                     ${employee.poste_nom || '<span class="missing-data">Non défini</span>'}
                 </span>
             </div>
@@ -3496,19 +3002,19 @@ function createEmployeeRow(employee) {
             <div class="flex flex-col space-y-1">
                 ${employee.cv ? `
                     <a href="uploads/documents/${employee.cv}" target="_blank"
-                       class="text-blue-600 hover:text-blue-800 text-xs flex items-center">
+                    class="text-blue-600 hover:text-blue-800 text-xs flex items-center">
                         <i class="fas fa-file-pdf mr-1 text-red-500"></i>CV
                     </a>
                 ` : '<span class="text-red-500 text-xs">Manquant</span>'}
                 ${employee.contrat ? `
                     <a href="uploads/documents/${employee.contrat}" target="_blank"
-                       class="text-blue-600 hover:text-blue-800 text-xs flex items-center">
+                    class="text-blue-600 hover:text-blue-800 text-xs flex items-center">
                         <i class="fas fa-file-contract mr-1 text-green-500"></i>Contrat
                     </a>
                 ` : '<span class="text-red-500 text-xs">Manquant</span>'}
                 ${employee.piece_identite ? `
                     <a href="uploads/documents/${employee.piece_identite}" target="_blank"
-                       class="text-blue-600 hover:text-blue-800 text-xs flex items-center">
+                    class="text-blue-600 hover:text-blue-800 text-xs flex items-center">
                         <i class="fas fa-id-card mr-1 text-purple-500"></i>Pièce ID
                     </a>
                 ` : '<span class="text-red-500 text-xs">Manquant</span>'}
@@ -3776,88 +3282,6 @@ function permanentDeleteEmployee(id) {
             });
         }
     }
-}
-
-// Fonctions de génération de bulletins
-function genererBulletin() {
-    const employeId = document.getElementById('employe_id').value;
-    const moisAnnee = document.getElementById('mois_annee').value;
-
-    if (!employeId) {
-        showNotification('Veuillez sélectionner un employé', 'error');
-        return;
-    }
-
-    if (!moisAnnee) {
-        showNotification('Veuillez sélectionner un mois', 'error');
-        return;
-    }
-
-    showNotification('Génération du bulletin en cours...', 'info');
-
-    // Créer un formulaire pour le téléchargement
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = '?action=generer_bulletin';
-    form.target = '_blank';
-
-    const employeInput = document.createElement('input');
-    employeInput.type = 'hidden';
-    employeInput.name = 'employe_id';
-    employeInput.value = employeId;
-    form.appendChild(employeInput);
-
-    const moisInput = document.createElement('input');
-    moisInput.type = 'hidden';
-    moisInput.name = 'mois_annee';
-    moisInput.value = moisAnnee;
-    form.appendChild(moisInput);
-
-    document.body.appendChild(form);
-    form.submit();
-    document.body.removeChild(form);
-
-    setTimeout(() => {
-        hideNotification();
-        showNotification('Bulletin généré avec succès!', 'success');
-    }, 1000);
-}
-
-function genererTousBulletins() {
-    const moisAnnee = document.getElementById('mois_annee').value;
-
-    if (!moisAnnee) {
-        showNotification('Veuillez sélectionner un mois', 'error');
-        return;
-    }
-
-    if (!confirm(`Générer les bulletins de paie pour tous les employés actifs pour ${moisAnnee} ?`)) {
-        return;
-    }
-
-    showNotification('Génération des bulletins en cours...', 'info');
-
-    const formData = new FormData();
-    formData.append('mois_annee', moisAnnee);
-
-    fetch('?action=generer_tous_bulletins', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        hideNotification();
-        if (data.success) {
-            showNotification(`${data.count} bulletins générés sur ${data.total} employés`, 'success');
-        } else {
-            showNotification(data.message || 'Erreur lors de la génération des bulletins', 'error');
-        }
-    })
-    .catch(error => {
-        hideNotification();
-        console.error('Erreur:', error);
-        showNotification('Erreur lors de la génération des bulletins', 'error');
-    });
 }
 
 // Fonctions de génération de rapports

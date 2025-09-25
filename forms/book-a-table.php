@@ -105,7 +105,7 @@ if (file_exists($php_email_form_path)) {
         $mail->smtp = [
             'host' => 'smtp.gmail.com',
             'username' => 'mulhomabiala29@gmail.com',
-            'password' => 'khli pyzj ihte qdgu', // mot de passe d’application
+            'password' => ' ', // mot de passe d’application
             'port' => '587',
             'encryption' => 'tls'
         ];
