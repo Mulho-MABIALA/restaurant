@@ -1,4 +1,50 @@
 <?php
+// Gestion des erreurs pour AJAX
+if (isset($_GET['action']) || isset($_POST['ajaxAction'])) {
+    // Capturer toute sortie inattendue
+    ob_start();
+
+    ini_set('display_errors', 0);
+    error_reporting(E_ALL);
+
+    // Handler d'erreur pour AJAX
+    set_error_handler(function($errno, $errstr, $errfile, $errline) {
+        // Ignorer les warnings de conversion implicite (PHP 8.1+)
+        if (strpos($errstr, 'Implicit conversion') !== false) {
+            return false; // Laisser PHP gérer normalement
+        }
+
+        // Pour les erreurs graves uniquement
+        if ($errno === E_ERROR || $errno === E_USER_ERROR || $errno === E_RECOVERABLE_ERROR) {
+            ob_clean(); // Nettoyer le buffer
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => false,
+                'message' => 'Erreur PHP: ' . $errstr,
+                'file' => basename($errfile),
+                'line' => $errline
+            ]);
+            exit;
+        }
+
+        return false; // Laisser PHP gérer les autres erreurs normalement
+    });
+
+    register_shutdown_function(function() {
+        $error = error_get_last();
+        if ($error !== null && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+            ob_clean(); // Nettoyer le buffer
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => false,
+                'message' => 'Erreur fatale: ' . $error['message'],
+                'file' => basename($error['file']),
+                'line' => $error['line']
+            ]);
+        }
+    });
+}
+
 session_start();
 require_once '../config.php';
 require_once './permissions.php';
@@ -6,20 +52,41 @@ require_once 'phpqrcode/qrlib.php';
 require_once 'classes/PayrollCalculator.php';
 require_once 'classes/BulletinPDFGenerateur.php';
 
+// Fonction pour détecter si c'est une requête AJAX
+$isAjaxRequest = isset($_GET['action']) || isset($_POST['ajaxAction']);
+
 // Rediriger si l'admin n'est pas connecté
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    if ($isAjaxRequest) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Session expirée']);
+        exit;
+    }
     header('Location: login.php');
     exit;
 }
 
 // Vérifier que admin_id existe
 if (!isset($_SESSION['admin_id'])) {
+    if ($isAjaxRequest) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Session expirée']);
+        exit;
+    }
     header('Location: login.php');
     exit;
 }
 
 // Vérifier les permissions
-requireAccess($conn, $_SESSION['admin_id'], 'gestion_employes');
+if (!canAccess($conn, $_SESSION['admin_id'], 'gestion_employes')) {
+    if ($isAjaxRequest) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Accès refusé']);
+        exit;
+    }
+    header('Location: access_denied.php');
+    exit;
+}
     // GESTIONNAIRE D'EMPLOYÉS
     class EmployeeManager
     {
@@ -648,7 +715,7 @@ requireAccess($conn, $_SESSION['admin_id'], 'gestion_employes');
       private function handleDocumentUpload(string $fieldName, string $currentFile = null): string
 {
     if (!isset($_FILES[$fieldName]) || $_FILES[$fieldName]['error'] !== UPLOAD_ERR_OK) {
-        return $currentFile;
+        return $currentFile ?? '';
     }
 
     $upload_dir = 'uploads/documents/';
@@ -732,12 +799,11 @@ private function insertEmployee(array $data, string $photo_filename, string $cv_
 
     return $this->conn->lastInsertId();
 }
-
-  private function updateEmployeeData(int $employee_id, array $data, string $photo_filename): void
+ 
+private function updateEmployeeData(int $employee_id, array $data, string $photo_filename): void
 {
     $salaire = !empty($data['salaire']) ? (int) $data['salaire'] : null;
 
-    // AJOUTEZ LES COLONNES MANQUANTES DANS LA REQUÊTE
     $stmt = $this->conn->prepare("
         UPDATE employes
         SET nom = ?, prenom = ?, email = ?, telephone = ?, poste_id = ?, salaire = ?,
@@ -747,7 +813,6 @@ private function insertEmployee(array $data, string $photo_filename, string $cv_
             contact_urgence_nom = ?, contact_urgence_relation = ?, contact_urgence_telephone = ?,
             adresse = ?, num_secu = ?, num_identite = ?, type_identite = ?, situation_familiale = ?,
             nombre_enfants = ?, iban = ?, nom_banque = ?, titulaire_compte = ?, bic = ?,
-            niveau_etude = ?, langues = ?, competences = ?, formations = ?, experiences = ?,
             cv = ?, contrat = ?, piece_identite = ?, code_numerique = ?
         WHERE id = ?
     ");
@@ -782,16 +847,11 @@ private function insertEmployee(array $data, string $photo_filename, string $cv_
         $data['nom_banque'] ?? null,
         $data['titulaire_compte'] ?? null,
         $data['bic'] ?? null,
-        $data['niveau_etude'] ?? null,
-        $data['langues'] ?? null,
-        $data['competences'] ?? null,
-        $data['formations'] ?? null,
-        $data['experiences'] ?? null,
         $data['cv'] ?? null,
         $data['contrat'] ?? null,
         $data['piece_identite'] ?? null,
-        $data['code_numerique'] ?? null,  // AJOUTEZ CETTE LIGNE
-        $employee_id,
+        $data['code_numerique'] ?? null,
+        $employee_id
     ]);
 }
 
@@ -1661,19 +1721,15 @@ private function generateWorkforceReport(array $filters): array
                 echo json_encode(['success' => false, 'message' => $e->getMessage()]);
             }
         }
-    public function handleRequest(): void
+  public function handleRequest(): void
 {
+    // TOUJOURS définir le header JSON en premier
+    header('Content-Type: application/json');
+    
     $action = $_GET['action'] ?? $_POST['ajax_action'] ?? '';
 
     // Log de l'action demandée pour debug
     error_log("Action demandée: " . $action);
-
-    // Actions qui ne nécessitent pas de header JSON
-    $non_json_actions = ['generer_bulletin'];
-
-    if (!in_array($action, $non_json_actions)) {
-        header('Content-Type: application/json');
-    }
 
     try {
         switch ($action) {
@@ -1720,25 +1776,21 @@ private function generateWorkforceReport(array $filters): array
                 $this->getTodayAttendance();
                 break;
             default:
-                header('Content-Type: application/json');
                 echo json_encode([
                     'success' => false, 
-                    'message' => 'Action non reconnue: ' . $action,
-                    'debug' => ['action' => $action, 'get' => $_GET, 'post_keys' => array_keys($_POST)]
+                    'message' => 'Action non reconnue: ' . $action
                 ]);
         }
     } catch (Exception $e) {
         error_log("Erreur dans handleRequest pour action $action: " . $e->getMessage());
-        header('Content-Type: application/json');
         echo json_encode([
             'success' => false, 
-            'message' => 'Erreur serveur: ' . $e->getMessage(),
-            'action' => $action
+            'message' => 'Erreur serveur: ' . $e->getMessage()
         ]);
     }
     
     exit;
-    }
+}
 
         private function getTodayAttendance(): void
         {
@@ -1904,6 +1956,10 @@ public function verifierPrerequisPaie(int $employe_id): array
 }
    $apiHandler = new APIHandler($conn);
 if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
+    // Nettoyer le buffer de sortie si nécessaire
+    if (ob_get_level() > 0) {
+        ob_end_clean();
+    }
     $apiHandler->handleRequest();
     exit; // Important pour éviter l'affichage du HTML après une requête API
 }
@@ -1921,25 +1977,32 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
     <link rel="stylesheet" href="employe.css">
 </head>
 <body class="bg-gray-50 min-h-screen">
-    <!-- Navigation -->
-    <nav class="bg-white shadow-lg border-b border-gray-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <i class="fas fa-utensils text-orange-600 text-2xl mr-3"></i>
-                    <h1 class="text-xl font-bold text-gray-900">Gestion Restaurant</h1>
-                </div>
-                <div class="flex items-center space-x-4">
-                    <button onclick="openAddModal()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition duration-200">
-                        <i class="fas fa-plus mr-2"></i>Ajouter Employé
-                    </button>
+    <div class="flex h-screen overflow-hidden">
+        <!-- Sidebar -->
+        <?php include 'sidebar.php'; ?>
+
+        <!-- Contenu Principal -->
+        <div class="flex-1 overflow-y-auto">
+            <!-- Header avec bouton d'ajout -->
+            <div class="bg-white shadow-sm border-b border-gray-200">
+                <div class="px-8 py-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h1 class="text-3xl font-bold text-gray-900">
+                                <i class="fas fa-users mr-3 text-blue-600"></i>
+                                Gestion des Employés
+                            </h1>
+                            <p class="text-gray-600 mt-1">Gérez votre équipe et les informations RH</p>
+                        </div>
+                        <button onclick="openAddModal()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg transition duration-200 shadow-lg">
+                            <i class="fas fa-plus mr-2"></i>Ajouter Employé
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
-    </nav>
 
-    <!-- Statistiques Dashboard -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <!-- Statistiques Dashboard -->
+            <div class="px-8 py-6">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
             <!-- Employés Actifs -->
             <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale stat-card-actifs">
@@ -3175,44 +3238,65 @@ function editEmployee(id) {
     modal.classList.remove('hidden');
 }
 
-// Fonctions CRUD employés
 function saveEmployee(event) {
     event.preventDefault();
 
     const formData = new FormData(event.target);
     showNotification('Enregistrement en cours...', 'info');
 
-    const action = formData.get('ajaxAction') || 'add_employee';
+    const action = formData.get('ajax_action') || 'add_employee';
     const url = `${window.location.pathname}?action=${action}`;
+
+    console.log('URL appelée:', url); // Debug
+    console.log('Action:', action); // Debug
 
     fetch(url, {
         method: 'POST',
         body: formData
     })
     .then(response => {
+        console.log('Status:', response.status); // Debug
+        console.log('Content-Type:', response.headers.get('content-type')); // Debug
+        
+        // Vérifier si c'est du JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            return response.text().then(text => {
+                console.error('Réponse non-JSON reçue:', text.substring(0, 500));
+                throw new Error('Le serveur n\'a pas retourné du JSON');
+            });
+        }
+        
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         return response.json();
     })
     .then(data => {
+        console.log('Données reçues:', data); // Debug
         hideNotification();
+
         if (data.success) {
-            showNotification('Employé sauvegardé avec succès!', 'success');
+            // Construire le message avec le code numérique si disponible
+            let message = data.message || 'Employé sauvegardé avec succès!';
+            if (data.numeric_code) {
+                message += ` - Code numérique: ${data.numeric_code}`;
+            }
+            showNotification(message, 'success');
             closeModal();
             loadEmployees();
             loadStatistics();
+            setTimeout(hideNotification, 5000);
         } else {
             showNotification(data.message || 'Erreur lors de la sauvegarde', 'error');
         }
     })
     .catch(error => {
         hideNotification();
-        console.error('Erreur:', error);
-        showNotification('Erreur de communication avec le serveur', 'error');
+        console.error('Erreur complète:', error);
+        showNotification('Erreur: ' + error.message, 'error');
     });
 }
-
 function deleteEmployee(id) {
     if (confirm('Êtes-vous sûr de vouloir DÉSACTIVER cet employé?')) {
         fetch('?action=delete_employee', {
@@ -3888,5 +3972,8 @@ function exportReportToExcel() {
     showNotification('Export Excel en cours de développement', 'info');
 }
     </script>
+        </div> <!-- Fin div px-8 py-6 -->
+        </div> <!-- Fin flex-1 overflow-y-auto -->
+    </div> <!-- Fin flex h-screen -->
 </body>
 </html>

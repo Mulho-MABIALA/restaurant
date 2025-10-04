@@ -1,7 +1,8 @@
 <?php
 // admin_newsletter_compose.php
-require_once '../config.php';
 session_start();
+
+require_once '../config.php';
 
 // Rediriger si l'admin n'est pas connecté
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {

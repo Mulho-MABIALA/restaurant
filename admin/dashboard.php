@@ -1099,6 +1099,160 @@ if ($admin_id > 0) {
     </div>
 </div>
 
+                <!-- Section Statistiques Employés et Stock -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Statistiques Employés -->
+                    <div class="dashboard-card card-indigo">
+                        <div class="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-900">Employés Actifs</h3>
+                                <p class="text-sm text-gray-600 mt-1">Gestion du personnel</p>
+                            </div>
+                            <div class="icon-wrapper icon-indigo">
+                                <i class="fas fa-users"></i>
+                            </div>
+                        </div>
+                        <?php
+                        $stmt = $conn->query("SELECT COUNT(*) FROM employes WHERE statut = 'actif'");
+                        $total_employes = $stmt->fetchColumn();
+
+                        $stmt = $conn->query("SELECT COUNT(DISTINCT employe_id) FROM presences WHERE DATE(heure_arrivee) = CURDATE()");
+                        $presents_today = $stmt->fetchColumn();
+
+                        $taux_presence = $total_employes > 0 ? round(($presents_today / $total_employes) * 100, 1) : 0;
+                        ?>
+                        <div class="space-y-4">
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">Total employés</span>
+                                <span class="text-2xl font-bold text-gray-900"><?= $total_employes ?></span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">Présents aujourd'hui</span>
+                                <span class="text-2xl font-bold text-green-600"><?= $presents_today ?></span>
+                            </div>
+                            <div>
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-sm text-gray-600">Taux de présence</span>
+                                    <span class="text-sm font-semibold text-gray-900"><?= $taux_presence ?>%</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-3">
+                                    <div class="bg-gradient-to-r from-indigo-500 to-purple-600 h-3 rounded-full transition-all duration-500" style="width: <?= $taux_presence ?>%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stock et Alertes -->
+                    <div class="dashboard-card card-red">
+                        <div class="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-900">Stock & Alertes</h3>
+                                <p class="text-sm text-gray-600 mt-1">Gestion des stocks</p>
+                            </div>
+                            <div class="icon-wrapper icon-red">
+                                <i class="fas fa-box"></i>
+                            </div>
+                        </div>
+                        <?php
+                        $stmt = $conn->query("SELECT COUNT(*) FROM stocks");
+                        $total_articles = $stmt->fetchColumn();
+
+                        $stmt = $conn->query("SELECT COUNT(*) FROM stocks WHERE quantite_actuelle <= seuil_alerte");
+                        $stock_faible = $stmt->fetchColumn();
+
+                        $stmt = $conn->query("SELECT COUNT(*) FROM stocks WHERE quantite_actuelle = 0");
+                        $stock_vide = $stmt->fetchColumn();
+                        ?>
+                        <div class="space-y-4">
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">Total articles</span>
+                                <span class="text-2xl font-bold text-gray-900"><?= $total_articles ?></span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">Stock faible</span>
+                                <span class="text-2xl font-bold text-orange-600"><?= $stock_faible ?></span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">Rupture de stock</span>
+                                <span class="text-2xl font-bold text-red-600"><?= $stock_vide ?></span>
+                            </div>
+                            <?php if ($stock_faible > 0 || $stock_vide > 0): ?>
+                            <div class="bg-red-50 border-l-4 border-red-500 p-3 mt-4">
+                                <p class="text-sm text-red-700">
+                                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                                    Attention: <?= $stock_faible + $stock_vide ?> articles nécessitent un réapprovisionnement
+                                </p>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section Commandes Récentes Détaillées -->
+                <div class="dashboard-card card-blue">
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <h3 class="text-2xl font-bold text-gray-900">Commandes Récentes</h3>
+                            <p class="text-sm text-gray-600 mt-1">Dernières commandes du restaurant</p>
+                        </div>
+                        <a href="commandes.php" class="action-btn btn-blue">
+                            <i class="fas fa-eye mr-2"></i>Voir tout
+                        </a>
+                    </div>
+                    <?php
+                    $stmt = $conn->query("
+                        SELECT numero_commande, nom_client, total, statut, date_commande, mode_retrait
+                        FROM commandes
+                        ORDER BY date_commande DESC
+                        LIMIT 5
+                    ");
+                    $recent_commandes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                    ?>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">N° Commande</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Client</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Montant</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Mode</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Statut</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Date</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                <?php foreach ($recent_commandes as $cmd): ?>
+                                <tr class="hover:bg-gray-50 transition-colors">
+                                    <td class="px-4 py-3 font-medium text-gray-900"><?= htmlspecialchars($cmd['numero_commande']) ?></td>
+                                    <td class="px-4 py-3 text-gray-700"><?= htmlspecialchars($cmd['nom_client']) ?></td>
+                                    <td class="px-4 py-3 font-semibold text-green-600"><?= number_format($cmd['total']) ?> FCFA</td>
+                                    <td class="px-4 py-3">
+                                        <span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-700">
+                                            <?= htmlspecialchars($cmd['mode_retrait']) ?>
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <?php
+                                        $badge_colors = [
+                                            'En cours' => 'bg-yellow-100 text-yellow-800',
+                                            'Prête' => 'bg-blue-100 text-blue-800',
+                                            'Livrée' => 'bg-green-100 text-green-800',
+                                            'Annulée' => 'bg-red-100 text-red-800'
+                                        ];
+                                        $badge = $badge_colors[$cmd['statut']] ?? 'bg-gray-100 text-gray-800';
+                                        ?>
+                                        <span class="px-2 py-1 text-xs rounded-full <?= $badge ?>">
+                                            <?= htmlspecialchars($cmd['statut']) ?>
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3 text-sm text-gray-600"><?= date('d/m/Y H:i', strtotime($cmd['date_commande'])) ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
 <!-- ... code suivant ... -->
                 </div>
 

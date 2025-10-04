@@ -1,196 +1,304 @@
 <?php
+session_start();
+require_once '../config.php';
+
+// Activer l'affichage des erreurs
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-// Test de diagnostic complet
-$diagnostics = [];
-
-// 1. Test de la session
-session_start();
-$diagnostics['session'] = [
-    'status' => session_status() === PHP_SESSION_ACTIVE ? '✅ Active' : '❌ Inactive',
-    'id' => session_id(),
-    'admin_logged_in' => isset($_SESSION['admin_logged_in']) ? '✅ Oui' : '❌ Non',
-    'admin_id' => $_SESSION['admin_id'] ?? 'Non défini',
-    'admin_name' => $_SESSION['admin_name'] ?? 'Non défini',
-];
-
-// 2. Test de connexion à la base de données
-try {
-    require_once '../config.php';
-    $diagnostics['database'] = [
-        'status' => '✅ Connexion réussie',
-        'driver' => $conn->getAttribute(PDO::ATTR_DRIVER_NAME),
-    ];
-    
-    // Test de requête
-    $test_query = $conn->query("SELECT COUNT(*) FROM reservations");
-    $diagnostics['database']['test_query'] = '✅ Requête OK';
-    
-} catch (Exception $e) {
-    $diagnostics['database'] = [
-        'status' => '❌ Erreur',
-        'message' => $e->getMessage()
-    ];
-}
-
-// 3. Test des fichiers requis
-$required_files = [
-    '../config.php' => file_exists('../config.php'),
-    './permissions.php' => file_exists('./permissions.php'),
-    './sidebar.php' => file_exists('./sidebar.php'),
-];
-
-$diagnostics['files'] = [];
-foreach ($required_files as $file => $exists) {
-    $diagnostics['files'][$file] = $exists ? '✅ Existe' : '❌ Manquant';
-}
-
-// 4. Test des permissions PHP
-$diagnostics['php'] = [
-    'version' => phpversion(),
-    'pdo' => extension_loaded('pdo') ? '✅ OK' : '❌ Manquant',
-    'pdo_mysql' => extension_loaded('pdo_mysql') ? '✅ OK' : '❌ Manquant',
-    'session.save_path' => session_save_path(),
-    'upload_max_filesize' => ini_get('upload_max_filesize'),
-    'post_max_size' => ini_get('post_max_size'),
-];
-
-// 5. Test du serveur
-$diagnostics['server'] = [
-    'software' => $_SERVER['SERVER_SOFTWARE'] ?? 'Unknown',
-    'php_sapi' => php_sapi_name(),
-    'document_root' => $_SERVER['DOCUMENT_ROOT'] ?? 'Unknown',
-    'current_dir' => __DIR__,
-];
-
-// 6. Vérifier les erreurs dans les logs
-$diagnostics['errors'] = [
-    'display_errors' => ini_get('display_errors'),
-    'error_reporting' => error_reporting(),
-    'log_errors' => ini_get('log_errors'),
-    'error_log' => ini_get('error_log'),
-];
-?>
-
-<!DOCTYPE html>
-<html lang="fr">
+echo "<!DOCTYPE html>
+<html lang='fr'>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Diagnostic Système</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <meta charset='UTF-8'>
+    <title>Diagnostic Employé</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .section { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .success { color: green; }
+        .error { color: red; font-weight: bold; }
+        .warning { color: orange; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #4CAF50; color: white; }
+        code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+        .test-btn { background: #2196F3; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin: 5px; }
+        .test-btn:hover { background: #0b7dda; }
+    </style>
 </head>
-<body class="bg-gray-100 p-8">
-    <div class="max-w-6xl mx-auto">
-        <div class="bg-white rounded-2xl shadow-xl p-8 mb-6">
-            <div class="flex items-center mb-6">
-                <div class="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mr-4">
-                    <i class="fas fa-stethoscope text-white text-2xl"></i>
-                </div>
-                <div>
-                    <h1 class="text-3xl font-bold text-gray-900">Diagnostic Système</h1>
-                    <p class="text-gray-600">Vérification complète de votre installation</p>
-                </div>
-            </div>
+<body>
+    <h1>🔍 Diagnostic Système Employé</h1>";
 
-            <!-- SESSION -->
-            <div class="mb-8">
-                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
-                    <i class="fas fa-user-circle mr-2 text-blue-500"></i>
-                    État de la Session
-                </h2>
-                <div class="bg-gray-50 rounded-xl p-4">
-                    <?php foreach ($diagnostics['session'] as $key => $value): ?>
-                        <div class="flex justify-between py-2 border-b border-gray-200 last:border-0">
-                            <span class="font-semibold text-gray-700"><?= ucfirst(str_replace('_', ' ', $key)) ?>:</span>
-                            <span class="text-gray-900"><?= htmlspecialchars($value) ?></span>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
+// ====================
+// 1. TEST CONNEXION BASE DE DONNÉES
+// ====================
+echo "<div class='section'>
+    <h2>1. Test Connexion Base de Données</h2>";
 
-            <!-- DATABASE -->
-            <div class="mb-8">
-                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
-                    <i class="fas fa-database mr-2 text-green-500"></i>
-                    Base de données
-                </h2>
-                <div class="bg-gray-50 rounded-xl p-4">
-                    <?php foreach ($diagnostics['database'] as $key => $value): ?>
-                        <div class="flex justify-between py-2 border-b border-gray-200 last:border-0">
-                            <span class="font-semibold text-gray-700"><?= ucfirst(str_replace('_', ' ', $key)) ?>:</span>
-                            <span class="text-gray-900"><?= htmlspecialchars($value) ?></span>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
+try {
+    $conn->query("SELECT 1");
+    echo "<p class='success'>✅ Connexion à la base de données : OK</p>";
+    echo "<p>Base de données : <code>" . $conn->query("SELECT DATABASE()")->fetchColumn() . "</code></p>";
+} catch (PDOException $e) {
+    echo "<p class='error'>❌ Erreur de connexion : " . $e->getMessage() . "</p>";
+}
 
-            <!-- FILES -->
-            <div class="mb-8">
-                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
-                    <i class="fas fa-file-code mr-2 text-purple-500"></i>
-                    Fichiers requis
-                </h2>
-                <div class="bg-gray-50 rounded-xl p-4">
-                    <?php foreach ($diagnostics['files'] as $file => $status): ?>
-                        <div class="flex justify-between py-2 border-b border-gray-200 last:border-0">
-                            <span class="font-semibold text-gray-700"><?= htmlspecialchars($file) ?>:</span>
-                            <span class="text-gray-900"><?= $status ?></span>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
+echo "</div>";
 
-            <!-- PHP -->
-            <div class="mb-8">
-                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
-                    <i class="fab fa-php mr-2 text-indigo-500"></i>
-                    Configuration PHP
-                </h2>
-                <div class="bg-gray-50 rounded-xl p-4">
-                    <?php foreach ($diagnostics['php'] as $key => $value): ?>
-                        <div class="flex justify-between py-2 border-b border-gray-200 last:border-0">
-                            <span class="font-semibold text-gray-700"><?= htmlspecialchars($key) ?>:</span>
-                            <span class="text-gray-900"><?= htmlspecialchars($value) ?></span>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
+// ====================
+// 2. STRUCTURE DE LA TABLE
+// ====================
+echo "<div class='section'>
+    <h2>2. Structure de la table 'employes'</h2>";
 
-            <!-- SERVER -->
-            <div class="mb-8">
-                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
-                    <i class="fas fa-server mr-2 text-orange-500"></i>
-                    Serveur
-                </h2>
-                <div class="bg-gray-50 rounded-xl p-4">
-                    <?php foreach ($diagnostics['server'] as $key => $value): ?>
-                        <div class="flex justify-between py-2 border-b border-gray-200 last:border-0">
-                            <span class="font-semibold text-gray-700"><?= ucfirst(str_replace('_', ' ', $key)) ?>:</span>
-                            <span class="text-gray-900 break-all"><?= htmlspecialchars($value) ?></span>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
+try {
+    $stmt = $conn->query("DESCRIBE employes");
+    $columns = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    echo "<p class='success'>✅ Table 'employes' trouvée avec " . count($columns) . " colonnes</p>";
+    echo "<table>
+        <tr>
+            <th>Nom Colonne</th>
+            <th>Type</th>
+            <th>Null</th>
+            <th>Clé</th>
+            <th>Défaut</th>
+        </tr>";
+    
+    $column_names = [];
+    foreach ($columns as $col) {
+        echo "<tr>
+            <td><strong>{$col['Field']}</strong></td>
+            <td>{$col['Type']}</td>
+            <td>{$col['Null']}</td>
+            <td>{$col['Key']}</td>
+            <td>{$col['Default']}</td>
+        </tr>";
+        $column_names[] = $col['Field'];
+    }
+    echo "</table>";
+    
+    // Vérifier les colonnes problématiques
+    $problematic_columns = ['niveau_etude', 'langues', 'competences', 'formations', 'experiences'];
+    $found_problematic = array_intersect($problematic_columns, $column_names);
+    
+    if (!empty($found_problematic)) {
+        echo "<p class='warning'>⚠️ Colonnes obsolètes trouvées : " . implode(', ', $found_problematic) . "</p>";
+    } else {
+        echo "<p class='success'>✅ Aucune colonne obsolète trouvée</p>";
+    }
+    
+} catch (PDOException $e) {
+    echo "<p class='error'>❌ Erreur : " . $e->getMessage() . "</p>";
+}
 
-            <!-- Test de connexion au dashboard -->
-            <div class="mt-8 p-4 bg-blue-50 border-2 border-blue-200 rounded-xl">
-                <h3 class="font-bold text-blue-900 mb-2">Actions de test</h3>
-                <div class="space-y-2">
-                    <a href="dashboard.php" class="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors">
-                        <i class="fas fa-tachometer-alt mr-2"></i>Accéder au Dashboard
-                    </a>
-                    <a href="reservations.php" class="inline-block bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors ml-2">
-                        <i class="fas fa-calendar-check mr-2"></i>Accéder aux Réservations
-                    </a>
-                    <button onclick="location.reload()" class="inline-block bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors ml-2">
-                        <i class="fas fa-sync-alt mr-2"></i>Rafraîchir
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-</body>
-</html>
+echo "</div>";
+
+// ====================
+// 3. TEST REQUÊTE INSERT
+// ====================
+echo "<div class='section'>
+    <h2>3. Test Requête INSERT (Simulation)</h2>";
+
+$test_data = [
+    'nom' => 'TEST',
+    'prenom' => 'Diagnostic',
+    'email' => 'test_' . time() . '@diagnostic.com',
+    'telephone' => '771234567',
+    'poste_id' => 1,
+    'salaire' => 150000,
+    'date_embauche' => '2025-01-01',
+    'heure_debut' => '08:00:00',
+    'heure_fin' => '17:00:00',
+    'photo' => 'default-avatar.png',
+    'is_admin' => 0,
+    'statut' => 'actif',
+    'date_naissance' => '1990-01-01',
+    'lieu_naissance' => 'Dakar',
+    'nationalite' => 'Sénégalaise',
+    'sexe' => 'M',
+    'contact_urgence_nom' => 'Contact Test',
+    'contact_urgence_relation' => 'Famille',
+    'contact_urgence_telephone' => '771234567',
+    'adresse' => 'Adresse test',
+    'num_secu' => '123456789012345',
+    'num_identite' => 'CNI123456',
+    'type_identite' => 'CNI',
+    'situation_familiale' => 'celibataire',
+    'nombre_enfants' => 0,
+    'iban' => 'SN12 3456 7890 1234 5678 90',
+    'nom_banque' => 'Banque Test',
+    'titulaire_compte' => 'TEST Diagnostic',
+    'bic' => 'TESTSNDA',
+    'cv' => null,
+    'contrat' => null,
+    'piece_identite' => null,
+    'code_numerique' => null
+];
+
+try {
+    $sql = "INSERT INTO employes (
+        nom, prenom, email, telephone, poste_id, salaire, date_embauche,
+        heure_debut, heure_fin, photo, is_admin, statut,
+        date_naissance, lieu_naissance, nationalite, sexe,
+        contact_urgence_nom, contact_urgence_relation, contact_urgence_telephone,
+        adresse, num_secu, num_identite, type_identite, situation_familiale,
+        nombre_enfants, iban, nom_banque, titulaire_compte, bic,
+        cv, contrat, piece_identite, code_numerique
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    
+    echo "<p><strong>Requête SQL :</strong></p>";
+    echo "<code style='display:block; white-space: pre-wrap; background: #f4f4f4; padding: 10px;'>$sql</code>";
+    
+    $stmt = $conn->prepare($sql);
+    
+    $params = array_values($test_data);
+    
+    echo "<p><strong>Nombre de paramètres :</strong> " . count($params) . "</p>";
+    echo "<p><strong>Nombre de placeholders (?) :</strong> " . substr_count($sql, '?') . "</p>";
+    
+    if (count($params) === substr_count($sql, '?')) {
+        echo "<p class='success'>✅ Nombre de paramètres correct</p>";
+        
+        // Test d'exécution
+        $stmt->execute($params);
+        $test_id = $conn->lastInsertId();
+        
+        echo "<p class='success'>✅ INSERT réussi ! ID généré : $test_id</p>";
+        
+        // Supprimer l'enregistrement de test
+        $conn->prepare("DELETE FROM employes WHERE id = ?")->execute([$test_id]);
+        echo "<p class='success'>✅ Enregistrement de test supprimé</p>";
+        
+    } else {
+        echo "<p class='error'>❌ ERREUR : Nombre de paramètres incorrect !</p>";
+        echo "<p>Attendu : " . substr_count($sql, '?') . " | Reçu : " . count($params) . "</p>";
+    }
+    
+} catch (PDOException $e) {
+    echo "<p class='error'>❌ Erreur SQL : " . $e->getMessage() . "</p>";
+    echo "<p class='error'>Code erreur : " . $e->getCode() . "</p>";
+}
+
+echo "</div>";
+
+// ====================
+// 4. VÉRIFIER LES POSTES
+// ====================
+echo "<div class='section'>
+    <h2>4. Vérification des Postes</h2>";
+
+try {
+    $stmt = $conn->query("SELECT COUNT(*) as total FROM postes WHERE actif = 1");
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($result['total'] > 0) {
+        echo "<p class='success'>✅ {$result['total']} poste(s) actif(s) trouvé(s)</p>";
+        
+        $stmt = $conn->query("SELECT id, nom, type_contrat, salaire FROM postes WHERE actif = 1 LIMIT 5");
+        echo "<table>
+            <tr><th>ID</th><th>Nom</th><th>Type Contrat</th><th>Salaire</th></tr>";
+        while ($poste = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            echo "<tr>
+                <td>{$poste['id']}</td>
+                <td>{$poste['nom']}</td>
+                <td>{$poste['type_contrat']}</td>
+                <td>" . number_format($poste['salaire'], 0, ',', ' ') . " FCFA</td>
+            </tr>";
+        }
+        echo "</table>";
+    } else {
+        echo "<p class='error'>❌ Aucun poste actif trouvé ! Créez au moins un poste.</p>";
+    }
+    
+} catch (PDOException $e) {
+    echo "<p class='error'>❌ Erreur : " . $e->getMessage() . "</p>";
+}
+
+echo "</div>";
+
+// ====================
+// 5. TEST COMPLET AVEC FORMULAIRE
+// ====================
+echo "<div class='section'>
+    <h2>5. Test avec Formulaire Réel</h2>";
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['test_insert'])) {
+    echo "<h3>Résultat du test d'insertion :</h3>";
+    
+    $test_employee = [
+        'nom' => $_POST['nom'] ?? 'TEST',
+        'prenom' => $_POST['prenom'] ?? 'Utilisateur',
+        'email' => 'test_' . time() . '@example.com',
+        'telephone' => '771234567',
+        'poste_id' => $_POST['poste_id'] ?? 1,
+        'salaire' => 150000,
+        'date_embauche' => date('Y-m-d'),
+        'heure_debut' => '08:00:00',
+        'heure_fin' => '17:00:00',
+        'photo' => 'default-avatar.png',
+        'is_admin' => 0,
+        'statut' => 'actif'
+    ];
+    
+    try {
+        $stmt = $conn->prepare("INSERT INTO employes (nom, prenom, email, telephone, poste_id, salaire, date_embauche, heure_debut, heure_fin, photo, is_admin, statut) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        
+        $stmt->execute([
+            $test_employee['nom'],
+            $test_employee['prenom'],
+            $test_employee['email'],
+            $test_employee['telephone'],
+            $test_employee['poste_id'],
+            $test_employee['salaire'],
+            $test_employee['date_embauche'],
+            $test_employee['heure_debut'],
+            $test_employee['heure_fin'],
+            $test_employee['photo'],
+            $test_employee['is_admin'],
+            $test_employee['statut']
+        ]);
+        
+        $new_id = $conn->lastInsertId();
+        echo "<p class='success'>✅ Employé test créé avec succès ! ID: $new_id</p>";
+        
+        // Supprimer
+        $conn->prepare("DELETE FROM employes WHERE id = ?")->execute([$new_id]);
+        echo "<p class='success'>✅ Employé test supprimé</p>";
+        
+    } catch (PDOException $e) {
+        echo "<p class='error'>❌ Erreur : " . $e->getMessage() . "</p>";
+    }
+}
+
+echo "<form method='POST'>
+    <h3>Test d'insertion manuel :</h3>
+    <p>
+        <label>Nom : <input type='text' name='nom' value='TEST' required></label><br>
+        <label>Prénom : <input type='text' name='prenom' value='Diagnostic' required></label><br>
+        <label>Poste ID : <input type='number' name='poste_id' value='1' required></label><br>
+        <button type='submit' name='test_insert' class='test-btn'>Tester l'insertion</button>
+    </p>
+</form>";
+
+echo "</div>";
+
+// ====================
+// 6. RECOMMANDATIONS
+// ====================
+echo "<div class='section'>
+    <h2>6. Recommandations</h2>
+    <ul>
+        <li>Vérifiez que votre fichier <code>gestion_employe.php</code> utilise exactement les mêmes noms de colonnes que la table</li>
+        <li>Assurez-vous que le nombre de paramètres dans <code>insertEmployee()</code> correspond au nombre de colonnes</li>
+        <li>Vérifiez les logs d'erreur PHP dans : <code>" . ini_get('error_log') . "</code></li>
+        <li>Consultez la console du navigateur (F12) pour voir les erreurs JavaScript</li>
+    </ul>
+</div>";
+
+echo "<div class='section'>
+    <h2>Actions Rapides</h2>
+    <a href='gestion_employe.php' class='test-btn'>Retour à Gestion Employés</a>
+</div>";
+
+echo "</body></html>";
+?>

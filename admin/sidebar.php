@@ -344,6 +344,47 @@ if ($adminId && isset($conn)) {
             background-size: 200% 100%;
             animation: shimmer 3s linear infinite;
         }
+
+        /* Sidebar Collapsed State */
+        #sidebar {
+            width: 320px;
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        #sidebar.sidebar-collapsed {
+            width: 80px;
+        }
+
+        #sidebar.sidebar-collapsed .sidebar-expanded-only {
+            display: none;
+        }
+
+        #sidebar.sidebar-collapsed .nav-item .flex-1,
+        #sidebar.sidebar-collapsed .nav-item .fa-chevron-right,
+        #sidebar.sidebar-collapsed .nav-item .fa-chevron-down {
+            display: none;
+        }
+
+        #sidebar.sidebar-collapsed .nav-item {
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        #sidebar.sidebar-collapsed .section-title {
+            display: none;
+        }
+
+        #sidebar.sidebar-collapsed .dropdown-item {
+            display: none;
+        }
+
+        .toggle-icon {
+            transition: transform 0.3s ease;
+        }
+
+        #sidebar.sidebar-collapsed .toggle-icon {
+            transform: rotate(180deg);
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200 min-h-screen">
@@ -357,18 +398,19 @@ if ($adminId && isset($conn)) {
 </button>
 
 <!-- Sidebar -->
-<aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-80 sidebar-gradient shadow-2xl sidebar-mobile lg:relative lg:translate-x-0 animate-slide-in-left">
-    
+<aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-80 sidebar-gradient shadow-2xl sidebar-mobile lg:relative lg:translate-x-0 animate-slide-in-left transition-all duration-300">
+
     <!-- Floating decorative elements -->
-    <div class="floating-elements">
+    <div class="floating-elements sidebar-expanded-only">
         <i class="fas fa-leaf text-primary text-lg"></i>
         <i class="fas fa-utensils text-accent text-sm"></i>
         <i class="fas fa-star text-primary-light text-xs"></i>
     </div>
-    
+
     <!-- Header -->
     <div class="flex items-center justify-between p-6 border-b border-gray-700/40 animate-fade-in-up">
-        <div class="flex items-center space-x-4 group cursor-pointer">
+        <!-- Logo et titre (masqué en mode réduit) -->
+        <div class="flex items-center space-x-4 group cursor-pointer sidebar-expanded-only">
             <div class="relative">
                 <div class="w-14 h-14 bg-gradient-to-br from-primary via-primary-light to-accent rounded-2xl flex items-center justify-center logo-glow shadow-lg">
                     <i class="fas fa-leaf text-white text-2xl"></i>
@@ -382,7 +424,13 @@ if ($adminId && isset($conn)) {
                 <p class="text-sm text-gray-400 font-medium opacity-90">Restaurant Admin</p>
             </div>
         </div>
-        
+
+        <!-- Bouton Toggle Desktop (toujours visible) -->
+        <button id="toggle-sidebar" class="hidden lg:block text-gray-400 hover:text-white p-2.5 rounded-xl hover:bg-surface-light transition-all duration-300 hover:scale-105">
+            <i class="fas fa-angles-left text-xl toggle-icon"></i>
+        </button>
+
+        <!-- Bouton fermer Mobile -->
         <button id="close-sidebar" class="lg:hidden text-gray-400 hover:text-white p-2.5 rounded-xl hover:bg-surface-light transition-all duration-300 hover:scale-105">
             <i class="fas fa-times text-xl"></i>
         </button>
@@ -390,13 +438,6 @@ if ($adminId && isset($conn)) {
     
     <!-- Navigation -->
     <nav class="px-4 py-6 space-y-6 overflow-y-auto h-full scrollbar-thin">
-
-        <!-- Debug Info (à retirer après test) -->
-        <?php if (true): // Debug temporaire ?>
-        <div class="bg-yellow-900/20 border border-yellow-500/50 rounded-lg p-3 text-xs text-yellow-200 mb-4">
-            <strong>Debug:</strong> AdminID = <?= $adminId ?? 'NULL' ?> | Role = <?= $userRole ?? 'NULL' ?>
-        </div>
-        <?php endif; ?>
 
         <!-- Dashboard Section -->
         <?php if (canAccess($conn, $adminId, 'dashboard')): ?>
@@ -901,21 +942,40 @@ if ($adminId && isset($conn)) {
     const mobileMenuBtn = document.getElementById('mobile-menu-btn');
     const closeSidebar = document.getElementById('close-sidebar');
     const mobileOverlay = document.getElementById('mobile-overlay');
-    
+    const toggleSidebarBtn = document.getElementById('toggle-sidebar');
+
     function toggleSidebar() {
         sidebar.classList.toggle('open');
         mobileOverlay.classList.toggle('opacity-0');
         mobileOverlay.classList.toggle('pointer-events-none');
         document.body.classList.toggle('overflow-hidden');
-        
+
         const btn = mobileMenuBtn.querySelector('i');
         btn.style.transform = sidebar.classList.contains('open') ? 'rotate(90deg)' : 'rotate(0deg)';
     }
-    
+
+    // Desktop toggle functionality
+    function toggleSidebarCollapse() {
+        sidebar.classList.toggle('sidebar-collapsed');
+
+        // Save state to localStorage
+        const isCollapsed = sidebar.classList.contains('sidebar-collapsed');
+        localStorage.setItem('sidebarCollapsed', isCollapsed ? 'true' : 'false');
+    }
+
+    // Load saved state on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        const savedState = localStorage.getItem('sidebarCollapsed');
+        if (savedState === 'true') {
+            sidebar.classList.add('sidebar-collapsed');
+        }
+    });
+
     mobileMenuBtn.addEventListener('click', toggleSidebar);
     closeSidebar.addEventListener('click', toggleSidebar);
     mobileOverlay.addEventListener('click', toggleSidebar);
-    
+    toggleSidebarBtn.addEventListener('click', toggleSidebarCollapse);
+
     window.addEventListener('resize', function() {
         if (window.innerWidth >= 1024) {
             sidebar.classList.remove('open');
@@ -925,7 +985,7 @@ if ($adminId && isset($conn)) {
             btn.style.transform = 'rotate(0deg)';
         }
     });
-    
+
     document.addEventListener('DOMContentLoaded', function() {
         const navItems = document.querySelectorAll('.nav-item');
         navItems.forEach((item, index) => {
@@ -933,15 +993,15 @@ if ($adminId && isset($conn)) {
             item.classList.add('animate-fade-in-up');
         });
     });
-    
+
     const navIcons = document.querySelectorAll('.nav-icon');
     navIcons.forEach(icon => {
         const navItem = icon.closest('.nav-item');
-        
+
         navItem.addEventListener('mouseenter', () => {
             icon.style.filter = 'drop-shadow(0 0 12px currentColor)';
         });
-        
+
         navItem.addEventListener('mouseleave', () => {
             if (!navItem.classList.contains('active-nav')) {
                 icon.style.filter = '';
