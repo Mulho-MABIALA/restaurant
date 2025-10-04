@@ -1,6 +1,13 @@
 <?php
-require_once '../config.php'; // Connexion via PDO depuis config.php
-
+session_start();
+require_once '../config.php'; 
+require_once './permissions.php';
+  // Vérifie l'accès admin
+    if (! isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+        header('Location: login.php');
+        exit;
+    }
+    requireAccess($conn, $_SESSION['admin_id'], 'categories_plats');
 // Connexion avec gestion d'erreur PDO (au cas où config.php n'initialise pas `$conn`)
 try {
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);

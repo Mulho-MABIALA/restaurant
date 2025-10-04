@@ -1,7 +1,7 @@
 <?php
 session_start();
 require_once '../../config.php';
-
+require_once '../permissions.php';
 // Activer les erreurs pour debug (à retirer en production)
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -11,7 +11,7 @@ if (!isset($_SESSION['admin_id'])) {
     header('Location: login.php');
     exit();
 }
-
+requireAccess($conn, $_SESSION['admin_id'], 'annonces');
 // Configuration du dossier d'upload
 $uploadDir = '../../uploads/annonces/';
 if (!is_dir($uploadDir)) {

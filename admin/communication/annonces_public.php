@@ -1,6 +1,7 @@
 <?php
-require_once '../../config.php'; // ⚠️ ton config.php doit créer $conn = new PDO(...)
-
+require_once '../../config.php'; 
+require_once '../admin/permissions.php';// ⚠️ ton config.php doit créer $conn = new PDO(...)
+requireAccess($conn, $_SESSION['admin_id'], 'annoces_public');
 $message = "";
 
 // Traitement des actions

@@ -1,13 +1,14 @@
 <?php
-    require_once '../config.php';
     session_start();
+    require_once '../config.php';
+    require_once './permissions.php';
 
     // Vérifie l'accès admin
     if (! isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
         header('Location: login.php');
         exit;
     }
-
+requireAccess($conn, $_SESSION['admin_id'], 'commandes');
     // Fonction pour échapper les valeurs
     function e($value)
     {

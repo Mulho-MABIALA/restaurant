@@ -1,0 +1,2584 @@
+Structure du dossier
+Le num‚ro de s‚rie du volume est 768D-B3F7
+C:.
+³   .env
+³   .env.example
+³   .gitignore
+³   .htaccess
+³   ajouter_au_panier.php
+³   cart.js
+³   cartes.php
+³   change_language.php
+³   check_plats_availability.php
+³   commander.php
+³   composer.json
+³   composer.lock
+³   config.php
+³   confirmation.php
+³   CORRECTIONS_SECURITE.md
+³   cron_email_queue.php
+³   email.php
+³   evenements.php
+³   gallery_public.php
+³   get_horaires_jour.php
+³   get_menu.php
+³   index.php
+³   menu.php
+³   newsletter_subscribe.php
+³   README.md
+³   RESUME_CORRECTIONS.txt
+³   security_helpers.php
+³   structure.txt
+³   track.php
+³   traitement_avis.php
+³   unsubscribe.php
+³   verifier_disponibilite.php
+³   ·_FAIRE_URGENT.txt
+³   
+ÃÄÄÄ.github
+³       copilot-instructions.md
+³       
+ÃÄÄÄ.vscode
+³       keybindings.json
+³       settings.json
+³       
+ÃÄÄÄadmin
+³   ³   .env
+³   ³   .htaccess
+³   ³   admin_evenements.php
+³   ³   admin_gestion.php
+³   ³   admin_newsletter.php
+³   ³   admin_newsletter_analytics.php
+³   ³   admin_newsletter_campaigns.php
+³   ³   admin_newsletter_compose.php
+³   ³   admin_newsletter_delete.php
+³   ³   admin_newsletter_import.php
+³   ³   admin_newsletter_templates.php
+³   ³   admin_newsletter_toggle.php
+³   ³   admin_supprimer.php
+³   ³   ajouter_admin.php
+³   ³   ajouter_plat.php
+³   ³   ajouter_stock.php
+³   ³   avis_admin.php
+³   ³   badgeuse.php
+³   ³   bg.jpg
+³   ³   categories_plats.php
+³   ³   changer_email.php
+³   ³   check_new_orders.php
+³   ³   check_new_reservations.php
+³   ³   check_notifications.php
+³   ³   check_open.php
+³   ³   check_permission.php
+³   ³   commandes.php
+³   ³   config_security.php
+³   ³   dashboard.php
+³   ³   debug_simple.php
+³   ³   edit.php
+³   ³   employe.css
+³   ³   employee_details.php
+³   ³   exportp_pdf.php
+³   ³   export_commandes.php
+³   ³   export_pdf.php
+³   ³   export_plats_pdf.php
+³   ³   form.php
+³   ³   gallery.php
+³   ³   gallery_data.json
+³   ³   generate_badge.php
+³   ³   generer_bulletin.php
+³   ³   gestion_contenu.php
+³   ³   gestion_employe.php
+³   ³   gestion_paie.php
+³   ³   gestion_plats.php
+³   ³   gestion_postes.php
+³   ³   gestion_stock.php
+³   ³   get_avis.php
+³   ³   get_presence_history.php
+³   ³   get_reservation.php
+³   ³   horaires.php
+³   ³   login.php
+³   ³   logout.php
+³   ³   manifest.json
+³   ³   mark_notifications_read.php
+³   ³   mark_presence.php
+³   ³   modifier_categorie.php
+³   ³   modifier_plat_ajax.php
+³   ³   notifications.php
+³   ³   php migrate_passwords.php
+³   ³   planification_horaires.php
+³   ³   presence.php
+³   ³   preview_email.php
+³   ³   profile.php
+³   ³   qaliqr.php
+³   ³   recu.php
+³   ³   reservations.php
+³   ³   send_newsletter.php
+³   ³   settings.php
+³   ³   sidebar.php
+³   ³   statistiques.php
+³   ³   stats.php
+³   ³   supprimer_plat.php
+³   ³   test.php
+³   ³   toggle_plat_status.php
+³   ³   update_commande.php
+³   ³   update_page.php
+³   ³   update_reservation.php
+³   ³   update_statut.php
+³   ³   upload_profile_photo.php
+³   ³   voir_commande.php
+³   ³   
+³   ÃÄÄÄajax
+³   ³       delete_subscriber.php
+³   ³       preview_email.php
+³   ³       send_newsletter.php
+³   ³       toggle_subscriber.php
+³   ³       upload_subscribers.php
+³   ³       
+³   ÃÄÄÄapi
+³   ³       finance.php
+³   ³       
+³   ÃÄÄÄassets
+³   ³   ÀÄÄÄimg
+³   ³       ÀÄÄÄgallery
+³   ³           ³   6895e6c0103e8.png
+³   ³           ³   689a69b19a569.jpeg
+³   ³           ³   689a6acfe1b7d.jpg
+³   ³           ³   689a6af58816e.jpeg
+³   ³           ³   689a6dcc2ad48.jpg
+³   ³           ³   
+³   ³           ÃÄÄÄcss
+³   ³           ³       admin.css
+³   ³           ³       
+³   ³           ÃÄÄÄjs
+³   ³           ³       admin.js
+³   ³           ³       subscribers.js
+³   ³           ³       
+³   ³           ÀÄÄÄuploads
+³   ÃÄÄÄbulletins
+³   ÃÄÄÄclasses
+³   ³       AlerteManager.php
+³   ³       AuditManager.php
+³   ³       AvancesManager.php
+³   ³       BulletinPDFGenerateur.php
+³   ³       BulletinUtilities.php
+³   ³       CongesManager.php
+³   ³       CoutManager.php
+³   ³       EmployeesManager.php
+³   ³       FacturationManager.php
+³   ³       FinanceAPI.php
+³   ³       FinanceHelper.php
+³   ³       FinanceManager.php
+³   ³       PaieManager.php
+³   ³       PayrollCalculator.php
+³   ³       PermissionManager.php
+³   ³       PostesManager.php
+³   ³       PresenceManager.php
+³   ³       PrevisionManager.php
+³   ³       PrimesManager.php
+³   ³       RapportManager.php
+³   ³       SecurityManager.php
+³   ³       TresorerieManager.php
+³   ³       
+³   ÃÄÄÄcommunication
+³   ³   ³   add_procedure.php
+³   ³   ³   annonces.php
+³   ³   ³   annonces_public.php
+³   ³   ³   api_annonces.php
+³   ³   ³   category_manage.php
+³   ³   ³   check_new_messages.php
+³   ³   ³   cleanup_annonces.php
+³   ³   ³   export_incidents.php
+³   ³   ³   export_pdf.php
+³   ³   ³   fonctions_annonces.php
+³   ³   ³   get_incident_details.php
+³   ³   ³   incidents.php
+³   ³   ³   mark_as_read.php
+³   ³   ³   preview.php
+³   ³   ³   procedures.php
+³   ³   ³   styles.css
+³   ³   ³   update_activity.php
+³   ³   ³   voir_annonce.php
+³   ³   ³   
+³   ³   ÀÄÄÄuploads
+³   ³       ³   688e9f7d98655.png
+³   ³       ³   688ea02a06e3d.jpg
+³   ³       ³   688ea0fef0beb.jpg
+³   ³       ³   688ea28acfa24.jpg
+³   ³       ³   6892701b50fd1.jpeg
+³   ³       ³   
+³   ³       ÀÄÄÄprocedures
+³   ÃÄÄÄfinances
+³   ³       dashboard.php
+³   ³       diagnostic.php
+³   ³       facturation.php
+³   ³       rapports.php
+³   ³       tresorerie.php
+³   ³       
+³   ÃÄÄÄincludes
+³   ³       email_analytics.php
+³   ³       email_queue.php
+³   ³       newsletter_functions.php
+³   ³       
+³   ÃÄÄÄpermissions
+³   ³       gestion_droits.php
+³   ³       get_permissions.php
+³   ³       
+³   ÃÄÄÄphpqrcode
+³   ³   ³   CHANGELOG
+³   ³   ³   employee_10_20250820001090.png-errors.txt
+³   ³   ³   employee_10_20250822001073.png-errors.txt
+³   ³   ³   employee_11_20250820001165.png-errors.txt
+³   ³   ³   employee_11_20250822001162.png-errors.txt
+³   ³   ³   employee_12_20250822001215.png-errors.txt
+³   ³   ³   employee_13_20250822001339.png-errors.txt
+³   ³   ³   employee_13_20250822001381.png-errors.txt
+³   ³   ³   employee_14_20250822001431.png-errors.txt
+³   ³   ³   employee_14_20250822001441.png-errors.txt
+³   ³   ³   employee_15_20250823001590.png-errors.txt
+³   ³   ³   employee_16_20250823001640.png-errors.txt
+³   ³   ³   employee_17_20250823001788.png-errors.txt
+³   ³   ³   employee_18_20250823001874.png-errors.txt
+³   ³   ³   employee_19_20250823001982.png-errors.txt
+³   ³   ³   employee_20_20250824002057.png-errors.txt
+³   ³   ³   employee_21_20250825002184.png-errors.txt
+³   ³   ³   employee_22_20250908002252.png-errors.txt
+³   ³   ³   employee_23_20250910002379.png-errors.txt
+³   ³   ³   employee_24_20250911002459.png-errors.txt
+³   ³   ³   employee_25_20250911002533.png-errors.txt
+³   ³   ³   employee_26_202509110026601.png-errors.txt
+³   ³   ³   employee_27_202509110027894.png-errors.txt
+³   ³   ³   employee_28_202509110028382.png-errors.txt
+³   ³   ³   employee_29_20250911191342964000295009.png-errors.txt
+³   ³   ³   employee_30_35761.png-errors.txt
+³   ³   ³   employee_31_74370.png-errors.txt
+³   ³   ³   employee_32_22350.png-errors.txt
+³   ³   ³   employee_7_20250817000751.png-errors.txt
+³   ³   ³   employee_8_20250819000838.png-errors.txt
+³   ³   ³   employee_9_20250820000935.png-errors.txt
+³   ³   ³   index.php
+³   ³   ³   INSTALL
+³   ³   ³   LICENSE
+³   ³   ³   phpqrcode.php
+³   ³   ³   qrbitstream.php
+³   ³   ³   qrconfig.php
+³   ³   ³   qrconst.php
+³   ³   ³   qrencode.php
+³   ³   ³   qrimage.php
+³   ³   ³   qrinput.php
+³   ³   ³   qrlib.php
+³   ³   ³   qrmask.php
+³   ³   ³   qrrscode.php
+³   ³   ³   qrspec.php
+³   ³   ³   qrsplit.php
+³   ³   ³   qrtools.php
+³   ³   ³   qr_employee_1.png-errors.txt
+³   ³   ³   qr_employee_2.png-errors.txt
+³   ³   ³   qr_employee_5.png-errors.txt
+³   ³   ³   qr_employee_6.png-errors.txt
+³   ³   ³   README
+³   ³   ³   test_qr_hq.png-errors.txt
+³   ³   ³   VERSION
+³   ³   ³   
+³   ³   ÃÄÄÄbindings
+³   ³   ³   ÀÄÄÄtcpdf
+³   ³   ³           qrcode.php
+³   ³   ³           
+³   ³   ÃÄÄÄcache
+³   ³   ³   ³   frame_1.dat
+³   ³   ³   ³   frame_1.png
+³   ³   ³   ³   frame_10.dat
+³   ³   ³   ³   frame_10.png
+³   ³   ³   ³   frame_11.dat
+³   ³   ³   ³   frame_11.png
+³   ³   ³   ³   frame_12.dat
+³   ³   ³   ³   frame_12.png
+³   ³   ³   ³   frame_13.dat
+³   ³   ³   ³   frame_13.png
+³   ³   ³   ³   frame_14.dat
+³   ³   ³   ³   frame_14.png
+³   ³   ³   ³   frame_15.dat
+³   ³   ³   ³   frame_15.png
+³   ³   ³   ³   frame_16.dat
+³   ³   ³   ³   frame_16.png
+³   ³   ³   ³   frame_17.dat
+³   ³   ³   ³   frame_17.png
+³   ³   ³   ³   frame_18.dat
+³   ³   ³   ³   frame_18.png
+³   ³   ³   ³   frame_19.dat
+³   ³   ³   ³   frame_19.png
+³   ³   ³   ³   frame_2.dat
+³   ³   ³   ³   frame_2.png
+³   ³   ³   ³   frame_20.dat
+³   ³   ³   ³   frame_20.png
+³   ³   ³   ³   frame_21.dat
+³   ³   ³   ³   frame_21.png
+³   ³   ³   ³   frame_22.dat
+³   ³   ³   ³   frame_22.png
+³   ³   ³   ³   frame_23.dat
+³   ³   ³   ³   frame_23.png
+³   ³   ³   ³   frame_24.dat
+³   ³   ³   ³   frame_24.png
+³   ³   ³   ³   frame_25.dat
+³   ³   ³   ³   frame_25.png
+³   ³   ³   ³   frame_26.dat
+³   ³   ³   ³   frame_26.png
+³   ³   ³   ³   frame_27.dat
+³   ³   ³   ³   frame_27.png
+³   ³   ³   ³   frame_28.dat
+³   ³   ³   ³   frame_28.png
+³   ³   ³   ³   frame_29.dat
+³   ³   ³   ³   frame_29.png
+³   ³   ³   ³   frame_3.dat
+³   ³   ³   ³   frame_3.png
+³   ³   ³   ³   frame_30.dat
+³   ³   ³   ³   frame_30.png
+³   ³   ³   ³   frame_31.dat
+³   ³   ³   ³   frame_31.png
+³   ³   ³   ³   frame_32.dat
+³   ³   ³   ³   frame_32.png
+³   ³   ³   ³   frame_33.dat
+³   ³   ³   ³   frame_33.png
+³   ³   ³   ³   frame_34.dat
+³   ³   ³   ³   frame_34.png
+³   ³   ³   ³   frame_35.dat
+³   ³   ³   ³   frame_35.png
+³   ³   ³   ³   frame_36.dat
+³   ³   ³   ³   frame_36.png
+³   ³   ³   ³   frame_37.dat
+³   ³   ³   ³   frame_37.png
+³   ³   ³   ³   frame_38.dat
+³   ³   ³   ³   frame_38.png
+³   ³   ³   ³   frame_39.dat
+³   ³   ³   ³   frame_39.png
+³   ³   ³   ³   frame_4.dat
+³   ³   ³   ³   frame_4.png
+³   ³   ³   ³   frame_40.dat
+³   ³   ³   ³   frame_40.png
+³   ³   ³   ³   frame_5.dat
+³   ³   ³   ³   frame_5.png
+³   ³   ³   ³   frame_6.dat
+³   ³   ³   ³   frame_6.png
+³   ³   ³   ³   frame_7.dat
+³   ³   ³   ³   frame_7.png
+³   ³   ³   ³   frame_8.dat
+³   ³   ³   ³   frame_8.png
+³   ³   ³   ³   frame_9.dat
+³   ³   ³   ³   frame_9.png
+³   ³   ³   ³   
+³   ³   ³   ÃÄÄÄmask_0
+³   ³   ³   ³       mask_101_0.dat
+³   ³   ³   ³       mask_105_0.dat
+³   ³   ³   ³       mask_109_0.dat
+³   ³   ³   ³       mask_113_0.dat
+³   ³   ³   ³       mask_117_0.dat
+³   ³   ³   ³       mask_121_0.dat
+³   ³   ³   ³       mask_125_0.dat
+³   ³   ³   ³       mask_129_0.dat
+³   ³   ³   ³       mask_133_0.dat
+³   ³   ³   ³       mask_137_0.dat
+³   ³   ³   ³       mask_141_0.dat
+³   ³   ³   ³       mask_145_0.dat
+³   ³   ³   ³       mask_149_0.dat
+³   ³   ³   ³       mask_153_0.dat
+³   ³   ³   ³       mask_157_0.dat
+³   ³   ³   ³       mask_161_0.dat
+³   ³   ³   ³       mask_165_0.dat
+³   ³   ³   ³       mask_169_0.dat
+³   ³   ³   ³       mask_173_0.dat
+³   ³   ³   ³       mask_177_0.dat
+³   ³   ³   ³       mask_21_0.dat
+³   ³   ³   ³       mask_25_0.dat
+³   ³   ³   ³       mask_29_0.dat
+³   ³   ³   ³       mask_33_0.dat
+³   ³   ³   ³       mask_37_0.dat
+³   ³   ³   ³       mask_41_0.dat
+³   ³   ³   ³       mask_45_0.dat
+³   ³   ³   ³       mask_49_0.dat
+³   ³   ³   ³       mask_53_0.dat
+³   ³   ³   ³       mask_57_0.dat
+³   ³   ³   ³       mask_61_0.dat
+³   ³   ³   ³       mask_65_0.dat
+³   ³   ³   ³       mask_69_0.dat
+³   ³   ³   ³       mask_73_0.dat
+³   ³   ³   ³       mask_77_0.dat
+³   ³   ³   ³       mask_81_0.dat
+³   ³   ³   ³       mask_85_0.dat
+³   ³   ³   ³       mask_89_0.dat
+³   ³   ³   ³       mask_93_0.dat
+³   ³   ³   ³       mask_97_0.dat
+³   ³   ³   ³       
+³   ³   ³   ÃÄÄÄmask_1
+³   ³   ³   ³       mask_101_1.dat
+³   ³   ³   ³       mask_105_1.dat
+³   ³   ³   ³       mask_109_1.dat
+³   ³   ³   ³       mask_113_1.dat
+³   ³   ³   ³       mask_117_1.dat
+³   ³   ³   ³       mask_121_1.dat
+³   ³   ³   ³       mask_125_1.dat
+³   ³   ³   ³       mask_129_1.dat
+³   ³   ³   ³       mask_133_1.dat
+³   ³   ³   ³       mask_137_1.dat
+³   ³   ³   ³       mask_141_1.dat
+³   ³   ³   ³       mask_145_1.dat
+³   ³   ³   ³       mask_149_1.dat
+³   ³   ³   ³       mask_153_1.dat
+³   ³   ³   ³       mask_157_1.dat
+³   ³   ³   ³       mask_161_1.dat
+³   ³   ³   ³       mask_165_1.dat
+³   ³   ³   ³       mask_169_1.dat
+³   ³   ³   ³       mask_173_1.dat
+³   ³   ³   ³       mask_177_1.dat
+³   ³   ³   ³       mask_21_1.dat
+³   ³   ³   ³       mask_25_1.dat
+³   ³   ³   ³       mask_29_1.dat
+³   ³   ³   ³       mask_33_1.dat
+³   ³   ³   ³       mask_37_1.dat
+³   ³   ³   ³       mask_41_1.dat
+³   ³   ³   ³       mask_45_1.dat
+³   ³   ³   ³       mask_49_1.dat
+³   ³   ³   ³       mask_53_1.dat
+³   ³   ³   ³       mask_57_1.dat
+³   ³   ³   ³       mask_61_1.dat
+³   ³   ³   ³       mask_65_1.dat
+³   ³   ³   ³       mask_69_1.dat
+³   ³   ³   ³       mask_73_1.dat
+³   ³   ³   ³       mask_77_1.dat
+³   ³   ³   ³       mask_81_1.dat
+³   ³   ³   ³       mask_85_1.dat
+³   ³   ³   ³       mask_89_1.dat
+³   ³   ³   ³       mask_93_1.dat
+³   ³   ³   ³       mask_97_1.dat
+³   ³   ³   ³       
+³   ³   ³   ÃÄÄÄmask_2
+³   ³   ³   ³       mask_101_2.dat
+³   ³   ³   ³       mask_105_2.dat
+³   ³   ³   ³       mask_109_2.dat
+³   ³   ³   ³       mask_113_2.dat
+³   ³   ³   ³       mask_117_2.dat
+³   ³   ³   ³       mask_121_2.dat
+³   ³   ³   ³       mask_125_2.dat
+³   ³   ³   ³       mask_129_2.dat
+³   ³   ³   ³       mask_133_2.dat
+³   ³   ³   ³       mask_137_2.dat
+³   ³   ³   ³       mask_141_2.dat
+³   ³   ³   ³       mask_145_2.dat
+³   ³   ³   ³       mask_149_2.dat
+³   ³   ³   ³       mask_153_2.dat
+³   ³   ³   ³       mask_157_2.dat
+³   ³   ³   ³       mask_161_2.dat
+³   ³   ³   ³       mask_165_2.dat
+³   ³   ³   ³       mask_169_2.dat
+³   ³   ³   ³       mask_173_2.dat
+³   ³   ³   ³       mask_177_2.dat
+³   ³   ³   ³       mask_21_2.dat
+³   ³   ³   ³       mask_25_2.dat
+³   ³   ³   ³       mask_29_2.dat
+³   ³   ³   ³       mask_33_2.dat
+³   ³   ³   ³       mask_37_2.dat
+³   ³   ³   ³       mask_41_2.dat
+³   ³   ³   ³       mask_45_2.dat
+³   ³   ³   ³       mask_49_2.dat
+³   ³   ³   ³       mask_53_2.dat
+³   ³   ³   ³       mask_57_2.dat
+³   ³   ³   ³       mask_61_2.dat
+³   ³   ³   ³       mask_65_2.dat
+³   ³   ³   ³       mask_69_2.dat
+³   ³   ³   ³       mask_73_2.dat
+³   ³   ³   ³       mask_77_2.dat
+³   ³   ³   ³       mask_81_2.dat
+³   ³   ³   ³       mask_85_2.dat
+³   ³   ³   ³       mask_89_2.dat
+³   ³   ³   ³       mask_93_2.dat
+³   ³   ³   ³       mask_97_2.dat
+³   ³   ³   ³       
+³   ³   ³   ÃÄÄÄmask_3
+³   ³   ³   ³       mask_101_3.dat
+³   ³   ³   ³       mask_105_3.dat
+³   ³   ³   ³       mask_109_3.dat
+³   ³   ³   ³       mask_113_3.dat
+³   ³   ³   ³       mask_117_3.dat
+³   ³   ³   ³       mask_121_3.dat
+³   ³   ³   ³       mask_125_3.dat
+³   ³   ³   ³       mask_129_3.dat
+³   ³   ³   ³       mask_133_3.dat
+³   ³   ³   ³       mask_137_3.dat
+³   ³   ³   ³       mask_141_3.dat
+³   ³   ³   ³       mask_145_3.dat
+³   ³   ³   ³       mask_149_3.dat
+³   ³   ³   ³       mask_153_3.dat
+³   ³   ³   ³       mask_157_3.dat
+³   ³   ³   ³       mask_161_3.dat
+³   ³   ³   ³       mask_165_3.dat
+³   ³   ³   ³       mask_169_3.dat
+³   ³   ³   ³       mask_173_3.dat
+³   ³   ³   ³       mask_177_3.dat
+³   ³   ³   ³       mask_21_3.dat
+³   ³   ³   ³       mask_25_3.dat
+³   ³   ³   ³       mask_29_3.dat
+³   ³   ³   ³       mask_33_3.dat
+³   ³   ³   ³       mask_37_3.dat
+³   ³   ³   ³       mask_41_3.dat
+³   ³   ³   ³       mask_45_3.dat
+³   ³   ³   ³       mask_49_3.dat
+³   ³   ³   ³       mask_53_3.dat
+³   ³   ³   ³       mask_57_3.dat
+³   ³   ³   ³       mask_61_3.dat
+³   ³   ³   ³       mask_65_3.dat
+³   ³   ³   ³       mask_69_3.dat
+³   ³   ³   ³       mask_73_3.dat
+³   ³   ³   ³       mask_77_3.dat
+³   ³   ³   ³       mask_81_3.dat
+³   ³   ³   ³       mask_85_3.dat
+³   ³   ³   ³       mask_89_3.dat
+³   ³   ³   ³       mask_93_3.dat
+³   ³   ³   ³       mask_97_3.dat
+³   ³   ³   ³       
+³   ³   ³   ÃÄÄÄmask_4
+³   ³   ³   ³       mask_101_4.dat
+³   ³   ³   ³       mask_105_4.dat
+³   ³   ³   ³       mask_109_4.dat
+³   ³   ³   ³       mask_113_4.dat
+³   ³   ³   ³       mask_117_4.dat
+³   ³   ³   ³       mask_121_4.dat
+³   ³   ³   ³       mask_125_4.dat
+³   ³   ³   ³       mask_129_4.dat
+³   ³   ³   ³       mask_133_4.dat
+³   ³   ³   ³       mask_137_4.dat
+³   ³   ³   ³       mask_141_4.dat
+³   ³   ³   ³       mask_145_4.dat
+³   ³   ³   ³       mask_149_4.dat
+³   ³   ³   ³       mask_153_4.dat
+³   ³   ³   ³       mask_157_4.dat
+³   ³   ³   ³       mask_161_4.dat
+³   ³   ³   ³       mask_165_4.dat
+³   ³   ³   ³       mask_169_4.dat
+³   ³   ³   ³       mask_173_4.dat
+³   ³   ³   ³       mask_177_4.dat
+³   ³   ³   ³       mask_21_4.dat
+³   ³   ³   ³       mask_25_4.dat
+³   ³   ³   ³       mask_29_4.dat
+³   ³   ³   ³       mask_33_4.dat
+³   ³   ³   ³       mask_37_4.dat
+³   ³   ³   ³       mask_41_4.dat
+³   ³   ³   ³       mask_45_4.dat
+³   ³   ³   ³       mask_49_4.dat
+³   ³   ³   ³       mask_53_4.dat
+³   ³   ³   ³       mask_57_4.dat
+³   ³   ³   ³       mask_61_4.dat
+³   ³   ³   ³       mask_65_4.dat
+³   ³   ³   ³       mask_69_4.dat
+³   ³   ³   ³       mask_73_4.dat
+³   ³   ³   ³       mask_77_4.dat
+³   ³   ³   ³       mask_81_4.dat
+³   ³   ³   ³       mask_85_4.dat
+³   ³   ³   ³       mask_89_4.dat
+³   ³   ³   ³       mask_93_4.dat
+³   ³   ³   ³       mask_97_4.dat
+³   ³   ³   ³       
+³   ³   ³   ÃÄÄÄmask_5
+³   ³   ³   ³       mask_101_5.dat
+³   ³   ³   ³       mask_105_5.dat
+³   ³   ³   ³       mask_109_5.dat
+³   ³   ³   ³       mask_113_5.dat
+³   ³   ³   ³       mask_117_5.dat
+³   ³   ³   ³       mask_121_5.dat
+³   ³   ³   ³       mask_125_5.dat
+³   ³   ³   ³       mask_129_5.dat
+³   ³   ³   ³       mask_133_5.dat
+³   ³   ³   ³       mask_137_5.dat
+³   ³   ³   ³       mask_141_5.dat
+³   ³   ³   ³       mask_145_5.dat
+³   ³   ³   ³       mask_149_5.dat
+³   ³   ³   ³       mask_153_5.dat
+³   ³   ³   ³       mask_157_5.dat
+³   ³   ³   ³       mask_161_5.dat
+³   ³   ³   ³       mask_165_5.dat
+³   ³   ³   ³       mask_169_5.dat
+³   ³   ³   ³       mask_173_5.dat
+³   ³   ³   ³       mask_177_5.dat
+³   ³   ³   ³       mask_21_5.dat
+³   ³   ³   ³       mask_25_5.dat
+³   ³   ³   ³       mask_29_5.dat
+³   ³   ³   ³       mask_33_5.dat
+³   ³   ³   ³       mask_37_5.dat
+³   ³   ³   ³       mask_41_5.dat
+³   ³   ³   ³       mask_45_5.dat
+³   ³   ³   ³       mask_49_5.dat
+³   ³   ³   ³       mask_53_5.dat
+³   ³   ³   ³       mask_57_5.dat
+³   ³   ³   ³       mask_61_5.dat
+³   ³   ³   ³       mask_65_5.dat
+³   ³   ³   ³       mask_69_5.dat
+³   ³   ³   ³       mask_73_5.dat
+³   ³   ³   ³       mask_77_5.dat
+³   ³   ³   ³       mask_81_5.dat
+³   ³   ³   ³       mask_85_5.dat
+³   ³   ³   ³       mask_89_5.dat
+³   ³   ³   ³       mask_93_5.dat
+³   ³   ³   ³       mask_97_5.dat
+³   ³   ³   ³       
+³   ³   ³   ÃÄÄÄmask_6
+³   ³   ³   ³       mask_101_6.dat
+³   ³   ³   ³       mask_105_6.dat
+³   ³   ³   ³       mask_109_6.dat
+³   ³   ³   ³       mask_113_6.dat
+³   ³   ³   ³       mask_117_6.dat
+³   ³   ³   ³       mask_121_6.dat
+³   ³   ³   ³       mask_125_6.dat
+³   ³   ³   ³       mask_129_6.dat
+³   ³   ³   ³       mask_133_6.dat
+³   ³   ³   ³       mask_137_6.dat
+³   ³   ³   ³       mask_141_6.dat
+³   ³   ³   ³       mask_145_6.dat
+³   ³   ³   ³       mask_149_6.dat
+³   ³   ³   ³       mask_153_6.dat
+³   ³   ³   ³       mask_157_6.dat
+³   ³   ³   ³       mask_161_6.dat
+³   ³   ³   ³       mask_165_6.dat
+³   ³   ³   ³       mask_169_6.dat
+³   ³   ³   ³       mask_173_6.dat
+³   ³   ³   ³       mask_177_6.dat
+³   ³   ³   ³       mask_21_6.dat
+³   ³   ³   ³       mask_25_6.dat
+³   ³   ³   ³       mask_29_6.dat
+³   ³   ³   ³       mask_33_6.dat
+³   ³   ³   ³       mask_37_6.dat
+³   ³   ³   ³       mask_41_6.dat
+³   ³   ³   ³       mask_45_6.dat
+³   ³   ³   ³       mask_49_6.dat
+³   ³   ³   ³       mask_53_6.dat
+³   ³   ³   ³       mask_57_6.dat
+³   ³   ³   ³       mask_61_6.dat
+³   ³   ³   ³       mask_65_6.dat
+³   ³   ³   ³       mask_69_6.dat
+³   ³   ³   ³       mask_73_6.dat
+³   ³   ³   ³       mask_77_6.dat
+³   ³   ³   ³       mask_81_6.dat
+³   ³   ³   ³       mask_85_6.dat
+³   ³   ³   ³       mask_89_6.dat
+³   ³   ³   ³       mask_93_6.dat
+³   ³   ³   ³       mask_97_6.dat
+³   ³   ³   ³       
+³   ³   ³   ÀÄÄÄmask_7
+³   ³   ³           mask_101_7.dat
+³   ³   ³           mask_105_7.dat
+³   ³   ³           mask_109_7.dat
+³   ³   ³           mask_113_7.dat
+³   ³   ³           mask_117_7.dat
+³   ³   ³           mask_121_7.dat
+³   ³   ³           mask_125_7.dat
+³   ³   ³           mask_129_7.dat
+³   ³   ³           mask_133_7.dat
+³   ³   ³           mask_137_7.dat
+³   ³   ³           mask_141_7.dat
+³   ³   ³           mask_145_7.dat
+³   ³   ³           mask_149_7.dat
+³   ³   ³           mask_153_7.dat
+³   ³   ³           mask_157_7.dat
+³   ³   ³           mask_161_7.dat
+³   ³   ³           mask_165_7.dat
+³   ³   ³           mask_169_7.dat
+³   ³   ³           mask_173_7.dat
+³   ³   ³           mask_177_7.dat
+³   ³   ³           mask_21_7.dat
+³   ³   ³           mask_25_7.dat
+³   ³   ³           mask_29_7.dat
+³   ³   ³           mask_33_7.dat
+³   ³   ³           mask_37_7.dat
+³   ³   ³           mask_41_7.dat
+³   ³   ³           mask_45_7.dat
+³   ³   ³           mask_49_7.dat
+³   ³   ³           mask_53_7.dat
+³   ³   ³           mask_57_7.dat
+³   ³   ³           mask_61_7.dat
+³   ³   ³           mask_65_7.dat
+³   ³   ³           mask_69_7.dat
+³   ³   ³           mask_73_7.dat
+³   ³   ³           mask_77_7.dat
+³   ³   ³           mask_81_7.dat
+³   ³   ³           mask_85_7.dat
+³   ³   ³           mask_89_7.dat
+³   ³   ³           mask_93_7.dat
+³   ³   ³           mask_97_7.dat
+³   ³   ³           
+³   ³   ÀÄÄÄtools
+³   ³           merge.bat
+³   ³           merge.php
+³   ³           merge.sh
+³   ³           merged_config.php
+³   ³           merged_header.php
+³   ³           
+³   ÃÄÄÄqrcodes
+³   ³       employee_10_20250820001090.png
+³   ³       employee_10_20250822001073.png
+³   ³       employee_11_20250820001165.png
+³   ³       employee_11_20250822001162.png
+³   ³       employee_12_20250822001215.png
+³   ³       employee_13_20250822001339.png
+³   ³       employee_13_20250822001381.png
+³   ³       employee_14_20250822001431.png
+³   ³       employee_14_20250822001441.png
+³   ³       employee_15_20250823001590.png
+³   ³       employee_16_20250823001640.png
+³   ³       employee_17_20250823001788.png
+³   ³       employee_18_20250823001874.png
+³   ³       employee_19_20250823001982.png
+³   ³       employee_20_20250824002057.png
+³   ³       employee_21_20250825002184.png
+³   ³       employee_22_20250908002252.png
+³   ³       employee_23_20250910002379.png
+³   ³       employee_24_20250911002459.png
+³   ³       employee_25_20250911002533.png
+³   ³       employee_26_202509110026601.png
+³   ³       employee_27_202509110027894.png
+³   ³       employee_28_202509110028382.png
+³   ³       employee_29_20250911191342964000295009.png
+³   ³       employee_30_35761.png
+³   ³       employee_31_74370.png
+³   ³       employee_32_22350.png
+³   ³       employee_7_20250817000751.png
+³   ³       employee_8_20250819000838.png
+³   ³       employee_9_20250820000935.png
+³   ³       qr_employee_1.png
+³   ³       qr_employee_2.png
+³   ³       qr_employee_3.png
+³   ³       qr_employee_4.png
+³   ³       qr_employee_5.png
+³   ³       qr_employee_6.png
+³   ³       
+³   ÃÄÄÄtemplates
+³   ³       basic_template.html
+³   ³       corporate_template.html
+³   ³       modern_template.html
+³   ³       
+³   ÃÄÄÄtest_qrcodes
+³   ³       hq_test_qr_hq_200px.png
+³   ³       hq_test_qr_hq_300px.png
+³   ³       hq_test_qr_hq_400px.png
+³   ³       hq_test_qr_hq_500px.png
+³   ³       test_qr_hq.png
+³   ³       
+³   ÃÄÄÄuploads
+³   ³   ³   1280c4877f794c023ca501704a5dfe0a.jpg
+³   ³   ³   301de6294a78932494c142ec45f6dbe0.jpg
+³   ³   ³   395ff7b7e566092d4c185cb6eda6c8bc.jpg
+³   ³   ³   3fb7720a0d77ab7c0ea0843a5b6b0054.jpg
+³   ³   ³   40481cf08caae437c16e79b533e93655.jpg
+³   ³   ³   4514a9e3948995903d48b2e9ea634c57.png
+³   ³   ³   5848bc69d748aafb9c4c4d013438c7c1.jpg
+³   ³   ³   62da622051364c8227a40ce18b50bf58.jpg
+³   ³   ³   72a19c7f10b210ff06ffd896fcf9c23c.jpg
+³   ³   ³   78e5566481c16c797b899e437e0b1652.jpg
+³   ³   ³   90debde002015179b5240ef4bb9aa74d.jpg
+³   ³   ³   98fd3b2cbdf0528bcd3d76ce721a872b.jpg
+³   ³   ³   9a4dbd408a063cb63b408261ccb10f86.jpg
+³   ³   ³   a07eabb43b09806fda2e81c806be0001.jpg
+³   ³   ³   a63a94295c1444a332ae649869b47d7b.jpg
+³   ³   ³   d061bbab4d33b4160427f7aeb53c37c1.jpeg
+³   ³   ³   d12298ceb715af9c390ed8a7db03862e.png
+³   ³   ³   edd2f858ed477f85e56b19e2952ca7ec.jpg
+³   ³   ³   plat_6878db52c7d26.png
+³   ³   ³   plat_6878dbb59bb4e.png
+³   ³   ³   
+³   ³   ÃÄÄÄdocuments
+³   ³   ³       68c48b7dcaa44_cv.pdf
+³   ³   ³       68c4906715a1c_cv.pdf
+³   ³   ³       68c4906715dc2_contrat.pdf
+³   ³   ³       68c49067162f6_piece_identite.pdf
+³   ³   ³       68c492eaadedf_cv.pdf
+³   ³   ³       68c492eaae234_contrat.pdf
+³   ³   ³       68c492eaae5ab_piece_identite.pdf
+³   ³   ³       68c5463acb70c_cv.pdf
+³   ³   ³       68c5463acc17e_contrat.pdf
+³   ³   ³       68c5463accc4d_piece_identite.pdf
+³   ³   ³       68c54b861c273_cv.pdf
+³   ³   ³       68c54b861cfc7_contrat.pdf
+³   ³   ³       68c54b861dbc8_piece_identite.pdf
+³   ³   ³       68c5b16beddbf_cv.pdf
+³   ³   ³       68c5b16bee961_contrat.pdf
+³   ³   ³       68c5b16bef060_piece_identite.pdf
+³   ³   ³       
+³   ³   ÃÄÄÄevenements
+³   ³   ³       event_68bee558af46f1.08136749.jpg
+³   ³   ³       
+³   ³   ÃÄÄÄincidents
+³   ³   ³       1755080034_Tiramisu (1).jpeg
+³   ³   ³       1755561332_IMG-20240129-WA0002.jpg
+³   ³   ³       1755562181_IMG-20240117-WA0007.jpg
+³   ³   ³       
+³   ³   ÃÄÄÄphotos
+³   ³   ³       689f3ab91f6fd.jpg
+³   ³   ³       689f4061bb30b.jpg
+³   ³   ³       68a04d084ab61.jpg
+³   ³   ³       68a1d9cee168e.jpg
+³   ³   ³       68a1e571d0b24.jpg
+³   ³   ³       68a1e57c2643e.jpg
+³   ³   ³       68a3b9e1e9ba5.jpg
+³   ³   ³       68a504f1e56be.jpg
+³   ³   ³       68a5d1284a293.jpg
+³   ³   ³       68a5f03445aca.jpg
+³   ³   ³       68a5f077664d7.jpg
+³   ³   ³       68a7b6a56eb3c.jpg
+³   ³   ³       68a8fb10a8abf.jpg
+³   ³   ³       68a90c4a41662.jpg
+³   ³   ³       68a90f7e0323e.png
+³   ³   ³       68ac83f004b9f.jpg
+³   ³   ³       68c1f07dedafd.jpg
+³   ³   ³       68c3191085375.jpg
+³   ³   ³       68c49067151b8.png
+³   ³   ³       68c492eaad6f8.png
+³   ³   ³       68d82d428ec79.jpg
+³   ³   ³       68d82d440d805.jpg
+³   ³   ³       68d82d44450b7.jpg
+³   ³   ³       68d82d44854dd.jpg
+³   ³   ³       68d82d44ac2fb.jpg
+³   ³   ³       68d82d452bf6b.jpg
+³   ³   ³       68d82d456c426.jpg
+³   ³   ³       68d82d45adf65.jpg
+³   ³   ³       68d82d45e7f9e.jpg
+³   ³   ³       68d82d462299a.jpg
+³   ³   ³       68d82d4652f11.jpg
+³   ³   ³       
+³   ³   ÀÄÄÄprofiles
+³   ³           admin_11_1754841531.jpeg
+³   ³           admin_11_1754841542.png
+³   ³           admin_11_1754841579.jpeg
+³   ³           admin_11_1754841771.png
+³   ³           admin_11_1754841838.png
+³   ³           
+³   ÀÄÄÄviews
+³       ÀÄÄÄpaie
+³               index.php
+³               
+ÃÄÄÄapi
+³       finance.php
+³       
+ÃÄÄÄassets
+³   ÃÄÄÄcss
+³   ³       main.css
+³   ³       
+³   ÃÄÄÄimg
+³   ³       about-2.jpg
+³   ³       apropos.jpg
+³   ³       events-1.jpg
+³   ³       events-2.jpg
+³   ³       events-3.jpg
+³   ³       events-4.jpg
+³   ³       logo.jpg
+³   ³       MENU-FARID-FR.pdf
+³   ³       reservation.jpg
+³   ³       slider1.jpg
+³   ³       slider2.jpg
+³   ³       slider3.jpg
+³   ³       stats-bg.jpg
+³   ³       team-shape.svg
+³   ³       
+³   ÃÄÄÄjs
+³   ³       main.js
+³   ³       
+³   ÃÄÄÄscss
+³   ³       Readme.txt
+³   ³       
+³   ÀÄÄÄvendor
+³       ÃÄÄÄaos
+³       ³       aos.cjs.js
+³       ³       aos.css
+³       ³       aos.esm.js
+³       ³       aos.js
+³       ³       aos.js.map
+³       ³       
+³       ÃÄÄÄbootstrap
+³       ³   ÃÄÄÄcss
+³       ³   ³       bootstrap-grid.css
+³       ³   ³       bootstrap-grid.css.map
+³       ³   ³       bootstrap-grid.min.css
+³       ³   ³       bootstrap-grid.min.css.map
+³       ³   ³       bootstrap-grid.rtl.css
+³       ³   ³       bootstrap-grid.rtl.css.map
+³       ³   ³       bootstrap-grid.rtl.min.css
+³       ³   ³       bootstrap-grid.rtl.min.css.map
+³       ³   ³       bootstrap-reboot.css
+³       ³   ³       bootstrap-reboot.css.map
+³       ³   ³       bootstrap-reboot.min.css
+³       ³   ³       bootstrap-reboot.min.css.map
+³       ³   ³       bootstrap-reboot.rtl.css
+³       ³   ³       bootstrap-reboot.rtl.css.map
+³       ³   ³       bootstrap-reboot.rtl.min.css
+³       ³   ³       bootstrap-reboot.rtl.min.css.map
+³       ³   ³       bootstrap-utilities.css
+³       ³   ³       bootstrap-utilities.css.map
+³       ³   ³       bootstrap-utilities.min.css
+³       ³   ³       bootstrap-utilities.min.css.map
+³       ³   ³       bootstrap-utilities.rtl.css
+³       ³   ³       bootstrap-utilities.rtl.css.map
+³       ³   ³       bootstrap-utilities.rtl.min.css
+³       ³   ³       bootstrap-utilities.rtl.min.css.map
+³       ³   ³       bootstrap.css
+³       ³   ³       bootstrap.css.map
+³       ³   ³       bootstrap.min.css
+³       ³   ³       bootstrap.min.css.map
+³       ³   ³       bootstrap.rtl.css
+³       ³   ³       bootstrap.rtl.css.map
+³       ³   ³       bootstrap.rtl.min.css
+³       ³   ³       bootstrap.rtl.min.css.map
+³       ³   ³       prb.txt
+³       ³   ³       
+³       ³   ÀÄÄÄjs
+³       ³           bootstrap.bundle.js
+³       ³           bootstrap.bundle.js.map
+³       ³           bootstrap.bundle.min.js
+³       ³           bootstrap.bundle.min.js.map
+³       ³           bootstrap.esm.js
+³       ³           bootstrap.esm.js.map
+³       ³           bootstrap.esm.min.js
+³       ³           bootstrap.esm.min.js.map
+³       ³           bootstrap.js
+³       ³           bootstrap.js.map
+³       ³           bootstrap.min.js
+³       ³           bootstrap.min.js.map
+³       ³           
+³       ÃÄÄÄbootstrap-icons
+³       ³   ³   bootstrap-icons.css
+³       ³   ³   bootstrap-icons.json
+³       ³   ³   bootstrap-icons.min.css
+³       ³   ³   bootstrap-icons.scss
+³       ³   ³   
+³       ³   ÀÄÄÄfonts
+³       ³           bootstrap-icons.woff
+³       ³           bootstrap-icons.woff2
+³       ³           
+³       ÃÄÄÄdompdf
+³       ³   ³   AUTHORS.md
+³       ³   ³   autoload.inc.php
+³       ³   ³   LICENSE.LGPL
+³       ³   ³   README.md
+³       ³   ³   VERSION
+³       ³   ³   
+³       ³   ÀÄÄÄvendor
+³       ³       ³   autoload.php
+³       ³       ³   
+³       ³       ÃÄÄÄcomposer
+³       ³       ³       autoload_classmap.php
+³       ³       ³       autoload_namespaces.php
+³       ³       ³       autoload_psr4.php
+³       ³       ³       autoload_real.php
+³       ³       ³       autoload_static.php
+³       ³       ³       ClassLoader.php
+³       ³       ³       installed.json
+³       ³       ³       installed.php
+³       ³       ³       InstalledVersions.php
+³       ³       ³       LICENSE
+³       ³       ³       platform_check.php
+³       ³       ³       
+³       ³       ÃÄÄÄdompdf
+³       ³       ³   ÃÄÄÄdompdf
+³       ³       ³   ³   ³   AUTHORS.md
+³       ³       ³   ³   ³   composer.json
+³       ³       ³   ³   ³   LICENSE.LGPL
+³       ³       ³   ³   ³   phpunit.xml
+³       ³       ³   ³   ³   README.md
+³       ³       ³   ³   ³   VERSION
+³       ³       ³   ³   ³   
+³       ³       ³   ³   ÃÄÄÄlib
+³       ³       ³   ³   ³   ³   Cpdf.php
+³       ³       ³   ³   ³   ³   
+³       ³       ³   ³   ³   ÃÄÄÄfonts
+³       ³       ³   ³   ³   ³       Courier-Bold.afm
+³       ³       ³   ³   ³   ³       Courier-BoldOblique.afm
+³       ³       ³   ³   ³   ³       Courier-Oblique.afm
+³       ³       ³   ³   ³   ³       Courier.afm
+³       ³       ³   ³   ³   ³       DejaVuSans-Bold.ttf
+³       ³       ³   ³   ³   ³       DejaVuSans-Bold.ufm
+³       ³       ³   ³   ³   ³       DejaVuSans-BoldOblique.ttf
+³       ³       ³   ³   ³   ³       DejaVuSans-BoldOblique.ufm
+³       ³       ³   ³   ³   ³       DejaVuSans-Oblique.ttf
+³       ³       ³   ³   ³   ³       DejaVuSans-Oblique.ufm
+³       ³       ³   ³   ³   ³       DejaVuSans.ttf
+³       ³       ³   ³   ³   ³       DejaVuSans.ufm
+³       ³       ³   ³   ³   ³       DejaVuSansMono-Bold.ttf
+³       ³       ³   ³   ³   ³       DejaVuSansMono-Bold.ufm
+³       ³       ³   ³   ³   ³       DejaVuSansMono-BoldOblique.ttf
+³       ³       ³   ³   ³   ³       DejaVuSansMono-BoldOblique.ufm
+³       ³       ³   ³   ³   ³       DejaVuSansMono-Oblique.ttf
+³       ³       ³   ³   ³   ³       DejaVuSansMono-Oblique.ufm
+³       ³       ³   ³   ³   ³       DejaVuSansMono.ttf
+³       ³       ³   ³   ³   ³       DejaVuSansMono.ufm
+³       ³       ³   ³   ³   ³       DejaVuSerif-Bold.ttf
+³       ³       ³   ³   ³   ³       DejaVuSerif-Bold.ufm
+³       ³       ³   ³   ³   ³       DejaVuSerif-BoldItalic.ttf
+³       ³       ³   ³   ³   ³       DejaVuSerif-BoldItalic.ufm
+³       ³       ³   ³   ³   ³       DejaVuSerif-Italic.ttf
+³       ³       ³   ³   ³   ³       DejaVuSerif-Italic.ufm
+³       ³       ³   ³   ³   ³       DejaVuSerif.ttf
+³       ³       ³   ³   ³   ³       DejaVuSerif.ufm
+³       ³       ³   ³   ³   ³       Helvetica-Bold.afm
+³       ³       ³   ³   ³   ³       Helvetica-BoldOblique.afm
+³       ³       ³   ³   ³   ³       Helvetica-Oblique.afm
+³       ³       ³   ³   ³   ³       Helvetica.afm
+³       ³       ³   ³   ³   ³       installed-fonts.dist.json
+³       ³       ³   ³   ³   ³       mustRead.html
+³       ³       ³   ³   ³   ³       Symbol.afm
+³       ³       ³   ³   ³   ³       Times-Bold.afm
+³       ³       ³   ³   ³   ³       Times-BoldItalic.afm
+³       ³       ³   ³   ³   ³       Times-Italic.afm
+³       ³       ³   ³   ³   ³       Times-Roman.afm
+³       ³       ³   ³   ³   ³       ZapfDingbats.afm
+³       ³       ³   ³   ³   ³       
+³       ³       ³   ³   ³   ÀÄÄÄres
+³       ³       ³   ³   ³           broken_image.png
+³       ³       ³   ³   ³           broken_image.svg
+³       ³       ³   ³   ³           html.css
+³       ³       ³   ³   ³           sRGB2014.icc
+³       ³       ³   ³   ³           sRGB2014.icc.LICENSE
+³       ³       ³   ³   ³           
+³       ³       ³   ³   ÀÄÄÄsrc
+³       ³       ³   ³       ³   Canvas.php
+³       ³       ³   ³       ³   CanvasFactory.php
+³       ³       ³   ³       ³   Cellmap.php
+³       ³       ³   ³       ³   Dompdf.php
+³       ³       ³   ³       ³   Exception.php
+³       ³       ³   ³       ³   FontMetrics.php
+³       ³       ³   ³       ³   Frame.php
+³       ³       ³   ³       ³   Helpers.php
+³       ³       ³   ³       ³   JavascriptEmbedder.php
+³       ³       ³   ³       ³   LineBox.php
+³       ³       ³   ³       ³   Options.php
+³       ³       ³   ³       ³   PhpEvaluator.php
+³       ³       ³   ³       ³   Renderer.php
+³       ³       ³   ³       ³   
+³       ³       ³   ³       ÃÄÄÄAdapter
+³       ³       ³   ³       ³       CPDF.php
+³       ³       ³   ³       ³       GD.php
+³       ³       ³   ³       ³       PDFLib.php
+³       ³       ³   ³       ³       
+³       ³       ³   ³       ÃÄÄÄCss
+³       ³       ³   ³       ³   ³   AttributeTranslator.php
+³       ³       ³   ³       ³   ³   Color.php
+³       ³       ³   ³       ³   ³   Style.php
+³       ³       ³   ³       ³   ³   Stylesheet.php
+³       ³       ³   ³       ³   ³   
+³       ³       ³   ³       ³   ÀÄÄÄContent
+³       ³       ³   ³       ³           Attr.php
+³       ³       ³   ³       ³           CloseQuote.php
+³       ³       ³   ³       ³           ContentPart.php
+³       ³       ³   ³       ³           Counter.php
+³       ³       ³   ³       ³           Counters.php
+³       ³       ³   ³       ³           NoCloseQuote.php
+³       ³       ³   ³       ³           NoOpenQuote.php
+³       ³       ³   ³       ³           OpenQuote.php
+³       ³       ³   ³       ³           StringPart.php
+³       ³       ³   ³       ³           Url.php
+³       ³       ³   ³       ³           
+³       ³       ³   ³       ÃÄÄÄException
+³       ³       ³   ³       ³       ImageException.php
+³       ³       ³   ³       ³       
+³       ³       ³   ³       ÃÄÄÄFrame
+³       ³       ³   ³       ³       Factory.php
+³       ³       ³   ³       ³       FrameListIterator.php
+³       ³       ³   ³       ³       FrameTree.php
+³       ³       ³   ³       ³       FrameTreeIterator.php
+³       ³       ³   ³       ³       
+³       ³       ³   ³       ÃÄÄÄFrameDecorator
+³       ³       ³   ³       ³       AbstractFrameDecorator.php
+³       ³       ³   ³       ³       Block.php
+³       ³       ³   ³       ³       Image.php
+³       ³       ³   ³       ³       Inline.php
+³       ³       ³   ³       ³       ListBullet.php
+³       ³       ³   ³       ³       ListBulletImage.php
+³       ³       ³   ³       ³       NullFrameDecorator.php
+³       ³       ³   ³       ³       Page.php
+³       ³       ³   ³       ³       Table.php
+³       ³       ³   ³       ³       TableCell.php
+³       ³       ³   ³       ³       TableRow.php
+³       ³       ³   ³       ³       TableRowGroup.php
+³       ³       ³   ³       ³       Text.php
+³       ³       ³   ³       ³       
+³       ³       ³   ³       ÃÄÄÄFrameReflower
+³       ³       ³   ³       ³       AbstractFrameReflower.php
+³       ³       ³   ³       ³       Block.php
+³       ³       ³   ³       ³       Image.php
+³       ³       ³   ³       ³       Inline.php
+³       ³       ³   ³       ³       ListBullet.php
+³       ³       ³   ³       ³       NullFrameReflower.php
+³       ³       ³   ³       ³       Page.php
+³       ³       ³   ³       ³       Table.php
+³       ³       ³   ³       ³       TableCell.php
+³       ³       ³   ³       ³       TableRow.php
+³       ³       ³   ³       ³       TableRowGroup.php
+³       ³       ³   ³       ³       Text.php
+³       ³       ³   ³       ³       
+³       ³       ³   ³       ÃÄÄÄImage
+³       ³       ³   ³       ³       Cache.php
+³       ³       ³   ³       ³       
+³       ³       ³   ³       ÃÄÄÄPositioner
+³       ³       ³   ³       ³       Absolute.php
+³       ³       ³   ³       ³       AbstractPositioner.php
+³       ³       ³   ³       ³       Block.php
+³       ³       ³   ³       ³       Fixed.php
+³       ³       ³   ³       ³       Inline.php
+³       ³       ³   ³       ³       ListBullet.php
+³       ³       ³   ³       ³       NullPositioner.php
+³       ³       ³   ³       ³       TableCell.php
+³       ³       ³   ³       ³       TableRow.php
+³       ³       ³   ³       ³       
+³       ³       ³   ³       ÀÄÄÄRenderer
+³       ³       ³   ³               AbstractRenderer.php
+³       ³       ³   ³               Block.php
+³       ³       ³   ³               Image.php
+³       ³       ³   ³               Inline.php
+³       ³       ³   ³               ListBullet.php
+³       ³       ³   ³               TableCell.php
+³       ³       ³   ³               TableRow.php
+³       ³       ³   ³               TableRowGroup.php
+³       ³       ³   ³               Text.php
+³       ³       ³   ³               
+³       ³       ³   ÃÄÄÄphp-font-lib
+³       ³       ³   ³   ³   AUTHORS.md
+³       ³       ³   ³   ³   composer.json
+³       ³       ³   ³   ³   LICENSE
+³       ³       ³   ³   ³   README.md
+³       ³       ³   ³   ³   
+³       ³       ³   ³   ÃÄÄÄmaps
+³       ³       ³   ³   ³       adobe-standard-encoding.map
+³       ³       ³   ³   ³       cp1250.map
+³       ³       ³   ³   ³       cp1251.map
+³       ³       ³   ³   ³       cp1252.map
+³       ³       ³   ³   ³       cp1253.map
+³       ³       ³   ³   ³       cp1254.map
+³       ³       ³   ³   ³       cp1255.map
+³       ³       ³   ³   ³       cp1257.map
+³       ³       ³   ³   ³       cp1258.map
+³       ³       ³   ³   ³       cp874.map
+³       ³       ³   ³   ³       iso-8859-1.map
+³       ³       ³   ³   ³       iso-8859-11.map
+³       ³       ³   ³   ³       iso-8859-15.map
+³       ³       ³   ³   ³       iso-8859-16.map
+³       ³       ³   ³   ³       iso-8859-2.map
+³       ³       ³   ³   ³       iso-8859-4.map
+³       ³       ³   ³   ³       iso-8859-5.map
+³       ³       ³   ³   ³       iso-8859-7.map
+³       ³       ³   ³   ³       iso-8859-9.map
+³       ³       ³   ³   ³       koi8-r.map
+³       ³       ³   ³   ³       koi8-u.map
+³       ³       ³   ³   ³       
+³       ³       ³   ³   ÀÄÄÄsrc
+³       ³       ³   ³       ÀÄÄÄFontLib
+³       ³       ³   ³           ³   AdobeFontMetrics.php
+³       ³       ³   ³           ³   BinaryStream.php
+³       ³       ³   ³           ³   EncodingMap.php
+³       ³       ³   ³           ³   Font.php
+³       ³       ³   ³           ³   Header.php
+³       ³       ³   ³           ³   
+³       ³       ³   ³           ÃÄÄÄEOT
+³       ³       ³   ³           ³       File.php
+³       ³       ³   ³           ³       Header.php
+³       ³       ³   ³           ³       
+³       ³       ³   ³           ÃÄÄÄException
+³       ³       ³   ³           ³       FontNotFoundException.php
+³       ³       ³   ³           ³       
+³       ³       ³   ³           ÃÄÄÄGlyph
+³       ³       ³   ³           ³       Outline.php
+³       ³       ³   ³           ³       OutlineComponent.php
+³       ³       ³   ³           ³       OutlineComposite.php
+³       ³       ³   ³           ³       OutlineSimple.php
+³       ³       ³   ³           ³       
+³       ³       ³   ³           ÃÄÄÄOpenType
+³       ³       ³   ³           ³       File.php
+³       ³       ³   ³           ³       TableDirectoryEntry.php
+³       ³       ³   ³           ³       
+³       ³       ³   ³           ÃÄÄÄTable
+³       ³       ³   ³           ³   ³   DirectoryEntry.php
+³       ³       ³   ³           ³   ³   Table.php
+³       ³       ³   ³           ³   ³   
+³       ³       ³   ³           ³   ÀÄÄÄType
+³       ³       ³   ³           ³           cmap.php
+³       ³       ³   ³           ³           cvt.php
+³       ³       ³   ³           ³           fpgm.php
+³       ³       ³   ³           ³           glyf.php
+³       ³       ³   ³           ³           head.php
+³       ³       ³   ³           ³           hhea.php
+³       ³       ³   ³           ³           hmtx.php
+³       ³       ³   ³           ³           kern.php
+³       ³       ³   ³           ³           loca.php
+³       ³       ³   ³           ³           maxp.php
+³       ³       ³   ³           ³           name.php
+³       ³       ³   ³           ³           nameRecord.php
+³       ³       ³   ³           ³           os2.php
+³       ³       ³   ³           ³           post.php
+³       ³       ³   ³           ³           prep.php
+³       ³       ³   ³           ³           
+³       ³       ³   ³           ÃÄÄÄTrueType
+³       ³       ³   ³           ³       Collection.php
+³       ³       ³   ³           ³       File.php
+³       ³       ³   ³           ³       Header.php
+³       ³       ³   ³           ³       TableDirectoryEntry.php
+³       ³       ³   ³           ³       
+³       ³       ³   ³           ÀÄÄÄWOFF
+³       ³       ³   ³                   File.php
+³       ³       ³   ³                   Header.php
+³       ³       ³   ³                   TableDirectoryEntry.php
+³       ³       ³   ³                   
+³       ³       ³   ÀÄÄÄphp-svg-lib
+³       ³       ³       ³   AUTHORS.md
+³       ³       ³       ³   composer.json
+³       ³       ³       ³   LICENSE
+³       ³       ³       ³   README.md
+³       ³       ³       ³   
+³       ³       ³       ÀÄÄÄsrc
+³       ³       ³           ÀÄÄÄSvg
+³       ³       ³               ³   CssLength.php
+³       ³       ³               ³   DefaultStyle.php
+³       ³       ³               ³   Document.php
+³       ³       ³               ³   Style.php
+³       ³       ³               ³   
+³       ³       ³               ÃÄÄÄGradient
+³       ³       ³               ³       Stop.php
+³       ³       ³               ³       
+³       ³       ³               ÃÄÄÄSurface
+³       ³       ³               ³       CPdf.php
+³       ³       ³               ³       SurfaceCpdf.php
+³       ³       ³               ³       SurfaceInterface.php
+³       ³       ³               ³       SurfacePDFLib.php
+³       ³       ³               ³       
+³       ³       ³               ÀÄÄÄTag
+³       ³       ³                       AbstractTag.php
+³       ³       ³                       Anchor.php
+³       ³       ³                       Circle.php
+³       ³       ³                       ClipPath.php
+³       ³       ³                       Ellipse.php
+³       ³       ³                       Group.php
+³       ³       ³                       Image.php
+³       ³       ³                       Line.php
+³       ³       ³                       LinearGradient.php
+³       ³       ³                       Path.php
+³       ³       ³                       Polygon.php
+³       ³       ³                       Polyline.php
+³       ³       ³                       RadialGradient.php
+³       ³       ³                       Rect.php
+³       ³       ³                       Shape.php
+³       ³       ³                       Stop.php
+³       ³       ³                       StyleTag.php
+³       ³       ³                       Symbol.php
+³       ³       ³                       Text.php
+³       ³       ³                       UseTag.php
+³       ³       ³                       
+³       ³       ÃÄÄÄmasterminds
+³       ³       ³   ÀÄÄÄhtml5
+³       ³       ³       ³   composer.json
+³       ³       ³       ³   CREDITS
+³       ³       ³       ³   LICENSE.txt
+³       ³       ³       ³   README.md
+³       ³       ³       ³   RELEASE.md
+³       ³       ³       ³   UPGRADING.md
+³       ³       ³       ³   
+³       ³       ³       ÃÄÄÄbin
+³       ³       ³       ³       entities.php
+³       ³       ³       ³       
+³       ³       ³       ÀÄÄÄsrc
+³       ³       ³           ³   HTML5.php
+³       ³       ³           ³   
+³       ³       ³           ÀÄÄÄHTML5
+³       ³       ³               ³   Elements.php
+³       ³       ³               ³   Entities.php
+³       ³       ³               ³   Exception.php
+³       ³       ³               ³   InstructionProcessor.php
+³       ³       ³               ³   
+³       ³       ³               ÃÄÄÄParser
+³       ³       ³               ³       CharacterReference.php
+³       ³       ³               ³       DOMTreeBuilder.php
+³       ³       ³               ³       EventHandler.php
+³       ³       ³               ³       FileInputStream.php
+³       ³       ³               ³       InputStream.php
+³       ³       ³               ³       ParseError.php
+³       ³       ³               ³       README.md
+³       ³       ³               ³       Scanner.php
+³       ³       ³               ³       StringInputStream.php
+³       ³       ³               ³       Tokenizer.php
+³       ³       ³               ³       TreeBuildingRules.php
+³       ³       ³               ³       UTF8Utils.php
+³       ³       ³               ³       
+³       ³       ³               ÀÄÄÄSerializer
+³       ³       ³                       HTML5Entities.php
+³       ³       ³                       OutputRules.php
+³       ³       ³                       README.md
+³       ³       ³                       RulesInterface.php
+³       ³       ³                       Traverser.php
+³       ³       ³                       
+³       ³       ÀÄÄÄsabberworm
+³       ³           ÀÄÄÄphp-css-parser
+³       ³               ³   CHANGELOG.md
+³       ³               ³   composer.json
+³       ³               ³   LICENSE
+³       ³               ³   README.md
+³       ³               ³   
+³       ³               ÀÄÄÄsrc
+³       ³                   ³   OutputFormat.php
+³       ³                   ³   OutputFormatter.php
+³       ³                   ³   Parser.php
+³       ³                   ³   Renderable.php
+³       ³                   ³   Settings.php
+³       ³                   ³   
+³       ³                   ÃÄÄÄComment
+³       ³                   ³       Comment.php
+³       ³                   ³       Commentable.php
+³       ³                   ³       
+³       ³                   ÃÄÄÄCSSList
+³       ³                   ³       AtRuleBlockList.php
+³       ³                   ³       CSSBlockList.php
+³       ³                   ³       CSSList.php
+³       ³                   ³       Document.php
+³       ³                   ³       KeyFrame.php
+³       ³                   ³       
+³       ³                   ÃÄÄÄParsing
+³       ³                   ³       Anchor.php
+³       ³                   ³       OutputException.php
+³       ³                   ³       ParserState.php
+³       ³                   ³       SourceException.php
+³       ³                   ³       UnexpectedEOFException.php
+³       ³                   ³       UnexpectedTokenException.php
+³       ³                   ³       
+³       ³                   ÃÄÄÄProperty
+³       ³                   ³       AtRule.php
+³       ³                   ³       Charset.php
+³       ³                   ³       CSSNamespace.php
+³       ³                   ³       Import.php
+³       ³                   ³       KeyframeSelector.php
+³       ³                   ³       Selector.php
+³       ³                   ³       
+³       ³                   ÃÄÄÄRule
+³       ³                   ³       Rule.php
+³       ³                   ³       
+³       ³                   ÃÄÄÄRuleSet
+³       ³                   ³       AtRuleSet.php
+³       ³                   ³       DeclarationBlock.php
+³       ³                   ³       RuleSet.php
+³       ³                   ³       
+³       ³                   ÀÄÄÄValue
+³       ³                           CalcFunction.php
+³       ³                           CalcRuleValueList.php
+³       ³                           Color.php
+³       ³                           CSSFunction.php
+³       ³                           CSSString.php
+³       ³                           LineName.php
+³       ³                           PrimitiveValue.php
+³       ³                           RuleValueList.php
+³       ³                           Size.php
+³       ³                           URL.php
+³       ³                           Value.php
+³       ³                           ValueList.php
+³       ³                           
+³       ÃÄÄÄglightbox
+³       ³   ÃÄÄÄcss
+³       ³   ³       glightbox.css
+³       ³   ³       glightbox.min.css
+³       ³   ³       
+³       ³   ÀÄÄÄjs
+³       ³           glightbox.js
+³       ³           glightbox.min.js
+³       ³           
+³       ÃÄÄÄphp-email-form
+³       ³   ³   php-email-form.php
+³       ³   ³   validate.js
+³       ³   ³   
+³       ³   ÀÄÄÄPHPMailer
+³       ³           DSNConfigurator.php
+³       ³           Exception.php
+³       ³           OAuth.php
+³       ³           OAuthTokenProvider.php
+³       ³           PHPMailer.php
+³       ³           POP3.php
+³       ³           SMTP.php
+³       ³           
+³       ÃÄÄÄpurecounter
+³       ³       purecounter_vanilla.js
+³       ³       purecounter_vanilla.js.map
+³       ³       
+³       ÀÄÄÄswiper
+³               swiper-bundle.min.css
+³               swiper-bundle.min.js
+³               swiper-bundle.min.js.map
+³               
+ÃÄÄÄforms
+³       book-a-table.php
+³       contact.php
+³       Readme.txt
+³       
+ÃÄÄÄincludes
+³       carrousel.php
+³       footer.php
+³       navbar.php
+³       
+ÃÄÄÄlogs
+ÃÄÄÄuploads
+³   ³   1753308165_assortimentdesoupedelicieusevuededessus.jpg
+³   ³   1753308289_assortimentdesoupedelicieusevuededessus.jpg
+³   ³   1753364340_FM_Cakes.png
+³   ³   1753364414_img.jpeg
+³   ³   1753364637_31tVPfUGLpL.jpg
+³   ³   1753899646_WhatsAppImage20250728at10.31.21.jpeg
+³   ³   1754426703_WhatsAppImage20250728at10.14.55.jpeg
+³   ³   1754596189_Capturedcran20250806144532.png
+³   ³   1754596519_picture.jpeg
+³   ³   1754596768_rs_fraisier_1x1.jpg
+³   ³   1754915076_Bissapglac.jpeg
+³   ³   1754915341_arton77572173ed.jpg
+³   ³   1754915475_Bouyepaindesinge.jpg
+³   ³   1754915566_Cocktailmanguepassion.jpg
+³   ³   1754915658_Thglaclamenthe.jpg
+³   ³   1754916408_Limonademaison.jpg
+³   ³   1754916504_Smoothieananasbanane.jpg
+³   ³   1754916706_eaudecoco.jpg
+³   ³   1754916864_Jusdegingembremiel.jpg
+³   ³   1754916983_Milkshakevanille.jpeg
+³   ³   1754917280_i3196photodeaccrasdemorue.jpeg
+³   ³   1754917472_saladedemangueverte.jpeg
+³   ³   1754917588_AcceuilSoupouKandia.jpg
+³   ³   1754917852_Brochettedepouletpaprikaetmoutardetrestendre.jpg
+³   ³   1754917983_Samboussaaubuf.jpeg
+³   ³   1754918224_Tiepboudiennsalade.jpeg
+³   ³   1754918338_Beignetsdelgumes.jpeg
+³   ³   1754918441_carpacciolangostinosojosneptuno.png
+³   ³   1754918542_Saladenioiseafricaine.jpg
+³   ³   1754918608_rillettes.png
+³   ³   1754918817_pouletyassa.jpg
+³   ³   1754918877_MafeboeufduSenegal.jpeg
+³   ³   1754918962_tieboudieune.jpg
+³   ³   1754919035_Couscousaupoisson.jpeg
+³   ³   1754919108_ragoutdeboeufauxgombos.jpg
+³   ³   1754919235_Poissonbrais.jpg
+³   ³   1754919354_Tajinedagneauauxpruneaux.jpeg
+³   ³   1754919429_Brochettesmixtes.jpeg
+³   ³   1754919524_tlchargement.jpeg
+³   ³   1754919600_sauce_graine.jpg
+³   ³   1754919784_Thiakry.jpeg
+³   ³   1754919877_Bananesflambesaumiel.jpg
+³   ³   1754919961_Gteaulapatatedouce.jpeg
+³   ³   1754920049_Saladedefruitsexotiques.jpeg
+³   ³   1754920181_tlchargement1.jpeg
+³   ³   1754921704_Capturedcran20250806144532.png
+³   ³   1754999633_Tiramisu.jpeg
+³   ³   1755516945_IMG20240221WA0030.jpg
+³   ³   1755517402_IMG20240524WA0186.jpg
+³   ³   1756759338_IMG20240221WA0046.jpg
+³   ³   1757340819_IMG20240129WA0001.jpg
+³   ³   1759077104_IMG20240129WA0001.jpg
+³   ³   687e8a0d15d27.jpg
+³   ³   687e8a3b819ed.jpg
+³   ³   687e8ab58db0e.jpg
+³   ³   plat_687e96b448f58.jpg
+³   ³   plat_687ee63ae7838.jpg
+³   ³   plat_687ee75bc1ca9.jpg
+³   ³   plat_687ee79908422.jpg
+³   ³   plat_687ee7cb8d29f.jpg
+³   ³   plat_687f7857233de.jpg
+³   ³   plat_687f787a2f862.jpg
+³   ³   plat_687fbf18031a4.jpg
+³   ³   plat_687fbf655344d.jpg
+³   ³   plat_68814d35cd57d.png
+³   ³   plat_68814e76c20de.jpeg
+³   ³   plat_68815511c6414.jpg
+³   ³   plat_68815989e4852.jpg
+³   ³   
+³   ÃÄÄÄannonces
+³   ³       annonce_68b8bfddaa176.jpg
+³   ³       
+³   ÃÄÄÄevenements
+³   ÃÄÄÄgallery
+³   ³       0fbeeb1b3ac4c429.png
+³   ³       6ce4687c9d74a17c.png
+³   ³       735a66af85cf4c7a.jpg
+³   ³       98daa2f33cb485ad.png
+³   ³       a56cbe206924ae27.jpeg
+³   ³       c8272c545f2758bc.png
+³   ³       ca29deb90eb528ad.jpg
+³   ³       f6e5093ae8cdbee8.jpg
+³   ³       
+³   ÃÄÄÄimports
+³   ÃÄÄÄmessages
+³   ³   ÀÄÄÄimages
+³   ³           img_10_1_689fa494aef188.45058867.jpg
+³   ³           
+³   ÃÄÄÄphotos
+³   ³       emp_689ba902b6460.jpg
+³   ³       emp_689ba906df0f8.jpg
+³   ³       emp_689ba907b702a.jpg
+³   ³       emp_689ba90863307.jpg
+³   ³       emp_689ba908f1c06.jpg
+³   ³       emp_689ba9d0d32d4.jpeg
+³   ³       emp_689ba9d25b514.jpeg
+³   ³       emp_689ba9d2d822a.jpeg
+³   ³       emp_689ba9d34530f.jpeg
+³   ³       emp_689ba9d3dcc20.jpeg
+³   ³       emp_689baa6dc7b88.png
+³   ³       emp_689baa6f25cc1.png
+³   ³       emp_689baa6f5b635.png
+³   ³       emp_689baa6f88cb1.png
+³   ³       emp_689e26b244edf.jpg
+³   ³       emp_689e26b792170.jpg
+³   ³       emp_689e26b857d2a.jpg
+³   ³       
+³   ÃÄÄÄprocedures
+³   ÀÄÄÄprofiles
+³           admin_11_1754842703.png
+³           admin_11_1754842954.png
+³           admin_11_1754848863.jpeg
+³           profile_10_1754920202.jpeg
+³           profile_11_1754848833.png
+³           profile_11_1754848878.png
+³           profile_14_1755733862.jpg
+³           
+ÀÄÄÄvendor
+    ³   autoload.php
+    ³   composer.json
+    ³   composer.lock
+    ³   
+    ÃÄÄÄbacon
+    ³   ÀÄÄÄbacon-qr-code
+    ³       ³   composer.json
+    ³       ³   LICENSE
+    ³       ³   phpunit.xml.dist
+    ³       ³   README.md
+    ³       ³   
+    ³       ÃÄÄÄsrc
+    ³       ³   ³   Writer.php
+    ³       ³   ³   
+    ³       ³   ÃÄÄÄCommon
+    ³       ³   ³       BitArray.php
+    ³       ³   ³       BitMatrix.php
+    ³       ³   ³       BitUtils.php
+    ³       ³   ³       CharacterSetEci.php
+    ³       ³   ³       EcBlock.php
+    ³       ³   ³       EcBlocks.php
+    ³       ³   ³       ErrorCorrectionLevel.php
+    ³       ³   ³       FormatInformation.php
+    ³       ³   ³       Mode.php
+    ³       ³   ³       ReedSolomonCodec.php
+    ³       ³   ³       Version.php
+    ³       ³   ³       
+    ³       ³   ÃÄÄÄEncoder
+    ³       ³   ³       BlockPair.php
+    ³       ³   ³       ByteMatrix.php
+    ³       ³   ³       Encoder.php
+    ³       ³   ³       MaskUtil.php
+    ³       ³   ³       MatrixUtil.php
+    ³       ³   ³       QrCode.php
+    ³       ³   ³       
+    ³       ³   ÃÄÄÄException
+    ³       ³   ³       ExceptionInterface.php
+    ³       ³   ³       InvalidArgumentException.php
+    ³       ³   ³       OutOfBoundsException.php
+    ³       ³   ³       RuntimeException.php
+    ³       ³   ³       UnexpectedValueException.php
+    ³       ³   ³       WriterException.php
+    ³       ³   ³       
+    ³       ³   ÀÄÄÄRenderer
+    ³       ³       ³   ImageRenderer.php
+    ³       ³       ³   PlainTextRenderer.php
+    ³       ³       ³   RendererInterface.php
+    ³       ³       ³   
+    ³       ³       ÃÄÄÄColor
+    ³       ³       ³       Alpha.php
+    ³       ³       ³       Cmyk.php
+    ³       ³       ³       ColorInterface.php
+    ³       ³       ³       Gray.php
+    ³       ³       ³       Rgb.php
+    ³       ³       ³       
+    ³       ³       ÃÄÄÄEye
+    ³       ³       ³       CompositeEye.php
+    ³       ³       ³       EyeInterface.php
+    ³       ³       ³       ModuleEye.php
+    ³       ³       ³       SimpleCircleEye.php
+    ³       ³       ³       SquareEye.php
+    ³       ³       ³       
+    ³       ³       ÃÄÄÄImage
+    ³       ³       ³       EpsImageBackEnd.php
+    ³       ³       ³       ImageBackEndInterface.php
+    ³       ³       ³       ImagickImageBackEnd.php
+    ³       ³       ³       SvgImageBackEnd.php
+    ³       ³       ³       TransformationMatrix.php
+    ³       ³       ³       
+    ³       ³       ÃÄÄÄModule
+    ³       ³       ³   ³   DotsModule.php
+    ³       ³       ³   ³   ModuleInterface.php
+    ³       ³       ³   ³   RoundnessModule.php
+    ³       ³       ³   ³   SquareModule.php
+    ³       ³       ³   ³   
+    ³       ³       ³   ÀÄÄÄEdgeIterator
+    ³       ³       ³           Edge.php
+    ³       ³       ³           EdgeIterator.php
+    ³       ³       ³           
+    ³       ³       ÃÄÄÄPath
+    ³       ³       ³       Close.php
+    ³       ³       ³       Curve.php
+    ³       ³       ³       EllipticArc.php
+    ³       ³       ³       Line.php
+    ³       ³       ³       Move.php
+    ³       ³       ³       OperationInterface.php
+    ³       ³       ³       Path.php
+    ³       ³       ³       
+    ³       ³       ÀÄÄÄRendererStyle
+    ³       ³               EyeFill.php
+    ³       ³               Fill.php
+    ³       ³               Gradient.php
+    ³       ³               GradientType.php
+    ³       ³               RendererStyle.php
+    ³       ³               
+    ³       ÀÄÄÄtest
+    ³           ÃÄÄÄCommon
+    ³           ³       BitArrayTest.php
+    ³           ³       BitMatrixTest.php
+    ³           ³       BitUtilsTest.php
+    ³           ³       ErrorCorrectionLevelTest.php
+    ³           ³       FormatInformationTest.php
+    ³           ³       ModeTest.php
+    ³           ³       ReedSolomonCodecTest.php
+    ³           ³       VersionTest.php
+    ³           ³       
+    ³           ÃÄÄÄEncoder
+    ³           ³       EncoderTest.php
+    ³           ³       MaskUtilTest.php
+    ³           ³       MatrixUtilTest.php
+    ³           ³       
+    ³           ÀÄÄÄIntegration
+    ³               ³   ImagickRenderingTest.php
+    ³               ³   
+    ³               ÀÄÄÄ__snapshots__
+    ³                   ÀÄÄÄfiles
+    ³                           ImagickRenderingTest__testGenericQrCode__1.png
+    ³                           ImagickRenderingTest__testIssue79__1.png
+    ³                           
+    ÃÄÄÄbin
+    ÃÄÄÄcomposer
+    ³       autoload_classmap.php
+    ³       autoload_namespaces.php
+    ³       autoload_psr4.php
+    ³       autoload_real.php
+    ³       autoload_static.php
+    ³       ClassLoader.php
+    ³       installed.json
+    ³       installed.php
+    ³       InstalledVersions.php
+    ³       LICENSE
+    ³       platform_check.php
+    ³       
+    ÃÄÄÄdasprid
+    ³   ÀÄÄÄenum
+    ³       ³   composer.json
+    ³       ³   LICENSE
+    ³       ³   README.md
+    ³       ³   
+    ³       ÀÄÄÄsrc
+    ³           ³   AbstractEnum.php
+    ³           ³   EnumMap.php
+    ³           ³   NullValue.php
+    ³           ³   
+    ³           ÀÄÄÄException
+    ³                   CloneNotSupportedException.php
+    ³                   ExceptionInterface.php
+    ³                   ExpectationException.php
+    ³                   IllegalArgumentException.php
+    ³                   MismatchException.php
+    ³                   SerializeNotSupportedException.php
+    ³                   UnserializeNotSupportedException.php
+    ³                   
+    ÃÄÄÄdompdf
+    ³   ÃÄÄÄdompdf
+    ³   ³   ³   AUTHORS.md
+    ³   ³   ³   composer.json
+    ³   ³   ³   LICENSE.LGPL
+    ³   ³   ³   phpunit.xml
+    ³   ³   ³   README.md
+    ³   ³   ³   VERSION
+    ³   ³   ³   
+    ³   ³   ÃÄÄÄlib
+    ³   ³   ³   ³   Cpdf.php
+    ³   ³   ³   ³   
+    ³   ³   ³   ÃÄÄÄfonts
+    ³   ³   ³   ³       Courier-Bold.afm
+    ³   ³   ³   ³       Courier-BoldOblique.afm
+    ³   ³   ³   ³       Courier-Oblique.afm
+    ³   ³   ³   ³       Courier.afm
+    ³   ³   ³   ³       DejaVuSans-Bold.ttf
+    ³   ³   ³   ³       DejaVuSans-Bold.ufm
+    ³   ³   ³   ³       DejaVuSans-Bold.ufm.json
+    ³   ³   ³   ³       DejaVuSans-BoldOblique.ttf
+    ³   ³   ³   ³       DejaVuSans-BoldOblique.ufm
+    ³   ³   ³   ³       DejaVuSans-Oblique.ttf
+    ³   ³   ³   ³       DejaVuSans-Oblique.ufm
+    ³   ³   ³   ³       DejaVuSans.ttf
+    ³   ³   ³   ³       DejaVuSans.ufm
+    ³   ³   ³   ³       DejaVuSans.ufm.json
+    ³   ³   ³   ³       DejaVuSansMono-Bold.ttf
+    ³   ³   ³   ³       DejaVuSansMono-Bold.ufm
+    ³   ³   ³   ³       DejaVuSansMono-BoldOblique.ttf
+    ³   ³   ³   ³       DejaVuSansMono-BoldOblique.ufm
+    ³   ³   ³   ³       DejaVuSansMono-Oblique.ttf
+    ³   ³   ³   ³       DejaVuSansMono-Oblique.ufm
+    ³   ³   ³   ³       DejaVuSansMono.ttf
+    ³   ³   ³   ³       DejaVuSansMono.ufm
+    ³   ³   ³   ³       DejaVuSerif-Bold.ttf
+    ³   ³   ³   ³       DejaVuSerif-Bold.ufm
+    ³   ³   ³   ³       DejaVuSerif-BoldItalic.ttf
+    ³   ³   ³   ³       DejaVuSerif-BoldItalic.ufm
+    ³   ³   ³   ³       DejaVuSerif-Italic.ttf
+    ³   ³   ³   ³       DejaVuSerif-Italic.ufm
+    ³   ³   ³   ³       DejaVuSerif.ttf
+    ³   ³   ³   ³       DejaVuSerif.ufm
+    ³   ³   ³   ³       Helvetica-Bold.afm
+    ³   ³   ³   ³       Helvetica-Bold.afm.json
+    ³   ³   ³   ³       Helvetica-BoldOblique.afm
+    ³   ³   ³   ³       Helvetica-Oblique.afm
+    ³   ³   ³   ³       Helvetica.afm
+    ³   ³   ³   ³       Helvetica.afm.json
+    ³   ³   ³   ³       installed-fonts.dist.json
+    ³   ³   ³   ³       mustRead.html
+    ³   ³   ³   ³       Symbol.afm
+    ³   ³   ³   ³       Times-Bold.afm
+    ³   ³   ³   ³       Times-BoldItalic.afm
+    ³   ³   ³   ³       Times-Italic.afm
+    ³   ³   ³   ³       Times-Roman.afm
+    ³   ³   ³   ³       ZapfDingbats.afm
+    ³   ³   ³   ³       
+    ³   ³   ³   ÀÄÄÄres
+    ³   ³   ³           broken_image.png
+    ³   ³   ³           broken_image.svg
+    ³   ³   ³           html.css
+    ³   ³   ³           sRGB2014.icc
+    ³   ³   ³           sRGB2014.icc.LICENSE
+    ³   ³   ³           
+    ³   ³   ÀÄÄÄsrc
+    ³   ³       ³   Canvas.php
+    ³   ³       ³   CanvasFactory.php
+    ³   ³       ³   Cellmap.php
+    ³   ³       ³   Dompdf.php
+    ³   ³       ³   Exception.php
+    ³   ³       ³   FontMetrics.php
+    ³   ³       ³   Frame.php
+    ³   ³       ³   Helpers.php
+    ³   ³       ³   JavascriptEmbedder.php
+    ³   ³       ³   LineBox.php
+    ³   ³       ³   Options.php
+    ³   ³       ³   PhpEvaluator.php
+    ³   ³       ³   Renderer.php
+    ³   ³       ³   
+    ³   ³       ÃÄÄÄAdapter
+    ³   ³       ³       CPDF.php
+    ³   ³       ³       GD.php
+    ³   ³       ³       PDFLib.php
+    ³   ³       ³       
+    ³   ³       ÃÄÄÄCss
+    ³   ³       ³   ³   AttributeTranslator.php
+    ³   ³       ³   ³   Color.php
+    ³   ³       ³   ³   Style.php
+    ³   ³       ³   ³   Stylesheet.php
+    ³   ³       ³   ³   
+    ³   ³       ³   ÀÄÄÄContent
+    ³   ³       ³           Attr.php
+    ³   ³       ³           CloseQuote.php
+    ³   ³       ³           ContentPart.php
+    ³   ³       ³           Counter.php
+    ³   ³       ³           Counters.php
+    ³   ³       ³           NoCloseQuote.php
+    ³   ³       ³           NoOpenQuote.php
+    ³   ³       ³           OpenQuote.php
+    ³   ³       ³           StringPart.php
+    ³   ³       ³           Url.php
+    ³   ³       ³           
+    ³   ³       ÃÄÄÄException
+    ³   ³       ³       ImageException.php
+    ³   ³       ³       
+    ³   ³       ÃÄÄÄFrame
+    ³   ³       ³       Factory.php
+    ³   ³       ³       FrameListIterator.php
+    ³   ³       ³       FrameTree.php
+    ³   ³       ³       FrameTreeIterator.php
+    ³   ³       ³       
+    ³   ³       ÃÄÄÄFrameDecorator
+    ³   ³       ³       AbstractFrameDecorator.php
+    ³   ³       ³       Block.php
+    ³   ³       ³       Image.php
+    ³   ³       ³       Inline.php
+    ³   ³       ³       ListBullet.php
+    ³   ³       ³       ListBulletImage.php
+    ³   ³       ³       NullFrameDecorator.php
+    ³   ³       ³       Page.php
+    ³   ³       ³       Table.php
+    ³   ³       ³       TableCell.php
+    ³   ³       ³       TableRow.php
+    ³   ³       ³       TableRowGroup.php
+    ³   ³       ³       Text.php
+    ³   ³       ³       
+    ³   ³       ÃÄÄÄFrameReflower
+    ³   ³       ³       AbstractFrameReflower.php
+    ³   ³       ³       Block.php
+    ³   ³       ³       Image.php
+    ³   ³       ³       Inline.php
+    ³   ³       ³       ListBullet.php
+    ³   ³       ³       NullFrameReflower.php
+    ³   ³       ³       Page.php
+    ³   ³       ³       Table.php
+    ³   ³       ³       TableCell.php
+    ³   ³       ³       TableRow.php
+    ³   ³       ³       TableRowGroup.php
+    ³   ³       ³       Text.php
+    ³   ³       ³       
+    ³   ³       ÃÄÄÄImage
+    ³   ³       ³       Cache.php
+    ³   ³       ³       
+    ³   ³       ÃÄÄÄPositioner
+    ³   ³       ³       Absolute.php
+    ³   ³       ³       AbstractPositioner.php
+    ³   ³       ³       Block.php
+    ³   ³       ³       Fixed.php
+    ³   ³       ³       Inline.php
+    ³   ³       ³       ListBullet.php
+    ³   ³       ³       NullPositioner.php
+    ³   ³       ³       TableCell.php
+    ³   ³       ³       TableRow.php
+    ³   ³       ³       
+    ³   ³       ÀÄÄÄRenderer
+    ³   ³               AbstractRenderer.php
+    ³   ³               Block.php
+    ³   ³               Image.php
+    ³   ³               Inline.php
+    ³   ³               ListBullet.php
+    ³   ³               TableCell.php
+    ³   ³               TableRow.php
+    ³   ³               TableRowGroup.php
+    ³   ³               Text.php
+    ³   ³               
+    ³   ÃÄÄÄphp-font-lib
+    ³   ³   ³   AUTHORS.md
+    ³   ³   ³   composer.json
+    ³   ³   ³   LICENSE
+    ³   ³   ³   README.md
+    ³   ³   ³   
+    ³   ³   ÃÄÄÄmaps
+    ³   ³   ³       adobe-standard-encoding.map
+    ³   ³   ³       cp1250.map
+    ³   ³   ³       cp1251.map
+    ³   ³   ³       cp1252.map
+    ³   ³   ³       cp1253.map
+    ³   ³   ³       cp1254.map
+    ³   ³   ³       cp1255.map
+    ³   ³   ³       cp1257.map
+    ³   ³   ³       cp1258.map
+    ³   ³   ³       cp874.map
+    ³   ³   ³       iso-8859-1.map
+    ³   ³   ³       iso-8859-11.map
+    ³   ³   ³       iso-8859-15.map
+    ³   ³   ³       iso-8859-16.map
+    ³   ³   ³       iso-8859-2.map
+    ³   ³   ³       iso-8859-4.map
+    ³   ³   ³       iso-8859-5.map
+    ³   ³   ³       iso-8859-7.map
+    ³   ³   ³       iso-8859-9.map
+    ³   ³   ³       koi8-r.map
+    ³   ³   ³       koi8-u.map
+    ³   ³   ³       
+    ³   ³   ÀÄÄÄsrc
+    ³   ³       ÀÄÄÄFontLib
+    ³   ³           ³   AdobeFontMetrics.php
+    ³   ³           ³   BinaryStream.php
+    ³   ³           ³   EncodingMap.php
+    ³   ³           ³   Font.php
+    ³   ³           ³   Header.php
+    ³   ³           ³   
+    ³   ³           ÃÄÄÄEOT
+    ³   ³           ³       File.php
+    ³   ³           ³       Header.php
+    ³   ³           ³       
+    ³   ³           ÃÄÄÄException
+    ³   ³           ³       FontNotFoundException.php
+    ³   ³           ³       
+    ³   ³           ÃÄÄÄGlyph
+    ³   ³           ³       Outline.php
+    ³   ³           ³       OutlineComponent.php
+    ³   ³           ³       OutlineComposite.php
+    ³   ³           ³       OutlineSimple.php
+    ³   ³           ³       
+    ³   ³           ÃÄÄÄOpenType
+    ³   ³           ³       File.php
+    ³   ³           ³       TableDirectoryEntry.php
+    ³   ³           ³       
+    ³   ³           ÃÄÄÄTable
+    ³   ³           ³   ³   DirectoryEntry.php
+    ³   ³           ³   ³   Table.php
+    ³   ³           ³   ³   
+    ³   ³           ³   ÀÄÄÄType
+    ³   ³           ³           cmap.php
+    ³   ³           ³           cvt.php
+    ³   ³           ³           fpgm.php
+    ³   ³           ³           glyf.php
+    ³   ³           ³           head.php
+    ³   ³           ³           hhea.php
+    ³   ³           ³           hmtx.php
+    ³   ³           ³           kern.php
+    ³   ³           ³           loca.php
+    ³   ³           ³           maxp.php
+    ³   ³           ³           name.php
+    ³   ³           ³           nameRecord.php
+    ³   ³           ³           os2.php
+    ³   ³           ³           post.php
+    ³   ³           ³           prep.php
+    ³   ³           ³           
+    ³   ³           ÃÄÄÄTrueType
+    ³   ³           ³       Collection.php
+    ³   ³           ³       File.php
+    ³   ³           ³       Header.php
+    ³   ³           ³       TableDirectoryEntry.php
+    ³   ³           ³       
+    ³   ³           ÀÄÄÄWOFF
+    ³   ³                   File.php
+    ³   ³                   Header.php
+    ³   ³                   TableDirectoryEntry.php
+    ³   ³                   
+    ³   ÀÄÄÄphp-svg-lib
+    ³       ³   AUTHORS.md
+    ³       ³   composer.json
+    ³       ³   LICENSE
+    ³       ³   README.md
+    ³       ³   
+    ³       ÀÄÄÄsrc
+    ³           ÀÄÄÄSvg
+    ³               ³   CssLength.php
+    ³               ³   DefaultStyle.php
+    ³               ³   Document.php
+    ³               ³   Style.php
+    ³               ³   
+    ³               ÃÄÄÄGradient
+    ³               ³       Stop.php
+    ³               ³       
+    ³               ÃÄÄÄSurface
+    ³               ³       CPdf.php
+    ³               ³       SurfaceCpdf.php
+    ³               ³       SurfaceInterface.php
+    ³               ³       SurfacePDFLib.php
+    ³               ³       
+    ³               ÀÄÄÄTag
+    ³                       AbstractTag.php
+    ³                       Anchor.php
+    ³                       Circle.php
+    ³                       ClipPath.php
+    ³                       Ellipse.php
+    ³                       Group.php
+    ³                       Image.php
+    ³                       Line.php
+    ³                       LinearGradient.php
+    ³                       Path.php
+    ³                       Polygon.php
+    ³                       Polyline.php
+    ³                       RadialGradient.php
+    ³                       Rect.php
+    ³                       Shape.php
+    ³                       Stop.php
+    ³                       StyleTag.php
+    ³                       Symbol.php
+    ³                       Text.php
+    ³                       UseTag.php
+    ³                       
+    ÃÄÄÄendroid
+    ³   ÀÄÄÄqr-code
+    ³       ³   .gitignore
+    ³       ³   composer.json
+    ³       ³   LICENSE
+    ³       ³   README.md
+    ³       ³   
+    ³       ÃÄÄÄ.github
+    ³       ³   ³   FUNDING.yml
+    ³       ³   ³   
+    ³       ³   ÀÄÄÄworkflows
+    ³       ³           CI.yml
+    ³       ³           
+    ³       ÃÄÄÄassets
+    ³       ³       noto_sans.otf
+    ³       ³       open_sans.ttf
+    ³       ³       
+    ³       ÃÄÄÄsrc
+    ³       ³   ³   QrCode.php
+    ³       ³   ³   QrCodeInterface.php
+    ³       ³   ³   WritableInterface.php
+    ³       ³   ³   
+    ³       ³   ÃÄÄÄBacon
+    ³       ³   ³       ErrorCorrectionLevelConverter.php
+    ³       ³   ³       MatrixFactory.php
+    ³       ³   ³       
+    ³       ³   ÃÄÄÄBuilder
+    ³       ³   ³       Builder.php
+    ³       ³   ³       BuilderInterface.php
+    ³       ³   ³       BuilderRegistry.php
+    ³       ³   ³       BuilderRegistryInterface.php
+    ³       ³   ³       
+    ³       ³   ÃÄÄÄColor
+    ³       ³   ³       Color.php
+    ³       ³   ³       ColorInterface.php
+    ³       ³   ³       
+    ³       ³   ÃÄÄÄEncoding
+    ³       ³   ³       Encoding.php
+    ³       ³   ³       EncodingInterface.php
+    ³       ³   ³       
+    ³       ³   ÃÄÄÄErrorCorrectionLevel
+    ³       ³   ³       ErrorCorrectionLevelHigh.php
+    ³       ³   ³       ErrorCorrectionLevelInterface.php
+    ³       ³   ³       ErrorCorrectionLevelLow.php
+    ³       ³   ³       ErrorCorrectionLevelMedium.php
+    ³       ³   ³       ErrorCorrectionLevelQuartile.php
+    ³       ³   ³       
+    ³       ³   ÃÄÄÄLabel
+    ³       ³   ³   ³   Label.php
+    ³       ³   ³   ³   LabelInterface.php
+    ³       ³   ³   ³   
+    ³       ³   ³   ÃÄÄÄAlignment
+    ³       ³   ³   ³       LabelAlignmentCenter.php
+    ³       ³   ³   ³       LabelAlignmentInterface.php
+    ³       ³   ³   ³       LabelAlignmentLeft.php
+    ³       ³   ³   ³       LabelAlignmentRight.php
+    ³       ³   ³   ³       
+    ³       ³   ³   ÃÄÄÄFont
+    ³       ³   ³   ³       Font.php
+    ³       ³   ³   ³       FontInterface.php
+    ³       ³   ³   ³       NotoSans.php
+    ³       ³   ³   ³       OpenSans.php
+    ³       ³   ³   ³       
+    ³       ³   ³   ÀÄÄÄMargin
+    ³       ³   ³           Margin.php
+    ³       ³   ³           MarginInterface.php
+    ³       ³   ³           
+    ³       ³   ÃÄÄÄLogo
+    ³       ³   ³       Logo.php
+    ³       ³   ³       LogoInterface.php
+    ³       ³   ³       
+    ³       ³   ÃÄÄÄMatrix
+    ³       ³   ³       Matrix.php
+    ³       ³   ³       MatrixFactoryInterface.php
+    ³       ³   ³       MatrixInterface.php
+    ³       ³   ³       
+    ³       ³   ÃÄÄÄRoundBlockSizeMode
+    ³       ³   ³       RoundBlockSizeModeEnlarge.php
+    ³       ³   ³       RoundBlockSizeModeInterface.php
+    ³       ³   ³       RoundBlockSizeModeMargin.php
+    ³       ³   ³       RoundBlockSizeModeNone.php
+    ³       ³   ³       RoundBlockSizeModeShrink.php
+    ³       ³   ³       
+    ³       ³   ÀÄÄÄWriter
+    ³       ³       ³   BinaryWriter.php
+    ³       ³       ³   DebugWriter.php
+    ³       ³       ³   EpsWriter.php
+    ³       ³       ³   PdfWriter.php
+    ³       ³       ³   PngWriter.php
+    ³       ³       ³   SvgWriter.php
+    ³       ³       ³   ValidatingWriterInterface.php
+    ³       ³       ³   WriterInterface.php
+    ³       ³       ³   
+    ³       ³       ÀÄÄÄResult
+    ³       ³               AbstractResult.php
+    ³       ³               BinaryResult.php
+    ³       ³               DebugResult.php
+    ³       ³               EpsResult.php
+    ³       ³               PdfResult.php
+    ³       ³               PngResult.php
+    ³       ³               ResultInterface.php
+    ³       ³               SvgResult.php
+    ³       ³               
+    ³       ÀÄÄÄtests
+    ³           ³   .gitignore
+    ³           ³   BuilderTest.php
+    ³           ³   QrCodeTest.php
+    ³           ³   ValidatorTest.php
+    ³           ³   
+    ³           ÀÄÄÄassets
+    ³                   symfony.png
+    ³                   
+    ÃÄÄÄmasterminds
+    ³   ÀÄÄÄhtml5
+    ³       ³   composer.json
+    ³       ³   CREDITS
+    ³       ³   LICENSE.txt
+    ³       ³   README.md
+    ³       ³   RELEASE.md
+    ³       ³   UPGRADING.md
+    ³       ³   
+    ³       ÃÄÄÄbin
+    ³       ³       entities.php
+    ³       ³       
+    ³       ÀÄÄÄsrc
+    ³           ³   HTML5.php
+    ³           ³   
+    ³           ÀÄÄÄHTML5
+    ³               ³   Elements.php
+    ³               ³   Entities.php
+    ³               ³   Exception.php
+    ³               ³   InstructionProcessor.php
+    ³               ³   
+    ³               ÃÄÄÄParser
+    ³               ³       CharacterReference.php
+    ³               ³       DOMTreeBuilder.php
+    ³               ³       EventHandler.php
+    ³               ³       FileInputStream.php
+    ³               ³       InputStream.php
+    ³               ³       ParseError.php
+    ³               ³       README.md
+    ³               ³       Scanner.php
+    ³               ³       StringInputStream.php
+    ³               ³       Tokenizer.php
+    ³               ³       TreeBuildingRules.php
+    ³               ³       UTF8Utils.php
+    ³               ³       
+    ³               ÀÄÄÄSerializer
+    ³                       HTML5Entities.php
+    ³                       OutputRules.php
+    ³                       README.md
+    ³                       RulesInterface.php
+    ³                       Traverser.php
+    ³                       
+    ÃÄÄÄphpmailer
+    ³   ÀÄÄÄphpmailer
+    ³       ³   COMMITMENT
+    ³       ³   composer.json
+    ³       ³   get_oauth_token.php
+    ³       ³   LICENSE
+    ³       ³   README.md
+    ³       ³   SECURITY.md
+    ³       ³   SMTPUTF8.md
+    ³       ³   VERSION
+    ³       ³   
+    ³       ÃÄÄÄlanguage
+    ³       ³       phpmailer.lang-af.php
+    ³       ³       phpmailer.lang-ar.php
+    ³       ³       phpmailer.lang-as.php
+    ³       ³       phpmailer.lang-az.php
+    ³       ³       phpmailer.lang-ba.php
+    ³       ³       phpmailer.lang-be.php
+    ³       ³       phpmailer.lang-bg.php
+    ³       ³       phpmailer.lang-bn.php
+    ³       ³       phpmailer.lang-ca.php
+    ³       ³       phpmailer.lang-cs.php
+    ³       ³       phpmailer.lang-da.php
+    ³       ³       phpmailer.lang-de.php
+    ³       ³       phpmailer.lang-el.php
+    ³       ³       phpmailer.lang-eo.php
+    ³       ³       phpmailer.lang-es.php
+    ³       ³       phpmailer.lang-et.php
+    ³       ³       phpmailer.lang-fa.php
+    ³       ³       phpmailer.lang-fi.php
+    ³       ³       phpmailer.lang-fo.php
+    ³       ³       phpmailer.lang-fr.php
+    ³       ³       phpmailer.lang-gl.php
+    ³       ³       phpmailer.lang-he.php
+    ³       ³       phpmailer.lang-hi.php
+    ³       ³       phpmailer.lang-hr.php
+    ³       ³       phpmailer.lang-hu.php
+    ³       ³       phpmailer.lang-hy.php
+    ³       ³       phpmailer.lang-id.php
+    ³       ³       phpmailer.lang-it.php
+    ³       ³       phpmailer.lang-ja.php
+    ³       ³       phpmailer.lang-ka.php
+    ³       ³       phpmailer.lang-ko.php
+    ³       ³       phpmailer.lang-ku.php
+    ³       ³       phpmailer.lang-lt.php
+    ³       ³       phpmailer.lang-lv.php
+    ³       ³       phpmailer.lang-mg.php
+    ³       ³       phpmailer.lang-mn.php
+    ³       ³       phpmailer.lang-ms.php
+    ³       ³       phpmailer.lang-nb.php
+    ³       ³       phpmailer.lang-nl.php
+    ³       ³       phpmailer.lang-pl.php
+    ³       ³       phpmailer.lang-pt.php
+    ³       ³       phpmailer.lang-pt_br.php
+    ³       ³       phpmailer.lang-ro.php
+    ³       ³       phpmailer.lang-ru.php
+    ³       ³       phpmailer.lang-si.php
+    ³       ³       phpmailer.lang-sk.php
+    ³       ³       phpmailer.lang-sl.php
+    ³       ³       phpmailer.lang-sr.php
+    ³       ³       phpmailer.lang-sr_latn.php
+    ³       ³       phpmailer.lang-sv.php
+    ³       ³       phpmailer.lang-tl.php
+    ³       ³       phpmailer.lang-tr.php
+    ³       ³       phpmailer.lang-uk.php
+    ³       ³       phpmailer.lang-ur.php
+    ³       ³       phpmailer.lang-vi.php
+    ³       ³       phpmailer.lang-zh.php
+    ³       ³       phpmailer.lang-zh_cn.php
+    ³       ³       
+    ³       ÀÄÄÄsrc
+    ³               DSNConfigurator.php
+    ³               Exception.php
+    ³               OAuth.php
+    ³               OAuthTokenProvider.php
+    ³               PHPMailer.php
+    ³               POP3.php
+    ³               SMTP.php
+    ³               
+    ÃÄÄÄsabberworm
+    ³   ÀÄÄÄphp-css-parser
+    ³       ³   CHANGELOG.md
+    ³       ³   composer.json
+    ³       ³   LICENSE
+    ³       ³   README.md
+    ³       ³   
+    ³       ÀÄÄÄsrc
+    ³           ³   CSSElement.php
+    ³           ³   OutputFormat.php
+    ³           ³   OutputFormatter.php
+    ³           ³   Parser.php
+    ³           ³   Renderable.php
+    ³           ³   Settings.php
+    ³           ³   
+    ³           ÃÄÄÄComment
+    ³           ³       Comment.php
+    ³           ³       Commentable.php
+    ³           ³       
+    ³           ÃÄÄÄCSSList
+    ³           ³       AtRuleBlockList.php
+    ³           ³       CSSBlockList.php
+    ³           ³       CSSList.php
+    ³           ³       Document.php
+    ³           ³       KeyFrame.php
+    ³           ³       
+    ³           ÃÄÄÄParsing
+    ³           ³       Anchor.php
+    ³           ³       OutputException.php
+    ³           ³       ParserState.php
+    ³           ³       SourceException.php
+    ³           ³       UnexpectedEOFException.php
+    ³           ³       UnexpectedTokenException.php
+    ³           ³       
+    ³           ÃÄÄÄPosition
+    ³           ³       Position.php
+    ³           ³       Positionable.php
+    ³           ³       
+    ³           ÃÄÄÄProperty
+    ³           ³       AtRule.php
+    ³           ³       Charset.php
+    ³           ³       CSSNamespace.php
+    ³           ³       Import.php
+    ³           ³       KeyframeSelector.php
+    ³           ³       Selector.php
+    ³           ³       
+    ³           ÃÄÄÄRule
+    ³           ³       Rule.php
+    ³           ³       
+    ³           ÃÄÄÄRuleSet
+    ³           ³       AtRuleSet.php
+    ³           ³       DeclarationBlock.php
+    ³           ³       RuleSet.php
+    ³           ³       
+    ³           ÀÄÄÄValue
+    ³                   CalcFunction.php
+    ³                   CalcRuleValueList.php
+    ³                   Color.php
+    ³                   CSSFunction.php
+    ³                   CSSString.php
+    ³                   LineName.php
+    ³                   PrimitiveValue.php
+    ³                   RuleValueList.php
+    ³                   Size.php
+    ³                   URL.php
+    ³                   Value.php
+    ³                   ValueList.php
+    ³                   
+    ÀÄÄÄvendor
+        ³   autoload.php
+        ³   
+        ÃÄÄÄcomposer
+        ³       autoload_classmap.php
+        ³       autoload_namespaces.php
+        ³       autoload_psr4.php
+        ³       autoload_real.php
+        ³       autoload_static.php
+        ³       ClassLoader.php
+        ³       installed.json
+        ³       installed.php
+        ³       InstalledVersions.php
+        ³       LICENSE
+        ³       platform_check.php
+        ³       
+        ÃÄÄÄparagonie
+        ³   ÀÄÄÄconstant_time_encoding
+        ³       ³   composer.json
+        ³       ³   LICENSE.txt
+        ³       ³   README.md
+        ³       ³   
+        ³       ÀÄÄÄsrc
+        ³               Base32.php
+        ³               Base32Hex.php
+        ³               Base64.php
+        ³               Base64DotSlash.php
+        ³               Base64DotSlashOrdered.php
+        ³               Base64UrlSafe.php
+        ³               Binary.php
+        ³               EncoderInterface.php
+        ³               Encoding.php
+        ³               Hex.php
+        ³               RFC4648.php
+        ³               
+        ÃÄÄÄpragmarx
+        ³   ÀÄÄÄgoogle2fa
+        ³       ³   CHANGELOG.md
+        ³       ³   composer.json
+        ³       ³   LICENSE.md
+        ³       ³   README.md
+        ³       ³   
+        ³       ÃÄÄÄ.github
+        ³       ³   ÀÄÄÄworkflows
+        ³       ³           run-tests.yml
+        ³       ³           
+        ³       ÀÄÄÄsrc
+        ³           ³   Google2FA.php
+        ³           ³   
+        ³           ÃÄÄÄExceptions
+        ³           ³   ³   Google2FAException.php
+        ³           ³   ³   IncompatibleWithGoogleAuthenticatorException.php
+        ³           ³   ³   InvalidAlgorithmException.php
+        ³           ³   ³   InvalidCharactersException.php
+        ³           ³   ³   SecretKeyTooShortException.php
+        ³           ³   ³   
+        ³           ³   ÀÄÄÄContracts
+        ³           ³           Google2FA.php
+        ³           ³           IncompatibleWithGoogleAuthenticator.php
+        ³           ³           InvalidAlgorithm.php
+        ³           ³           InvalidCharacters.php
+        ³           ³           SecretKeyTooShort.php
+        ³           ³           
+        ³           ÀÄÄÄSupport
+        ³                   Base32.php
+        ³                   Constants.php
+        ³                   QRCode.php
+        ³                   
+        ÀÄÄÄtecnickcom
+            ÀÄÄÄtcpdf
+                ³   CHANGELOG.TXT
+                ³   composer.json
+                ³   LICENSE.TXT
+                ³   README.md
+                ³   tcpdf.php
+                ³   tcpdf_autoconfig.php
+                ³   tcpdf_barcodes_1d.php
+                ³   tcpdf_barcodes_2d.php
+                ³   VERSION
+                ³   
+                ÃÄÄÄconfig
+                ³       tcpdf_config.php
+                ³       
+                ÃÄÄÄfonts
+                ³   ³   aealarabiya.ctg.z
+                ³   ³   aealarabiya.php
+                ³   ³   aealarabiya.z
+                ³   ³   aefurat.ctg.z
+                ³   ³   aefurat.php
+                ³   ³   aefurat.z
+                ³   ³   cid0cs.php
+                ³   ³   cid0ct.php
+                ³   ³   cid0jp.php
+                ³   ³   cid0kr.php
+                ³   ³   courier.php
+                ³   ³   courierb.php
+                ³   ³   courierbi.php
+                ³   ³   courieri.php
+                ³   ³   dejavusans.ctg.z
+                ³   ³   dejavusans.php
+                ³   ³   dejavusans.z
+                ³   ³   dejavusansb.ctg.z
+                ³   ³   dejavusansb.php
+                ³   ³   dejavusansb.z
+                ³   ³   dejavusansbi.ctg.z
+                ³   ³   dejavusansbi.php
+                ³   ³   dejavusansbi.z
+                ³   ³   dejavusanscondensed.ctg.z
+                ³   ³   dejavusanscondensed.php
+                ³   ³   dejavusanscondensed.z
+                ³   ³   dejavusanscondensedb.ctg.z
+                ³   ³   dejavusanscondensedb.php
+                ³   ³   dejavusanscondensedb.z
+                ³   ³   dejavusanscondensedbi.ctg.z
+                ³   ³   dejavusanscondensedbi.php
+                ³   ³   dejavusanscondensedbi.z
+                ³   ³   dejavusanscondensedi.ctg.z
+                ³   ³   dejavusanscondensedi.php
+                ³   ³   dejavusanscondensedi.z
+                ³   ³   dejavusansextralight.ctg.z
+                ³   ³   dejavusansextralight.php
+                ³   ³   dejavusansextralight.z
+                ³   ³   dejavusansi.ctg.z
+                ³   ³   dejavusansi.php
+                ³   ³   dejavusansi.z
+                ³   ³   dejavusansmono.ctg.z
+                ³   ³   dejavusansmono.php
+                ³   ³   dejavusansmono.z
+                ³   ³   dejavusansmonob.ctg.z
+                ³   ³   dejavusansmonob.php
+                ³   ³   dejavusansmonob.z
+                ³   ³   dejavusansmonobi.ctg.z
+                ³   ³   dejavusansmonobi.php
+                ³   ³   dejavusansmonobi.z
+                ³   ³   dejavusansmonoi.ctg.z
+                ³   ³   dejavusansmonoi.php
+                ³   ³   dejavusansmonoi.z
+                ³   ³   dejavuserif.ctg.z
+                ³   ³   dejavuserif.php
+                ³   ³   dejavuserif.z
+                ³   ³   dejavuserifb.ctg.z
+                ³   ³   dejavuserifb.php
+                ³   ³   dejavuserifb.z
+                ³   ³   dejavuserifbi.ctg.z
+                ³   ³   dejavuserifbi.php
+                ³   ³   dejavuserifbi.z
+                ³   ³   dejavuserifcondensed.ctg.z
+                ³   ³   dejavuserifcondensed.php
+                ³   ³   dejavuserifcondensed.z
+                ³   ³   dejavuserifcondensedb.ctg.z
+                ³   ³   dejavuserifcondensedb.php
+                ³   ³   dejavuserifcondensedb.z
+                ³   ³   dejavuserifcondensedbi.ctg.z
+                ³   ³   dejavuserifcondensedbi.php
+                ³   ³   dejavuserifcondensedbi.z
+                ³   ³   dejavuserifcondensedi.ctg.z
+                ³   ³   dejavuserifcondensedi.php
+                ³   ³   dejavuserifcondensedi.z
+                ³   ³   dejavuserifi.ctg.z
+                ³   ³   dejavuserifi.php
+                ³   ³   dejavuserifi.z
+                ³   ³   freemono.ctg.z
+                ³   ³   freemono.php
+                ³   ³   freemono.z
+                ³   ³   freemonob.ctg.z
+                ³   ³   freemonob.php
+                ³   ³   freemonob.z
+                ³   ³   freemonobi.ctg.z
+                ³   ³   freemonobi.php
+                ³   ³   freemonobi.z
+                ³   ³   freemonoi.ctg.z
+                ³   ³   freemonoi.php
+                ³   ³   freemonoi.z
+                ³   ³   freesans.ctg.z
+                ³   ³   freesans.php
+                ³   ³   freesans.z
+                ³   ³   freesansb.ctg.z
+                ³   ³   freesansb.php
+                ³   ³   freesansb.z
+                ³   ³   freesansbi.ctg.z
+                ³   ³   freesansbi.php
+                ³   ³   freesansbi.z
+                ³   ³   freesansi.ctg.z
+                ³   ³   freesansi.php
+                ³   ³   freesansi.z
+                ³   ³   freeserif.ctg.z
+                ³   ³   freeserif.php
+                ³   ³   freeserif.z
+                ³   ³   freeserifb.ctg.z
+                ³   ³   freeserifb.php
+                ³   ³   freeserifb.z
+                ³   ³   freeserifbi.ctg.z
+                ³   ³   freeserifbi.php
+                ³   ³   freeserifbi.z
+                ³   ³   freeserifi.ctg.z
+                ³   ³   freeserifi.php
+                ³   ³   freeserifi.z
+                ³   ³   helvetica.php
+                ³   ³   helveticab.php
+                ³   ³   helveticabi.php
+                ³   ³   helveticai.php
+                ³   ³   hysmyeongjostdmedium.php
+                ³   ³   kozgopromedium.php
+                ³   ³   kozminproregular.php
+                ³   ³   msungstdlight.php
+                ³   ³   pdfacourier.php
+                ³   ³   pdfacourier.z
+                ³   ³   pdfacourierb.php
+                ³   ³   pdfacourierb.z
+                ³   ³   pdfacourierbi.php
+                ³   ³   pdfacourierbi.z
+                ³   ³   pdfacourieri.php
+                ³   ³   pdfacourieri.z
+                ³   ³   pdfahelvetica.php
+                ³   ³   pdfahelvetica.z
+                ³   ³   pdfahelveticab.php
+                ³   ³   pdfahelveticab.z
+                ³   ³   pdfahelveticabi.php
+                ³   ³   pdfahelveticabi.z
+                ³   ³   pdfahelveticai.php
+                ³   ³   pdfahelveticai.z
+                ³   ³   pdfasymbol.php
+                ³   ³   pdfasymbol.z
+                ³   ³   pdfatimes.php
+                ³   ³   pdfatimes.z
+                ³   ³   pdfatimesb.php
+                ³   ³   pdfatimesb.z
+                ³   ³   pdfatimesbi.php
+                ³   ³   pdfatimesbi.z
+                ³   ³   pdfatimesi.php
+                ³   ³   pdfatimesi.z
+                ³   ³   pdfazapfdingbats.php
+                ³   ³   pdfazapfdingbats.z
+                ³   ³   stsongstdlight.php
+                ³   ³   symbol.php
+                ³   ³   times.php
+                ³   ³   timesb.php
+                ³   ³   timesbi.php
+                ³   ³   timesi.php
+                ³   ³   uni2cid_ac15.php
+                ³   ³   uni2cid_ag15.php
+                ³   ³   uni2cid_aj16.php
+                ³   ³   uni2cid_ak12.php
+                ³   ³   zapfdingbats.php
+                ³   ³   
+                ³   ÃÄÄÄae_fonts_2.0
+                ³   ³       ChangeLog
+                ³   ³       COPYING
+                ³   ³       README
+                ³   ³       
+                ³   ÃÄÄÄdejavu-fonts-ttf-2.33
+                ³   ³       AUTHORS
+                ³   ³       BUGS
+                ³   ³       langcover.txt
+                ³   ³       LICENSE
+                ³   ³       NEWS
+                ³   ³       README
+                ³   ³       unicover.txt
+                ³   ³       
+                ³   ÃÄÄÄdejavu-fonts-ttf-2.34
+                ³   ³       AUTHORS
+                ³   ³       BUGS
+                ³   ³       langcover.txt
+                ³   ³       LICENSE
+                ³   ³       NEWS
+                ³   ³       README
+                ³   ³       unicover.txt
+                ³   ³       
+                ³   ÃÄÄÄfreefont-20100919
+                ³   ³       AUTHORS
+                ³   ³       ChangeLog
+                ³   ³       COPYING
+                ³   ³       CREDITS
+                ³   ³       INSTALL
+                ³   ³       README
+                ³   ³       
+                ³   ÀÄÄÄfreefont-20120503
+                ³           AUTHORS
+                ³           ChangeLog
+                ³           COPYING
+                ³           CREDITS
+                ³           INSTALL
+                ³           README
+                ³           TROUBLESHOOTING
+                ³           USAGE
+                ³           
+                ÃÄÄÄinclude
+                ³   ³   sRGB.icc
+                ³   ³   tcpdf_colors.php
+                ³   ³   tcpdf_filters.php
+                ³   ³   tcpdf_fonts.php
+                ³   ³   tcpdf_font_data.php
+                ³   ³   tcpdf_images.php
+                ³   ³   tcpdf_static.php
+                ³   ³   
+                ³   ÀÄÄÄbarcodes
+                ³           datamatrix.php
+                ³           pdf417.php
+                ³           qrcode.php
+                ³           
+                ÀÄÄÄtools
+                        .htaccess
+                        convert_fonts_examples.txt
+                        tcpdf_addfont.php
+                        

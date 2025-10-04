@@ -86,8 +86,8 @@ function send2FACode($email, $code, $username) {
         $mail->isSMTP();
         $mail->Host       = 'smtp.gmail.com';
         $mail->SMTPAuth   = true;
-        $mail->Username   = 'mulhomabiala29@gmail.com';
-        $mail->Password   = 'khli pyzj ihte qdgu'; // À déplacer dans un fichier de config sécurisé !
+        $mail->Username   = 'restaurantmulho@gmail.com';
+        $mail->Password   = 'opty ztuw fjzw vwhx'; // À déplacer dans un fichier de config sécurisé !
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = 587;
 

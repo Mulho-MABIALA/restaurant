@@ -1,9 +1,11 @@
 <?php
 require_once '../config.php';
+require_once './permissions.php';
+
 
 $categorieId = isset($plat['categorie_id']) ? $plat['categorie_id'] : null;
 $nomCategorie = isset($categories[$categorieId]) ? $categories[$categorieId] : 'Non catégorisé';
-
+requireAccess($conn, $_SESSION['admin_id'], 'gestion_plats');
 try {
     // Récupération des catégories
     $categories = $conn->query("SELECT id, nom FROM categories ORDER BY nom")->fetchAll(PDO::FETCH_ASSOC);

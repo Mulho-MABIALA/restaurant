@@ -1,19 +1,15 @@
 <?php
-require_once __DIR__ . '/../config.php';
+require_once '../config.php';
+require_once './permissions.php';
 
-try {
-    // Récupération des catégories depuis la table dédiée 'categories'
-    $stmt = $conn->query("
-        SELECT id, nom 
-        FROM categories 
-        ORDER BY nom ASC
-    ");
-    $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-} catch (PDOException $e) {
-    // Gestion d'erreur et fallback
-    error_log("Erreur de récupération des catégories: " . $e->getMessage());
-    $categories = [];
+$adminId = $_SESSION['admin_id'] ?? null;
+$userRole = '';
+
+if ($adminId) {
+    $stmt = $conn->prepare("SELECT role FROM admin WHERE id = ?");
+    $stmt->execute([$adminId]);
+    $admin = $stmt->fetch(PDO::FETCH_ASSOC);
+    $userRole = $admin['role'] ?? '';
 }
 ?>
 
@@ -288,7 +284,6 @@ try {
             }
         }
         
-        /* Amélioration des dropdowns */
         .dropdown-menu {
             background: rgba(31, 41, 55, 0.95);
             backdrop-filter: blur(16px);
@@ -317,7 +312,6 @@ try {
             height: 60%;
         }
         
-        /* Animation d'entrée améliorée */
         .animate-fade-in-up {
             animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
         }
@@ -333,7 +327,6 @@ try {
             }
         }
         
-        /* Shimmer effect pour les éléments interactifs */
         .shimmer {
             background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
             background-size: 200% 100%;
@@ -387,6 +380,7 @@ try {
     <nav class="px-4 py-6 space-y-6 overflow-y-auto h-full scrollbar-thin">
         
         <!-- Dashboard Section -->
+        <?php if (canAccess($conn, $adminId, 'dashboard')): ?>
         <div class="space-y-3 animate-fade-in">
             <h2 class="section-title text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 flex items-center pb-2">
                 <div class="w-2 h-2 bg-primary rounded-full mr-3 animate-pulse-soft"></div>
@@ -403,14 +397,17 @@ try {
                 <div class="w-2 h-2 bg-white rounded-full opacity-80 group-hover:opacity-100 transition-opacity"></div>
             </a>
         </div>
+        <?php endif; ?>
         
         <!-- Restaurant Management -->
+        <?php if (anyVisible($conn, $adminId, ['reservations', 'commandes', 'gestion_plats', 'categories_plats', 'gallery', 'admin_evenements', 'horaires', 'admin_newsletter', 'avis_admin'])): ?>
         <div class="space-y-3 animate-fade-in" style="animation-delay: 0.1s">
             <h2 class="section-title text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 flex items-center pb-2">
                 <div class="w-2 h-2 bg-accent rounded-full mr-3 animate-pulse-soft" style="animation-delay: 0.5s"></div>
                 Gestion Restaurant
             </h2>
             <div class="space-y-2">
+                <?php if (canAccess($conn, $adminId, 'reservations')): ?>
                 <a href="reservations.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-calendar-check nav-icon text-lg"></i>
@@ -421,6 +418,9 @@ try {
                     </div>
                     <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
                 </a>
+                <?php endif; ?>
+                
+                <?php if (canAccess($conn, $adminId, 'commandes')): ?>
                 <a href="commandes.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-receipt nav-icon text-lg"></i>
@@ -431,7 +431,9 @@ try {
                     </div>
                     <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
                 </a>
+                <?php endif; ?>
                 
+                <?php if (canAccess($conn, $adminId, 'gestion_plats')): ?>
                 <a href="gestion_plats.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-utensils nav-icon text-lg"></i>
@@ -442,7 +444,9 @@ try {
                     </div>
                     <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
                 </a>
+                <?php endif; ?>
                 
+                <?php if (canAccess($conn, $adminId, 'categories_plats')): ?>
                 <a href="categories_plats.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-folder nav-icon text-lg"></i>
@@ -453,7 +457,9 @@ try {
                     </div>
                     <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
                 </a>
+                <?php endif; ?>
         
+                <?php if (canAccess($conn, $adminId, 'gallery')): ?>
                 <a href="gallery.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-images nav-icon text-lg"></i>
@@ -464,17 +470,22 @@ try {
                     </div>
                     <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
                 </a>
-            <a href="admin_evenements.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
-                <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
-                    <i class="fas fa-calendar-alt nav-icon text-lg"></i>
-                </div>
-                <div class="flex-1">
-                    <span class="font-medium text-base">Événements</span>
-                    <p class="nav-description text-sm text-gray-400 opacity-80">Gestion des événements</p>
-                </div>
-                <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
-            </a>
+                <?php endif; ?>
                 
+                <?php if (canAccess($conn, $adminId, 'admin_evenements')): ?>
+                <a href="admin_evenements.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
+                    <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
+                        <i class="fas fa-calendar-alt nav-icon text-lg"></i>
+                    </div>
+                    <div class="flex-1">
+                        <span class="font-medium text-base">Événements</span>
+                        <p class="nav-description text-sm text-gray-400 opacity-80">Gestion des événements</p>
+                    </div>
+                    <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
+                </a>
+                <?php endif; ?>
+                
+                <?php if (canAccess($conn, $adminId, 'horaires')): ?>
                 <a href="horaires.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-clock nav-icon text-lg"></i>
@@ -485,6 +496,9 @@ try {
                     </div>
                     <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
                 </a>
+                <?php endif; ?>
+                
+                <?php if (canAccess($conn, $adminId, 'admin_newsletter')): ?>
                 <a href="admin_newsletter.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-envelope nav-icon text-lg"></i>
@@ -495,18 +509,23 @@ try {
                     </div>
                     <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
                 </a>
+                <?php endif; ?>
         
-        <a href="avis_admin.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
-            <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
-                <i class="fas fa-comments nav-icon text-lg"></i>
-            </div>
-            <div class="flex-1">
-                <span class="font-medium text-base">Avis Clients</span>
-                <p class="nav-description text-sm text-gray-400 opacity-80">Gestion des avis clients</p>
-            </div>
-            <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
-        </a>
+                <?php if (canAccess($conn, $adminId, 'avis_admin')): ?>
+                <a href="avis_admin.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
+                    <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
+                        <i class="fas fa-comments nav-icon text-lg"></i>
+                    </div>
+                    <div class="flex-1">
+                        <span class="font-medium text-base">Avis Clients</span>
+                        <p class="nav-description text-sm text-gray-400 opacity-80">Gestion des avis clients</p>
+                    </div>
+                    <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
+                </a>
+                <?php endif; ?>
+                
                 <!-- Communication Dropdown -->
+                <?php if (anyVisible($conn, $adminId, ['annonces', 'annonces_public', 'add_procedure', 'voir_annonce', 'procedures', 'incidents'])): ?>
                 <div x-data="{ open: false }" class="relative">
                     <button type="button"
                         class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl w-full focus:outline-none"
@@ -534,42 +553,123 @@ try {
                          class="mt-3 ml-8 space-y-1 dropdown-menu rounded-xl shadow-2xl py-3 w-[85%] z-10 absolute left-0"
                          style="display: none;"
                     >
+                        <?php if (canAccess($conn, $adminId, 'annonces')): ?>
                         <a href="communication/annonces.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                             <i class="fas fa-bullhorn mr-3 w-5 text-sm"></i>
                             <span class="font-medium">Annonces internes</span>
                         </a>
+                        <?php endif; ?>
+                        
+                        <?php if (canAccess($conn, $adminId, 'annonces_public')): ?>
                         <a href="communication/annonces_public.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                             <i class="fas fa-bullhorn mr-3 w-5 text-sm"></i>
                             <span class="font-medium">Annonces public</span>
                         </a>
-                         <a href="communication/add_procedure.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                        <?php endif; ?>
+                        
+                        <?php if (canAccess($conn, $adminId, 'add_procedure')): ?>
+                        <a href="communication/add_procedure.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                             <i class="fas fa-book mr-3 w-5 text-sm"></i>
                             <span class="font-medium">Ajouter Procédures internes</span>
                         </a>
-                        <a href="ommunication/voir_annonce.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                        <?php endif; ?>
+                        
+                        <?php if (canAccess($conn, $adminId, 'voir_annonce')): ?>
+                        <a href="communication/voir_annonce.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                             <i class="fas fa-bullhorn mr-3 w-5 text-sm"></i>
                             <span class="font-medium">Voir annonces</span>
                         </a>
+                        <?php endif; ?>
+                        
+                        <?php if (canAccess($conn, $adminId, 'procedures')): ?>
                         <a href="communication/procedures.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                             <i class="fas fa-book mr-3 w-5 text-sm"></i>
-                            <span class="font-medium">voir Procédures internes</span>
+                            <span class="font-medium">Voir Procédures internes</span>
                         </a>
+                        <?php endif; ?>
+                        
+                        <?php if (canAccess($conn, $adminId, 'incidents')): ?>
                         <a href="communication/incidents.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                             <i class="fas fa-exclamation-triangle mr-3 w-5 text-sm"></i>
                             <span class="font-medium">Signalements</span>
                         </a>
+                        <?php endif; ?>
                     </div>
                 </div>
+                <?php endif; ?>
             </div>
         </div>
+        <?php endif; ?>
+        
+        <!-- Finances Dropdown -->
+        <?php if (anyVisible($conn, $adminId, ['dashboard_finances', 'facturation', 'rapports', 'tresorerie'])): ?>
+        <div x-data="{ open: false }" class="relative animate-fade-in" style="animation-delay: 0.15s">
+            <button type="button"
+                class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl w-full focus:outline-none"
+                @click="open = !open"
+                aria-haspopup="true"
+                :aria-expanded="open"
+            >
+                <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
+                    <i class="fas fa-coins nav-icon text-lg"></i>
+                </div>
+                <div class="flex-1 text-left">
+                    <span class="font-medium text-base">Finances</span>
+                    <p class="nav-description text-sm text-gray-400 opacity-80">Gestion financière</p>
+                </div>
+                <i class="fas fa-chevron-down text-xs ml-2 transition-transform duration-300"
+                   :class="open ? 'rotate-180' : ''"></i>
+            </button>
+            <div x-show="open" @click.away="open = false"
+                 x-transition:enter="transition ease-out duration-300"
+                 x-transition:enter-start="opacity-0 scale-95 -translate-y-2"
+                 x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                 x-transition:leave="transition ease-in duration-200"
+                 x-transition:leave-start="opacity-100 scale-100 translate-y-0"
+                 x-transition:leave-end="opacity-0 scale-95 -translate-y-2"
+                 class="mt-3 ml-8 space-y-1 dropdown-menu rounded-xl shadow-2xl py-3 w-[85%] z-10 absolute left-0"
+                 style="display: none;"
+            >
+                <?php if (canAccess($conn, $adminId, 'dashboard_finances')): ?>
+                <a href="dashboard.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                    <i class="fas fa-tachometer-alt mr-3 w-5 text-sm"></i>
+                    <span class="font-medium">Dashboard</span>
+                </a>
+                <?php endif; ?>
+                
+                <?php if (canAccess($conn, $adminId, 'facturation')): ?>
+                <a href="facturation.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                    <i class="fas fa-file-invoice-dollar mr-3 w-5 text-sm"></i>
+                    <span class="font-medium">Facturation</span>
+                </a>
+                <?php endif; ?>
+                
+                <?php if (canAccess($conn, $adminId, 'rapports')): ?>
+                <a href="rapports.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                    <i class="fas fa-chart-pie mr-3 w-5 text-sm"></i>
+                    <span class="font-medium">Rapports</span>
+                </a>
+                <?php endif; ?>
+                
+                <?php if (canAccess($conn, $adminId, 'tresorerie')): ?>
+                <a href="tresorerie.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                    <i class="fas fa-piggy-bank mr-3 w-5 text-sm"></i>
+                    <span class="font-medium">Trésorerie</span>
+                </a>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php endif; ?>
         
         <!-- Administration Section -->
+        <?php if (anyVisible($conn, $adminId, ['gestion_stock', 'gestion_employe', 'gestion_postes', 'planification_horaires', 'gestion_paie', 'badgeuse', 'presence', 'generate_badge', 'admin_gestion', 'gestion_droits', 'statistiques'])): ?>
         <div class="space-y-3 animate-fade-in" style="animation-delay: 0.2s">
             <h2 class="section-title text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 flex items-center pb-2">
                 <div class="w-2 h-2 bg-blue-500 rounded-full mr-3 animate-pulse-soft" style="animation-delay: 1s"></div>
                 Administration
             </h2>
             <div class="space-y-2">
+                <?php if (canAccess($conn, $adminId, 'gestion_stock')): ?>
                 <a href="gestion_stock.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-boxes nav-icon text-lg"></i>
@@ -580,82 +680,108 @@ try {
                     </div>
                     <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
                 </a>
-            <!-- Employés Dropdown -->
-            <div x-data="{ open: false }" class="relative">
-                <button type="button"
-                    class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl w-full focus:outline-none"
-                    @click="open = !open"
-                    aria-haspopup="true"
-                    :aria-expanded="open"
-                >
-                    <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
-                        <i class="fas fa-user-tie nav-icon text-lg"></i>
-                    </div>
-                    <div class="flex-1 text-left">
-                        <span class="font-medium text-base">Employés</span>
-                        <p class="nav-description text-sm text-gray-400 opacity-80">Gestion des employés</p>
-                    </div>
-                    <i class="fas fa-chevron-down text-xs ml-2 transition-transform duration-300"
-                       :class="open ? 'rotate-180' : ''"></i>
-                </button>
-                <div x-show="open" @click.away="open = false"
-                     x-transition:enter="transition ease-out duration-300"
-                     x-transition:enter-start="opacity-0 scale-95 -translate-y-2"
-                     x-transition:enter-end="opacity-100 scale-100 translate-y-0"
-                     x-transition:leave="transition ease-in duration-200"
-                     x-transition:leave-start="opacity-100 scale-100 translate-y-0"
-                     x-transition:leave-end="opacity-0 scale-95 -translate-y-2"
-                     class="mt-3 ml-8 space-y-1 dropdown-menu rounded-xl shadow-2xl py-3 w-[85%] z-10 absolute left-0"
-                     style="display: none;"
-                >
-                    <a href="gestion_employe.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
-                        <i class="fas fa-users mr-3 w-5 text-sm"></i>
-                        <span class="font-medium">Liste des employés</span>
-                    </a>
-                    <a href="gestion_postes.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
-                        <i class="fas fa-briefcase mr-3 w-5 text-sm"></i>
-                        <span class="font-medium">Gestion des postes</span>
-                    </a>
-                    <a href="planification_horaires.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
-                        <i class="fas fa-calendar-alt mr-3 w-5 text-sm"></i>
-                        <span class="font-medium">Planification horaire</span>
-                    </a>
-                    <a href="gestion_paie.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
-                        <i class="fas fa-briefcase mr-3 w-5 text-sm"></i>
-                        <span class="font-medium">Gestion paie</span>
-                    </a>
-                    <!-- Pointage Dropdown -->
-                    <div x-data="{ open: false }" class="relative">
-                        <button type="button"
-                            class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl w-full focus:outline-none"
-                            @click="open = !open"
-                            aria-haspopup="true"
-                            :aria-expanded="open"
-                        >
-                            <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
-                                <i class="fas fa-fingerprint nav-icon text-lg"></i>
+                <?php endif; ?>
+                
+                <!-- Employés Dropdown -->
+                <?php if (anyVisible($conn, $adminId, ['gestion_employe', 'gestion_postes', 'planification_horaires', 'gestion_paie', 'badgeuse', 'presence', 'generate_badge'])): ?>
+                <div x-data="{ open: false }" class="relative">
+                    <button type="button"
+                        class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl w-full focus:outline-none"
+                        @click="open = !open"
+                        aria-haspopup="true"
+                        :aria-expanded="open"
+                    >
+                        <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
+                            <i class="fas fa-user-tie nav-icon text-lg"></i>
+                        </div>
+                        <div class="flex-1 text-left">
+                            <span class="font-medium text-base">Employés</span>
+                            <p class="nav-description text-sm text-gray-400 opacity-80">Gestion des employés</p>
+                        </div>
+                        <i class="fas fa-chevron-down text-xs ml-2 transition-transform duration-300"
+                           :class="open ? 'rotate-180' : ''"></i>
+                    </button>
+                    <div x-show="open" @click.away="open = false"
+                         x-transition:enter="transition ease-out duration-300"
+                         x-transition:enter-start="opacity-0 scale-95 -translate-y-2"
+                         x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                         x-transition:leave="transition ease-in duration-200"
+                         x-transition:leave-start="opacity-100 scale-100 translate-y-0"
+                         x-transition:leave-end="opacity-0 scale-95 -translate-y-2"
+                         class="mt-3 ml-8 space-y-1 dropdown-menu rounded-xl shadow-2xl py-3 w-[85%] z-10 absolute left-0"
+                         style="display: none;"
+                    >
+                        <?php if (canAccess($conn, $adminId, 'gestion_employe')): ?>
+                        <a href="gestion_employe.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                            <i class="fas fa-users mr-3 w-5 text-sm"></i>
+                            <span class="font-medium">Liste des employés</span>
+                        </a>
+                        <?php endif; ?>
+                        
+                        <?php if (canAccess($conn, $adminId, 'gestion_postes')): ?>
+                        <a href="gestion_postes.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                            <i class="fas fa-briefcase mr-3 w-5 text-sm"></i>
+                            <span class="font-medium">Gestion des postes</span>
+                        </a>
+                        <?php endif; ?>
+                        
+                        <?php if (canAccess($conn, $adminId, 'planification_horaires')): ?>
+                        <a href="planification_horaires.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                            <i class="fas fa-calendar-alt mr-3 w-5 text-sm"></i>
+                            <span class="font-medium">Planification horaire</span>
+                        </a>
+                        <?php endif; ?>
+                        
+                        <?php if (canAccess($conn, $adminId, 'gestion_paie')): ?>
+                        <a href="gestion_paie.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                            <i class="fas fa-briefcase mr-3 w-5 text-sm"></i>
+                            <span class="font-medium">Gestion paie</span>
+                        </a>
+                        <?php endif; ?>
+                        
+                        <!-- Pointage Dropdown -->
+                        <?php if (anyVisible($conn, $adminId, ['badgeuse', 'presence', 'generate_badge'])): ?>
+                        <div x-data="{ openPointage: false }" class="relative">
+                            <button type="button"
+                                class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300 w-full"
+                                @click="openPointage = !openPointage"
+                            >
+                                <i class="fas fa-fingerprint mr-3 w-5 text-sm"></i>
+                                <span class="font-medium flex-1 text-left">Pointage</span>
+                                <i class="fas fa-chevron-down text-xs transition-transform duration-300"
+                                   :class="openPointage ? 'rotate-180' : ''"></i>
+                            </button>
+                            
+                            <!-- Sous-menus Pointage -->
+                            <div x-show="openPointage" class="ml-8 space-y-1 mt-1">
+                                <?php if (canAccess($conn, $adminId, 'badgeuse')): ?>
+                                <a href="badgeuse.php" class="dropdown-item flex items-center px-4 py-2 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                                    <i class="fas fa-id-card mr-3 w-5 text-sm"></i>
+                                    <span class="font-medium">Badgeuse</span>
+                                </a>
+                                <?php endif; ?>
+                                
+                                <?php if (canAccess($conn, $adminId, 'presence')): ?>
+                                <a href="presence.php" class="dropdown-item flex items-center px-4 py-2 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                                    <i class="fas fa-user-check mr-3 w-5 text-sm"></i>
+                                    <span class="font-medium">Présence</span>
+                                </a>
+                                <?php endif; ?>
+                                
+                                <?php if (canAccess($conn, $adminId, 'generate_badge')): ?>
+                                <a href="generate_badge.php" class="dropdown-item flex items-center px-4 py-2 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                                    <i class="fas fa-barcode mr-3 w-5 text-sm"></i>
+                                    <span class="font-medium">Générer badges</span>
+                                </a>
+                                <?php endif; ?>
                             </div>
-                            <div class="flex-1 text-left">
-                                <span class="font-medium text-base">Pointage</span>
-                                </div>
-                                </button>
-                                <!-- Sous-menus Pointage en dehors du dropdown -->
-                                <div class="ml-8 space-y-1">
-                                    <a href="badgeuse.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
-                                        <i class="fas fa-id-card mr-3 w-5 text-sm"></i>
-                                        <span class="font-medium">Badgeuse</span>
-                                    </a>
-                                    <a href="presence.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
-                                        <i class="fas fa-user-check mr-3 w-5 text-sm"></i>
-                                        <span class="font-medium">Présence</span>
-                                    </a>
-                                    <a href="generate_badge.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
-                                        <i class="fas fa-barcode mr-3 w-5 text-sm"></i>
-                                        <span class="font-medium">Générer badges</span>
-                                    </a>
-                                </div>
-                            </div>
+                        </div>
+                        <?php endif; ?>
+                    </div>
                 </div>
+                <?php endif; ?>
+                
+                <?php if (canAccess($conn, $adminId, 'admin_gestion')): ?>
                 <a href="admin_gestion.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-users-cog nav-icon text-lg"></i>
@@ -666,17 +792,22 @@ try {
                     </div>
                     <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
                 </a>
+                <?php endif; ?>
+                
+                <?php if (canAccess($conn, $adminId, 'gestion_droits') || $userRole === 'superadmin'): ?>
                 <a href="gestion_droits.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-user-shield nav-icon text-lg"></i>
                     </div>
-                    
                     <div class="flex-1">
                         <span class="font-medium text-base">Gestion des Droits</span>
                         <p class="nav-description text-sm text-gray-400 opacity-80">Gestion des accès et permissions</p>
                     </div>
                     <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
                 </a>
+                <?php endif; ?>
+                
+                <?php if (canAccess($conn, $adminId, 'statistiques')): ?>
                 <a href="statistiques.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-chart-line nav-icon text-lg"></i>
@@ -687,8 +818,10 @@ try {
                     </div>
                     <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
                 </a>
+                <?php endif; ?>
             </div>
         </div>
+        <?php endif; ?>
         
         <!-- Divider -->
         <div class="relative px-4 py-6 animate-fade-in" style="animation-delay: 0.3s">
@@ -756,7 +889,6 @@ try {
         mobileOverlay.classList.toggle('pointer-events-none');
         document.body.classList.toggle('overflow-hidden');
         
-        // Animation améliorée pour le bouton mobile
         const btn = mobileMenuBtn.querySelector('i');
         btn.style.transform = sidebar.classList.contains('open') ? 'rotate(90deg)' : 'rotate(0deg)';
     }
@@ -765,7 +897,6 @@ try {
     closeSidebar.addEventListener('click', toggleSidebar);
     mobileOverlay.addEventListener('click', toggleSidebar);
     
-    // Close sidebar on window resize if open on mobile
     window.addEventListener('resize', function() {
         if (window.innerWidth >= 1024) {
             sidebar.classList.remove('open');
@@ -776,7 +907,6 @@ try {
         }
     });
     
-    // Animation d'entrée progressive des éléments
     document.addEventListener('DOMContentLoaded', function() {
         const navItems = document.querySelectorAll('.nav-item');
         navItems.forEach((item, index) => {
@@ -785,7 +915,6 @@ try {
         });
     });
     
-    // Effet de hover amélioré pour les icônes
     const navIcons = document.querySelectorAll('.nav-icon');
     navIcons.forEach(icon => {
         const navItem = icon.closest('.nav-item');

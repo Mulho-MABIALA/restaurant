@@ -1,14 +1,13 @@
 <?php
-
-require_once '../config.php';
-
 session_start();
+require_once '../config.php';
+require_once './permissions.php';
 // Rediriger si l'admin n'est pas connecté
     if (! isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
         header('Location: login.php');
         exit;
     }
-
+requireAccess($conn, $_SESSION['admin_id'], 'avis_admin');
 // Traitement des actions
 if (isset($_GET['action'])) {
     $action = $_GET['action'];

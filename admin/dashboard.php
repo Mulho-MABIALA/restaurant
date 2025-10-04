@@ -387,6 +387,76 @@ if ($admin_id > 0) {
         ::-webkit-scrollbar-thumb:hover {
             background: rgba(3, 105, 161, 0.6);
         }
+
+        /* Styles des cartes modernes de gestion_plats.php */
+.dashboard-card {
+    background: rgba(30, 41, 59, 0.8);
+    backdrop-filter: blur(20px);
+    border-radius: 16px;
+    padding: 24px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.dashboard-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--card-accent, #3b82f6);
+    border-radius: 16px 16px 0 0;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2), 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.card-purple { --card-accent: #8b5cf6; }
+.card-red { --card-accent: #ef4444; }
+.card-blue { --card-accent: #3b82f6; }
+.card-green { --card-accent: #10b981; }
+.card-orange { --card-accent: #f59e0b; }
+.card-cyan { --card-accent: #06b6d4; }
+
+.icon-wrapper {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    transition: transform 0.3s ease;
+}
+
+.dashboard-card:hover .icon-wrapper {
+    transform: scale(1.1) rotate(5deg);
+}
+
+.icon-purple { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
+.icon-red { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+.icon-blue { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+.icon-green { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+.icon-orange { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+.icon-cyan { background: rgba(6, 182, 212, 0.2); color: #22d3ee; }
+
+/* Animation des cartes au chargement */
+@keyframes fadeIn {
+    0% { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.5s ease-in-out forwards;
+    opacity: 0;
+}
     </style>
 </head>
 
@@ -791,114 +861,73 @@ if ($admin_id > 0) {
 
             <!-- Contenu Principal -->
             <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-8 scrollbar-hidden">
-                <!-- Cartes KPI Professionnelles -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-slide-up">
-                    <!-- KPI Réservations -->
-                    <div class="glass-card p-8 rounded-2xl card-hover group overflow-hidden relative">
-                        <div class="absolute inset-0 bg-gradient-to-br from-corporate-blue/5 to-corporate-teal/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                        <div class="relative z-10">
-                            <div class="flex items-center justify-between mb-6">
-                                <div class="w-16 h-16 bg-corporate-gradient rounded-2xl flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform duration-300">
-                                    <i class="fas fa-calendar-check text-white text-2xl"></i>
-                                </div>
-                                <div class="text-right">
-                                    <div class="w-12 h-2 bg-corporate-gradient rounded-full"></div>
-                                </div>
-                            </div>
-                            <div class="space-y-3">
-                                <h3 class="text-text-secondary font-semibold text-lg">Réservations Totales</h3>
-                                <p class="text-5xl font-black text-corporate">
-                                    <?= htmlspecialchars($reservations) ?>
-                                </p>
-                                <div class="flex items-center text-success">
-                                    <div class="w-6 h-6 bg-success/20 rounded-lg flex items-center justify-center mr-2">
-                                        <i class="fas fa-trending-up text-xs"></i>
-                                    </div>
-                                    <span class="font-semibold text-sm">+12.5% ce mois</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- KPI Plats -->
-                    <div class="glass-card p-8 rounded-2xl card-hover group overflow-hidden relative">
-                        <div class="absolute inset-0 bg-gradient-to-br from-corporate-amber/5 to-warning/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                        <div class="relative z-10">
-                            <div class="flex items-center justify-between mb-6">
-                                <div class="w-16 h-16 bg-warning-gradient rounded-2xl flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform duration-300">
-                                    <i class="fas fa-utensils text-white text-2xl"></i>
-                                </div>
-                                <div class="text-right">
-                                    <div class="w-12 h-2 bg-warning-gradient rounded-full"></div>
-                                </div>
-                            </div>
-                            <div class="space-y-3">
-                                <h3 class="text-text-secondary font-semibold text-lg">Plats au Menu</h3>
-                                <p class="text-5xl font-black text-corporate">
-                                    <?= htmlspecialchars($plats) ?>
-                                </p>
-                                <div class="flex items-center text-info">
-                                    <div class="w-6 h-6 bg-info/20 rounded-lg flex items-center justify-center mr-2">
-                                        <i class="fas fa-star text-xs"></i>
-                                    </div>
-                                    <span class="font-semibold text-sm">Menu diversifié</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- KPI Revenus -->
-                    <div class="glass-card p-8 rounded-2xl card-hover group overflow-hidden relative">
-                        <div class="absolute inset-0 bg-gradient-to-br from-corporate-emerald/5 to-success/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                        <div class="relative z-10">
-                            <div class="flex items-center justify-between mb-6">
-                                <div class="w-16 h-16 bg-success-gradient rounded-2xl flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform duration-300">
-                                    <i class="fas fa-coins text-white text-2xl animate-spin-slow"></i>
-                                </div>
-                                <div class="text-right">
-                                    <div class="w-12 h-2 bg-success-gradient rounded-full"></div>
-                                </div>
-                            </div>
-                            <div class="space-y-3">
-                                <h3 class="text-text-secondary font-semibold text-lg">Chiffre d'Affaires</h3>
-                                <p class="text-4xl font-black text-corporate">
-                                    <?= number_format($revenus, 0, ',', ' ') ?> <span class="text-2xl">FCFA</span>
-                                </p>
-                                <div class="flex items-center text-success">
-                                    <div class="w-6 h-6 bg-success/20 rounded-lg flex items-center justify-center mr-2">
-                                        <i class="fas fa-chart-line text-xs"></i>
-                                    </div>
-                                    <span class="font-semibold text-sm">Croissance stable</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- KPI Taux de confirmation -->
-                    <div class="glass-card p-8 rounded-2xl card-hover group overflow-hidden relative">
-                        <div class="absolute inset-0 bg-gradient-to-br from-corporate-violet/5 to-corporate-rose/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                        <div class="relative z-10">
-                            <div class="flex items-center justify-between mb-6">
-                                <div class="w-16 h-16 bg-gradient-to-br from-corporate-violet to-corporate-rose rounded-2xl flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform duration-300">
-                                    <i class="fas fa-check-circle text-white text-2xl"></i>
-                                </div>
-                                <div class="text-right">
-                                    <div class="w-12 h-2 bg-gradient-to-r from-corporate-violet to-corporate-rose rounded-full"></div>
-                                </div>
-                            </div>
-                            <div class="space-y-4">
-                                <h3 class="text-text-secondary font-semibold text-lg">Taux Confirmation</h3>
-                                <p class="text-5xl font-black text-corporate">
-                                    <?= $taux_confirmation ?>%
-                                </p>
-                                <div class="w-full bg-white/10 rounded-full h-3 overflow-hidden">
-                                    <div class="h-full bg-gradient-to-r from-corporate-violet to-corporate-rose rounded-full transition-all duration-2000 ease-out shadow-lg" 
-                                         style="width: <?= $taux_confirmation ?>%"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+             <!-- Section Cartes KPI Professionnelles - NOUVEAU DESIGN -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-slide-up">
+    <!-- KPI Réservations -->
+    <div class="dashboard-card card-purple animate-fade-in">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-gray-400 text-sm font-medium mb-1">Total des réservations</p>
+                <p class="text-3xl font-bold text-white"><?= htmlspecialchars($reservations) ?></p>
+                <p class="text-sm text-green-400 flex items-center mt-2">
+                    <i class="fas fa-arrow-up mr-1"></i>
+                    +12.5% ce mois
+                </p>
+            </div>
+            <div class="icon-wrapper icon-purple">
+                <i class="fas fa-calendar-check"></i>
+            </div>
+        </div>
+    </div>
+    
+    <!-- KPI Plats -->
+    <div class="dashboard-card card-orange animate-fade-in" style="animation-delay: 0.1s;">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-gray-400 text-sm font-medium mb-1">Plats au menu</p>
+                <p class="text-3xl font-bold text-white"><?= htmlspecialchars($plats) ?></p>
+                <p class="text-sm text-blue-400 flex items-center mt-2">
+                    <i class="fas fa-star mr-1"></i>
+                    Menu diversifié
+                </p>
+            </div>
+            <div class="icon-wrapper icon-orange">
+                <i class="fas fa-utensils"></i>
+            </div>
+        </div>
+    </div>
+    
+    <!-- KPI Revenus -->
+    <div class="dashboard-card card-green animate-fade-in" style="animation-delay: 0.2s;">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-gray-400 text-sm font-medium mb-1">Chiffre d'affaires</p>
+                <p class="text-3xl font-bold text-white"><?= number_format($revenus, 0, ',', ' ') ?></p>
+                <p class="text-xs text-gray-400 mt-1">FCFA</p>
+            </div>
+            <div class="icon-wrapper icon-green">
+                <i class="fas fa-coins"></i>
+            </div>
+        </div>
+    </div>
+    
+    <!-- KPI Taux de confirmation -->
+    <div class="dashboard-card card-blue animate-fade-in" style="animation-delay: 0.3s;">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-gray-400 text-sm font-medium mb-1">Taux confirmation</p>
+                <p class="text-3xl font-bold text-white"><?= $taux_confirmation ?>%</p>
+                <div class="w-full bg-gray-700 rounded-full h-2 mt-3">
+                    <div class="h-full bg-blue-500 rounded-full transition-all duration-1000" 
+                         style="width: <?= $taux_confirmation ?>%"></div>
                 </div>
+            </div>
+            <div class="icon-wrapper icon-blue">
+                <i class="fas fa-check-circle"></i>
+            </div>
+        </div>
+    </div>
+</div>
 
                 <!-- Section Graphiques & Analytics -->
                 <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
@@ -1635,5 +1664,237 @@ function uploadProfilePhoto(input) {
             100% { box-shadow: 0 0 20px rgba(3, 105, 161, 0.6), 0 0 30px rgba(15, 118, 110, 0.4); }
         }
     </style>
+    <!-- JavaScript complet pour les animations des cartes -->
+<script>
+// Animation au chargement des cartes
+document.addEventListener('DOMContentLoaded', function() {
+    // Animation des dashboard cards avec délai progressif
+    const dashboardCards = document.querySelectorAll('.dashboard-card');
+    dashboardCards.forEach((card, index) => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        setTimeout(() => {
+            card.style.transition = 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+        }, index * 100);
+    });
+
+    // Animation des éléments au scroll avec Intersection Observer
+    const animatedElements = document.querySelectorAll('.animate-fade-in, .animate-slide-up');
+    const observerOptions = {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry, index) => {
+            if (entry.isIntersecting) {
+                setTimeout(() => {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                    entry.target.classList.add('animated');
+                }, index * 100);
+                observer.unobserve(entry.target);
+            }
+        });
+    }, observerOptions);
+
+    animatedElements.forEach(element => {
+        element.style.opacity = '0';
+        element.style.transform = 'translateY(30px)';
+        element.style.transition = 'all 0.6s ease';
+        observer.observe(element);
+    });
+
+    // Effet de parallaxe sur les icônes au scroll
+    let ticking = false;
+    window.addEventListener('scroll', () => {
+        if (!ticking) {
+            window.requestAnimationFrame(() => {
+                const scrolled = window.pageYOffset;
+                const iconWrappers = document.querySelectorAll('.icon-wrapper');
+                
+                iconWrappers.forEach((icon, index) => {
+                    const speed = 0.5 + (index * 0.05);
+                    const yPos = -(scrolled * speed / 20);
+                    icon.style.transform = `translateY(${yPos}px)`;
+                });
+                ticking = false;
+            });
+            ticking = true;
+        }
+    }, { passive: true });
+
+    // Animation des barres de progression
+    setTimeout(() => {
+        const progressBars = document.querySelectorAll('.dashboard-card .bg-blue-500, .dashboard-card .bg-gradient-to-r, .dashboard-card [class*="rounded-full h-"]');
+        progressBars.forEach(bar => {
+            const targetWidth = bar.style.width;
+            if (targetWidth) {
+                bar.style.width = '0%';
+                setTimeout(() => {
+                    bar.style.transition = 'width 1.5s ease-out';
+                    bar.style.width = targetWidth;
+                }, 100);
+            }
+        });
+    }, 800);
+
+    // Effet hover sur les badges numérotés
+    const numberBadges = document.querySelectorAll('.number-badge');
+    numberBadges.forEach(badge => {
+        badge.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-3px) scale(1.1) rotate(5deg)';
+        });
+        badge.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0) scale(1) rotate(0deg)';
+        });
+    });
+
+    // Animation des chiffres (compteur animé)
+    const animateNumbers = () => {
+        const numberElements = document.querySelectorAll('.dashboard-card .text-3xl, .dashboard-card .text-4xl, .dashboard-card .text-5xl');
+        
+        numberElements.forEach(element => {
+            const text = element.textContent.trim();
+            const numberMatch = text.match(/[\d\s,]+/);
+            
+            if (numberMatch) {
+                const finalNumber = parseInt(numberMatch[0].replace(/[\s,]/g, ''));
+                if (!isNaN(finalNumber) && finalNumber > 0) {
+                    const duration = 2000;
+                    const steps = 60;
+                    const increment = finalNumber / steps;
+                    let current = 0;
+                    let step = 0;
+
+                    const timer = setInterval(() => {
+                        current += increment;
+                        step++;
+                        
+                        if (step >= steps) {
+                            current = finalNumber;
+                            clearInterval(timer);
+                        }
+                        
+                        const formatted = Math.floor(current).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+                        element.textContent = text.replace(/[\d\s,]+/, formatted);
+                    }, duration / steps);
+                }
+            }
+        });
+    };
+
+    setTimeout(animateNumbers, 500);
+
+    // Effet de brillance sur les cartes au survol
+    dashboardCards.forEach(card => {
+        card.addEventListener('mousemove', (e) => {
+            const rect = card.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+
+            const angleX = (y - centerY) / 20;
+            const angleY = (centerX - x) / 20;
+
+            card.style.transform = `perspective(1000px) rotateX(${angleX}deg) rotateY(${angleY}deg) translateY(-5px)`;
+        });
+
+        card.addEventListener('mouseleave', () => {
+            card.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) translateY(0)';
+        });
+    });
+
+    // Animation des icônes au hover des cartes
+    dashboardCards.forEach(card => {
+        const icon = card.querySelector('.icon-wrapper');
+        if (icon) {
+            card.addEventListener('mouseenter', () => {
+                icon.style.transform = 'scale(1.15) rotate(10deg)';
+                icon.style.transition = 'transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
+            });
+            card.addEventListener('mouseleave', () => {
+                icon.style.transform = 'scale(1) rotate(0deg)';
+            });
+        }
+    });
+
+    // Animation des éléments du Hall of Fame
+    const hallOfFameItems = document.querySelectorAll('.glass-morphism');
+    hallOfFameItems.forEach((item, index) => {
+        setTimeout(() => {
+            item.style.transition = 'all 0.5s ease';
+            item.style.opacity = '1';
+            item.style.transform = 'translateX(0)';
+        }, 300 + (index * 100));
+    });
+
+    // Effet de pulsation sur les badges de notification
+    const notificationBadges = document.querySelectorAll('.notification-badge, .animate-pulse');
+    notificationBadges.forEach(badge => {
+        setInterval(() => {
+            badge.style.transform = 'scale(1.1)';
+            setTimeout(() => {
+                badge.style.transform = 'scale(1)';
+            }, 200);
+        }, 2000);
+    });
+
+    console.log('✅ Animations chargées avec succès');
+    console.log('Dashboard cards trouvées:', dashboardCards.length);
+});
+
+// Animation de chargement de la page
+window.addEventListener('load', () => {
+    document.body.style.opacity = '0';
+    setTimeout(() => {
+        document.body.style.transition = 'opacity 0.5s ease';
+        document.body.style.opacity = '1';
+    }, 100);
+});
+</script>
+
+<!-- Styles additionnels pour les badges numérotés -->
+<style>
+.number-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    color: white;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 700;
+    box-shadow: 0 4px 6px rgba(59, 130, 246, 0.4);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+}
+
+.number-badge:hover {
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 6px 12px rgba(59, 130, 246, 0.5);
+}
+
+.number-badge.alt-1 {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    box-shadow: 0 4px 6px rgba(16, 185, 129, 0.4);
+}
+
+.number-badge.alt-2 {
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    box-shadow: 0 4px 6px rgba(139, 92, 246, 0.4);
+}
+
+.number-badge.alt-3 {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    box-shadow: 0 4px 6px rgba(245, 158, 11, 0.4);
+}
+</style>
 </body>
 </html>

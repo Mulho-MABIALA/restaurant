@@ -1,5 +1,7 @@
 <?php
 session_start();
+require_once '../config.php';
+require_once './permissions.php';
 
 // Vérification admin
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
@@ -7,21 +9,18 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     exit;
 }
 
-$mysqli = new mysqli("localhost", "root", "", "restaurant");
-if ($mysqli->connect_errno) {
-    die("Erreur de connexion : " . $mysqli->connect_error);
-}
+// Vérifier les permissions pour cette page
+requireAccess($conn, $_SESSION['admin_id'], 'horaires');
 
 $message = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $jours = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
-    foreach ($jours as $jour) {
-        $ouverture = $_POST["{$jour}_ouverture"] ?? '';
-        $fermeture = $_POST["{$jour}_fermeture"] ?? '';
-        $ferme = isset($_POST["{$jour}_ferme"]) ? 1 : 0;
-
-        $stmt = $mysqli->prepare("
+    try {
+        $conn->beginTransaction();
+        
+        $jours = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+        
+        $stmt = $conn->prepare("
             INSERT INTO horaires_ouverture (jour, heure_ouverture, heure_fermeture, ferme)
             VALUES (?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE 
@@ -29,20 +28,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 heure_fermeture = VALUES(heure_fermeture),
                 ferme = VALUES(ferme)
         ");
-        $stmt->bind_param("sssi", $jour, $ouverture, $fermeture, $ferme);
-        $stmt->execute();
-        $stmt->close();
+        
+        foreach ($jours as $jour) {
+            $ouverture = $_POST["{$jour}_ouverture"] ?? '';
+            $fermeture = $_POST["{$jour}_fermeture"] ?? '';
+            $ferme = isset($_POST["{$jour}_ferme"]) ? 1 : 0;
+            
+            $stmt->execute([$jour, $ouverture, $fermeture, $ferme]);
+        }
+        
+        $conn->commit();
+        $message = "✅ Horaires mis à jour avec succès.";
+        
+    } catch (Exception $e) {
+        $conn->rollBack();
+        $message = "❌ Erreur lors de la mise à jour : " . $e->getMessage();
     }
-    $message = "✅ Horaires mis à jour avec succès.";
 }
 
 // Récupération des horaires existants pour affichage
 $horaires = [];
-$result = $mysqli->query("SELECT * FROM horaires_ouverture");   
-while ($row = $result->fetch_assoc()) {
-    $horaires[$row['jour']] = $row;
+$result = $conn->query("SELECT * FROM horaires_ouverture");
+
+if ($result) {
+    while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
+        $horaires[$row['jour']] = $row;
+    }
 }
-$mysqli->close();
 ?>
 <!DOCTYPE html>
 <html lang="fr">

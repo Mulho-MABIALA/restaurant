@@ -1,14 +1,15 @@
 <?php
+session_start();
 // admin_newsletter.php - Version complète et organisée
 require_once '../config.php';
-session_start();
+require_once './permissions.php';
 
 // Rediriger si l'admin n'est pas connecté
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Location: login.php');
     exit;
 }
-
+requireAccess($conn, $_SESSION['admin_id'], 'admin_newsletter');
 // Actions spéciales
 if (isset($_GET['action'])) {
     $action = $_GET['action'];
