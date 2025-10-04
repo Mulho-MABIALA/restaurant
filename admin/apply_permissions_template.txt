@@ -1,0 +1,20 @@
+// Template à ajouter en haut de chaque fichier PHP après <?php
+
+session_start();
+require_once '../config.php';
+require_once './permissions.php';
+
+// Vérifier si l'admin est connecté
+if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    header('Location: login.php');
+    exit;
+}
+
+// Vérifier que admin_id existe
+if (!isset($_SESSION['admin_id'])) {
+    header('Location: login.php');
+    exit;
+}
+
+// Vérifier les permissions (ADAPTER LE SLUG SELON LA PAGE)
+requireAccess($conn, $_SESSION['admin_id'], 'PAGE_SLUG_ICI');

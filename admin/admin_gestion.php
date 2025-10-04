@@ -1,10 +1,21 @@
 <?php
 session_start();
+require_once '../config.php';
+require_once './permissions.php';
+
 if (!isset($_SESSION['admin_logged_in'])) {
     header('Location: login.php');
     exit;
 }
-require_once '../config.php';
+
+// Vérifier que admin_id existe
+if (!isset($_SESSION['admin_id'])) {
+    header('Location: login.php');
+    exit;
+}
+
+// Vérifier les permissions
+requireAccess($conn, $_SESSION['admin_id'], 'admin_gestion');
 
 // Fonction pour enregistrer les logs d'activité
 function logActivity($conn, $admin_id, $admin_username, $action, $target = null, $details = null) {
@@ -433,6 +444,7 @@ try {
     <title>Gestion des administrateurs</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/cards-design.css">
     <style>
         .toast {
             transform: translateX(100%);
@@ -449,14 +461,6 @@ try {
         .dark .text-slate-800 { color: #f1f5f9 !important; }
         .dark .text-slate-600 { color: #cbd5e1 !important; }
         .dark .border-slate-200 { border-color: #334155 !important; }
-        
-        .stat-card {
-            transition: all 0.3s ease;
-        }
-        .stat-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        }
         
         .glass-effect {
             backdrop-filter: blur(10px);
@@ -644,100 +648,82 @@ try {
                 <div class="max-w-7xl mx-auto">
                     <!-- Statistiques -->
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
-                        <div class="stat-card glass-effect rounded-2xl shadow-lg p-4 relative overflow-hidden border-2 border-blue-100">
-                            <div class="absolute top-0 right-0 w-20 h-20 bg-blue-500 rounded-full -translate-y-10 translate-x-10 opacity-10"></div>
-                            <div class="relative z-10">
-                                <div class="flex items-center justify-between mb-2">
-                                    <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-                                        <i class="fas fa-users text-white text-sm"></i>
-                                    </div>
-                                    <div class="text-right">
-                                        <div class="text-xl font-bold text-blue-600"><?= $stats['total'] ?></div>
-                                        <div class="text-xs text-blue-500 font-medium">TOTAL</div>
-                                    </div>
+                        <div class="dashboard-card card-blue glass-effect p-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="icon-wrapper icon-blue" style="width: 32px; height: 32px; font-size: 14px;">
+                                    <i class="fas fa-users"></i>
                                 </div>
-                                <h3 class="font-semibold text-slate-800 text-sm">Total</h3>
+                                <div class="text-right">
+                                    <div class="text-xl font-bold text-gray-900"><?= $stats['total'] ?></div>
+                                    <div class="text-xs text-blue-600 font-medium">TOTAL</div>
+                                </div>
                             </div>
+                            <h3 class="font-semibold text-gray-700 text-sm">Total</h3>
                         </div>
                         
-                        <div class="stat-card glass-effect rounded-2xl shadow-lg p-4 relative overflow-hidden border-2 border-purple-100">
-                            <div class="absolute top-0 right-0 w-20 h-20 bg-purple-500 rounded-full -translate-y-10 translate-x-10 opacity-10"></div>
-                            <div class="relative z-10">
-                                <div class="flex items-center justify-between mb-2">
-                                    <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
-                                        <i class="fas fa-crown text-white text-sm"></i>
-                                    </div>
-                                    <div class="text-right">
-                                        <div class="text-xl font-bold text-purple-600"><?= $stats['super_admin'] ?></div>
-                                        <div class="text-xs text-purple-500 font-medium">SUPER</div>
-                                    </div>
+                        <div class="dashboard-card card-purple glass-effect p-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="icon-wrapper icon-purple" style="width: 32px; height: 32px; font-size: 14px;">
+                                    <i class="fas fa-crown"></i>
                                 </div>
-                                <h3 class="font-semibold text-slate-800 text-sm">Super Admin</h3>
+                                <div class="text-right">
+                                    <div class="text-xl font-bold text-gray-900"><?= $stats['super_admin'] ?></div>
+                                    <div class="text-xs text-purple-600 font-medium">SUPER</div>
+                                </div>
                             </div>
+                            <h3 class="font-semibold text-gray-700 text-sm">Super Admin</h3>
                         </div>
-                        
-                        <div class="stat-card glass-effect rounded-2xl shadow-lg p-4 relative overflow-hidden border-2 border-green-100">
-                            <div class="absolute top-0 right-0 w-20 h-20 bg-green-500 rounded-full -translate-y-10 translate-x-10 opacity-10"></div>
-                            <div class="relative z-10">
-                                <div class="flex items-center justify-between mb-2">
-                                    <div class="w-8 h-8 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
-                                        <i class="fas fa-user-tie text-white text-sm"></i>
-                                    </div>
-                                    <div class="text-right">
-                                        <div class="text-xl font-bold text-green-600"><?= $stats['admin'] ?></div>
-                                        <div class="text-xs text-green-500 font-medium">ADMIN</div>
-                                    </div>
+
+                        <div class="dashboard-card card-green glass-effect p-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="icon-wrapper icon-green" style="width: 32px; height: 32px; font-size: 14px;">
+                                    <i class="fas fa-user-tie"></i>
                                 </div>
-                                <h3 class="font-semibold text-slate-800 text-sm">Admin</h3>
+                                <div class="text-right">
+                                    <div class="text-xl font-bold text-gray-900"><?= $stats['admin'] ?></div>
+                                    <div class="text-xs text-green-600 font-medium">ADMIN</div>
+                                </div>
                             </div>
+                            <h3 class="font-semibold text-gray-700 text-sm">Admin</h3>
                         </div>
-                        
-                        <div class="stat-card glass-effect rounded-2xl shadow-lg p-4 relative overflow-hidden border-2 border-emerald-100">
-                            <div class="absolute top-0 right-0 w-20 h-20 bg-emerald-500 rounded-full -translate-y-10 translate-x-10 opacity-10"></div>
-                            <div class="relative z-10">
-                                <div class="flex items-center justify-between mb-2">
-                                    <div class="w-8 h-8 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center">
-                                        <i class="fas fa-check-circle text-white text-sm"></i>
-                                    </div>
-                                    <div class="text-right">
-                                        <div class="text-xl font-bold text-emerald-600"><?= $stats['active'] ?></div>
-                                        <div class="text-xs text-emerald-500 font-medium">ACTIFS</div>
-                                    </div>
+
+                        <div class="dashboard-card card-teal glass-effect p-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="icon-wrapper icon-teal" style="width: 32px; height: 32px; font-size: 14px;">
+                                    <i class="fas fa-check-circle"></i>
                                 </div>
-                                <h3 class="font-semibold text-slate-800 text-sm">Actifs</h3>
+                                <div class="text-right">
+                                    <div class="text-xl font-bold text-gray-900"><?= $stats['active'] ?></div>
+                                    <div class="text-xs text-teal-600 font-medium">ACTIFS</div>
+                                </div>
                             </div>
+                            <h3 class="font-semibold text-gray-700 text-sm">Actifs</h3>
                         </div>
-                        
-                        <div class="stat-card glass-effect rounded-2xl shadow-lg p-4 relative overflow-hidden border-2 border-red-100">
-                            <div class="absolute top-0 right-0 w-20 h-20 bg-red-500 rounded-full -translate-y-10 translate-x-10 opacity-10"></div>
-                            <div class="relative z-10">
-                                <div class="flex items-center justify-between mb-2">
-                                    <div class="w-8 h-8 bg-gradient-to-r from-red-500 to-red-600 rounded-lg flex items-center justify-center">
-                                        <i class="fas fa-times-circle text-white text-sm"></i>
-                                    </div>
-                                    <div class="text-right">
-                                        <div class="text-xl font-bold text-red-600"><?= $stats['inactive'] ?></div>
-                                        <div class="text-xs text-red-500 font-medium">INACTIFS</div>
-                                    </div>
+
+                        <div class="dashboard-card card-red glass-effect p-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="icon-wrapper icon-red" style="width: 32px; height: 32px; font-size: 14px;">
+                                    <i class="fas fa-times-circle"></i>
                                 </div>
-                                <h3 class="font-semibold text-slate-800 text-sm">Inactifs</h3>
+                                <div class="text-right">
+                                    <div class="text-xl font-bold text-gray-900"><?= $stats['inactive'] ?></div>
+                                    <div class="text-xs text-red-600 font-medium">INACTIFS</div>
+                                </div>
                             </div>
+                            <h3 class="font-semibold text-gray-700 text-sm">Inactifs</h3>
                         </div>
-                        
-                        <div class="stat-card glass-effect rounded-2xl shadow-lg p-4 relative overflow-hidden border-2 border-indigo-100">
-                            <div class="absolute top-0 right-0 w-20 h-20 bg-indigo-500 rounded-full -translate-y-10 translate-x-10 opacity-10"></div>
-                            <div class="relative z-10">
-                                <div class="flex items-center justify-between mb-2">
-                                    <div class="w-8 h-8 bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                                        <i class="fas fa-wifi text-white text-sm"></i>
-                                    </div>
-                                    <div class="text-right">
-                                        <div class="text-xl font-bold text-indigo-600"><?= $stats['online'] ?></div>
-                                        <div class="text-xs text-indigo-500 font-medium">EN LIGNE</div>
-                                    </div>
+
+                        <div class="dashboard-card card-indigo glass-effect p-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="icon-wrapper icon-indigo" style="width: 32px; height: 32px; font-size: 14px;">
+                                    <i class="fas fa-wifi"></i>
                                 </div>
-                                <h3 class="font-semibold text-slate-800 text-sm">En ligne</h3>
+                                <div class="text-right">
+                                    <div class="text-xl font-bold text-gray-900"><?= $stats['online'] ?></div>
+                                    <div class="text-xs text-indigo-600 font-medium">EN LIGNE</div>
+                                </div>
                             </div>
+                            <h3 class="font-semibold text-gray-700 text-sm">En ligne</h3>
                         </div>
                     </div>
 

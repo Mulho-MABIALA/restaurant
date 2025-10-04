@@ -1,0 +1,36 @@
+# Environnement et configuration sensible
+.env
+.env.local
+.env.*.local
+admin/.env
+
+# Logs
+*.log
+error_log
+debug.log
+
+# Uploads et fichiers temporaires
+uploads/*
+!uploads/.gitkeep
+temp/*
+*.tmp
+
+# Vendor (Composer)
+/vendor/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Backups
+*.bak
+*.backup
+*.sql

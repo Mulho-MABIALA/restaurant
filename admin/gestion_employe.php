@@ -1,16 +1,25 @@
 <?php
 session_start();
-
-    require_once '../config.php';
-    require_once 'phpqrcode/qrlib.php';
-    require_once 'classes/PayrollCalculator.php';
-require_once 'classes/BulletinPDFGenerateur.php'; 
+require_once '../config.php';
+require_once './permissions.php';
+require_once 'phpqrcode/qrlib.php';
+require_once 'classes/PayrollCalculator.php';
+require_once 'classes/BulletinPDFGenerateur.php';
 
 // Rediriger si l'admin n'est pas connecté
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Location: login.php');
     exit;
 }
+
+// Vérifier que admin_id existe
+if (!isset($_SESSION['admin_id'])) {
+    header('Location: login.php');
+    exit;
+}
+
+// Vérifier les permissions
+requireAccess($conn, $_SESSION['admin_id'], 'gestion_employes');
     // GESTIONNAIRE D'EMPLOYÉS
     class EmployeeManager
     {

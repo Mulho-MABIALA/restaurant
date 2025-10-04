@@ -2,10 +2,18 @@
 session_start();
 require_once __DIR__ . '/../config.php';
 require_once './permissions.php';
+
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
-    header('Location: login.php'); 
+    header('Location: login.php');
     exit;
 }
+
+// Vérifier que admin_id existe
+if (!isset($_SESSION['admin_id'])) {
+    header('Location: login.php');
+    exit;
+}
+
 requireAccess($conn, $_SESSION['admin_id'], 'gallery');
 define('UPLOAD_URL', 'http://localhost/restaurant/uploads/gallery/');
 define('DISHES_UPLOAD_URL', 'http://localhost/restaurant/uploads/'); // URL pour les images de plats

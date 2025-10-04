@@ -3,6 +3,14 @@ session_start();
 require_once '../config.php';
 require_once __DIR__ . '/../vendor/autoload.php';
 
+// Charger les variables d'environnement
+if (file_exists(__DIR__ . '/../.env')) {
+    $env = parse_ini_file(__DIR__ . '/../.env');
+    foreach ($env as $key => $value) {
+        $_ENV[$key] = $value;
+    }
+}
+
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
@@ -10,11 +18,11 @@ $error = '';
 $success = '';
 $show2FAForm = false;
 
-// Configuration de sécurité
-const MAX_LOGIN_ATTEMPTS = 5;
-const LOCKOUT_TIME = 900; // 15 minutes
-const CODE_EXPIRY_TIME = 300; // 5 minutes
-const MAX_CODE_ATTEMPTS = 3;
+// Configuration de sécurité depuis .env
+define('MAX_LOGIN_ATTEMPTS', $_ENV['MAX_LOGIN_ATTEMPTS'] ?? 5);
+define('LOCKOUT_TIME', $_ENV['LOCKOUT_TIME'] ?? 900);
+define('CODE_EXPIRY_TIME', $_ENV['CODE_EXPIRY_TIME'] ?? 300);
+define('MAX_CODE_ATTEMPTS', $_ENV['MAX_CODE_ATTEMPTS'] ?? 3);
 
 // Fonction pour nettoyer les tentatives expirées
 function cleanExpiredAttempts($conn) {
@@ -64,13 +72,8 @@ function hashPassword($password) {
     ]);
 }
 
-// FONCTION DE CORRECTION AUTOMATIQUE DU MOT DE PASSE
-function fixPassword($conn, $username, $password) {
-    $correctHash = hashPassword($password);
-    $stmt = $conn->prepare("UPDATE admin SET password = ? WHERE username = ?");
-    $result = $stmt->execute([$correctHash, $username]);
-    return $result;
-}
+// Fonction supprimée pour des raisons de sécurité
+// Les mots de passe doivent être réinitialisés via un processus sécurisé
 
 // Fonction pour générer un code 2FA plus sécurisé
 function generate2FACode() {
@@ -82,16 +85,16 @@ function send2FACode($email, $code, $username) {
     $mail = new PHPMailer(true);
 
     try {
-        // Configuration SMTP sécurisée
+        // Configuration SMTP sécurisée depuis .env
         $mail->isSMTP();
-        $mail->Host       = 'smtp.gmail.com';
+        $mail->Host       = $_ENV['SMTP_HOST'] ?? 'smtp.gmail.com';
         $mail->SMTPAuth   = true;
-        $mail->Username   = 'restaurantmulho@gmail.com';
-        $mail->Password   = 'opty ztuw fjzw vwhx'; // À déplacer dans un fichier de config sécurisé !
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-        $mail->Port       = 587;
+        $mail->Username   = $_ENV['SMTP_USERNAME'] ?? 'restaurantmulho@gmail.com';
+        $mail->Password   = $_ENV['SMTP_PASSWORD'] ?? '';
+        $mail->SMTPSecure = ($_ENV['SMTP_ENCRYPTION'] ?? 'tls') === 'tls' ? PHPMailer::ENCRYPTION_STARTTLS : PHPMailer::ENCRYPTION_SMTPS;
+        $mail->Port       = $_ENV['SMTP_PORT'] ?? 587;
 
-        $mail->setFrom('no-reply@tonrestaurant.com', 'Ton Restaurant - Sécurité');
+        $mail->setFrom($_ENV['SMTP_FROM_EMAIL'] ?? 'no-reply@tonrestaurant.com', $_ENV['SMTP_FROM_NAME'] ?? 'Ton Restaurant - Sécurité');
         $mail->addAddress($email);
 
         $mail->isHTML(true);
@@ -269,13 +272,6 @@ if (isIpBlocked($conn, $clientIP)) {
                         $error = 'Compte temporairement verrouillé. Réessayez plus tard.';
                         recordFailedAttempt($conn, $clientIP, $username);
                     } 
-                    // CORRECTION AUTOMATIQUE pour "mulho" avec mot de passe "1010"
-                    elseif ($username === 'mulho' && $password === '1010' && strpos($admin['password'], '[HASH_SERA_GÉNÉRÉ]') !== false) {
-                        // Le hash est incorrect, le corriger automatiquement
-                        fixPassword($conn, $username, $password);
-                        $success = 'Mot de passe corrigé automatiquement. Veuillez vous reconnecter.';
-                        error_log("Password fixed for user: $username");
-                    }
                     elseif (password_verify($password, $admin['password'])) {
                         // Mot de passe correct - réinitialiser les tentatives échouées
                         $stmt = $conn->prepare("UPDATE admin SET failed_attempts = 0, locked_until = NULL WHERE id = ?");

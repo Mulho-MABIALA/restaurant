@@ -16,7 +16,27 @@
     if (empty($_SESSION['csrf_token'])) {
         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
     }
-requireAccess($conn, $_SESSION['admin_id'], 'reservations');
+
+    // Vérifier que admin_id existe
+    if (!isset($_SESSION['admin_id'])) {
+        // Tenter de récupérer depuis la DB si username existe
+        if (isset($_SESSION['admin_username'])) {
+            $stmt = $conn->prepare("SELECT id FROM admin WHERE username = ?");
+            $stmt->execute([$_SESSION['admin_username']]);
+            $admin_data = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($admin_data) {
+                $_SESSION['admin_id'] = (int)$admin_data['id'];
+            }
+        }
+
+        // Si toujours pas défini, rediriger vers login
+        if (!isset($_SESSION['admin_id'])) {
+            header('Location: login.php');
+            exit;
+        }
+    }
+
+    requireAccess($conn, $_SESSION['admin_id'], 'reservations');
     // Pagination & filtres
     $search           = $_GET['search'] ?? '';
     $date_filter      = $_GET['date_filter'] ?? '';
@@ -145,6 +165,7 @@ requireAccess($conn, $_SESSION['admin_id'], 'reservations');
       }
     }
   </script>
+  <link rel="stylesheet" href="assets/css/cards-design.css">
   <style>
     @keyframes fadeIn {
       from { opacity: 0; }
@@ -154,7 +175,6 @@ requireAccess($conn, $_SESSION['admin_id'], 'reservations');
       from { transform: translateY(20px); opacity: 0; }
       to { transform: translateY(0); opacity: 1; }
     }
-    /* Styles des cartes modernes adaptés de gestion_plats.php */
 
     /* Fix pour le sidebar */
 #sidebar {
@@ -162,85 +182,7 @@ requireAccess($conn, $_SESSION['admin_id'], 'reservations');
     z-index: 50;
 }
 
-/* Si le sidebar est caché par défaut sur mobile */
-@media (max-width: 1024px) {
-    #sidebar {
-        transform: translateX(-100%);
-        transition: transform 0.3s ease;
-    }
-    
-    #sidebar.show {
-        transform: translateX(0);
-    }
-}
-.dashboard-card {
-    background: rgba(30, 41, 59, 0.8);
-    backdrop-filter: blur(20px);
-    border-radius: 16px;
-    padding: 24px;
-    border: 2px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-    overflow: hidden;
-}
 
-.dashboard-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: var(--card-accent, #3b82f6);
-    border-radius: 16px 16px 0 0;
-}
-
-.dashboard-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2), 0 4px 8px rgba(0, 0, 0, 0.1);
-    border-color: rgba(255, 255, 255, 0.2);
-}
-
-.card-purple { --card-accent: #8b5cf6; }
-.card-red { --card-accent: #ef4444; }
-.card-blue { --card-accent: #3b82f6; }
-.card-green { --card-accent: #10b981; }
-.card-orange { --card-accent: #f59e0b; }
-.card-cyan { --card-accent: #06b6d4; }
-
-.icon-wrapper {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
-    transition: transform 0.3s ease;
-}
-
-.dashboard-card:hover .icon-wrapper {
-    transform: scale(1.1) rotate(5deg);
-}
-
-.icon-purple { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
-.icon-red { background: rgba(239, 68, 68, 0.2); color: #f87171; }
-.icon-blue { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
-.icon-green { background: rgba(16, 185, 129, 0.2); color: #34d399; }
-.icon-orange { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
-.icon-cyan { background: rgba(6, 182, 212, 0.2); color: #22d3ee; }
-
-/* Animation des cartes au chargement */
-@keyframes fadeIn {
-    0% { opacity: 0; transform: translateY(20px); }
-    100% { opacity: 1; transform: translateY(0); }
-}
-
-.animate-fade-in {
-    animation: fadeIn 0.5s ease-in-out forwards;
-    opacity: 0;
-}
   </style>
 </head>
 <body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 min-h-screen">
@@ -295,17 +237,15 @@ requireAccess($conn, $_SESSION['admin_id'], 'reservations');
     <div class="dashboard-card card-blue animate-fade-in">
         <div class="flex items-center justify-between">
             <div>
-                <p class="text-gray-400 text-sm font-medium mb-1">Total réservations</p>
-                <p class="text-3xl font-bold text-white"><?php echo $total_global?></p>
-                <p class="text-sm text-green-400 flex items-center mt-2">
+                <p class="text-gray-600 text-sm font-medium mb-1">Total réservations</p>
+                <p class="text-3xl font-bold text-gray-900"><?php echo $total_global?></p>
+                <p class="text-sm text-green-600 flex items-center mt-2">
                     <i class="fas fa-arrow-up mr-1"></i>
                     +8% ce mois
                 </p>
             </div>
             <div class="icon-wrapper icon-blue">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                </svg>
+                <i class="fas fa-calendar-check"></i>
             </div>
         </div>
     </div>
@@ -314,19 +254,15 @@ requireAccess($conn, $_SESSION['admin_id'], 'reservations');
     <div class="dashboard-card card-green animate-fade-in" style="animation-delay: 0.1s;">
         <div class="flex items-center justify-between">
             <div>
-                <p class="text-gray-400 text-sm font-medium mb-1">Nouvelles</p>
-                <p class="text-3xl font-bold text-white"><?php echo $nombre_nouvelles?></p>
-                <p class="text-sm text-amber-400 flex items-center mt-2">
-                    <svg class="w-3 h-3 mr-1 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
-                    </svg>
+                <p class="text-gray-600 text-sm font-medium mb-1">Nouvelles</p>
+                <p class="text-3xl font-bold text-gray-900"><?php echo $nombre_nouvelles?></p>
+                <p class="text-sm text-amber-600 flex items-center mt-2">
+                    <i class="fas fa-bell mr-1 animate-pulse"></i>
                     À traiter
                 </p>
             </div>
             <div class="icon-wrapper icon-green">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
-                </svg>
+                <i class="fas fa-bell"></i>
             </div>
         </div>
     </div>
@@ -335,14 +271,12 @@ requireAccess($conn, $_SESSION['admin_id'], 'reservations');
     <div class="dashboard-card card-orange animate-fade-in" style="animation-delay: 0.2s;">
         <div class="flex items-center justify-between">
             <div>
-                <p class="text-gray-400 text-sm font-medium mb-1">Aujourd'hui</p>
-                <p class="text-3xl font-bold text-white"><?php echo $reservations_aujourdhui?></p>
-                <p class="text-sm text-gray-400 mt-1"><?php echo date('d M Y')?></p>
+                <p class="text-gray-600 text-sm font-medium mb-1">Aujourd'hui</p>
+                <p class="text-3xl font-bold text-gray-900"><?php echo $reservations_aujourdhui?></p>
+                <p class="text-sm text-gray-600 mt-1"><?php echo date('d M Y')?></p>
             </div>
             <div class="icon-wrapper icon-orange">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                </svg>
+                <i class="fas fa-calendar-day"></i>
             </div>
         </div>
     </div>
@@ -351,14 +285,12 @@ requireAccess($conn, $_SESSION['admin_id'], 'reservations');
     <div class="dashboard-card card-purple animate-fade-in" style="animation-delay: 0.3s;">
         <div class="flex items-center justify-between">
             <div>
-                <p class="text-gray-400 text-sm font-medium mb-1">Moyenne</p>
-                <p class="text-3xl font-bold text-white"><?php echo $moyenne_personnes?></p>
-                <p class="text-sm text-gray-400 mt-1">Personnes/résa</p>
+                <p class="text-gray-600 text-sm font-medium mb-1">Moyenne</p>
+                <p class="text-3xl font-bold text-gray-900"><?php echo $moyenne_personnes?></p>
+                <p class="text-sm text-gray-600 mt-1">Personnes/résa</p>
             </div>
             <div class="icon-wrapper icon-purple">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                </svg>
+                <i class="fas fa-users"></i>
             </div>
         </div>
     </div>

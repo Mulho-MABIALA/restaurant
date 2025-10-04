@@ -1,15 +1,27 @@
 <?php
-require_once '../config.php';
-require_once './permissions.php';
+// Vérifier si config.php a déjà été chargé
+if (!isset($conn)) {
+    require_once '../config.php';
+}
+
+// Vérifier si permissions.php a déjà été chargé
+if (!function_exists('canAccess')) {
+    require_once './permissions.php';
+}
 
 $adminId = $_SESSION['admin_id'] ?? null;
 $userRole = '';
 
-if ($adminId) {
-    $stmt = $conn->prepare("SELECT role FROM admin WHERE id = ?");
-    $stmt->execute([$adminId]);
-    $admin = $stmt->fetch(PDO::FETCH_ASSOC);
-    $userRole = $admin['role'] ?? '';
+if ($adminId && isset($conn)) {
+    try {
+        $stmt = $conn->prepare("SELECT role FROM admin WHERE id = ?");
+        $stmt->execute([$adminId]);
+        $admin = $stmt->fetch(PDO::FETCH_ASSOC);
+        $userRole = $admin['role'] ?? '';
+    } catch (PDOException $e) {
+        error_log("Erreur sidebar.php: " . $e->getMessage());
+        $userRole = '';
+    }
 }
 ?>
 
@@ -378,7 +390,14 @@ if ($adminId) {
     
     <!-- Navigation -->
     <nav class="px-4 py-6 space-y-6 overflow-y-auto h-full scrollbar-thin">
-        
+
+        <!-- Debug Info (à retirer après test) -->
+        <?php if (true): // Debug temporaire ?>
+        <div class="bg-yellow-900/20 border border-yellow-500/50 rounded-lg p-3 text-xs text-yellow-200 mb-4">
+            <strong>Debug:</strong> AdminID = <?= $adminId ?? 'NULL' ?> | Role = <?= $userRole ?? 'NULL' ?>
+        </div>
+        <?php endif; ?>
+
         <!-- Dashboard Section -->
         <?php if (canAccess($conn, $adminId, 'dashboard')): ?>
         <div class="space-y-3 animate-fade-in">

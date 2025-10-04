@@ -1,7 +1,19 @@
 <?php
+session_start();
 require_once '../config.php';
 require_once './permissions.php';
 
+// Vérifier si l'admin est connecté
+if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    header('Location: login.php');
+    exit;
+}
+
+// Vérifier que admin_id existe
+if (!isset($_SESSION['admin_id'])) {
+    header('Location: login.php');
+    exit;
+}
 
 $categorieId = isset($plat['categorie_id']) ? $plat['categorie_id'] : null;
 $nomCategorie = isset($categories[$categorieId]) ? $categories[$categorieId] : 'Non catégorisé';
@@ -59,6 +71,7 @@ try {
     <title>Gestion des Plats</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/cards-design.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -103,262 +116,10 @@ try {
         body {
             font-family: 'Inter', sans-serif;
         }
-        
-        .dashboard-card {
-            background: white;
-            border-radius: 16px;
-            padding: 24px;
-            border: 2px solid #e5e7eb;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .dashboard-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: var(--card-accent, #3b82f6);
-            border-radius: 16px 16px 0 0;
-        }
-        
-        .dashboard-card:hover {
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15), 0 4px 8px rgba(0, 0, 0, 0.1);
-            transform: translateY(-3px);
-            border-color: #d1d5db;
-        }
-        
-        .card-purple { --card-accent: #8b5cf6; border-color: #c4b5fd; }
-        .card-red { --card-accent: #ef4444; border-color: #fca5a5; }
-        .card-blue { --card-accent: #3b82f6; border-color: #93c5fd; }
-        .card-green { --card-accent: #10b981; border-color: #6ee7b7; }
-        .card-orange { --card-accent: #f59e0b; border-color: #fbbf24; }
-        .card-cyan { --card-accent: #06b6d4; border-color: #67e8f9; }
-        
-        .action-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 500;
-            transition: all 0.2s ease;
-            border: 1px solid transparent;
-        }
-        
-        .btn-view {
-            background: rgba(16, 185, 129, 0.1);
-            color: #059669;
-            border-color: rgba(16, 185, 129, 0.2);
-        }
-        
-        .btn-view:hover {
-            background: rgba(16, 185, 129, 0.2);
-        }
-        
-        .btn-edit {
-            background: rgba(59, 130, 246, 0.1);
-            color: #2563eb;
-            border-color: rgba(59, 130, 246, 0.2);
-        }
-        
-        .btn-edit:hover {
-            background: rgba(59, 130, 246, 0.2);
-        }
-        
-        .btn-delete {
-            background: rgba(239, 68, 68, 0.1);
-            color: #dc2626;
-            border-color: rgba(239, 68, 68, 0.2);
-        }
-        
-        .btn-delete:hover {
-            background: rgba(239, 68, 68, 0.2);
-        }
-        
-        .btn-block {
-            background: rgba(245, 158, 11, 0.1);
-            color: #d97706;
-            border-color: rgba(245, 158, 11, 0.2);
-        }
-        
-        .btn-block:hover {
-            background: rgba(245, 158, 11, 0.2);
-        }
-        
-        .btn-unblock {
-            background: rgba(16, 185, 129, 0.1);
-            color: #059669;
-            border-color: rgba(16, 185, 129, 0.2);
-        }
-        
-        .btn-unblock:hover {
-            background: rgba(16, 185, 129, 0.2);
-        }
-        
-        .icon-wrapper {
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-        }
-        
-        .icon-purple { background: rgba(139, 92, 246, 0.1); color: #8b5cf6; }
-        .icon-red { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
-        .icon-blue { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
-        .icon-green { background: rgba(16, 185, 129, 0.1); color: #10b981; }
-        .icon-orange { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
-        .icon-cyan { background: rgba(6, 182, 212, 0.1); color: #06b6d4; }
-        
-        .gradient-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-        
-        .modal-backdrop {
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
-        }
-        
-        .modal-content {
-            animation: modalSlideIn 0.3s ease-out;
-        }
-        
-        @keyframes modalSlideIn {
-            from {
-                opacity: 0;
-                transform: scale(0.9) translateY(-20px);
-            }
-            to {
-                opacity: 1;
-                transform: scale(1) translateY(0);
-            }
-        }
-        
-        .modal-exit {
-            animation: modalSlideOut 0.2s ease-in forwards;
-        }
-        
-        @keyframes modalSlideOut {
-            from {
-                opacity: 1;
-                transform: scale(1) translateY(0);
-            }
-            to {
-                opacity: 0;
-                transform: scale(0.9) translateY(-20px);
-            }
-        }
-        
-        .table-modern {
-            border-collapse: separate;
-            border-spacing: 0;
-        }
-        
-        .table-modern tr {
-            transition: all 0.2s ease;
-        }
-        
-        .table-modern tr:hover {
-            background: rgba(249, 250, 251, 0.8);
-        }
-        
-        .table-modern th {
-            border-bottom: 2px solid #e5e7eb;
-            border-right: 1px solid #e5e7eb;
-        }
-        
-        .table-modern th:last-child {
-            border-right: none;
-        }
-        
-        .table-modern td {
-            border-bottom: 1px solid #e5e7eb;
-            border-right: 1px solid #f3f4f6;
-        }
-        
-        .table-modern td:last-child {
-            border-right: none;
-        }
-        
-        .table-container {
-            border: 2px solid #e5e7eb;
-            border-radius: 16px;
-            overflow: hidden;
-        }
-        
-        .number-badge {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 32px;
-            height: 32px;
-            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-            color: white;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
-            border: 2px solid #e5e7eb;
-            transition: all 0.2s ease;
-        }
 
-        .number-badge:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
-        }
-
-        .number-badge.alt-1 {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
-        }
-
-        .number-badge.alt-2 {
-            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-            box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);
-        }
-
-        .number-badge.alt-3 {
-            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-            box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
-        }
-
-        .number-badge.alt-4 {
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-            box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
-        }
-        
         .plat-blocked {
             opacity: 0.6;
             background: rgba(239, 68, 68, 0.05);
-        }
-        
-        .status-badge {
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .status-available {
-            background: rgba(16, 185, 129, 0.1);
-            color: #059669;
-            border: 1px solid rgba(16, 185, 129, 0.2);
-        }
-        
-        .status-blocked {
-            background: rgba(239, 68, 68, 0.1);
-            color: #dc2626;
-            border: 1px solid rgba(239, 68, 68, 0.2);
         }
     </style>
 </head>

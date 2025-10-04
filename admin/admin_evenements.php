@@ -2,10 +2,18 @@
 session_start();
 require_once '../config.php';
 require_once './permissions.php';
+
 if (!isset($_SESSION['admin_logged_in'])) {
     header('Location: login.php');
     exit;
 }
+
+// Vérifier que admin_id existe
+if (!isset($_SESSION['admin_id'])) {
+    header('Location: login.php');
+    exit;
+}
+
 requireAccess($conn, $_SESSION['admin_id'], 'admin_evenements');
 // Création du dossier uploads si nécessaire
 if (!is_dir('uploads/evenements/')) {

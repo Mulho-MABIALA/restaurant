@@ -8,7 +8,15 @@
         header('Location: login.php');
         exit;
     }
-requireAccess($conn, $_SESSION['admin_id'], 'commandes');
+
+    // Vérifier que admin_id existe
+    if (!isset($_SESSION['admin_id'])) {
+        header('Location: login.php');
+        exit;
+    }
+
+    // Vérifier les permissions
+    requireAccess($conn, $_SESSION['admin_id'], 'commandes');
     // Fonction pour échapper les valeurs
     function e($value)
     {
@@ -371,49 +379,17 @@ $categories_disponibles = getAllCategories($conn);
     <link rel="icon" type="image/x-icon" href="../assets/img/logo.jpg">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/cards-design.css">
     <style>
         body {
             font-family: ui-sans-serif, system-ui, sans-serif;
             background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
         }
 
-        /* Cards statistiques */
-        .stat-card {
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            border-radius: 16px;
-            background: rgba(255, 255, 255, 0.95);
+        /* Styles supplémentaires pour les cards de commandes */
+        .dashboard-card {
             backdrop-filter: blur(20px);
-            border: 3px solid;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
-
-        .stat-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        }
-
-        /* Couleurs de contour pour chaque card */
-        .card-total { border-color: rgba(99, 102, 241, 0.8); }
-        .card-nouvelles { border-color: rgba(239, 68, 68, 0.8); }
-        .card-aujourdhui { border-color: rgba(6, 182, 212, 0.8); }
-        .card-ventes { border-color: rgba(16, 185, 129, 0.8); }
-        .card-payees { border-color: rgba(34, 197, 94, 0.8); }
-        .card-impayees { border-color: rgba(251, 146, 60, 0.8); }
-
-        .card-total:hover { border-color: rgba(99, 102, 241, 1); }
-        .card-nouvelles:hover { border-color: rgba(239, 68, 68, 1); }
-        .card-aujourdhui:hover { border-color: rgba(6, 182, 212, 1); }
-        .card-ventes:hover { border-color: rgba(16, 185, 129, 1); }
-        .card-payees:hover { border-color: rgba(34, 197, 94, 1); }
-        .card-impayees:hover { border-color: rgba(251, 146, 60, 1); }
-
-        /* Icônes colorées pour chaque card */
-        .icon-total { color: #6366f1; background: rgba(99, 102, 241, 0.1); }
-        .icon-nouvelles { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
-        .icon-aujourdhui { color: #06b6d4; background: rgba(6, 182, 212, 0.1); }
-        .icon-ventes { color: #10b981; background: rgba(16, 185, 129, 0.1); }
-        .icon-payees { color: #22c55e; background: rgba(34, 197, 94, 0.1); }
-        .icon-impayees { color: #fb923c; background: rgba(251, 146, 60, 0.1); }
 
         /* Indicateurs de tendance */
         .trend-indicator {
@@ -1022,11 +998,11 @@ $categories_disponibles = getAllCategories($conn);
                     <!-- Première rangée - 3 cards -->
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <!-- Total Commandes -->
-                        <div class="stat-card card-total p-6">
+                        <div class="dashboard-card card-indigo p-6">
                             <div class="flex items-center justify-between">
                                 <div class="flex-1">
                                     <div class="flex items-center mb-4">
-                                        <div class="w-12 h-12 rounded-xl icon-total flex items-center justify-center mr-4">
+                                        <div class="icon-wrapper icon-indigo mr-4">
                                             <i class="fas fa-shopping-cart text-xl"></i>
                                         </div>
                                         <div>
@@ -1040,11 +1016,11 @@ $categories_disponibles = getAllCategories($conn);
                         </div>
 
                         <!-- Nouvelles Commandes -->
-                        <div class="stat-card card-nouvelles p-6">
+                        <div class="dashboard-card card-red p-6">
                             <div class="flex items-center justify-between">
                                 <div class="flex-1">
                                     <div class="flex items-center mb-4">
-                                        <div class="w-12 h-12 rounded-xl icon-nouvelles flex items-center justify-center mr-4">
+                                        <div class="icon-wrapper icon-red mr-4">
                                             <i class="fas fa-bell text-xl"></i>
                                         </div>
                                         <div>
@@ -1058,11 +1034,11 @@ $categories_disponibles = getAllCategories($conn);
                         </div>
 
                         <!-- Aujourd'hui -->
-                        <div class="stat-card card-aujourdhui p-6">
+                        <div class="dashboard-card card-cyan p-6">
                             <div class="flex items-center justify-between">
                                 <div class="flex-1">
                                     <div class="flex items-center mb-4">
-                                        <div class="w-12 h-12 rounded-xl icon-aujourdhui flex items-center justify-center mr-4">
+                                        <div class="icon-wrapper icon-cyan mr-4">
                                             <i class="fas fa-calendar-day text-xl"></i>
                                         </div>
                                         <div>
@@ -1079,11 +1055,11 @@ $categories_disponibles = getAllCategories($conn);
                     <!-- Deuxième rangée - 3 cards -->
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <!-- Total Ventes -->
-                        <div class="stat-card card-ventes p-6">
+                        <div class="dashboard-card card-green p-6">
                             <div class="flex items-center justify-between">
                                 <div class="flex-1">
                                     <div class="flex items-center mb-4">
-                                        <div class="w-12 h-12 rounded-xl icon-ventes flex items-center justify-center mr-4">
+                                        <div class="icon-wrapper icon-green mr-4">
                                             <i class="fas fa-chart-line text-xl"></i>
                                         </div>
                                         <div class="flex-1 min-w-0">
@@ -1097,11 +1073,11 @@ $categories_disponibles = getAllCategories($conn);
                         </div>
 
                         <!-- Commandes Payées -->
-                        <div class="stat-card card-payees p-6">
+                        <div class="dashboard-card card-teal p-6">
                             <div class="flex items-center justify-between">
                                 <div class="flex-1">
                                     <div class="flex items-center mb-4">
-                                        <div class="w-12 h-12 rounded-xl icon-payees flex items-center justify-center mr-4">
+                                        <div class="icon-wrapper icon-teal mr-4">
                                             <i class="fas fa-check-circle text-xl"></i>
                                         </div>
                                         <div>
@@ -1115,11 +1091,11 @@ $categories_disponibles = getAllCategories($conn);
                         </div>
 
                         <!-- Commandes Impayées -->
-                        <div class="stat-card card-impayees p-6">
+                        <div class="dashboard-card card-orange p-6">
                             <div class="flex items-center justify-between">
                                 <div class="flex-1">
                                     <div class="flex items-center mb-4">
-                                        <div class="w-12 h-12 rounded-xl icon-impayees flex items-center justify-center mr-4">
+                                        <div class="icon-wrapper icon-orange mr-4">
                                             <i class="fas fa-exclamation-circle text-xl"></i>
                                         </div>
                                         <div>
@@ -2613,7 +2589,7 @@ endforeach; ?>
     const commandesImpayees = totalCommandes - commandesPayees;
 
     // Mettre à jour les cards de statistiques
-    const statCards = document.querySelectorAll('.stat-card');
+    const statCards = document.querySelectorAll('.dashboard-card');
 
     // Total Commandes (première card)
     if (statCards[0]) {
@@ -2692,7 +2668,7 @@ function updateTrendIndicator(card, current, total) {
 
         // Animation au chargement des cards
         document.addEventListener('DOMContentLoaded', function() {
-            const cards = document.querySelectorAll('.stat-card');
+            const cards = document.querySelectorAll('.dashboard-card');
             cards.forEach((card, index) => {
                 setTimeout(() => {
                     card.style.opacity = '0';
