@@ -45,12 +45,18 @@
     // Marquer toutes les réservations comme lues (optionnel)
     $conn->query("UPDATE reservations SET statut = 'lu' WHERE statut = 'non_lu'");
 
-    // Suppression
-    if (isset($_GET['delete'])) {
-        $id   = (int) $_GET['delete'];
-        $stmt = $conn->prepare("DELETE FROM reservations WHERE id = ?");
-        $stmt->execute([$id]);
-        header("Location: reservations.php");
+    // Suppression via AJAX
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'supprimer') {
+        header('Content-Type: application/json');
+        $id = (int) $_POST['id'];
+
+        try {
+            $stmt = $conn->prepare("DELETE FROM reservations WHERE id = ?");
+            $stmt->execute([$id]);
+            echo json_encode(['success' => true, 'message' => 'Réservation supprimée avec succès']);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'Erreur lors de la suppression']);
+        }
         exit;
     }
 
@@ -359,6 +365,20 @@
           </form>
         </div>
 
+        <!-- Onglets -->
+        <div class="mb-6 border-b border-gray-200">
+            <nav class="-mb-px flex space-x-8">
+                <button onclick="switchTab('actives')" id="tab-actives" class="tab-button border-b-2 border-blue-500 py-4 px-1 text-sm font-medium text-blue-600">
+                    <i class="fas fa-calendar-check mr-2"></i>Réservations Actives
+                </button>
+                <button onclick="switchTab('historique')" id="tab-historique" class="tab-button border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                    <i class="fas fa-history mr-2"></i>Historique
+                </button>
+            </nav>
+        </div>
+
+        <!-- Content Actives -->
+        <div id="content-actives">
         <!-- Tableau des réservations avec bordures visibles -->
         <div class="bg-white rounded-2xl shadow-xl border-2 border-gray-200 overflow-hidden animate-slide-up">
           <div class="overflow-x-auto">
@@ -499,14 +519,14 @@
               </svg>
               Modifier
             </button>
-            <a href="?delete=<?php echo $res['id']?>" onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette réservation ?')" class="inline-flex items-center px-3 py-2 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-all duration-200 hover:scale-105 border border-red-200">
+            <button onclick="confirmDelete(<?php echo $res['id']?>, '<?php echo htmlspecialchars($res['nom'], ENT_QUOTES)?>', '<?php echo date('d/m/Y', strtotime($res['date_reservation']))?>')" class="inline-flex items-center px-3 py-2 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-all duration-200 hover:scale-105 border border-red-200">
               <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" clip-rule="evenodd"/>
                 <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3l1.5 1.5a1 1 0 01-1.414 1.414L10 10.414V6a1 1 0 011-1z" clip-rule="evenodd"/>
                 <path fill-rule="evenodd" d="M3 5a2 2 0 012-2h1a1 1 0 000 2H5v11a2 2 0 002 2h6a2 2 0 002-2V5h-1a1 1 0 100-2h1a2 2 0 012 2v11a4 4 0 01-4 4H7a4 4 0 01-4-4V5z" clip-rule="evenodd"/>
               </svg>
               Supprimer
-            </a>
+            </button>
           </div>
         </td>
       </tr>
@@ -528,6 +548,172 @@
             </table>
           </div>
         </div>
+        </div>
+
+        <!-- Content Historique -->
+        <div id="content-historique" class="hidden">
+            <!-- Filtres Historique -->
+            <div class="bg-white rounded-2xl shadow-xl border border-gray-200 p-6 mb-6">
+                <h3 class="text-lg font-semibold mb-4">Filtres Historique</h3>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Date début</label>
+                        <input type="date" id="hist-date-debut" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Date fin</label>
+                        <input type="date" id="hist-date-fin" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Statut</label>
+                        <select id="hist-statut" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                            <option value="">Tous les statuts</option>
+                            <option value="lu">Confirmé</option>
+                            <option value="annule">Annulé</option>
+                            <option value="modifie">Modifié</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Recherche</label>
+                        <input type="text" id="hist-search" placeholder="Nom, email..." class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                    </div>
+                </div>
+                <div class="mt-4 flex justify-end space-x-3">
+                    <button onclick="resetHistFilters()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
+                        <i class="fas fa-redo mr-2"></i>Réinitialiser
+                    </button>
+                    <button onclick="applyHistFilters()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-filter mr-2"></i>Filtrer
+                    </button>
+                </div>
+            </div>
+
+            <!-- Statistiques Historique -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                <div class="dashboard-card card-blue">
+                    <div class="icon-wrapper icon-blue">
+                        <i class="fas fa-calendar-alt"></i>
+                    </div>
+                    <div class="card-content">
+                        <h3 class="card-title">Total Réservations</h3>
+                        <p class="card-value" id="hist-total"><?= count($reservations) ?></p>
+                    </div>
+                </div>
+                <div class="dashboard-card card-green">
+                    <div class="icon-wrapper icon-green">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="card-content">
+                        <h3 class="card-title">Total Personnes</h3>
+                        <p class="card-value" id="hist-personnes"><?= array_sum(array_column($reservations, 'personnes')) ?></p>
+                    </div>
+                </div>
+                <div class="dashboard-card card-purple">
+                    <div class="icon-wrapper icon-purple">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div class="card-content">
+                        <h3 class="card-title">Moyenne/Résa</h3>
+                        <p class="card-value" id="hist-moyenne"><?= count($reservations) > 0 ? round(array_sum(array_column($reservations, 'personnes')) / count($reservations), 1) : 0 ?></p>
+                    </div>
+                </div>
+                <div class="dashboard-card card-orange">
+                    <div class="icon-wrapper icon-orange">
+                        <i class="fas fa-trophy"></i>
+                    </div>
+                    <div class="card-content">
+                        <h3 class="card-title">Plus Grande Résa</h3>
+                        <p class="card-value" id="hist-max"><?= !empty($reservations) ? max(array_column($reservations, 'personnes')) : 0 ?></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tableau Historique -->
+            <div class="bg-white rounded-2xl shadow-xl border-2 border-gray-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full border-collapse" id="table-historique">
+                        <thead>
+                            <tr class="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-300">
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">N°</th>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Client</th>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Contact</th>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Date</th>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Heure</th>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Personnes</th>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Statut</th>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Message</th>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($reservations as $index => $resa):
+                                $statut_badge = [
+                                    'lu' => 'bg-green-100 text-green-800',
+                                    'annule' => 'bg-red-100 text-red-800',
+                                    'modifie' => 'bg-orange-100 text-orange-800',
+                                    'non_lu' => 'bg-blue-100 text-blue-800'
+                                ];
+                                $badge_color = $statut_badge[$resa['statut']] ?? 'bg-gray-100 text-gray-800';
+                            ?>
+                            <tr class="border-b border-gray-200 hover:bg-gray-50"
+                                data-nom="<?= strtolower($resa['nom']) ?>"
+                                data-email="<?= strtolower($resa['email']) ?>"
+                                data-date="<?= $resa['date_reservation'] ?>"
+                                data-statut="<?= $resa['statut'] ?>">
+                                <td class="px-6 py-4 text-sm font-medium text-gray-900">#<?= $resa['id'] ?></td>
+                                <td class="px-6 py-4">
+                                    <div class="font-semibold text-gray-900"><?= htmlspecialchars($resa['nom']) ?></div>
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-700">
+                                    <div><?= htmlspecialchars($resa['email']) ?></div>
+                                    <div><?= htmlspecialchars($resa['telephone']) ?></div>
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-700">
+                                    <?= date('d/m/Y', strtotime($resa['date_reservation'])) ?>
+                                </td>
+                                <td class="px-6 py-4 text-sm font-semibold text-blue-600">
+                                    <?= date('H:i', strtotime($resa['heure_reservation'])) ?>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-semibold">
+                                        <?= $resa['personnes'] ?> pers.
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="px-3 py-1 rounded-full text-xs font-semibold <?= $badge_color ?>">
+                                        <?php
+                                            $statut_text = [
+                                                'lu' => 'Confirmé',
+                                                'annule' => 'Annulé',
+                                                'modifie' => 'Modifié',
+                                                'non_lu' => 'Nouveau'
+                                            ];
+                                            echo $statut_text[$resa['statut']] ?? ucfirst($resa['statut']);
+                                        ?>
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-600">
+                                    <?php if (!empty($resa['message'])): ?>
+                                        <button onclick="viewMessage('<?= htmlspecialchars($resa['message'], ENT_QUOTES) ?>')" class="text-blue-600 hover:text-blue-800">
+                                            <i class="fas fa-envelope mr-1"></i>Voir
+                                        </button>
+                                    <?php else: ?>
+                                        <span class="text-gray-400">Aucun</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <button onclick='viewHistDetails(<?= json_encode($resa) ?>)' class="text-blue-600 hover:text-blue-800 mr-2">
+                                        <i class="fas fa-eye"></i> Détails
+                                    </button>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -995,6 +1181,34 @@
   </div>
 </div>
 
+  <!-- Modal de confirmation de suppression -->
+  <div id="deleteModal" class="fixed inset-0 bg-black/50 modal-overlay flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg p-6 m-4 max-w-md w-full border border-gray-200 shadow-xl">
+      <div class="text-center">
+        <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <i class="fas fa-exclamation-triangle text-red-600 text-2xl"></i>
+        </div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2">Confirmer la suppression</h3>
+        <p class="text-gray-600 mb-2">Vous êtes sur le point de supprimer définitivement la réservation :</p>
+        <div class="bg-gray-50 rounded-lg p-3 mb-4 border border-gray-200">
+          <p class="font-medium text-gray-800" id="deleteReservationInfo"></p>
+        </div>
+        <p class="text-red-600 text-sm font-medium mb-6">Cette action est irréversible !</p>
+        <div class="flex space-x-3">
+          <button onclick="closeDeleteModal()"
+                  class="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300 transition-colors">
+            Annuler
+          </button>
+          <button onclick="deleteReservation()"
+                  id="confirmDeleteBtn"
+                  class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors">
+            Supprimer
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     // Gestion du modal d'ajout
     function openModal() {
@@ -1360,6 +1574,225 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+// Onglets
+function switchTab(tab) {
+    document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.classList.remove('border-blue-500', 'text-blue-600');
+        btn.classList.add('border-transparent', 'text-gray-500');
+    });
+    document.getElementById(`tab-${tab}`).classList.remove('border-transparent', 'text-gray-500');
+    document.getElementById(`tab-${tab}`).classList.add('border-blue-500', 'text-blue-600');
+
+    document.getElementById('content-actives').classList.toggle('hidden', tab !== 'actives');
+    document.getElementById('content-historique').classList.toggle('hidden', tab !== 'historique');
+}
+
+// Filtres historique
+function applyHistFilters() {
+    const dateDebut = document.getElementById('hist-date-debut').value;
+    const dateFin = document.getElementById('hist-date-fin').value;
+    const statut = document.getElementById('hist-statut').value;
+    const search = document.getElementById('hist-search').value.toLowerCase();
+
+    const rows = document.querySelectorAll('#table-historique tbody tr');
+    let total = 0;
+    let totalPersonnes = 0;
+    let max = 0;
+
+    rows.forEach(row => {
+        let show = true;
+
+        if (dateDebut && row.dataset.date < dateDebut) show = false;
+        if (dateFin && row.dataset.date > dateFin) show = false;
+        if (statut && row.dataset.statut !== statut) show = false;
+        if (search && !row.dataset.nom.includes(search) && !row.dataset.email.includes(search)) show = false;
+
+        if (show) {
+            row.style.display = '';
+            total++;
+            const personnes = parseInt(row.cells[5].textContent);
+            totalPersonnes += personnes;
+            if (personnes > max) max = personnes;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+
+    document.getElementById('hist-total').textContent = total;
+    document.getElementById('hist-personnes').textContent = totalPersonnes;
+    document.getElementById('hist-moyenne').textContent = total > 0 ? (totalPersonnes / total).toFixed(1) : 0;
+    document.getElementById('hist-max').textContent = max;
+}
+
+function resetHistFilters() {
+    document.getElementById('hist-date-debut').value = '';
+    document.getElementById('hist-date-fin').value = '';
+    document.getElementById('hist-statut').value = '';
+    document.getElementById('hist-search').value = '';
+    applyHistFilters();
+}
+
+function viewHistDetails(resa) {
+    const modalHTML = `
+        <div class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center" onclick="this.remove()">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 p-8" onclick="event.stopPropagation()">
+                <div class="flex justify-between items-center mb-6 border-b pb-4">
+                    <h3 class="text-2xl font-bold text-gray-800">Détails Réservation #${resa.id}</h3>
+                    <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-2xl"></i>
+                    </button>
+                </div>
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-sm text-gray-500 font-semibold">Client</p>
+                            <p class="text-lg font-medium">${resa.nom}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500 font-semibold">Personnes</p>
+                            <p class="text-lg font-semibold text-purple-600">${resa.personnes}</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-sm text-gray-500 font-semibold">Email</p>
+                            <p class="text-lg">${resa.email}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500 font-semibold">Téléphone</p>
+                            <p class="text-lg">${resa.telephone}</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-sm text-gray-500 font-semibold">Date</p>
+                            <p class="text-lg">${new Date(resa.date_reservation).toLocaleDateString('fr-FR')}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500 font-semibold">Heure</p>
+                            <p class="text-lg font-semibold text-blue-600">${resa.heure_reservation}</p>
+                        </div>
+                    </div>
+                    ${resa.message ? `
+                    <div class="border-t pt-4">
+                        <p class="text-sm text-gray-500 font-semibold mb-2">Message</p>
+                        <p class="text-gray-700 bg-gray-50 p-3 rounded">${resa.message}</p>
+                    </div>
+                    ` : ''}
+                </div>
+                <div class="mt-6 flex justify-end">
+                    <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
+                        Fermer
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+
+// Variables pour la suppression
+let reservationToDelete = null;
+
+// Fonction pour afficher le modal de confirmation de suppression
+function confirmDelete(id, nomClient, dateReservation) {
+    reservationToDelete = id;
+
+    const modal = document.getElementById('deleteModal');
+    document.getElementById('deleteReservationInfo').textContent = `${nomClient} - ${dateReservation}`;
+
+    // S'assurer que le bouton est dans son état normal
+    const confirmBtn = document.getElementById('confirmDeleteBtn');
+    confirmBtn.innerHTML = 'Supprimer';
+    confirmBtn.disabled = false;
+
+    modal.classList.remove('hidden');
+}
+
+// Fonction pour fermer le modal de suppression
+function closeDeleteModal() {
+    const modal = document.getElementById('deleteModal');
+    modal.classList.add('hidden');
+
+    // Réinitialiser
+    reservationToDelete = null;
+    document.getElementById('deleteReservationInfo').textContent = '';
+
+    const confirmBtn = document.getElementById('confirmDeleteBtn');
+    confirmBtn.innerHTML = 'Supprimer';
+    confirmBtn.disabled = false;
+}
+
+// Fonction pour supprimer la réservation via AJAX
+function deleteReservation() {
+    if (!reservationToDelete) return;
+
+    const confirmBtn = document.getElementById('confirmDeleteBtn');
+    const originalText = confirmBtn.innerHTML;
+
+    // Animation de chargement
+    confirmBtn.innerHTML = `
+        <i class="fas fa-spinner fa-spin mr-2"></i>
+        Suppression...
+    `;
+    confirmBtn.disabled = true;
+
+    const reservationId = reservationToDelete;
+
+    // Requête AJAX
+    fetch('reservations.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `action=supprimer&id=${reservationId}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Trouver et supprimer la ligne du tableau
+            const rows = document.querySelectorAll('tbody tr');
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length > 0) {
+                    // Chercher le bouton de suppression qui contient l'ID
+                    const deleteBtn = row.querySelector(`button[onclick*="confirmDelete(${reservationId}"]`);
+                    if (deleteBtn) {
+                        row.style.opacity = '0';
+                        row.style.transform = 'translateX(-100%)';
+                        row.style.transition = 'all 0.3s ease';
+
+                        setTimeout(() => {
+                            row.remove();
+
+                            // Vérifier s'il reste des réservations
+                            const remainingRows = document.querySelectorAll('tbody tr');
+                            if (remainingRows.length === 0) {
+                                location.reload();
+                            }
+                        }, 300);
+                    }
+                }
+            });
+
+            closeDeleteModal();
+
+            // Message de succès (optionnel - vous pouvez ajouter un toast)
+            console.log('Réservation supprimée avec succès');
+        } else {
+            alert('Erreur: ' + data.message);
+            confirmBtn.innerHTML = originalText;
+            confirmBtn.disabled = false;
+        }
+    })
+    .catch(error => {
+        console.error('Erreur:', error);
+        alert('Erreur de connexion');
+        confirmBtn.innerHTML = originalText;
+        confirmBtn.disabled = false;
+    });
+}
   </script>
 
 </body>

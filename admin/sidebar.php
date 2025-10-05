@@ -717,6 +717,34 @@ if ($adminId && isset($conn)) {
                     <span class="font-medium">Trésorerie</span>
                 </a>
                 <?php endif; ?>
+
+                <?php if (canAccess($conn, $adminId, 'fournisseurs')): ?>
+                <a href="./finances/fournisseurs.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                    <i class="fas fa-truck mr-3 w-5 text-sm"></i>
+                    <span class="font-medium">Fournisseurs</span>
+                </a>
+                <?php endif; ?>
+
+                <?php if (canAccess($conn, $adminId, 'factures_fournisseur')): ?>
+                <a href="./finances/factures_fournisseur.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                    <i class="fas fa-file-invoice mr-3 w-5 text-sm"></i>
+                    <span class="font-medium">Factures Fournisseurs</span>
+                </a>
+                <?php endif; ?>
+
+                <?php if (canAccess($conn, $adminId, 'marges')): ?>
+                <a href="./finances/marges.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                    <i class="fas fa-chart-line mr-3 w-5 text-sm"></i>
+                    <span class="font-medium">Analyse Marges</span>
+                </a>
+                <?php endif; ?>
+
+                <?php if (canAccess($conn, $adminId, 'alertes')): ?>
+                <a href="./finances/alertes.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                    <i class="fas fa-bell mr-3 w-5 text-sm"></i>
+                    <span class="font-medium">Alertes Financières</span>
+                </a>
+                <?php endif; ?>
             </div>
         </div>
         <?php endif; ?>
