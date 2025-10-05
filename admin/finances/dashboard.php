@@ -1,3 +1,74 @@
+<?php
+session_start();
+require_once '../../config.php';
+require_once '../permissions.php';
+
+// Vérifier authentification
+if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    header('Location: ../login.php');
+    exit;
+}
+
+if (!isset($_SESSION['admin_id'])) {
+    header('Location: ../login.php');
+    exit;
+}
+
+// Vérifier les permissions
+requireAccess($conn, $_SESSION['admin_id'], 'finances');
+
+// Récupérer les données financières
+$date_filter = $_GET['date'] ?? date('Y-m-d');
+
+// CA du jour
+$stmt = $conn->prepare("
+    SELECT
+        COUNT(*) as nb_commandes,
+        COALESCE(SUM(total), 0) as ca_total,
+        COALESCE(AVG(total), 0) as panier_moyen
+    FROM commandes
+    WHERE DATE(date_commande) = ? AND statut_paiement = 'Payé'
+");
+$stmt->execute([$date_filter]);
+$ventes_jour = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// Évolution 7 derniers jours
+$stmt = $conn->query("
+    SELECT
+        DATE(date_commande) as date,
+        COALESCE(SUM(total), 0) as ca_total
+    FROM commandes
+    WHERE DATE(date_commande) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+    AND statut_paiement = 'Payé'
+    GROUP BY DATE(date_commande)
+    ORDER BY date ASC
+");
+$evolution_7j = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Top plats vendus
+try {
+    $stmt = $conn->query("
+        SELECT
+            cd.nom_plat as nom,
+            SUM(cd.quantite) as quantite
+        FROM commande_details cd
+        JOIN commandes c ON cd.commande_id = c.id
+        WHERE DATE(c.date_commande) = CURDATE()
+        GROUP BY cd.nom_plat
+        ORDER BY quantite DESC
+        LIMIT 5
+    ");
+    $top_plats = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    // Si erreur, tableau vide
+    $top_plats = [];
+}
+
+// Objectif du jour
+$objectif_ca = 500000; // À configurer
+$progression = $ventes_jour['ca_total'] > 0 ? round(($ventes_jour['ca_total'] / $objectif_ca) * 100, 1) : 0;
+?>
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -7,512 +78,306 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/cards-design.css">
+    <style>
+        /* Scrollbar pour light theme */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 5px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #cbd5e1 0%, #94a3b8 100%);
+            border-radius: 5px;
+            border: 2px solid #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, #94a3b8 0%, #64748b 100%);
+        }
+
+        /* Scrollbar pour dark mode */
+        @media (prefers-color-scheme: dark) {
+            ::-webkit-scrollbar-track {
+                background: #1e293b;
+            }
+            ::-webkit-scrollbar-thumb {
+                background: linear-gradient(180deg, #475569 0%, #334155 100%);
+                border-color: #1e293b;
+            }
+            ::-webkit-scrollbar-thumb:hover {
+                background: linear-gradient(180deg, #64748b 0%, #475569 100%);
+            }
+        }
+
+        /* Chart container */
+        .chart-container {
+            position: relative;
+            height: 250px;
+        }
+    </style>
 </head>
 <body class="bg-gray-50">
-    
-    <!-- Navigation Finances -->
-    <nav class="bg-white shadow-lg border-b">
-        <div class="max-w-7xl mx-auto px-4">
-            <div class="flex justify-between items-center h-16">
-                <div class="flex items-center space-x-4">
-                    <h1 class="text-xl font-bold text-gray-800">Dashboard Financier</h1>
-                    <div class="hidden md:flex space-x-4">
-                        <a href="dashboard.php" class="nav-btn active bg-blue-600 text-white px-4 py-2 rounded-lg">Tableau de bord</a>
-                        <a href="facturation.php" class="nav-btn text-gray-600 hover:text-gray-800 px-4 py-2 rounded-lg">Facturation</a>
-                        <a href="rapports.php" class="nav-btn text-gray-600 hover:text-gray-800 px-4 py-2 rounded-lg">Rapports</a>
-                        <a href="tresorerie.php" class="nav-btn text-gray-600 hover:text-gray-800 px-4 py-2 rounded-lg">Trésorerie</a>
-                    </div>
-                </div>
-                <div class="flex items-center space-x-4">
-                    <input type="date" id="dateSelector" class="px-3 py-2 border rounded-lg" value="">
-                    <button onclick="refreshData()" class="p-2 text-gray-600 hover:text-gray-800">
-                        <i class="fas fa-refresh"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </nav>
 
-    <!-- Alertes -->
-    <div id="alertesContainer" class="max-w-7xl mx-auto px-4 mt-4"></div>
+    <div class="flex h-screen overflow-hidden">
+        <?php include '../sidebar.php'; ?>
 
-    <div class="max-w-7xl mx-auto px-4 py-6">
-        
-        <!-- KPIs Principaux -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div class="bg-white rounded-lg shadow p-6">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-gray-600">CA Aujourd'hui</p>
-                        <p class="text-2xl font-bold text-gray-900" id="caJour">0 FCFA</p>
-                        <p class="text-sm text-green-600" id="evolutionCA">+0%</p>
-                    </div>
-                    <div class="p-3 bg-green-100 rounded-full">
-                        <i class="fas fa-coins text-green-600"></i>
+        <div class="flex-1 overflow-y-auto">
+            <!-- Navigation Finances -->
+            <nav class="bg-white shadow-sm border-b sticky top-0 z-10">
+                <div class="max-w-7xl mx-auto px-4">
+                    <div class="flex justify-between items-center h-16">
+                        <div class="flex items-center space-x-4">
+                            <h1 class="text-xl font-bold text-gray-800">
+                                <i class="fas fa-chart-line mr-2 text-green-600"></i>
+                                Dashboard Financier
+                            </h1>
+                            <div class="hidden md:flex space-x-2">
+                                <a href="dashboard.php" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                                    <i class="fas fa-dashboard mr-1"></i>Tableau de bord
+                                </a>
+                                <a href="facturation.php" class="text-gray-600 hover:bg-gray-100 px-4 py-2 rounded-lg text-sm font-medium">
+                                    <i class="fas fa-file-invoice mr-1"></i>Facturation
+                                </a>
+                                <a href="rapports.php" class="text-gray-600 hover:bg-gray-100 px-4 py-2 rounded-lg text-sm font-medium">
+                                    <i class="fas fa-chart-bar mr-1"></i>Rapports
+                                </a>
+                                <a href="tresorerie.php" class="text-gray-600 hover:bg-gray-100 px-4 py-2 rounded-lg text-sm font-medium">
+                                    <i class="fas fa-wallet mr-1"></i>Trésorerie
+                                </a>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <input type="date" id="dateSelector" class="px-3 py-2 border rounded-lg text-sm" value="<?= $date_filter ?>">
+                            <button onclick="window.location.reload()" class="p-2 text-gray-600 hover:text-gray-800">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </nav>
 
-            <div class="bg-white rounded-lg shadow p-6">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-gray-600">Commandes</p>
-                        <p class="text-2xl font-bold text-gray-900" id="nbCommandes">0</p>
-                        <p class="text-sm text-blue-600" id="panierMoyen">Panier: 0 FCFA</p>
+            <div class="max-w-7xl mx-auto px-4 py-6">
+
+                <!-- KPIs Principaux -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <!-- CA du jour -->
+                    <div class="dashboard-card card-green">
+                        <div class="icon-wrapper icon-green">
+                            <i class="fas fa-coins"></i>
+                        </div>
+                        <div class="card-content">
+                            <h3 class="card-title">CA du Jour</h3>
+                            <p class="card-value"><?= number_format($ventes_jour['ca_total']) ?> FCFA</p>
+                            <p class="card-subtitle text-green-600">
+                                <i class="fas fa-arrow-up mr-1"></i>
+                                <?= $ventes_jour['nb_commandes'] ?> commandes
+                            </p>
+                        </div>
                     </div>
-                    <div class="p-3 bg-blue-100 rounded-full">
-                        <i class="fas fa-shopping-cart text-blue-600"></i>
+
+                    <!-- Panier moyen -->
+                    <div class="dashboard-card card-blue">
+                        <div class="icon-wrapper icon-blue">
+                            <i class="fas fa-shopping-cart"></i>
+                        </div>
+                        <div class="card-content">
+                            <h3 class="card-title">Panier Moyen</h3>
+                            <p class="card-value"><?= number_format($ventes_jour['panier_moyen']) ?> FCFA</p>
+                            <p class="card-subtitle text-gray-600">
+                                Par commande
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Objectif -->
+                    <div class="dashboard-card card-purple">
+                        <div class="icon-wrapper icon-purple">
+                            <i class="fas fa-target"></i>
+                        </div>
+                        <div class="card-content">
+                            <h3 class="card-title">Objectif du Jour</h3>
+                            <p class="card-value"><?= $progression ?>%</p>
+                            <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
+                                <div class="bg-gradient-to-r from-purple-500 to-pink-600 h-2 rounded-full" style="width: <?= min(100, $progression) ?>%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Commandes -->
+                    <div class="dashboard-card card-orange">
+                        <div class="icon-wrapper icon-orange">
+                            <i class="fas fa-receipt"></i>
+                        </div>
+                        <div class="card-content">
+                            <h3 class="card-title">Commandes</h3>
+                            <p class="card-value"><?= $ventes_jour['nb_commandes'] ?></p>
+                            <p class="card-subtitle text-gray-600">
+                                Aujourd'hui
+                            </p>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="bg-white rounded-lg shadow p-6">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-gray-600">Caisse</p>
-                        <p class="text-2xl font-bold text-gray-900" id="statusCaisse">Fermée</p>
-                        <p class="text-sm text-orange-600" id="ecartCaisse">Écart: 0 FCFA</p>
+                <!-- Graphiques -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                    <!-- Évolution des ventes -->
+                    <div class="dashboard-card card-blue">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center text-gray-900">
+                            <div class="icon-wrapper icon-blue mr-3">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                            Évolution des ventes (7 jours)
+                        </h3>
+                        <div class="chart-container">
+                            <canvas id="chartVentes"></canvas>
+                        </div>
                     </div>
-                    <div class="p-3 bg-orange-100 rounded-full">
-                        <i class="fas fa-cash-register text-orange-600"></i>
-                    </div>
-                </div>
-            </div>
 
-            <div class="bg-white rounded-lg shadow p-6">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-gray-600">Objectif</p>
-                        <p class="text-2xl font-bold text-gray-900" id="objectifJour">0%</p>
-                        <p class="text-sm text-purple-600" id="manqueObjectif">Reste: 0 FCFA</p>
-                    </div>
-                    <div class="p-3 bg-purple-100 rounded-full">
-                        <i class="fas fa-target text-purple-600"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Graphiques -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="text-lg font-semibold mb-4">Évolution des ventes (7 jours)</h3>
-                <canvas id="chartVentes" width="400" height="200"></canvas>
-            </div>
-
-            <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="text-lg font-semibold mb-4">Top 5 Plats du jour</h3>
-                <canvas id="chartTopPlats" width="400" height="200"></canvas>
-            </div>
-        </div>
-
-        <!-- Top Plats et Alertes -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="bg-white rounded-lg shadow">
-                <div class="p-6 border-b">
-                    <h3 class="text-lg font-semibold">Top Plats Rentables</h3>
-                </div>
-                <div class="p-6">
-                    <div id="topPlatsRentables" class="space-y-4">
-                        <!-- Sera rempli par JavaScript -->
+                    <!-- Top plats -->
+                    <div class="dashboard-card card-orange">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center text-gray-900">
+                            <div class="icon-wrapper icon-orange mr-3">
+                                <i class="fas fa-fire"></i>
+                            </div>
+                            Top 5 Plats du Jour
+                        </h3>
+                        <div class="space-y-3">
+                            <?php if (!empty($top_plats)): ?>
+                                <?php foreach ($top_plats as $index => $plat): ?>
+                                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                                        <div class="flex items-center space-x-3">
+                                            <span class="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-pink-500 text-white text-xs font-bold">#<?= $index + 1 ?></span>
+                                            <span class="text-sm font-medium text-gray-900"><?= htmlspecialchars($plat['nom']) ?></span>
+                                        </div>
+                                        <span class="text-sm font-semibold text-orange-600 bg-orange-50 px-3 py-1 rounded-full"><?= $plat['quantite'] ?> ventes</span>
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <div class="text-center py-8">
+                                    <i class="fas fa-utensils text-4xl text-gray-300 mb-3"></i>
+                                    <p class="text-sm text-gray-500">Aucune vente aujourd'hui</p>
+                                </div>
+                            <?php endif; ?>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="bg-white rounded-lg shadow">
-                <div class="p-6 border-b">
-                    <h3 class="text-lg font-semibold">Suggestions d'Optimisation</h3>
+                <!-- Détails par mode de paiement -->
+                <div class="dashboard-card card-green mb-8">
+                    <h3 class="text-lg font-semibold mb-6 flex items-center text-gray-900">
+                        <div class="icon-wrapper icon-green mr-3">
+                            <i class="fas fa-credit-card"></i>
+                        </div>
+                        Répartition par mode de paiement
+                    </h3>
+                    <?php
+                    $stmt = $conn->prepare("
+                        SELECT
+                            mode_paiement,
+                            COUNT(*) as nb_transactions,
+                            SUM(total) as montant_total
+                        FROM commandes
+                        WHERE DATE(date_commande) = ? AND statut_paiement = 'Payé'
+                        GROUP BY mode_paiement
+                    ");
+                    $stmt->execute([$date_filter]);
+                    $modes_paiement = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                    $icons = [
+                        'Espèces' => 'fa-money-bill-wave',
+                        'Carte bancaire' => 'fa-credit-card',
+                        'Mobile Money' => 'fa-mobile-alt',
+                        'Virement' => 'fa-exchange-alt'
+                    ];
+
+                    $colors = [
+                        'Espèces' => ['bg' => 'bg-green-50', 'text' => 'text-green-600', 'icon' => 'text-green-500'],
+                        'Carte bancaire' => ['bg' => 'bg-blue-50', 'text' => 'text-blue-600', 'icon' => 'text-blue-500'],
+                        'Mobile Money' => ['bg' => 'bg-purple-50', 'text' => 'text-purple-600', 'icon' => 'text-purple-500'],
+                        'Virement' => ['bg' => 'bg-orange-50', 'text' => 'text-orange-600', 'icon' => 'text-orange-500']
+                    ];
+                    ?>
+                    <?php if (!empty($modes_paiement)): ?>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <?php foreach ($modes_paiement as $mode): ?>
+                                <?php
+                                    $modeName = $mode['mode_paiement'];
+                                    $color = $colors[$modeName] ?? ['bg' => 'bg-gray-50', 'text' => 'text-gray-600', 'icon' => 'text-gray-500'];
+                                    $icon = $icons[$modeName] ?? 'fa-wallet';
+                                ?>
+                                <div class="<?= $color['bg'] ?> border border-gray-200 rounded-xl p-5 hover:shadow-md transition-shadow">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <i class="fas <?= $icon ?> text-2xl <?= $color['icon'] ?>"></i>
+                                        <span class="text-xs font-medium <?= $color['text'] ?> bg-white px-2 py-1 rounded-full"><?= $mode['nb_transactions'] ?> trans.</span>
+                                    </div>
+                                    <p class="text-sm text-gray-600 mb-1"><?= htmlspecialchars($modeName) ?></p>
+                                    <p class="text-2xl font-bold <?= $color['text'] ?>"><?= number_format($mode['montant_total']) ?></p>
+                                    <p class="text-xs text-gray-500 mt-1">FCFA</p>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php else: ?>
+                        <div class="text-center py-8">
+                            <i class="fas fa-wallet text-4xl text-gray-300 mb-3"></i>
+                            <p class="text-sm text-gray-500">Aucune transaction enregistrée</p>
+                        </div>
+                    <?php endif; ?>
                 </div>
-                <div class="p-6">
-                    <div id="suggestionsOptimisation" class="space-y-4">
-                        <!-- Sera rempli par JavaScript -->
-                    </div>
-                </div>
+
             </div>
         </div>
     </div>
 
     <script>
-        // Variables globales
-        let dashboardData = {};
-        let chartsInstances = {};
+        // Graphique évolution des ventes
+        const ctx = document.getElementById('chartVentes').getContext('2d');
+        const evolutionData = <?= json_encode($evolution_7j) ?>;
 
-        // Initialisation
-        document.addEventListener('DOMContentLoaded', function() {
-            // Définir la date d'aujourd'hui
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('dateSelector').value = today;
-            
-            loadDashboardData();
-            
-            // Event listeners
-            document.getElementById('dateSelector').addEventListener('change', function() {
-                loadDashboardData();
-            });
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: evolutionData.map(d => {
+                    const date = new Date(d.date);
+                    return date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+                }),
+                datasets: [{
+                    label: 'CA (FCFA)',
+                    data: evolutionData.map(d => d.ca_total),
+                    borderColor: 'rgb(59, 130, 246)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return value.toLocaleString() + ' FCFA';
+                            }
+                        }
+                    }
+                }
+            }
         });
 
-        // Chargement des données du dashboard
-        async function loadDashboardData() {
-            try {
-                const date = document.getElementById('dateSelector').value;
-                console.log('Chargement des données pour:', date);
-                
-                // Construire l'URL relative correctement
-                const baseUrl = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/admin/'));
-                const apiUrl = `${baseUrl}/api/finance.php?action=dashboard&date=${date}`;
-                
-                console.log('URL API:', apiUrl);
-                
-                const response = await fetch(apiUrl);
-                const responseText = await response.text();
-                
-                console.log('Réponse brute:', responseText);
-                
-                try {
-                    dashboardData = JSON.parse(responseText);
-                } catch (e) {
-                    console.error('Erreur parsing JSON:', e);
-                    console.error('Réponse reçue:', responseText);
-                    throw new Error('Réponse invalide du serveur');
-                }
-
-                if (dashboardData.error) {
-                    throw new Error(dashboardData.error);
-                }
-
-                updateDashboardKPIs();
-                updateDashboardCharts();
-                updateTopPlats();
-                updateSuggestions();
-                updateAlertes();
-
-            } catch (error) {
-                console.error('Erreur chargement dashboard:', error);
-                showNotification('Erreur lors du chargement des données: ' + error.message, 'error');
-                
-                // Utiliser des données de démonstration en cas d'erreur
-                useDemoData();
-            }
-        }
-
-        // Données de démonstration
-        function useDemoData() {
-            dashboardData = {
-                ventes_jour: {
-                    nb_commandes: 45,
-                    ca_total: 450000,
-                    panier_moyen: 10000,
-                    evolution: 12.5
-                },
-                caisse_quotidienne: {
-                    statut: 'ouverte',
-                    montant_ouverture: 100000,
-                    ecart: 2500
-                },
-                objectifs: {
-                    ca_objectif: 600000,
-                    nb_commandes_objectif: 60
-                },
-                evolution_7j: [
-                    {date: '2025-01-03', ca_total: 380000},
-                    {date: '2025-01-04', ca_total: 420000},
-                    {date: '2025-01-05', ca_total: 550000},
-                    {date: '2025-01-06', ca_total: 480000},
-                    {date: '2025-01-07', ca_total: 390000},
-                    {date: '2025-01-08', ca_total: 440000},
-                    {date: '2025-01-09', ca_total: 450000}
-                ],
-                top_plats: [
-                    {nom: 'Thiéboudienne', quantite: 35},
-                    {nom: 'Yassa Poulet', quantite: 28},
-                    {nom: 'Mafé', quantite: 22},
-                    {nom: 'Bassi Salté', quantite: 18},
-                    {nom: 'Domoda', quantite: 15}
-                ],
-                top_plats_rentables: [
-                    {nom: 'Sauce Feuilles', benefice_total: 37500, marge_pourcentage: 60},
-                    {nom: 'Thiéboudienne', benefice_total: 60000, marge_pourcentage: 50},
-                    {nom: 'Domoda', benefice_total: 30000, marge_pourcentage: 50}
-                ],
-                suggestions: [
-                    {titre: 'Augmenter les ventes', message: 'Proposez des menus complets'},
-                    {titre: 'Stock à vérifier', message: 'Vérifier le stock de poulet'}
-                ],
-                alertes: [
-                    {id: 1, titre: 'Bonne performance', message: 'CA en hausse', priorite: 'low'}
-                ]
-            };
-            
-            updateDashboardKPIs();
-            updateDashboardCharts();
-            updateTopPlats();
-            updateSuggestions();
-            updateAlertes();
-        }
-
-        // Mise à jour des KPIs
-        function updateDashboardKPIs() {
-            const data = dashboardData;
-            
-            // CA du jour
-            document.getElementById('caJour').textContent = formatMontant(data.ventes_jour?.ca_total || 0);
-            
-            // Evolution
-            const evolution = data.ventes_jour?.evolution || 0;
-            const evolutionEl = document.getElementById('evolutionCA');
-            evolutionEl.textContent = evolution > 0 ? `+${evolution}%` : `${evolution}%`;
-            evolutionEl.className = evolution > 0 ? 'text-sm text-green-600' : 'text-sm text-red-600';
-            
-            // Nombre de commandes
-            document.getElementById('nbCommandes').textContent = data.ventes_jour?.nb_commandes || 0;
-            document.getElementById('panierMoyen').textContent = 'Panier: ' + formatMontant(data.ventes_jour?.panier_moyen || 0);
-            
-            // Statut caisse
-            const statutCaisse = data.caisse_quotidienne?.statut || 'fermee';
-            document.getElementById('statusCaisse').textContent = statutCaisse === 'ouverte' ? 'Ouverte' : 'Fermée';
-            document.getElementById('ecartCaisse').textContent = 'Écart: ' + formatMontant(data.caisse_quotidienne?.ecart || 0);
-            
-            // Objectif
-            const objectifAtteint = ((data.ventes_jour?.ca_total || 0) / (data.objectifs?.ca_objectif || 1)) * 100;
-            document.getElementById('objectifJour').textContent = Math.round(objectifAtteint) + '%';
-            const manque = Math.max(0, (data.objectifs?.ca_objectif || 0) - (data.ventes_jour?.ca_total || 0));
-            document.getElementById('manqueObjectif').textContent = 'Reste: ' + formatMontant(manque);
-        }
-
-        // Création des graphiques
-        function updateDashboardCharts() {
-            createSalesChart();
-            createTopPlatsChart();
-        }
-
-        function createSalesChart() {
-            const ctx = document.getElementById('chartVentes').getContext('2d');
-            
-            if (chartsInstances.ventes) {
-                chartsInstances.ventes.destroy();
-            }
-
-            const data = dashboardData.evolution_7j || [];
-            
-            chartsInstances.ventes = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: data.map(d => formatDate(d.date)),
-                    datasets: [{
-                        label: 'CA Quotidien (FCFA)',
-                        data: data.map(d => d.ca_total),
-                        borderColor: '#3B82F6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        tension: 0.4,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return formatMontantCourt(value);
-                                }
-                            }
-                        }
-                    },
-                    plugins: {
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return 'CA: ' + formatMontant(context.parsed.y);
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        function createTopPlatsChart() {
-            const ctx = document.getElementById('chartTopPlats').getContext('2d');
-            
-            if (chartsInstances.topPlats) {
-                chartsInstances.topPlats.destroy();
-            }
-
-            const data = dashboardData.top_plats || [];
-            
-            chartsInstances.topPlats = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: data.map(d => d.nom),
-                    datasets: [{
-                        data: data.map(d => d.quantite),
-                        backgroundColor: ['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { 
-                            position: 'bottom',
-                            labels: {
-                                padding: 10,
-                                font: {
-                                    size: 11
-                                }
-                            }
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return context.label + ': ' + context.parsed + ' portions';
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        function updateTopPlats() {
-            const container = document.getElementById('topPlatsRentables');
-            const topPlats = dashboardData.top_plats_rentables || [];
-            
-            if (topPlats.length === 0) {
-                container.innerHTML = '<p class="text-gray-500">Aucune donnée disponible</p>';
-                return;
-            }
-            
-            container.innerHTML = topPlats.map(plat => `
-                <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
-                    <div>
-                        <div class="font-medium">${plat.nom}</div>
-                        <div class="text-sm text-gray-600">Marge: ${plat.marge_pourcentage}%</div>
-                    </div>
-                    <div class="text-green-600 font-semibold">${formatMontant(plat.benefice_total)}</div>
-                </div>
-            `).join('');
-        }
-
-        function updateSuggestions() {
-            const container = document.getElementById('suggestionsOptimisation');
-            const suggestions = dashboardData.suggestions || [];
-            
-            if (suggestions.length === 0) {
-                container.innerHTML = '<p class="text-gray-500">Aucune suggestion pour le moment</p>';
-                return;
-            }
-            
-            container.innerHTML = suggestions.map(suggestion => `
-                <div class="p-3 border-l-4 border-blue-500 bg-blue-50 rounded">
-                    <div class="font-medium text-blue-800">${suggestion.titre}</div>
-                    <div class="text-sm text-blue-600">${suggestion.message}</div>
-                </div>
-            `).join('');
-        }
-
-        function updateAlertes() {
-            const container = document.getElementById('alertesContainer');
-            const alertes = dashboardData.alertes || [];
-            
-            if (alertes.length === 0) {
-                container.innerHTML = '';
-                return;
-            }
-            
-            container.innerHTML = alertes.map(alerte => `
-                <div class="mb-2 p-4 rounded-lg ${getAlerteClass(alerte.priorite)}">
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <div class="font-medium">${alerte.titre}</div>
-                            <div class="text-sm">${alerte.message}</div>
-                        </div>
-                        <button onclick="dismissAlert(${alerte.id})" class="text-gray-400 hover:text-gray-600">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function getAlerteClass(priorite) {
-            switch(priorite) {
-                case 'critical': return 'bg-red-100 border border-red-200 text-red-800';
-                case 'high': return 'bg-orange-100 border border-orange-200 text-orange-800';
-                case 'warning': return 'bg-yellow-100 border border-yellow-200 text-yellow-800';
-                case 'medium': return 'bg-blue-100 border border-blue-200 text-blue-800';
-                default: return 'bg-green-100 border border-green-200 text-green-800';
-            }
-        }
-
-        // Fonctions utilitaires
-        function formatMontant(montant) {
-            // Formatage en FCFA avec espaces comme séparateurs de milliers
-            return new Intl.NumberFormat('fr-FR', {
-                style: 'decimal',
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0
-            }).format(montant || 0) + ' FCFA';
-        }
-        
-        function formatMontantCourt(montant) {
-            // Format court pour les graphiques
-            if (montant >= 1000000) {
-                return (montant / 1000000).toFixed(1) + 'M';
-            } else if (montant >= 1000) {
-                return (montant / 1000).toFixed(0) + 'K';
-            }
-            return montant.toString();
-        }
-
-        function formatDate(dateStr) {
-            const options = { day: '2-digit', month: 'short' };
-            return new Date(dateStr).toLocaleDateString('fr-FR', options);
-        }
-
-        function showNotification(message, type = 'info') {
-            const notification = document.createElement('div');
-            notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
-                type === 'error' ? 'bg-red-600 text-white' :
-                type === 'success' ? 'bg-green-600 text-white' :
-                'bg-blue-600 text-white'
-            }`;
-            notification.innerHTML = `
-                <div class="flex items-center">
-                    <i class="fas fa-${type === 'error' ? 'exclamation-circle' : 'info-circle'} mr-2"></i>
-                    <span>${message}</span>
-                </div>
-            `;
-            
-            document.body.appendChild(notification);
-            
-            setTimeout(() => {
-                notification.style.opacity = '0';
-                notification.style.transition = 'opacity 0.5s';
-                setTimeout(() => notification.remove(), 500);
-            }, 5000);
-        }
-
-        function refreshData() {
-            showNotification('Actualisation des données...', 'info');
-            loadDashboardData();
-        }
-
-        function dismissAlert(alerteId) {
-            // Masquer l'alerte visuellement
-            const alertes = dashboardData.alertes || [];
-            dashboardData.alertes = alertes.filter(a => a.id !== alerteId);
-            updateAlertes();
-            
-            // Envoyer la mise à jour au serveur
-            fetch('../../api/finance.php?action=alertes', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ alerte_id: alerteId, statut: 'lue' })
-            }).catch(err => console.error('Erreur mise à jour alerte:', err));
-        }
+        // Date selector
+        document.getElementById('dateSelector').addEventListener('change', function() {
+            window.location.href = '?date=' + this.value;
+        });
     </script>
+
 </body>
 </html>

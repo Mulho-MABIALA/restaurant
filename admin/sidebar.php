@@ -691,28 +691,28 @@ if ($adminId && isset($conn)) {
                  style="display: none;"
             >
                 <?php if (canAccess($conn, $adminId, 'dashboard_finances')): ?>
-                <a href="dashboard.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                <a href="./finances/dashboard.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                     <i class="fas fa-tachometer-alt mr-3 w-5 text-sm"></i>
                     <span class="font-medium">Dashboard</span>
                 </a>
                 <?php endif; ?>
                 
                 <?php if (canAccess($conn, $adminId, 'facturation')): ?>
-                <a href="facturation.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                <a href="./finances/facturation.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                     <i class="fas fa-file-invoice-dollar mr-3 w-5 text-sm"></i>
                     <span class="font-medium">Facturation</span>
                 </a>
                 <?php endif; ?>
                 
                 <?php if (canAccess($conn, $adminId, 'rapports')): ?>
-                <a href="rapports.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                <a href="./finances/rapports.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                     <i class="fas fa-chart-pie mr-3 w-5 text-sm"></i>
                     <span class="font-medium">Rapports</span>
                 </a>
                 <?php endif; ?>
                 
                 <?php if (canAccess($conn, $adminId, 'tresorerie')): ?>
-                <a href="tresorerie.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                <a href="./finances/tresorerie.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                     <i class="fas fa-piggy-bank mr-3 w-5 text-sm"></i>
                     <span class="font-medium">Trésorerie</span>
                 </a>

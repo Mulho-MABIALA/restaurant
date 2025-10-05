@@ -1,13 +1,88 @@
 <?php
+session_start();
 require_once '../../config.php';
-    session_start();
+require_once '../permissions.php';
 
-    // Vérifie l'accès admin
-    if (! isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
-        header('Location: login.php');
-        exit;
-    }
+// Vérifier authentification
+if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    header('Location: ../login.php');
+    exit;
+}
 
+if (!isset($_SESSION['admin_id'])) {
+    header('Location: ../login.php');
+    exit;
+}
+
+// Vérifier les permissions
+requireAccess($conn, $_SESSION['admin_id'], 'finances');
+
+// Paramètres de date
+$date_debut = $_GET['date_debut'] ?? date('Y-m-01');
+$date_fin = $_GET['date_fin'] ?? date('Y-m-t');
+
+// Statistiques globales
+$stmt = $conn->prepare("
+    SELECT
+        COUNT(*) as nb_commandes,
+        COALESCE(SUM(total), 0) as ca_total,
+        COALESCE(AVG(total), 0) as panier_moyen
+    FROM commandes
+    WHERE DATE(date_commande) BETWEEN ? AND ?
+    AND statut_paiement = 'Payé'
+");
+$stmt->execute([$date_debut, $date_fin]);
+$stats = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// CA par jour
+$stmt = $conn->prepare("
+    SELECT
+        DATE(date_commande) as jour,
+        COALESCE(SUM(total), 0) as ca_jour,
+        COUNT(*) as nb_commandes
+    FROM commandes
+    WHERE DATE(date_commande) BETWEEN ? AND ?
+    AND statut_paiement = 'Payé'
+    GROUP BY DATE(date_commande)
+    ORDER BY jour ASC
+");
+$stmt->execute([$date_debut, $date_fin]);
+$ca_par_jour = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Top 10 plats
+$stmt = $conn->prepare("
+    SELECT
+        cd.nom_plat as nom,
+        SUM(cd.quantite) as quantite_vendue,
+        SUM(cd.prix * cd.quantite) as ca_plat
+    FROM commande_details cd
+    JOIN commandes c ON cd.commande_id = c.id
+    WHERE DATE(c.date_commande) BETWEEN ? AND ?
+    AND c.statut_paiement = 'Payé'
+    GROUP BY cd.nom_plat
+    ORDER BY ca_plat DESC
+    LIMIT 10
+");
+$stmt->execute([$date_debut, $date_fin]);
+$top_plats = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// CA par mode de paiement
+$stmt = $conn->prepare("
+    SELECT
+        mode_paiement,
+        COUNT(*) as nb_transactions,
+        COALESCE(SUM(total), 0) as ca_total
+    FROM commandes
+    WHERE DATE(date_commande) BETWEEN ? AND ?
+    AND statut_paiement = 'Payé'
+    GROUP BY mode_paiement
+");
+$stmt->execute([$date_debut, $date_fin]);
+$ca_par_mode = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Calcul CA quotidien moyen
+$nb_jours = count($ca_par_jour) > 0 ? count($ca_par_jour) : 1;
+$ca_quotidien_moyen = $stats['ca_total'] / $nb_jours;
 ?>
 
 <!DOCTYPE html>
@@ -19,635 +94,320 @@ require_once '../../config.php';
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/cards-design.css">
+    <style>
+        /* Scrollbar pour light theme */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 5px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #cbd5e1 0%, #94a3b8 100%);
+            border-radius: 5px;
+            border: 2px solid #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, #94a3b8 0%, #64748b 100%);
+        }
+
+        /* Scrollbar pour dark mode */
+        @media (prefers-color-scheme: dark) {
+            ::-webkit-scrollbar-track {
+                background: #1e293b;
+            }
+            ::-webkit-scrollbar-thumb {
+                background: linear-gradient(180deg, #475569 0%, #334155 100%);
+                border-color: #1e293b;
+            }
+            ::-webkit-scrollbar-thumb:hover {
+                background: linear-gradient(180deg, #64748b 0%, #475569 100%);
+            }
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+    </style>
 </head>
 <body class="bg-gray-50">
-    
-    <!-- Navigation Finances -->
-    <nav class="bg-white shadow-lg border-b">
-        <div class="max-w-7xl mx-auto px-4">
-            <div class="flex justify-between items-center h-16">
-                <div class="flex items-center space-x-4">
-                    <h1 class="text-xl font-bold text-gray-800">Rapports et Analyses</h1>
-                    <div class="hidden md:flex space-x-4">
-                        <a href="dashboard.php" class="nav-btn text-gray-600 hover:text-gray-800 px-4 py-2 rounded-lg">Tableau de bord</a>
-                        <a href="facturation.php" class="nav-btn text-gray-600 hover:text-gray-800 px-4 py-2 rounded-lg">Facturation</a>
-                        <a href="rapports.php" class="nav-btn active bg-blue-600 text-white px-4 py-2 rounded-lg">Rapports</a>
-                        <a href="tresorerie.php" class="nav-btn text-gray-600 hover:text-gray-800 px-4 py-2 rounded-lg">Trésorerie</a>
+
+    <div class="flex h-screen overflow-hidden">
+        <?php include '../sidebar.php'; ?>
+
+        <div class="flex-1 overflow-y-auto">
+            <!-- Navigation Finances -->
+            <nav class="bg-white shadow-sm border-b sticky top-0 z-10">
+                <div class="max-w-7xl mx-auto px-4">
+                    <div class="flex justify-between items-center h-16">
+                        <div class="flex items-center space-x-4">
+                            <h1 class="text-xl font-bold text-gray-800">
+                                <i class="fas fa-chart-bar mr-2 text-purple-600"></i>
+                                Rapports et Analyses
+                            </h1>
+                            <div class="hidden md:flex space-x-2">
+                                <a href="dashboard.php" class="text-gray-600 hover:bg-gray-100 px-4 py-2 rounded-lg text-sm font-medium">
+                                    <i class="fas fa-dashboard mr-1"></i>Tableau de bord
+                                </a>
+                                <a href="facturation.php" class="text-gray-600 hover:bg-gray-100 px-4 py-2 rounded-lg text-sm font-medium">
+                                    <i class="fas fa-file-invoice mr-1"></i>Facturation
+                                </a>
+                                <a href="rapports.php" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                                    <i class="fas fa-chart-bar mr-1"></i>Rapports
+                                </a>
+                                <a href="tresorerie.php" class="text-gray-600 hover:bg-gray-100 px-4 py-2 rounded-lg text-sm font-medium">
+                                    <i class="fas fa-wallet mr-1"></i>Trésorerie
+                                </a>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
-    </nav>
+            </nav>
 
-    <div class="max-w-7xl mx-auto px-4 py-6">
-        
-        <div class="bg-white rounded-lg shadow">
-            <div class="p-6 border-b">
-                <h3 class="text-lg font-semibold">Rapports et Analyses</h3>
-                <div class="mt-4 flex flex-wrap gap-4">
-                    <input type="date" id="rapportDateDebut" class="px-3 py-2 border rounded-lg" value="<?= date('Y-m-01') ?>">
-                    <input type="date" id="rapportDateFin" class="px-3 py-2 border rounded-lg" value="<?= date('Y-m-t') ?>">
-                    <button onclick="genererRapport()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
-                        <i class="fas fa-chart-bar mr-2"></i>Générer Rapport
-                    </button>
-                    <button onclick="exporterRapport('pdf')" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">
-                        <i class="fas fa-file-pdf mr-2"></i>Export PDF
-                    </button>
-                    <button onclick="exporterRapport('excel')" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
-                        <i class="fas fa-file-excel mr-2"></i>Export Excel
-                    </button>
-                </div>
-            </div>
+            <div class="max-w-7xl mx-auto px-4 py-6">
 
-            <div class="p-6">
-                <!-- Résumé du rapport -->
-                <div id="resumeRapport" class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                    <!-- KPIs seront générés ici -->
+                <!-- Filtres de période -->
+                <div class="dashboard-card card-blue mb-8">
+                    <div class="flex flex-wrap gap-4 items-end">
+                        <div class="flex-1">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Date début</label>
+                            <input type="date" id="dateDebut" value="<?= $date_debut ?>" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Date fin</label>
+                            <input type="date" id="dateFin" value="<?= $date_fin ?>" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <button onclick="appliquerFiltre()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                            <i class="fas fa-filter mr-2"></i>Filtrer
+                        </button>
+                        <button onclick="exporterPDF()" class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700">
+                            <i class="fas fa-file-pdf mr-2"></i>Export PDF
+                        </button>
+                    </div>
                 </div>
 
-                <!-- Graphiques et tableaux -->
+                <!-- KPIs Résumé -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                    <div class="dashboard-card card-green">
+                        <div class="icon-wrapper icon-green">
+                            <i class="fas fa-coins"></i>
+                        </div>
+                        <div class="card-content">
+                            <h3 class="card-title">CA Total</h3>
+                            <p class="card-value"><?= number_format($stats['ca_total']) ?></p>
+                            <p class="card-subtitle text-gray-600">FCFA</p>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-card card-blue">
+                        <div class="icon-wrapper icon-blue">
+                            <i class="fas fa-receipt"></i>
+                        </div>
+                        <div class="card-content">
+                            <h3 class="card-title">Commandes</h3>
+                            <p class="card-value"><?= number_format($stats['nb_commandes']) ?></p>
+                            <p class="card-subtitle text-gray-600">Total</p>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-card card-purple">
+                        <div class="icon-wrapper icon-purple">
+                            <i class="fas fa-shopping-cart"></i>
+                        </div>
+                        <div class="card-content">
+                            <h3 class="card-title">Panier Moyen</h3>
+                            <p class="card-value"><?= number_format($stats['panier_moyen']) ?></p>
+                            <p class="card-subtitle text-gray-600">FCFA</p>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-card card-orange">
+                        <div class="icon-wrapper icon-orange">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="card-content">
+                            <h3 class="card-title">CA Quotidien</h3>
+                            <p class="card-value"><?= number_format($ca_quotidien_moyen) ?></p>
+                            <p class="card-subtitle text-gray-600">Moyenne</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Graphiques -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                    <div class="bg-gray-50 rounded-lg p-6">
-                        <h4 class="text-lg font-semibold mb-4">Évolution CA par jour</h4>
-                        <canvas id="chartRapportJours" width="400" height="300"></canvas>
+                    <!-- CA par jour -->
+                    <div class="dashboard-card card-blue">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center text-gray-900">
+                            <div class="icon-wrapper icon-blue mr-3">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                            Évolution CA par jour
+                        </h3>
+                        <div class="chart-container">
+                            <canvas id="chartCAJour"></canvas>
+                        </div>
                     </div>
 
-                    <div class="bg-gray-50 rounded-lg p-6">
-                        <h4 class="text-lg font-semibold mb-4">Répartition par heure</h4>
-                        <canvas id="chartRapportHeures" width="400" height="300"></canvas>
+                    <!-- CA par mode de paiement -->
+                    <div class="dashboard-card card-green">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center text-gray-900">
+                            <div class="icon-wrapper icon-green mr-3">
+                                <i class="fas fa-credit-card"></i>
+                            </div>
+                            Répartition par mode de paiement
+                        </h3>
+                        <div class="chart-container">
+                            <canvas id="chartModePaiement"></canvas>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Analyses détaillées -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                    <div class="bg-gray-50 rounded-lg p-6">
-                        <h4 class="text-lg font-semibold mb-4">Évolution des marges</h4>
-                        <canvas id="chartMarges" width="400" height="300"></canvas>
-                    </div>
-
-                    <div class="bg-gray-50 rounded-lg p-6">
-                        <h4 class="text-lg font-semibold mb-4">Modes de commande</h4>
-                        <canvas id="chartModesCommande" width="400" height="300"></canvas>
+                <!-- Top 10 Plats -->
+                <div class="dashboard-card card-orange mb-8">
+                    <h3 class="text-lg font-semibold mb-6 flex items-center text-gray-900">
+                        <div class="icon-wrapper icon-orange mr-3">
+                            <i class="fas fa-fire"></i>
+                        </div>
+                        Top 10 Plats de la Période
+                    </h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Plat</th>
+                                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Quantité</th>
+                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">CA Total</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <?php if (!empty($top_plats)): ?>
+                                    <?php foreach ($top_plats as $index => $plat): ?>
+                                        <tr class="hover:bg-gray-50 transition-colors">
+                                            <td class="px-4 py-3">
+                                                <span class="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-pink-500 text-white text-xs font-bold">
+                                                    <?= $index + 1 ?>
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-3 font-medium text-gray-900"><?= htmlspecialchars($plat['nom']) ?></td>
+                                            <td class="px-4 py-3 text-center">
+                                                <span class="px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                                                    <?= number_format($plat['quantite_vendue']) ?>
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-3 text-right font-semibold text-green-600"><?= number_format($plat['ca_plat']) ?> FCFA</td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <tr>
+                                        <td colspan="4" class="px-4 py-8 text-center text-gray-500">
+                                            <i class="fas fa-inbox text-4xl mb-3 block"></i>
+                                            Aucune donnée pour cette période
+                                        </td>
+                                    </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
-                <!-- Top 10 plats -->
-                <div class="bg-gray-50 rounded-lg p-6 mb-8">
-                    <h4 class="text-lg font-semibold mb-4">Top 10 Plats de la Période</h4>
-                    <div id="tableauTop10Plats" class="overflow-x-auto">
-                        <!-- Tableau sera généré par JavaScript -->
-                    </div>
-                </div>
-
-                <!-- Analyse de rentabilité -->
-                <div class="bg-gray-50 rounded-lg p-6 mb-8">
-                    <h4 class="text-lg font-semibold mb-4">Analyse de Rentabilité par Catégorie</h4>
-                    <div id="tableauRentabilite" class="overflow-x-auto">
-                        <!-- Tableau sera généré par JavaScript -->
-                    </div>
-                </div>
-
-                <!-- Comparaison périodes -->
-                <div class="bg-gray-50 rounded-lg p-6">
-                    <h4 class="text-lg font-semibold mb-4">Comparaison avec la période précédente</h4>
-                    <div id="comparaisonPeriodes" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <!-- Comparaisons seront générées ici -->
-                    </div>
-                </div>
             </div>
         </div>
     </div>
 
     <script>
-        // Variables globales
-        let rapportData = {};
-        let chartsRapport = {};
+        // CA par jour
+        const ctxCAJour = document.getElementById('chartCAJour').getContext('2d');
+        const dataCAJour = <?= json_encode($ca_par_jour) ?>;
 
-        // Initialisation
-        document.addEventListener('DOMContentLoaded', function() {
-            // Générer rapport automatiquement au chargement
-            genererRapport();
+        new Chart(ctxCAJour, {
+            type: 'line',
+            data: {
+                labels: dataCAJour.map(d => new Date(d.jour).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })),
+                datasets: [{
+                    label: 'CA Quotidien (FCFA)',
+                    data: dataCAJour.map(d => d.ca_jour),
+                    borderColor: 'rgb(59, 130, 246)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return value.toLocaleString() + ' FCFA';
+                            }
+                        }
+                    }
+                }
+            }
         });
 
-        // Générer rapport
-        async function genererRapport() {
-            try {
-                showLoading(true);
-                
-                const dateDebut = document.getElementById('rapportDateDebut').value;
-                const dateFin = document.getElementById('rapportDateFin').value;
-                
-                if (!dateDebut || !dateFin) {
-                    showNotification('Veuillez sélectionner les dates de début et fin', 'error');
-                    return;
-                }
-                
-                if (new Date(dateDebut) > new Date(dateFin)) {
-                    showNotification('La date de début doit être antérieure à la date de fin', 'error');
-                    return;
-                }
+        // CA par mode de paiement
+        const ctxModePaiement = document.getElementById('chartModePaiement').getContext('2d');
+        const dataModePaiement = <?= json_encode($ca_par_mode) ?>;
 
-                // Charger données du rapport
-                const response = await fetch(`../../api/finance.php?action=rapport_ventes&date_debut=${dateDebut}&date_fin=${dateFin}`);
-                rapportData = await response.json();
-
-                // Charger top plats
-                const topPlatsResponse = await fetch(`../../api/finance.php?action=top_plats&date_debut=${dateDebut}&date_fin=${dateFin}&limit=10`);
-                rapportData.top_plats = await topPlatsResponse.json();
-
-                // Charger évolution ventes
-                const evolutionResponse = await fetch(`../../api/finance.php?action=evolution_ventes&date_debut=${dateDebut}&date_fin=${dateFin}`);
-                rapportData.evolution_ventes = await evolutionResponse.json();
-
-                updateResumeRapport();
-                updateChartsRapport();
-                updateTableaux();
-                updateComparaisons();
-
-                showLoading(false);
-                showNotification('Rapport généré avec succès', 'success');
-
-            } catch (error) {
-                console.error('Erreur génération rapport:', error);
-                showNotification('Erreur lors de la génération du rapport', 'error');
-                showLoading(false);
-            }
-        }
-
-        // Mettre à jour résumé
-        function updateResumeRapport() {
-            const resume = rapportData.resume;
-            if (!resume) return;
-
-            const container = document.getElementById('resumeRapport');
-            container.innerHTML = `
-                <div class="bg-white rounded-lg p-6 shadow">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-sm font-medium text-gray-600">Chiffre d'Affaires</p>
-                            <p class="text-2xl font-bold text-blue-600">${formatMontant(resume.ca_total)}</p>
-                            <p class="text-sm text-gray-500">HT: ${formatMontant(resume.ca_ht)}</p>
-                        </div>
-                        <div class="p-3 bg-blue-100 rounded-full">
-                            <i class="fas fa-euro-sign text-blue-600"></i>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-lg p-6 shadow">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-sm font-medium text-gray-600">Nombre de Commandes</p>
-                            <p class="text-2xl font-bold text-green-600">${resume.nb_commandes}</p>
-                            <p class="text-sm text-gray-500">Commandes</p>
-                        </div>
-                        <div class="p-3 bg-green-100 rounded-full">
-                            <i class="fas fa-shopping-cart text-green-600"></i>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-lg p-6 shadow">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-sm font-medium text-gray-600">Panier Moyen</p>
-                            <p class="text-2xl font-bold text-purple-600">${formatMontant(resume.panier_moyen)}</p>
-                            <p class="text-sm text-gray-500">Par commande</p>
-                        </div>
-                        <div class="p-3 bg-purple-100 rounded-full">
-                            <i class="fas fa-calculator text-purple-600"></i>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-lg p-6 shadow">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-sm font-medium text-gray-600">CA Quotidien Moyen</p>
-                            <p class="text-2xl font-bold text-orange-600">${formatMontant(resume.ca_quotidien_moyen)}</p>
-                            <p class="text-sm text-gray-500">Par jour</p>
-                        </div>
-                        <div class="p-3 bg-orange-100 rounded-full">
-                            <i class="fas fa-chart-line text-orange-600"></i>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        // Mettre à jour graphiques
-        function updateChartsRapport() {
-            createChartJours();
-            createChartHeures();
-            createChartMarges();
-            createChartModesCommande();
-        }
-
-        function createChartJours() {
-            const ctx = document.getElementById('chartRapportJours').getContext('2d');
-            
-            if (chartsRapport.jours) {
-                chartsRapport.jours.destroy();
-            }
-
-            const data = rapportData.par_jour || [];
-            
-            chartsRapport.jours = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: data.map(d => formatDate(d.jour)),
-                    datasets: [{
-                        label: 'CA Quotidien',
-                        data: data.map(d => d.ca_jour),
-                        borderColor: '#3B82F6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        tension: 0.4,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return formatMontant(value);
-                                }
-                            }
-                        }
-                    },
-                    plugins: {
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return 'CA: ' + formatMontant(context.parsed.y);
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        function createChartHeures() {
-            const ctx = document.getElementById('chartRapportHeures').getContext('2d');
-            
-            if (chartsRapport.heures) {
-                chartsRapport.heures.destroy();
-            }
-
-            const data = rapportData.par_heure || [];
-            
-            chartsRapport.heures = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: data.map(d => d.heure + 'h'),
-                    datasets: [{
-                        label: 'CA par heure',
-                        data: data.map(d => d.ca_heure),
-                        backgroundColor: 'rgba(16, 185, 129, 0.8)',
-                        borderColor: '#10B981',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return formatMontant(value);
-                                }
-                            }
-                        }
-                    },
-                    plugins: {
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return 'CA: ' + formatMontant(context.parsed.y);
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        function createChartMarges() {
-            const ctx = document.getElementById('chartMarges').getContext('2d');
-            
-            if (chartsRapport.marges) {
-                chartsRapport.marges.destroy();
-            }
-
-            // Simuler données de marges par jour
-            const data = rapportData.par_jour || [];
-            
-            chartsRapport.marges = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: data.map(d => formatDate(d.jour)),
-                    datasets: [
-                        {
-                            label: 'CA',
-                            data: data.map(d => d.ca_jour),
-                            borderColor: '#3B82F6',
-                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                            yAxisID: 'y'
-                        },
-                        {
-                            label: 'Marge estimée',
-                            data: data.map(d => d.ca_jour * 0.65), // 65% de marge estimée
-                            borderColor: '#10B981',
-                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                            yAxisID: 'y'
-                        }
+        new Chart(ctxModePaiement, {
+            type: 'doughnut',
+            data: {
+                labels: dataModePaiement.map(d => d.mode_paiement),
+                datasets: [{
+                    data: dataModePaiement.map(d => d.ca_total),
+                    backgroundColor: [
+                        'rgb(59, 130, 246)',
+                        'rgb(16, 185, 129)',
+                        'rgb(245, 158, 11)',
+                        'rgb(139, 92, 246)'
                     ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            type: 'linear',
-                            display: true,
-                            position: 'left',
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return formatMontant(value);
-                                }
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.label + ': ' + context.parsed.toLocaleString() + ' FCFA';
                             }
                         }
                     }
                 }
-            });
-        }
-
-        function createChartModesCommande() {
-            const ctx = document.getElementById('chartModesCommande').getContext('2d');
-            
-            if (chartsRapport.modes) {
-                chartsRapport.modes.destroy();
             }
+        });
 
-            const data = rapportData.par_mode_commande || [
-                { mode: 'Sur place', ca: 15000 },
-                { mode: 'QR Code', ca: 8000 },
-                { mode: 'Emporter', ca: 3000 }
-            ];
-            
-            chartsRapport.modes = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: data.map(d => d.mode),
-                    datasets: [{
-                        data: data.map(d => d.ca),
-                        backgroundColor: ['#3B82F6', '#10B981', '#F59E0B']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'bottom' },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return context.label + ': ' + formatMontant(context.parsed);
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
+        function appliquerFiltre() {
+            const dateDebut = document.getElementById('dateDebut').value;
+            const dateFin = document.getElementById('dateFin').value;
 
-        // Mettre à jour tableaux
-        function updateTableaux() {
-            updateTableauTop10Plats();
-            updateTableauRentabilite();
-        }
-
-        function updateTableauTop10Plats() {
-            const container = document.getElementById('tableauTop10Plats');
-            const topPlats = rapportData.top_plats || [];
-
-            if (topPlats.length === 0) {
-                container.innerHTML = '<div class="text-center py-8 text-gray-500">Aucune donnée disponible</div>';
-                return;
-            }
-
-            container.innerHTML = `
-                <table class="w-full table-auto">
-                    <thead class="bg-white">
-                        <tr>
-                            <th class="px-4 py-2 text-left">#</th>
-                            <th class="px-4 py-2 text-left">Plat</th>
-                            <th class="px-4 py-2 text-center">Quantité</th>
-                            <th class="px-4 py-2 text-right">CA Total</th>
-                            <th class="px-4 py-2 text-center">Marge %</th>
-                            <th class="px-4 py-2 text-right">Bénéfice</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${topPlats.map((plat, index) => `
-                            <tr class="border-b hover:bg-white">
-                                <td class="px-4 py-2 font-bold text-gray-600">${index + 1}</td>
-                                <td class="px-4 py-2 font-medium">${plat.nom}</td>
-                                <td class="px-4 py-2 text-center">${plat.quantite_vendue}</td>
-                                <td class="px-4 py-2 text-right font-medium">${formatMontant(plat.ca_plat)}</td>
-                                <td class="px-4 py-2 text-center">
-                                    <span class="px-2 py-1 rounded text-xs ${getMargeClass(plat.marge_pourcentage)}">
-                                        ${plat.marge_pourcentage ? plat.marge_pourcentage.toFixed(1) + '%' : 'N/A'}
-                                    </span>
-                                </td>
-                                <td class="px-4 py-2 text-right font-medium text-green-600">
-                                    ${formatMontant(plat.benefice_total || 0)}
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            `;
-        }
-
-        function updateTableauRentabilite() {
-            const container = document.getElementById('tableauRentabilite');
-            
-            // Simuler données de rentabilité par catégorie
-            const categories = [
-                { nom: 'Entrées', ca: 3500, cout: 1400, marge: 60 },
-                { nom: 'Plats principaux', ca: 15000, cout: 5250, marge: 65 },
-                { nom: 'Desserts', ca: 2800, cout: 980, marge: 65 },
-                { nom: 'Boissons', ca: 4200, cout: 1260, marge: 70 }
-            ];
-
-            container.innerHTML = `
-                <table class="w-full table-auto">
-                    <thead class="bg-white">
-                        <tr>
-                            <th class="px-4 py-2 text-left">Catégorie</th>
-                            <th class="px-4 py-2 text-right">CA</th>
-                            <th class="px-4 py-2 text-right">Coût</th>
-                            <th class="px-4 py-2 text-right">Marge Brute</th>
-                            <th class="px-4 py-2 text-center">Marge %</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${categories.map(cat => `
-                            <tr class="border-b hover:bg-white">
-                                <td class="px-4 py-2 font-medium">${cat.nom}</td>
-                                <td class="px-4 py-2 text-right">${formatMontant(cat.ca)}</td>
-                                <td class="px-4 py-2 text-right text-red-600">${formatMontant(cat.cout)}</td>
-                                <td class="px-4 py-2 text-right text-green-600 font-medium">${formatMontant(cat.ca - cat.cout)}</td>
-                                <td class="px-4 py-2 text-center">
-                                    <span class="px-2 py-1 rounded text-xs ${getMargeClass(cat.marge)}">
-                                        ${cat.marge}%
-                                    </span>
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            `;
-        }
-
-        // Mettre à jour comparaisons
-        function updateComparaisons() {
-            const container = document.getElementById('comparaisonPeriodes');
-            
-            // Simuler comparaison avec période précédente
-            const current = rapportData.resume;
-            if (!current) return;
-
-            const previous = {
-                ca_total: current.ca_total * 0.85,
-                nb_commandes: current.nb_commandes * 0.92,
-                panier_moyen: current.panier_moyen * 0.95
-            };
-
-            const evolutionCA = ((current.ca_total - previous.ca_total) / previous.ca_total) * 100;
-            const evolutionCommandes = ((current.nb_commandes - previous.nb_commandes) / previous.nb_commandes) * 100;
-            const evolutionPanier = ((current.panier_moyen - previous.panier_moyen) / previous.panier_moyen) * 100;
-
-            container.innerHTML = `
-                <div class="bg-white p-4 rounded-lg">
-                    <h5 class="font-medium text-gray-800 mb-2">Chiffre d'Affaires</h5>
-                    <div class="text-2xl font-bold">${formatMontant(current.ca_total)}</div>
-                    <div class="text-sm ${evolutionCA >= 0 ? 'text-green-600' : 'text-red-600'}">
-                        <i class="fas fa-arrow-${evolutionCA >= 0 ? 'up' : 'down'} mr-1"></i>
-                        ${Math.abs(evolutionCA).toFixed(1)}% vs période précédente
-                    </div>
-                </div>
-
-                <div class="bg-white p-4 rounded-lg">
-                    <h5 class="font-medium text-gray-800 mb-2">Nombre de Commandes</h5>
-                    <div class="text-2xl font-bold">${current.nb_commandes}</div>
-                    <div class="text-sm ${evolutionCommandes >= 0 ? 'text-green-600' : 'text-red-600'}">
-                        <i class="fas fa-arrow-${evolutionCommandes >= 0 ? 'up' : 'down'} mr-1"></i>
-                        ${Math.abs(evolutionCommandes).toFixed(1)}% vs période précédente
-                    </div>
-                </div>
-
-                <div class="bg-white p-4 rounded-lg">
-                    <h5 class="font-medium text-gray-800 mb-2">Panier Moyen</h5>
-                    <div class="text-2xl font-bold">${formatMontant(current.panier_moyen)}</div>
-                    <div class="text-sm ${evolutionPanier >= 0 ? 'text-green-600' : 'text-red-600'}">
-                        <i class="fas fa-arrow-${evolutionPanier >= 0 ? 'up' : 'down'} mr-1"></i>
-                        ${Math.abs(evolutionPanier).toFixed(1)}% vs période précédente
-                    </div>
-                </div>
-            `;
-        }
-
-        // Export rapports
-        function exporterRapport(format) {
-            const dateDebut = document.getElementById('rapportDateDebut').value;
-            const dateFin = document.getElementById('rapportDateFin').value;
-            
             if (!dateDebut || !dateFin) {
-                showNotification('Veuillez générer un rapport avant d\'exporter', 'error');
+                alert('Veuillez sélectionner les deux dates');
                 return;
             }
 
-            const url = `../../api/finance.php?action=export_rapport&format=${format}&date_debut=${dateDebut}&date_fin=${dateFin}`;
-            
-            if (format === 'pdf') {
-                window.open(url, '_blank');
-            } else {
-                window.location.href = url;
-            }
-            
-            showNotification(`Export ${format.toUpperCase()} en cours...`, 'info');
+            window.location.href = `?date_debut=${dateDebut}&date_fin=${dateFin}`;
         }
 
-        // Fonctions utilitaires
-        function formatMontant(montant) {
-            return new Intl.NumberFormat('fr-FR', {
-                style: 'currency',
-                currency: 'EUR'
-            }).format(montant || 0);
-        }
-
-        function formatDate(dateStr) {
-            return new Date(dateStr).toLocaleDateString('fr-FR', {
-                day: '2-digit',
-                month: '2-digit'
-            });
-        }
-
-        function getMargeClass(marge) {
-            if (marge >= 70) return 'bg-green-100 text-green-800';
-            if (marge >= 50) return 'bg-yellow-100 text-yellow-800';
-            return 'bg-red-100 text-red-800';
-        }
-
-        function showNotification(message, type = 'info') {
-            const notification = document.createElement('div');
-            notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
-                type === 'error' ? 'bg-red-600 text-white' :
-                type === 'success' ? 'bg-green-600 text-white' :
-                'bg-blue-600 text-white'
-            }`;
-            notification.textContent = message;
-            
-            document.body.appendChild(notification);
-            
-            setTimeout(() => {
-                notification.remove();
-            }, 5000);
-        }
-
-        function showLoading(show) {
-            const overlay = document.getElementById('loadingOverlay');
-            if (show) {
-                if (!overlay) {
-                    const loading = document.createElement('div');
-                    loading.id = 'loadingOverlay';
-                    loading.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
-                    loading.innerHTML = `
-                        <div class="bg-white p-6 rounded-lg shadow-xl">
-                            <div class="flex items-center space-x-3">
-                                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                                <span class="text-gray-700">Génération du rapport...</span>
-                            </div>
-                        </div>
-                    `;
-                    document.body.appendChild(loading);
-                }
-            } else {
-                if (overlay) {
-                    overlay.remove();
-                }
-            }
+        function exporterPDF() {
+            const dateDebut = document.getElementById('dateDebut').value;
+            const dateFin = document.getElementById('dateFin').value;
+            window.open(`../../api/export_rapport.php?date_debut=${dateDebut}&date_fin=${dateFin}`, '_blank');
         }
     </script>
+
 </body>
 </html>
-

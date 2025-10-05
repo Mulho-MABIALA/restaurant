@@ -803,7 +803,7 @@ if ($admin_id > 0) {
             </header>
 
             <!-- Contenu Principal -->
-            <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-8 scrollbar-hidden">
+            <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-8" style="scrollbar-width: thin; scrollbar-color: #475569 #1e293b;">
              <!-- Section Cartes KPI Professionnelles - NOUVEAU DESIGN -->
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-slide-up">
     <!-- KPI Réservations -->
@@ -1100,7 +1100,7 @@ if ($admin_id > 0) {
 </div>
 
                 <!-- Section Statistiques Employés et Stock -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
                     <!-- Statistiques Employés -->
                     <div class="dashboard-card card-indigo">
                         <div class="flex items-center justify-between mb-6">
@@ -1157,10 +1157,10 @@ if ($admin_id > 0) {
                         $stmt = $conn->query("SELECT COUNT(*) FROM stocks");
                         $total_articles = $stmt->fetchColumn();
 
-                        $stmt = $conn->query("SELECT COUNT(*) FROM stocks WHERE quantite_actuelle <= seuil_alerte");
+                        $stmt = $conn->query("SELECT COUNT(*) FROM stocks WHERE quantite <= seuil_alerte");
                         $stock_faible = $stmt->fetchColumn();
 
-                        $stmt = $conn->query("SELECT COUNT(*) FROM stocks WHERE quantite_actuelle = 0");
+                        $stmt = $conn->query("SELECT COUNT(*) FROM stocks WHERE quantite = 0");
                         $stock_vide = $stmt->fetchColumn();
                         ?>
                         <div class="space-y-4">
@@ -1189,7 +1189,7 @@ if ($admin_id > 0) {
                 </div>
 
                 <!-- Section Commandes Récentes Détaillées -->
-                <div class="dashboard-card card-blue">
+                <div class="dashboard-card card-blue mt-8">
                     <div class="flex items-center justify-between mb-6">
                         <div>
                             <h3 class="text-2xl font-bold text-gray-900">Commandes Récentes</h3>
@@ -1223,12 +1223,12 @@ if ($admin_id > 0) {
                             <tbody class="divide-y divide-gray-200">
                                 <?php foreach ($recent_commandes as $cmd): ?>
                                 <tr class="hover:bg-gray-50 transition-colors">
-                                    <td class="px-4 py-3 font-medium text-gray-900"><?= htmlspecialchars($cmd['numero_commande']) ?></td>
-                                    <td class="px-4 py-3 text-gray-700"><?= htmlspecialchars($cmd['nom_client']) ?></td>
+                                    <td class="px-4 py-3 font-medium text-gray-900"><?= htmlspecialchars($cmd['numero_commande'] ?? 'N/A') ?></td>
+                                    <td class="px-4 py-3 text-gray-700"><?= htmlspecialchars($cmd['nom_client'] ?? 'Client inconnu') ?></td>
                                     <td class="px-4 py-3 font-semibold text-green-600"><?= number_format($cmd['total']) ?> FCFA</td>
                                     <td class="px-4 py-3">
                                         <span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-700">
-                                            <?= htmlspecialchars($cmd['mode_retrait']) ?>
+                                            <?= htmlspecialchars($cmd['mode_retrait'] ?? 'Sur place') ?>
                                         </span>
                                     </td>
                                     <td class="px-4 py-3">
