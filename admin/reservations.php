@@ -37,6 +37,15 @@
     }
 
     requireAccess($conn, $_SESSION['admin_id'], 'reservations');
+
+    // Récupérer les infos de l'admin
+    $stmt_admin = $conn->prepare("SELECT username, email FROM admin WHERE id = ?");
+    $stmt_admin->execute([$_SESSION['admin_id']]);
+    $admin_info = $stmt_admin->fetch(PDO::FETCH_ASSOC);
+    $admin_name = $admin_info['username'] ?? $_SESSION['admin_username'] ?? 'Admin';
+    $admin_email = $admin_info['email'] ?? 'admin@restaurant.com';
+    $admin_photo = null; // Photo non disponible dans la base de données
+
     // Pagination & filtres
     $search           = $_GET['search'] ?? '';
     $date_filter      = $_GET['date_filter'] ?? '';
@@ -149,6 +158,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gestion des Réservations</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -200,24 +210,130 @@
 
     <div class="flex-1 overflow-y-auto">
 
-      <!-- Header Section -->
-      <div class="bg-white shadow-sm border-b border-gray-200">
-        <div class="px-8 py-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <h1 class="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                Gestion des Réservations
-              </h1>
-              <p class="text-gray-600 mt-1">Gérez et suivez toutes vos réservations en temps réel</p>
-            </div>
+      <!-- Header Professionnel -->
+      <header class="bg-slate-900 shadow-lg sticky top-0 z-40">
+        <div class="px-4 sm:px-6 lg:px-8 py-4">
+          <div class="flex justify-between items-center">
+            <!-- Section Titre -->
             <div class="flex items-center space-x-4">
-              <div class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg">
-    <?php echo $total_global?> réservations au total
-</div>
+              <div class="w-12 h-12 bg-teal-600 rounded-xl flex items-center justify-center">
+                <i class="fas fa-chart-line text-white text-lg"></i>
+              </div>
+              <div>
+                <h1 class="text-2xl font-bold text-white">
+                  Tableau de Bord
+                </h1>
+                <p class="text-gray-400 text-sm">
+                  Bienvenue, <?= htmlspecialchars($_SESSION['admin_username'] ?? 'Admin') ?> ✨
+                </p>
+              </div>
+            </div>
+
+            <!-- Contrôles -->
+            <div class="flex items-center space-x-4" x-data="{ profileOpen: false }">
+              <!-- Widget Date/Heure -->
+              <div class="hidden sm:flex items-center space-x-5 bg-slate-800 rounded-xl px-5 py-3">
+                <div class="flex items-center space-x-3">
+                  <div class="w-10 h-10 bg-slate-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-calendar text-blue-400 text-sm"></i>
+                  </div>
+                  <div>
+                    <p class="text-xs text-gray-400 uppercase">Aujourd'hui</p>
+                    <p class="text-sm font-bold text-white"><?= date('d M Y') ?></p>
+                  </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                  <div class="w-10 h-10 bg-slate-700 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-clock text-teal-400 text-sm"></i>
+                  </div>
+                  <div>
+                    <p class="text-xs text-gray-400 uppercase">Heure</p>
+                    <p class="text-sm font-bold text-white font-mono" id="live-clock"><?= date('H:i:s') ?></p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Menu Profil -->
+              <div class="relative">
+                <button
+                  @click="profileOpen = !profileOpen"
+                  class="relative w-12 h-12 rounded-xl flex items-center justify-center hover:opacity-90 transition-opacity focus:outline-none overflow-hidden"
+                  type="button"
+                >
+                  <?php if (!empty($admin_photo) && file_exists(__DIR__ . '/' . $admin_photo)): ?>
+                    <img src="<?= htmlspecialchars($admin_photo) ?>"
+                         alt="Photo de profil"
+                         class="w-full h-full object-cover rounded-xl">
+                  <?php else: ?>
+                    <div class="w-full h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                      <span class="text-white font-bold text-base">
+                        <?= strtoupper(substr($admin_name, 0, 1)) ?>
+                      </span>
+                    </div>
+                  <?php endif; ?>
+                  <div class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-400 border-2 border-slate-900 rounded-full"></div>
+                </button>
+
+                <!-- Dropdown Profil -->
+                <div
+                  x-show="profileOpen"
+                  @click.away="profileOpen = false"
+                  x-transition:enter="transition ease-out duration-200"
+                  x-transition:enter-start="transform opacity-0 scale-95"
+                  x-transition:enter-end="transform opacity-100 scale-100"
+                  x-transition:leave="transition ease-in duration-150"
+                  x-transition:leave-start="transform opacity-100 scale-100"
+                  x-transition:leave-end="transform opacity-0 scale-95"
+                  class="absolute right-0 mt-2 w-72 bg-slate-800 rounded-xl shadow-xl overflow-hidden z-50"
+                  style="display: none;"
+                >
+                  <!-- En-tête -->
+                  <div class="px-5 py-4 border-b border-slate-700">
+                    <div class="flex items-center space-x-3">
+                      <?php if (!empty($admin_photo) && file_exists(__DIR__ . '/' . $admin_photo)): ?>
+                        <img src="<?= htmlspecialchars($admin_photo) ?>"
+                             alt="Photo de profil"
+                             class="w-12 h-12 object-cover rounded-lg">
+                      <?php else: ?>
+                        <div class="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                          <span class="text-white font-bold text-base"><?= strtoupper(substr($admin_name, 0, 1)) ?></span>
+                        </div>
+                      <?php endif; ?>
+                      <div>
+                        <p class="text-white font-semibold text-base"><?= htmlspecialchars($admin_name) ?></p>
+                        <p class="text-gray-400 text-sm"><?= htmlspecialchars($admin_email) ?></p>
+                      </div>
+                    </div>
+                    <div class="mt-3 flex items-center">
+                      <span class="w-2 h-2 bg-green-400 rounded-full mr-2"></span>
+                      <span class="text-green-400 text-sm">En ligne</span>
+                    </div>
+                  </div>
+
+                  <!-- Menu -->
+                  <div class="py-2">
+                    <a href="profile.php" class="flex items-center px-5 py-3 hover:bg-slate-700 transition-colors">
+                      <i class="fas fa-user text-blue-400 w-5"></i>
+                      <span class="ml-3 text-white text-sm">Mon profil</span>
+                      <span class="ml-auto text-gray-400">›</span>
+                    </a>
+                    <a href="settings.php" class="flex items-center px-5 py-3 hover:bg-slate-700 transition-colors">
+                      <i class="fas fa-envelope text-purple-400 w-5"></i>
+                      <span class="ml-3 text-white text-sm">Changer email</span>
+                      <span class="ml-auto text-gray-400">›</span>
+                    </a>
+                    <div class="border-t border-slate-700 my-2"></div>
+                    <a href="logout.php" class="flex items-center px-5 py-3 hover:bg-red-900/20 transition-colors">
+                      <i class="fas fa-sign-out-alt text-red-400 w-5"></i>
+                      <span class="ml-3 text-red-400 text-sm font-medium">Déconnexion</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
       <div class="p-8">
 
@@ -1793,6 +1909,18 @@ function deleteReservation() {
         confirmBtn.disabled = false;
     });
 }
+
+// Live clock update
+setInterval(() => {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const clockElement = document.getElementById('live-clock');
+    if (clockElement) {
+        clockElement.textContent = `${hours}:${minutes}:${seconds}`;
+    }
+}, 1000);
   </script>
 
 </body>

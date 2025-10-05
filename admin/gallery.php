@@ -408,133 +408,194 @@ foreach ($allImages as $img) {
     <link rel="icon" type="image/x-icon" href="../assets/img/logo.jpg">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/cards-design.css">
     <style>
         .gradient-bg {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
         
-        .card-hover {
-            transition: all 0.3s ease;
-        }
-        
-        .card-hover:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        }
-        
-        .image-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.7) 100%);
-            opacity: 0;
-            transition: all 0.3s ease;
-        }
-        
-        .image-card:hover .image-overlay {
-            opacity: 1;
-        }
-        
-        .image-card:hover .image-actions {
-            transform: translateY(0);
-            opacity: 1;
-        }
-        
-        .image-actions {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            padding: 1rem;
-            transform: translateY(20px);
-            opacity: 0;
-            transition: all 0.3s ease;
-        }
-        
-        .stat-card {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        }
-        
-        .stat-card-blue {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-        }
-        
-        .stat-card-green {
-            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
-        }
-        
-        .stat-card-purple {
-            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-        }
-        
-        .category-badge {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-        
-        .dish-badge {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        }
         
         .glass-effect {
             backdrop-filter: blur(10px);
             background: rgba(255, 255, 255, 0.95);
         }
         
-        /* Styles pour la galerie moderne */
+        /* Styles pour la galerie - Design inspiré de reservations.php */
         .gallery-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 25px;
-            padding: 20px 0;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 24px;
+            padding: 0;
         }
-        
-        .gallery-item {
-            position: relative;
+
+        .gallery-card {
+            background: white;
+            border-radius: 16px;
             overflow: hidden;
-            border-radius: 12px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
-            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border: 2px solid #e5e7eb;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: pointer;
-            background: #fff;
         }
-        
-        .gallery-item:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+
+        .gallery-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            border-color: #667eea;
         }
-        
-        .gallery-item img {
+
+        .gallery-card-image-wrapper {
+            position: relative;
             width: 100%;
             height: 240px;
-            object-fit: cover;
-            transition: transform 0.5s ease;
+            overflow: hidden;
+            background: #f3f4f6;
         }
-        
-        .gallery-item:hover img {
+
+        .gallery-card-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+
+        .gallery-card:hover .gallery-card-image {
             transform: scale(1.05);
         }
-        
-        .gallery-item-info {
-            padding: 15px;
-            background: #fff;
-        }
-        
-        .gallery-item-title {
+
+        .gallery-card-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 11px;
             font-weight: 600;
-            font-size: 16px;
-            margin-bottom: 5px;
-            color: #333;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            z-index: 10;
         }
-        
-        .gallery-item-category {
-            font-size: 13px;
+
+        .badge-plat {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        .badge-category {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .gallery-card-content {
+            padding: 16px;
+        }
+
+        .gallery-card-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 8px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .gallery-card-info {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .gallery-card-category {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
             color: #667eea;
+            font-size: 13px;
             font-weight: 500;
         }
-        
-        /* Lightbox styles */
+
+        .gallery-card-date {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: #6b7280;
+            font-size: 12px;
+        }
+
+        .gallery-card-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+            cursor: pointer;
+            border: 1px solid;
+        }
+
+        .btn-view {
+            background: #dbeafe;
+            color: #1e40af;
+            border-color: #93c5fd;
+        }
+
+        .btn-view:hover {
+            background: #bfdbfe;
+            transform: scale(1.05);
+        }
+
+        .btn-edit {
+            background: #fef3c7;
+            color: #92400e;
+            border-color: #fcd34d;
+        }
+
+        .btn-edit:hover {
+            background: #fde68a;
+            transform: scale(1.05);
+        }
+
+        .btn-delete {
+            background: #fee2e2;
+            color: #991b1b;
+            border-color: #fca5a5;
+        }
+
+        .btn-delete:hover {
+            background: #fecaca;
+            transform: scale(1.05);
+        }
+
+        .dish-card-notice {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1e40af;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 11px;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        /* Lightbox styles - Design de cartes.php */
         .lightbox {
             display: none;
             position: fixed;
@@ -542,116 +603,161 @@ foreach ($allImages as $img) {
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.9);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 9999;
+            backdrop-filter: blur(10px);
         }
-        
+
+        .lightbox.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
         .lightbox-content {
             position: relative;
-            max-width: 90%;
-            max-height: 90%;
+            max-width: 90vw;
+            max-height: 90vh;
+            margin: 0 auto;
         }
-        
+
         .lightbox-img {
             max-width: 100%;
             max-height: 80vh;
-            border-radius: 8px;
-            box-shadow: 0 5px 25px rgba(0, 0, 0, 0.3);
+            object-fit: contain;
+            border-radius: 12px;
+            box-shadow: 0 10px 50px rgba(0, 0, 0, 0.5);
         }
-        
-        .lightbox-caption {
-            color: #fff;
+
+        .lightbox-info {
             text-align: center;
-            padding: 15px 0;
-            font-size: 18px;
+            color: white;
+            margin-top: 20px;
         }
-        
+
+        .lightbox-caption {
+            font-family: 'Playfair Display', serif;
+            font-size: 2rem;
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
         .lightbox-close {
             position: absolute;
-            top: 25px;
-            right: 25px;
-            color: #fff;
-            font-size: 30px;
+            top: -60px;
+            right: 0;
+            color: white;
+            font-size: 2rem;
             cursor: pointer;
-            background: rgba(0, 0, 0, 0.5);
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            padding: 10px;
             transition: all 0.3s ease;
+            background: transparent;
+            border: none;
+            width: auto;
+            height: auto;
         }
-        
+
         .lightbox-close:hover {
-            background: rgba(0, 0, 0, 0.8);
-            transform: rotate(90deg);
+            color: #667eea;
+            transform: scale(1.2);
         }
-        
+
         .lightbox-nav {
             position: absolute;
             top: 50%;
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
             transform: translateY(-50%);
-            padding: 0 20px;
-        }
-        
-        .lightbox-button {
-            color: #fff;
-            font-size: 30px;
+            color: white;
+            font-size: 2.5rem;
             cursor: pointer;
+            padding: 20px;
+            transition: all 0.3s ease;
             background: rgba(0, 0, 0, 0.5);
-            width: 50px;
-            height: 50px;
             border-radius: 50%;
+            width: 60px;
+            height: 60px;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.3s ease;
         }
-        
-        .lightbox-button:hover {
-            background: rgba(0, 0, 0, 0.8);
+
+        .lightbox-nav:hover {
+            color: #667eea;
+            background: rgba(102, 126, 234, 0.2);
+            transform: translateY(-50%) scale(1.1);
         }
-        
-        /* Responsive adjustments */
+
+        .lightbox-prev {
+            left: -80px;
+        }
+
+        .lightbox-next {
+            right: -80px;
+        }
+
+        .lightbox-counter {
+            position: absolute;
+            top: -60px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.8);
+            font-family: 'Inter', sans-serif;
+            font-size: 1rem;
+        }
+
+        /* Responsive Gallery - Design de cartes.php */
         @media (max-width: 768px) {
             .gallery-grid {
-                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-                gap: 15px;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 20px;
+                padding: 0 20px;
             }
-            
-            .gallery-item img {
-                height: 180px;
+
+            .gallery-item {
+                height: 250px;
             }
-            
-            .lightbox-button, .lightbox-close {
-                width: 40px;
-                height: 40px;
-                font-size: 24px;
+
+            .lightbox-nav {
+                font-size: 1.5rem;
+                width: 45px;
+                height: 45px;
+            }
+
+            .lightbox-prev {
+                left: -60px;
+            }
+
+            .lightbox-next {
+                right: -60px;
+            }
+
+            .lightbox-caption {
+                font-size: 1.5rem;
             }
         }
-        
+
         @media (max-width: 480px) {
             .gallery-grid {
-                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-                gap: 12px;
+                grid-template-columns: 1fr;
+                padding: 0 15px;
             }
-            
-            .gallery-item img {
-                height: 150px;
+
+            .lightbox-nav {
+                position: fixed;
+                top: auto;
+                bottom: 20px;
+                transform: none;
+                font-size: 1.3rem;
+                width: 40px;
+                height: 40px;
             }
-            
-            .gallery-item-info {
-                padding: 10px;
+
+            .lightbox-prev {
+                left: 20px;
             }
-            
-            .gallery-item-title {
-                font-size: 14px;
+
+            .lightbox-next {
+                right: 20px;
             }
         }
     </style>
@@ -683,56 +789,72 @@ foreach ($allImages as $img) {
                 </div>
             </div>
 
-            <!-- Cartes de statistiques -->
+            <!-- Cartes de statistiques - Design de reservations.php -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 <!-- Total des images -->
-                <div class="stat-card text-white p-6 rounded-xl card-hover">
+                <div class="dashboard-card card-pink">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-white text-opacity-80 text-sm font-medium">Total Images</p>
-                            <p class="text-3xl font-bold"><?= $totalImages ?></p>
+                            <p class="text-gray-600 text-sm font-medium mb-1">Total Images</p>
+                            <p class="text-3xl font-bold text-gray-900"><?= $totalImages ?></p>
+                            <p class="text-sm text-gray-500 mt-2">
+                                <i class="fas fa-layer-group mr-1"></i>
+                                Toutes sources
+                            </p>
                         </div>
-                        <div class="bg-white bg-opacity-20 p-3 rounded-full">
-                            <i class="fas fa-images text-2xl"></i>
+                        <div class="icon-wrapper icon-pink">
+                            <i class="fas fa-images"></i>
                         </div>
                     </div>
                 </div>
 
                 <!-- Images de plats -->
-                <div class="stat-card-blue text-white p-6 rounded-xl card-hover">
+                <div class="dashboard-card card-blue">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-white text-opacity-80 text-sm font-medium">Images de Plats</p>
-                            <p class="text-3xl font-bold"><?= $dishImages ?></p>
+                            <p class="text-gray-600 text-sm font-medium mb-1">Images de Plats</p>
+                            <p class="text-3xl font-bold text-gray-900"><?= $dishImages ?></p>
+                            <p class="text-sm text-gray-500 mt-2">
+                                <i class="fas fa-sync-alt mr-1"></i>
+                                Auto-sync
+                            </p>
                         </div>
-                        <div class="bg-white bg-opacity-20 p-3 rounded-full">
-                            <i class="fas fa-utensils text-2xl"></i>
+                        <div class="icon-wrapper icon-blue">
+                            <i class="fas fa-utensils"></i>
                         </div>
                     </div>
                 </div>
 
                 <!-- Images normales -->
-                <div class="stat-card-green text-white p-6 rounded-xl card-hover">
+                <div class="dashboard-card card-green">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-white text-opacity-80 text-sm font-medium">Images Galerie</p>
-                            <p class="text-3xl font-bold"><?= $normalImages ?></p>
+                            <p class="text-gray-600 text-sm font-medium mb-1">Images Galerie</p>
+                            <p class="text-3xl font-bold text-gray-900"><?= $normalImages ?></p>
+                            <p class="text-sm text-gray-500 mt-2">
+                                <i class="fas fa-upload mr-1"></i>
+                                Manuelles
+                            </p>
                         </div>
-                        <div class="bg-white bg-opacity-20 p-3 rounded-full">
-                            <i class="fas fa-camera text-2xl"></i>
+                        <div class="icon-wrapper icon-green">
+                            <i class="fas fa-camera"></i>
                         </div>
                     </div>
                 </div>
 
                 <!-- Total catégories -->
-                <div class="stat-card-purple text-white p-6 rounded-xl card-hover">
+                <div class="dashboard-card card-orange">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-white text-opacity-80 text-sm font-medium">Catégories</p>
-                            <p class="text-3xl font-bold"><?= $totalCategories ?></p>
+                            <p class="text-gray-600 text-sm font-medium mb-1">Catégories</p>
+                            <p class="text-3xl font-bold text-gray-900"><?= $totalCategories ?></p>
+                            <p class="text-sm text-gray-500 mt-2">
+                                <i class="fas fa-folder-open mr-1"></i>
+                                Collections
+                            </p>
                         </div>
-                        <div class="bg-white bg-opacity-20 p-3 rounded-full">
-                            <i class="fas fa-tags text-2xl"></i>
+                        <div class="icon-wrapper icon-orange">
+                            <i class="fas fa-tags"></i>
                         </div>
                     </div>
                 </div>
@@ -752,59 +874,75 @@ foreach ($allImages as $img) {
                 </div>
             </div>
 
-            <!-- Grille des images avec design moderne -->
+            <!-- Grille des images avec design de cards style reservations.php -->
             <div class="gallery-grid" id="gallery-grid">
                 <?php foreach($allImages as $index => $img): ?>
-                    <?php 
+                    <?php
                     $isDish = isset($img['is_dish']) && $img['is_dish'];
                     $imageUrl = $isDish ? DISHES_UPLOAD_URL . htmlspecialchars($img['filename']) : UPLOAD_URL . htmlspecialchars($img['filename']);
                     ?>
-                    <div class="gallery-item" data-index="<?= $index ?>" data-is-dish="<?= $isDish ? 'true' : 'false' ?>">
-                        <img src="<?= $imageUrl ?>" alt="<?= htmlspecialchars($img['title'] ?: 'Image de la galerie') ?>">
-                        
-                        <!-- Badge catégorie -->
-                        <div class="absolute top-3 right-3">
+                    <div class="gallery-card" data-index="<?= $index ?>" data-is-dish="<?= $isDish ? 'true' : 'false' ?>" data-id="<?= $img['id'] ?? 'dish_'.$img['id'] ?>">
+                        <!-- Image -->
+                        <div class="gallery-card-image-wrapper" onclick="openLightbox(<?= $index ?>)">
+                            <img src="<?= $imageUrl ?>"
+                                 alt="<?= htmlspecialchars($img['title'] ?: 'Image de la galerie') ?>"
+                                 class="gallery-card-image"
+                                 loading="lazy">
+
+                            <!-- Badge catégorie -->
                             <?php if ($isDish): ?>
-                                <span class="dish-badge text-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                                <span class="gallery-card-badge badge-plat">
                                     <i class="fas fa-utensils"></i>
                                     Plat
                                 </span>
                             <?php else: ?>
-                                <span class="category-badge text-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                                <span class="gallery-card-badge badge-category">
                                     <i class="fas fa-tag"></i>
                                     <?= htmlspecialchars($img['category']) ?>
                                 </span>
                             <?php endif; ?>
                         </div>
-                        
-                        <div class="gallery-item-info">
-                            <div class="gallery-item-title truncate">
-                                <?= htmlspecialchars($img['title'] ?: 'Sans titre') ?>
-                            </div>
-                            <div class="flex items-center justify-between text-sm text-gray-600">
-                                <span class="gallery-item-category"><?= htmlspecialchars($img['category']) ?></span>
-                                <span class="text-xs">
-                                    <i class="fas fa-clock mr-1"></i>
+
+                        <!-- Contenu de la card -->
+                        <div class="gallery-card-content">
+                            <h3 class="gallery-card-title"><?= htmlspecialchars($img['title'] ?: 'Sans titre') ?></h3>
+
+                            <div class="gallery-card-info">
+                                <span class="gallery-card-category">
+                                    <i class="fas fa-folder"></i>
+                                    <?= htmlspecialchars($img['category']) ?>
+                                </span>
+                                <span class="gallery-card-date">
+                                    <i class="fas fa-clock"></i>
                                     <?= date('d/m/Y', strtotime($img['created_at'])) ?>
                                 </span>
                             </div>
-                        </div>
-                        
-                        <!-- Actions overlay (seulement pour les images non-plats) -->
-                        <?php if (!$isDish): ?>
-                            <div class="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center opacity-0 hover:opacity-100">
-                                <div class="flex gap-2">
-                                    <button onclick="event.stopPropagation(); openEditModal('<?= $img['id'] ?>', '<?= htmlspecialchars($img['title'], ENT_QUOTES) ?>', '<?= htmlspecialchars($img['category']) ?>')" 
-                                            class="bg-white text-blue-600 p-2 rounded-full hover:bg-blue-100 transition-colors">
-                                        <i class="fas fa-edit"></i>
+
+                            <!-- Actions -->
+                            <?php if ($isDish): ?>
+                                <div class="dish-card-notice">
+                                    <i class="fas fa-info-circle mr-1"></i>
+                                    Géré depuis la page des plats
+                                </div>
+                            <?php else: ?>
+                                <div class="gallery-card-actions">
+                                    <button onclick="openLightbox(<?= $index ?>)" class="action-btn btn-view">
+                                        <i class="fas fa-eye"></i>
+                                        Voir
                                     </button>
-                                    <button onclick="event.stopPropagation(); deleteImage('<?= $img['id'] ?>')" 
-                                            class="bg-white text-red-600 p-2 rounded-full hover:bg-red-100 transition-colors">
+                                    <button onclick="event.stopPropagation(); openEditModal('<?= $img['id'] ?>', '<?= htmlspecialchars($img['title'], ENT_QUOTES) ?>', '<?= htmlspecialchars($img['category']) ?>')"
+                                            class="action-btn btn-edit">
+                                        <i class="fas fa-edit"></i>
+                                        Modifier
+                                    </button>
+                                    <button onclick="event.stopPropagation(); confirmDeleteImage('<?= $img['id'] ?>', '<?= htmlspecialchars($img['title'], ENT_QUOTES) ?>')"
+                                            class="action-btn btn-delete">
                                         <i class="fas fa-trash"></i>
+                                        Supprimer
                                     </button>
                                 </div>
-                            </div>
-                        <?php endif; ?>
+                            <?php endif; ?>
+                        </div>
                     </div>
                 <?php endforeach; ?>
             </div>
@@ -826,20 +964,51 @@ foreach ($allImages as $img) {
     </div>
 
     <!-- Lightbox pour l'affichage des images -->
-    <div class="lightbox" id="lightbox">
-        <div class="lightbox-close" onclick="closeLightbox()">
-            <i class="fas fa-times"></i>
-        </div>
+    <div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
         <div class="lightbox-content">
-            <img class="lightbox-img" id="lightbox-img" src="" alt="">
-            <div class="lightbox-caption" id="lightbox-caption"></div>
-        </div>
-        <div class="lightbox-nav">
-            <div class="lightbox-button" id="lightbox-prev">
+            <div class="lightbox-close" onclick="closeLightbox()">&times;</div>
+            <div class="lightbox-counter" id="lightboxCounter"></div>
+
+            <div class="lightbox-nav lightbox-prev" onclick="previousImage(event)">
                 <i class="fas fa-chevron-left"></i>
             </div>
-            <div class="lightbox-button" id="lightbox-next">
+
+            <img id="lightbox-img" class="lightbox-img" src="" alt="">
+
+            <div class="lightbox-nav lightbox-next" onclick="nextImage(event)">
                 <i class="fas fa-chevron-right"></i>
+            </div>
+
+            <div class="lightbox-info">
+                <div class="lightbox-caption" id="lightbox-caption"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de confirmation de suppression - Style reservations.php -->
+    <div id="deleteImageModal" class="fixed inset-0 bg-black/50 modal-overlay flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg p-6 m-4 max-w-md w-full border border-gray-200 shadow-xl">
+            <div class="text-center">
+                <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-exclamation-triangle text-red-600 text-2xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-gray-800 mb-2">Confirmer la suppression</h3>
+                <p class="text-gray-600 mb-2">Vous êtes sur le point de supprimer définitivement l'image :</p>
+                <div class="bg-gray-50 rounded-lg p-3 mb-4 border border-gray-200">
+                    <p class="font-medium text-gray-800" id="deleteImageInfo"></p>
+                </div>
+                <p class="text-red-600 text-sm font-medium mb-6">Cette action est irréversible !</p>
+                <div class="flex space-x-3">
+                    <button onclick="closeDeleteImageModal()"
+                            class="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300 transition-colors">
+                        Annuler
+                    </button>
+                    <button onclick="executeDeleteImage()"
+                            id="confirmDeleteImageBtn"
+                            class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors">
+                        Supprimer
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -958,88 +1127,76 @@ foreach ($allImages as $img) {
         let galleryImages = <?= json_encode($allImages) ?>;
         let currentLightboxIndex = 0;
 
+        // Variables globales pour la suppression
+        let imageToDelete = null;
+
         // Initialisation de la lightbox
         function initLightbox() {
-            const lightbox = document.getElementById('lightbox');
-            const lightboxImg = document.getElementById('lightbox-img');
-            const lightboxCaption = document.getElementById('lightbox-caption');
-            const lightboxPrev = document.getElementById('lightbox-prev');
-            const lightboxNext = document.getElementById('lightbox-next');
-            
-            // Ouvrir la lightbox
-            document.querySelectorAll('.gallery-item').forEach((item, index) => {
-                item.addEventListener('click', () => {
-                    openLightbox(index);
-                });
-            });
-            
-            // Navigation dans la lightbox
-            lightboxPrev.addEventListener('click', (e) => {
-                e.stopPropagation();
-                navigateLightbox(-1);
-            });
-            
-            lightboxNext.addEventListener('click', (e) => {
-                e.stopPropagation();
-                navigateLightbox(1);
-            });
-            
             // Navigation au clavier
             document.addEventListener('keydown', (e) => {
-                if (lightbox.style.display === 'flex') {
-                    if (e.key === 'Escape') closeLightbox();
-                    if (e.key === 'ArrowLeft') navigateLightbox(-1);
-                    if (e.key === 'ArrowRight') navigateLightbox(1);
-                }
-            });
-            
-            // Fermer en cliquant à l'extérieur de l'image
-            lightbox.addEventListener('click', (e) => {
-                if (e.target === lightbox) {
-                    closeLightbox();
+                const lightbox = document.getElementById('lightbox');
+                if (lightbox.classList.contains('active')) {
+                    switch(e.key) {
+                        case 'Escape':
+                            closeLightbox();
+                            break;
+                        case 'ArrowLeft':
+                            previousImage(e);
+                            break;
+                        case 'ArrowRight':
+                            nextImage(e);
+                            break;
+                    }
                 }
             });
         }
-        
+
         // Ouvrir la lightbox
         function openLightbox(index) {
-            const lightbox = document.getElementById('lightbox');
-            const lightboxImg = document.getElementById('lightbox-img');
-            const lightboxCaption = document.getElementById('lightbox-caption');
-            
             currentLightboxIndex = index;
-            const image = galleryImages[index];
-            const isDish = image.is_dish || false;
-            const imageUrl = isDish ? 
-                '<?= DISHES_UPLOAD_URL ?>' + image.filename : 
-                '<?= UPLOAD_URL ?>' + image.filename;
-            
-            lightboxImg.src = imageUrl;
-            lightboxCaption.textContent = image.title || 'Sans titre';
-            
-            lightbox.style.display = 'flex';
-            document.body.style.overflow = 'hidden'; // Empêcher le défilement
-        }
-        
-        // Fermer la lightbox
-        function closeLightbox() {
             const lightbox = document.getElementById('lightbox');
-            lightbox.style.display = 'none';
-            document.body.style.overflow = 'auto'; // Réactiver le défilement
+            updateLightboxContent();
+            lightbox.classList.add('active');
+            document.body.style.overflow = 'hidden';
         }
-        
-        // Naviguer dans la lightbox
-        function navigateLightbox(direction) {
-            let newIndex = currentLightboxIndex + direction;
-            
-            // Gérer le débordement
-            if (newIndex < 0) {
-                newIndex = galleryImages.length - 1;
-            } else if (newIndex >= galleryImages.length) {
-                newIndex = 0;
-            }
-            
-            openLightbox(newIndex);
+
+        // Fermer la lightbox
+        function closeLightbox(event) {
+            if (event && event.target !== event.currentTarget && event.type !== 'click') return;
+
+            const lightbox = document.getElementById('lightbox');
+            lightbox.classList.remove('active');
+            document.body.style.overflow = 'auto';
+        }
+
+        // Image suivante
+        function nextImage(event) {
+            event.stopPropagation();
+            currentLightboxIndex = (currentLightboxIndex + 1) % galleryImages.length;
+            updateLightboxContent();
+        }
+
+        // Image précédente
+        function previousImage(event) {
+            event.stopPropagation();
+            currentLightboxIndex = (currentLightboxIndex - 1 + galleryImages.length) % galleryImages.length;
+            updateLightboxContent();
+        }
+
+        // Mettre à jour le contenu de la lightbox
+        function updateLightboxContent() {
+            if (galleryImages.length === 0) return;
+
+            const image = galleryImages[currentLightboxIndex];
+            const isDish = image.is_dish || false;
+            const imageUrl = isDish ?
+                '<?= DISHES_UPLOAD_URL ?>' + image.filename :
+                '<?= UPLOAD_URL ?>' + image.filename;
+
+            document.getElementById('lightbox-img').src = imageUrl;
+            document.getElementById('lightbox-img').alt = image.title || 'Sans titre';
+            document.getElementById('lightbox-caption').textContent = image.title || 'Sans titre';
+            document.getElementById('lightboxCounter').textContent = `${currentLightboxIndex + 1} / ${galleryImages.length}`;
         }
 
         // Gestion des notifications
@@ -1299,23 +1456,55 @@ foreach ($allImages as $img) {
             });
         });
 
-        // Gestion de la suppression
-        function deleteImage(id) {
-            // Vérifier si c'est un plat
-            const card = document.querySelector(`[data-id="${id}"]`);
-            if (card && card.dataset.isDish === 'true') {
-                showNotification('Les images de plats ne peuvent être supprimées que depuis la gestion des plats.', 'error');
-                return;
-            }
+        // Fonction pour afficher le modal de confirmation de suppression
+        function confirmDeleteImage(id, title) {
+            imageToDelete = id;
 
-            if (!confirm('Êtes-vous sûr de vouloir supprimer cette image ?')) {
-                return;
-            }
-            
+            const modal = document.getElementById('deleteImageModal');
+            document.getElementById('deleteImageInfo').textContent = title || 'Sans titre';
+
+            // S'assurer que le bouton est dans son état normal
+            const confirmBtn = document.getElementById('confirmDeleteImageBtn');
+            confirmBtn.innerHTML = 'Supprimer';
+            confirmBtn.disabled = false;
+
+            modal.classList.remove('hidden');
+        }
+
+        // Fonction pour fermer le modal de suppression
+        function closeDeleteImageModal() {
+            const modal = document.getElementById('deleteImageModal');
+            modal.classList.add('hidden');
+
+            // Réinitialiser
+            imageToDelete = null;
+            document.getElementById('deleteImageInfo').textContent = '';
+
+            const confirmBtn = document.getElementById('confirmDeleteImageBtn');
+            confirmBtn.innerHTML = 'Supprimer';
+            confirmBtn.disabled = false;
+        }
+
+        // Fonction pour exécuter la suppression
+        function executeDeleteImage() {
+            if (!imageToDelete) return;
+
+            const confirmBtn = document.getElementById('confirmDeleteImageBtn');
+            const originalText = confirmBtn.innerHTML;
+
+            // Animation de chargement
+            confirmBtn.innerHTML = `
+                <i class="fas fa-spinner fa-spin mr-2"></i>
+                Suppression...
+            `;
+            confirmBtn.disabled = true;
+
+            const imageId = imageToDelete;
+
             const formData = new FormData();
             formData.append('action', 'delete');
-            formData.append('id', id);
-            
+            formData.append('id', imageId);
+
             fetch(window.location.href, {
                 method: 'POST',
                 body: formData
@@ -1325,13 +1514,18 @@ foreach ($allImages as $img) {
                 if (data.success) {
                     showNotification(data.message);
                     removeImageFromGrid(data.id);
+                    closeDeleteImageModal();
                 } else {
                     showNotification(data.message, 'error');
+                    confirmBtn.innerHTML = originalText;
+                    confirmBtn.disabled = false;
                 }
             })
             .catch(error => {
                 showNotification('Erreur lors de la suppression.', 'error');
                 console.error(error);
+                confirmBtn.innerHTML = originalText;
+                confirmBtn.disabled = false;
             });
         }
 
@@ -1354,9 +1548,24 @@ foreach ($allImages as $img) {
         function updateImageInGrid(image) {
             const card = document.querySelector(`[data-id="${image.id}"]`);
             if (card) {
-                card.querySelector('.gallery-item-title').textContent = image.title || 'Sans titre';
-                card.querySelector('.gallery-item-category').textContent = image.category;
-                
+                // Mettre à jour le titre
+                const titleElement = card.querySelector('.gallery-card-title');
+                if (titleElement) {
+                    titleElement.textContent = image.title || 'Sans titre';
+                }
+
+                // Mettre à jour la catégorie dans le badge
+                const badgeElement = card.querySelector('.gallery-card-badge');
+                if (badgeElement) {
+                    badgeElement.innerHTML = `<i class="fas fa-tag"></i> ${image.category}`;
+                }
+
+                // Mettre à jour la catégorie dans les infos
+                const categoryElement = card.querySelector('.gallery-card-category');
+                if (categoryElement) {
+                    categoryElement.innerHTML = `<i class="fas fa-folder"></i> ${image.category}`;
+                }
+
                 // Mettre à jour le tableau des images pour la lightbox
                 const index = galleryImages.findIndex(img => img.id === image.id);
                 if (index !== -1) {
@@ -1384,40 +1593,43 @@ foreach ($allImages as $img) {
         function createImageCard(image) {
             const title = image.title ? image.title : 'Sans titre';
             const imageUrl = '../uploads/gallery/' + image.filename;
-            
+            const index = galleryImages.length;
+
             return `
-                <div class="gallery-item" data-id="${image.id}" data-is-dish="false">
-                    <img src="${imageUrl}" alt="${title}">
-                    
-                    <div class="absolute top-3 right-3">
-                        <span class="category-badge text-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                <div class="gallery-card" data-id="${image.id}" data-is-dish="false" data-index="${index}">
+                    <div class="gallery-card-image-wrapper" onclick="openLightbox(${index})">
+                        <img src="${imageUrl}" alt="${title}" class="gallery-card-image" loading="lazy">
+                        <span class="gallery-card-badge badge-category">
                             <i class="fas fa-tag"></i>
                             ${image.category}
                         </span>
                     </div>
-                    
-                    <div class="gallery-item-info">
-                        <div class="gallery-item-title truncate">
-                            ${title}
-                        </div>
-                        <div class="flex items-center justify-between text-sm text-gray-600">
-                            <span class="gallery-item-category">${image.category}</span>
-                            <span class="text-xs">
-                                <i class="fas fa-clock mr-1"></i>
+                    <div class="gallery-card-content">
+                        <h3 class="gallery-card-title">${title}</h3>
+                        <div class="gallery-card-info">
+                            <span class="gallery-card-category">
+                                <i class="fas fa-folder"></i>
+                                ${image.category}
+                            </span>
+                            <span class="gallery-card-date">
+                                <i class="fas fa-clock"></i>
                                 Nouveau
                             </span>
                         </div>
-                    </div>
-                    
-                    <div class="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center opacity-0 hover:opacity-100">
-                        <div class="flex gap-2">
-                            <button onclick="event.stopPropagation(); openEditModal('${image.id}', '${title.replace(/'/g, "\\'")}', '${image.category}')" 
-                                    class="bg-white text-blue-600 p-2 rounded-full hover:bg-blue-100 transition-colors">
-                                <i class="fas fa-edit"></i>
+                        <div class="gallery-card-actions">
+                            <button onclick="openLightbox(${index})" class="action-btn btn-view">
+                                <i class="fas fa-eye"></i>
+                                Voir
                             </button>
-                            <button onclick="event.stopPropagation(); deleteImage('${image.id}')" 
-                                    class="bg-white text-red-600 p-2 rounded-full hover:bg-red-100 transition-colors">
+                            <button onclick="event.stopPropagation(); openEditModal('${image.id}', '${title.replace(/'/g, "\\'")}', '${image.category}')"
+                                    class="action-btn btn-edit">
+                                <i class="fas fa-edit"></i>
+                                Modifier
+                            </button>
+                            <button onclick="event.stopPropagation(); confirmDeleteImage('${image.id}', '${title.replace(/'/g, "\\'")}')"
+                                    class="action-btn btn-delete">
                                 <i class="fas fa-trash"></i>
+                                Supprimer
                             </button>
                         </div>
                     </div>

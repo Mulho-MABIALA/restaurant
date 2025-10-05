@@ -8,6 +8,15 @@ require_once './permissions.php';
         exit;
     }
     requireAccess($conn, $_SESSION['admin_id'], 'categories_plats');
+
+// Récupérer les infos de l'admin
+$stmt_admin = $conn->prepare("SELECT username, email FROM admin WHERE id = ?");
+$stmt_admin->execute([$_SESSION['admin_id']]);
+$admin_info = $stmt_admin->fetch(PDO::FETCH_ASSOC);
+$admin_name = $admin_info['username'] ?? $_SESSION['admin_username'] ?? 'Admin';
+$admin_email = $admin_info['email'] ?? 'admin@restaurant.com';
+$admin_photo = null; // Photo non disponible dans la base de données
+
 // Connexion avec gestion d'erreur PDO (au cas où config.php n'initialise pas `$conn`)
 try {
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -91,6 +100,7 @@ if (isset($_GET['message']) && !$message) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestion des Catégories</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         .animate-slide-up {

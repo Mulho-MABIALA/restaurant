@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_permissions'])) 
         ");
         
         foreach ($selectedPages as $pageSlug) {
-            $canView = 1; // Toujours true si la page est sélectionnée
+            $canView = 1;
             $canCreate = isset($permissions[$pageSlug]['create']) ? 1 : 0;
             $canEdit = isset($permissions[$pageSlug]['edit']) ? 1 : 0;
             $canDelete = isset($permissions[$pageSlug]['delete']) ? 1 : 0;
@@ -116,172 +116,410 @@ if ($selectedAdminId) {
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
-            --primary-color: #667eea;
-            --secondary-color: #764ba2;
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             --success-color: #10b981;
             --danger-color: #ef4444;
-            --warning-color: #f59e0b;
+            --bg-light: #f8fafc;
+            --border-color: #e2e8f0;
+            --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+            --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
+            --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.15);
         }
         
         body {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
         }
         
-        .main-container {
+        .content-wrapper {
             background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            margin: 2rem auto;
-            max-width: 1400px;
+            border-radius: 24px;
+            box-shadow: var(--shadow-lg);
+            margin: 2rem;
+            overflow: hidden;
         }
         
-        .header-section {
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+        .page-header {
+            background: var(--primary-gradient);
+            padding: 2.5rem 2rem;
             color: white;
-            padding: 2rem;
-            border-radius: 20px 20px 0 0;
         }
         
-        .admin-selector {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            border-radius: 15px;
+        .page-header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .page-header p {
+            opacity: 0.95;
+            font-size: 1rem;
+            margin: 0;
+        }
+        
+        .content-body {
+            padding: 2rem;
+        }
+        
+        .admin-selector-card {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
+            border: 2px solid rgba(102, 126, 234, 0.2);
+            border-radius: 16px;
             padding: 1.5rem;
             margin-bottom: 2rem;
         }
         
-        .category-card {
-            background: #f8fafc;
-            border-radius: 15px;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            border: 2px solid #e2e8f0;
+        .admin-selector-card h5 {
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+        
+        .form-select {
+            border-radius: 12px;
+            border: 2px solid var(--border-color);
+            padding: 0.875rem 1rem;
+            font-size: 1rem;
             transition: all 0.3s ease;
         }
         
-        .category-card:hover {
-            border-color: var(--primary-color);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.1);
+        .form-select:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        }
+        
+        .permissions-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 2px solid var(--border-color);
+        }
+        
+        .permissions-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .admin-name {
+            color: #667eea;
+            font-weight: 700;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 0.75rem;
+        }
+        
+        .btn-action {
+            padding: 0.625rem 1.25rem;
+            border-radius: 10px;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+            border: 2px solid;
+        }
+        
+        .btn-action:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-sm);
+        }
+        
+        .btn-select-all {
+            background: white;
+            color: #667eea;
+            border-color: #667eea;
+        }
+        
+        .btn-select-all:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-deselect-all {
+            background: white;
+            color: #64748b;
+            border-color: #cbd5e1;
+        }
+        
+        .btn-deselect-all:hover {
+            background: #f1f5f9;
+            border-color: #94a3b8;
+        }
+        
+        .category-section {
+            background: white;
+            border: 2px solid var(--border-color);
+            border-radius: 16px;
+            margin-bottom: 1.5rem;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .category-section:hover {
+            border-color: #667eea;
+            box-shadow: var(--shadow-md);
         }
         
         .category-header {
+            background: linear-gradient(to right, #f8fafc, #f1f5f9);
+            padding: 1.25rem 1.5rem;
             display: flex;
             align-items: center;
-            margin-bottom: 1rem;
-            padding-bottom: 0.75rem;
-            border-bottom: 2px solid #e2e8f0;
+            justify-content: space-between;
+            border-bottom: 2px solid var(--border-color);
+        }
+        
+        .category-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #1e293b;
         }
         
         .category-icon {
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            border-radius: 10px;
+            width: 42px;
+            height: 42px;
+            background: var(--primary-gradient);
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
-            margin-right: 1rem;
+            font-size: 1.1rem;
         }
         
-        .page-item {
-            background: white;
-            border-radius: 10px;
+        .btn-category-toggle {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .btn-category-toggle:hover {
+            background: #5568d3;
+            transform: scale(1.05);
+        }
+        
+        .category-content {
             padding: 1rem;
+        }
+        
+        .page-row {
+            background: white;
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
             margin-bottom: 0.75rem;
-            border: 1px solid #e2e8f0;
             transition: all 0.3s ease;
         }
         
-        .page-item:hover {
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-            transform: translateY(-2px);
+        .page-row:hover {
+            border-color: #667eea;
+            box-shadow: var(--shadow-sm);
+            transform: translateX(4px);
         }
         
-        .page-checkbox {
+        .page-checkbox-wrapper {
             display: flex;
             align-items: center;
             gap: 1rem;
         }
         
         .custom-checkbox {
-            width: 24px;
-            height: 24px;
+            width: 22px;
+            height: 22px;
             cursor: pointer;
-            accent-color: var(--primary-color);
+            accent-color: #667eea;
+            transition: transform 0.2s ease;
         }
         
-        .permission-badges {
+        .custom-checkbox:hover {
+            transform: scale(1.1);
+        }
+        
+        .page-label {
+            flex: 1;
+            cursor: pointer;
+            font-weight: 500;
+            color: #334155;
             display: flex;
-            gap: 0.5rem;
-            margin-top: 0.5rem;
-            padding-left: 40px;
+            align-items: center;
+            gap: 0.75rem;
         }
         
-        .permission-badge {
+        .page-icon {
+            color: #667eea;
+            font-size: 1.1rem;
+        }
+        
+        .page-slug {
+            color: #94a3b8;
+            font-size: 0.85rem;
+            font-weight: 400;
+        }
+        
+        .permissions-group {
+            display: flex;
+            gap: 0.625rem;
+            margin-top: 0.875rem;
+            padding-left: 38px;
+            flex-wrap: wrap;
+        }
+        
+        .permission-item {
             display: inline-flex;
             align-items: center;
-            gap: 0.25rem;
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            background: #f1f5f9;
-            border: 1px solid #cbd5e1;
-        }
-        
-        .permission-badge input[type="checkbox"] {
-            width: 16px;
-            height: 16px;
-            cursor: pointer;
-        }
-        
-        .btn-save {
-            background: linear-gradient(135deg, var(--success-color), #059669);
-            border: none;
-            padding: 1rem 2rem;
-            font-size: 1.1rem;
-            border-radius: 12px;
-            color: white;
-            font-weight: 600;
-            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
-            transition: all 0.3s ease;
-        }
-        
-        .btn-save:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
-        }
-        
-        .select-all-btn {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            border: none;
+            gap: 0.5rem;
             padding: 0.5rem 1rem;
+            background: #f8fafc;
+            border: 2px solid var(--border-color);
             border-radius: 8px;
-            color: white;
             font-size: 0.9rem;
-            cursor: pointer;
+            font-weight: 500;
             transition: all 0.3s ease;
         }
         
-        .select-all-btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        .permission-item:hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+        }
+        
+        .permission-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #667eea;
+        }
+        
+        .permission-item.create {
+            border-color: #10b981;
+        }
+        
+        .permission-item.edit {
+            border-color: #f59e0b;
+        }
+        
+        .permission-item.delete {
+            border-color: #ef4444;
+        }
+        
+        .btn-save-permissions {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            padding: 1.125rem 3rem;
+            border-radius: 12px;
+            font-size: 1.125rem;
+            font-weight: 600;
+            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .btn-save-permissions:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 30px rgba(16, 185, 129, 0.4);
+        }
+        
+        .save-section {
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 2px solid var(--border-color);
+            text-align: center;
         }
         
         .alert-modern {
             border-radius: 12px;
             border: none;
-            padding: 1rem 1.5rem;
+            padding: 1.25rem 1.5rem;
             display: flex;
             align-items: center;
             gap: 1rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow-sm);
         }
         
         .alert-modern i {
             font-size: 1.5rem;
+        }
+        
+        .alert-success {
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+            color: #065f46;
+        }
+        
+        .alert-danger {
+            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+            color: #991b1b;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+        }
+        
+        .empty-state i {
+            font-size: 4rem;
+            color: #cbd5e1;
+            margin-bottom: 1.5rem;
+        }
+        
+        .empty-state h4 {
+            color: #64748b;
+            font-weight: 600;
+        }
+        
+        @media (max-width: 768px) {
+            .content-wrapper {
+                margin: 1rem;
+                border-radius: 16px;
+            }
+            
+            .page-header {
+                padding: 1.5rem 1rem;
+            }
+            
+            .content-body {
+                padding: 1rem;
+            }
+            
+            .permissions-header {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+            
+            .action-buttons {
+                width: 100%;
+                flex-direction: column;
+            }
+            
+            .btn-action {
+                width: 100%;
+            }
+            
+            .permissions-group {
+                padding-left: 0;
+            }
         }
     </style>
 </head>
@@ -290,15 +528,16 @@ if ($selectedAdminId) {
         <?php include 'sidebar.php'; ?>
         
         <div class="flex-1 overflow-y-auto">
-            <div class="main-container">
-                <div class="header-section">
-                    <h1 class="display-5 mb-3">
-                        <i class="fas fa-user-shield me-3"></i>Gestion des Droits d'Accès
+            <div class="content-wrapper">
+                <div class="page-header">
+                    <h1>
+                        <i class="fas fa-user-shield"></i>
+                        Gestion des Droits d'Accès
                     </h1>
-                    <p class="lead mb-0">Configurez les permissions d'accès aux pages pour chaque administrateur</p>
+                    <p>Configurez les permissions d'accès aux pages pour chaque administrateur</p>
                 </div>
 
-                <div class="p-4">
+                <div class="content-body">
                     <?php if ($message): ?>
                         <div class="alert alert-<?= $messageType === 'error' ? 'danger' : 'success' ?> alert-modern alert-dismissible fade show">
                             <i class="fas fa-<?= $messageType === 'error' ? 'exclamation-triangle' : 'check-circle' ?>"></i>
@@ -310,12 +549,11 @@ if ($selectedAdminId) {
                         </div>
                     <?php endif; ?>
 
-                    <!-- Sélection de l'administrateur -->
-                    <div class="admin-selector">
-                        <h5 class="text-white mb-3">
+                    <div class="admin-selector-card">
+                        <h5>
                             <i class="fas fa-user-circle me-2"></i>Sélectionnez un administrateur
                         </h5>
-                        <select class="form-select form-select-lg" id="adminSelector" onchange="selectAdmin(this.value)">
+                        <select class="form-select" id="adminSelector" onchange="selectAdmin(this.value)">
                             <option value="">-- Choisir un administrateur --</option>
                             <?php foreach ($admins as $admin): ?>
                                 <option value="<?= $admin['id'] ?>" <?= $selectedAdminId == $admin['id'] ? 'selected' : '' ?>>
@@ -331,96 +569,102 @@ if ($selectedAdminId) {
                         <form method="POST" id="permissionsForm">
                             <input type="hidden" name="admin_id" value="<?= $selectedAdminId ?>">
                             
-                            <div class="d-flex justify-content-between align-items-center mb-4">
-                                <h4 class="mb-0">
-                                    <i class="fas fa-lock me-2"></i>
-                                    Permissions pour : <strong class="text-primary"><?= htmlspecialchars($selectedAdmin['username']) ?></strong>
-                                </h4>
-                                <div>
-                                    <button type="button" class="btn btn-outline-primary me-2" onclick="selectAllPages()">
+                            <div class="permissions-header">
+                                <h2 class="permissions-title">
+                                    <i class="fas fa-lock"></i>
+                                    Permissions pour : <span class="admin-name"><?= htmlspecialchars($selectedAdmin['username']) ?></span>
+                                </h2>
+                                <div class="action-buttons">
+                                    <button type="button" class="btn btn-action btn-select-all" onclick="selectAllPages()">
                                         <i class="fas fa-check-double me-2"></i>Tout sélectionner
                                     </button>
-                                    <button type="button" class="btn btn-outline-secondary" onclick="deselectAllPages()">
+                                    <button type="button" class="btn btn-action btn-deselect-all" onclick="deselectAllPages()">
                                         <i class="fas fa-times me-2"></i>Tout désélectionner
                                     </button>
                                 </div>
                             </div>
 
                             <?php foreach ($pagesByCategory as $category => $categoryPages): ?>
-                                <div class="category-card">
+                                <div class="category-section">
                                     <div class="category-header">
-                                        <div class="category-icon">
-                                            <i class="fas fa-folder"></i>
-                                        </div>
-                                        <h5 class="mb-0 flex-grow-1"><?= htmlspecialchars($category) ?></h5>
-                                        <button type="button" class="select-all-btn" onclick="toggleCategory('<?= $category ?>')">
+                                        <h3 class="category-title">
+                                            <div class="category-icon">
+                                                <i class="fas fa-folder"></i>
+                                            </div>
+                                            <?= htmlspecialchars($category) ?>
+                                        </h3>
+                                        <button type="button" class="btn-category-toggle" onclick="toggleCategory('<?= $category ?>')">
                                             <i class="fas fa-check me-1"></i>Tout cocher
                                         </button>
                                     </div>
 
-                                    <?php foreach ($categoryPages as $page): ?>
-                                        <?php
-                                        $isChecked = isset($currentPermissions[$page['page_slug']]['view']) && 
-                                                    $currentPermissions[$page['page_slug']]['view'] == 1;
-                                        $canCreate = isset($currentPermissions[$page['page_slug']]['create']) && 
-                                                    $currentPermissions[$page['page_slug']]['create'] == 1;
-                                        $canEdit = isset($currentPermissions[$page['page_slug']]['edit']) && 
-                                                  $currentPermissions[$page['page_slug']]['edit'] == 1;
-                                        $canDelete = isset($currentPermissions[$page['page_slug']]['delete']) && 
-                                                    $currentPermissions[$page['page_slug']]['delete'] == 1;
-                                        ?>
-                                        <div class="page-item" data-category="<?= $category ?>">
-                                            <div class="page-checkbox">
-                                                <input type="checkbox" 
-                                                       class="custom-checkbox page-checkbox-input" 
-                                                       name="pages[]" 
-                                                       value="<?= htmlspecialchars($page['page_slug']) ?>"
-                                                       id="page_<?= $page['id'] ?>"
-                                                       data-page-id="<?= $page['id'] ?>"
-                                                       <?= $isChecked ? 'checked' : '' ?>
-                                                       onchange="togglePermissions(<?= $page['id'] ?>)">
-                                                <label for="page_<?= $page['id'] ?>" style="cursor: pointer; flex-grow: 1;">
-                                                    <i class="fas <?= htmlspecialchars($page['page_icon']) ?> me-2 text-primary"></i>
-                                                    <strong><?= htmlspecialchars($page['page_name']) ?></strong>
-                                                    <small class="text-muted ms-2">(<?= htmlspecialchars($page['page_slug']) ?>)</small>
-                                                </label>
+                                    <div class="category-content">
+                                        <?php foreach ($categoryPages as $page): ?>
+                                            <?php
+                                            $isChecked = isset($currentPermissions[$page['page_slug']]['view']) && 
+                                                        $currentPermissions[$page['page_slug']]['view'] == 1;
+                                            $canCreate = isset($currentPermissions[$page['page_slug']]['create']) && 
+                                                        $currentPermissions[$page['page_slug']]['create'] == 1;
+                                            $canEdit = isset($currentPermissions[$page['page_slug']]['edit']) && 
+                                                      $currentPermissions[$page['page_slug']]['edit'] == 1;
+                                            $canDelete = isset($currentPermissions[$page['page_slug']]['delete']) && 
+                                                        $currentPermissions[$page['page_slug']]['delete'] == 1;
+                                            ?>
+                                            <div class="page-row" data-category="<?= $category ?>">
+                                                <div class="page-checkbox-wrapper">
+                                                    <input type="checkbox" 
+                                                           class="custom-checkbox page-checkbox-input" 
+                                                           name="pages[]" 
+                                                           value="<?= htmlspecialchars($page['page_slug']) ?>"
+                                                           id="page_<?= $page['id'] ?>"
+                                                           data-page-id="<?= $page['id'] ?>"
+                                                           <?= $isChecked ? 'checked' : '' ?>
+                                                           onchange="togglePermissions(<?= $page['id'] ?>)">
+                                                    <label for="page_<?= $page['id'] ?>" class="page-label">
+                                                        <i class="fas <?= htmlspecialchars($page['page_icon']) ?> page-icon"></i>
+                                                        <span>
+                                                            <strong><?= htmlspecialchars($page['page_name']) ?></strong>
+                                                            <span class="page-slug">(<?= htmlspecialchars($page['page_slug']) ?>)</span>
+                                                        </span>
+                                                    </label>
+                                                </div>
+                                                
+                                                <div class="permissions-group" id="perms_<?= $page['id'] ?>" style="display: <?= $isChecked ? 'flex' : 'none' ?>">
+                                                    <div class="permission-item create">
+                                                        <input type="checkbox" 
+                                                               name="permissions[<?= htmlspecialchars($page['page_slug']) ?>][create]"
+                                                               <?= $canCreate ? 'checked' : '' ?>>
+                                                        <span>Créer</span>
+                                                    </div>
+                                                    <div class="permission-item edit">
+                                                        <input type="checkbox" 
+                                                               name="permissions[<?= htmlspecialchars($page['page_slug']) ?>][edit]"
+                                                               <?= $canEdit ? 'checked' : '' ?>>
+                                                        <span>Modifier</span>
+                                                    </div>
+                                                    <div class="permission-item delete">
+                                                        <input type="checkbox" 
+                                                               name="permissions[<?= htmlspecialchars($page['page_slug']) ?>][delete]"
+                                                               <?= $canDelete ? 'checked' : '' ?>>
+                                                        <span>Supprimer</span>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            
-                                            <div class="permission-badges" id="perms_<?= $page['id'] ?>" style="display: <?= $isChecked ? 'flex' : 'none' ?>">
-                                                <div class="permission-badge">
-                                                    <input type="checkbox" 
-                                                           name="permissions[<?= htmlspecialchars($page['page_slug']) ?>][create]"
-                                                           <?= $canCreate ? 'checked' : '' ?>>
-                                                    <span>Créer</span>
-                                                </div>
-                                                <div class="permission-badge">
-                                                    <input type="checkbox" 
-                                                           name="permissions[<?= htmlspecialchars($page['page_slug']) ?>][edit]"
-                                                           <?= $canEdit ? 'checked' : '' ?>>
-                                                    <span>Modifier</span>
-                                                </div>
-                                                <div class="permission-badge">
-                                                    <input type="checkbox" 
-                                                           name="permissions[<?= htmlspecialchars($page['page_slug']) ?>][delete]"
-                                                           <?= $canDelete ? 'checked' : '' ?>>
-                                                    <span>Supprimer</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    <?php endforeach; ?>
+                                        <?php endforeach; ?>
+                                    </div>
                                 </div>
                             <?php endforeach; ?>
 
-                            <div class="text-center mt-4">
-                                <button type="submit" name="save_permissions" class="btn-save">
+                            <div class="save-section">
+                                <button type="submit" name="save_permissions" class="btn-save-permissions">
                                     <i class="fas fa-save me-2"></i>Enregistrer les permissions
                                 </button>
                             </div>
                         </form>
                     <?php else: ?>
-                        <div class="text-center py-5">
-                            <i class="fas fa-user-circle fa-5x text-muted mb-3"></i>
-                            <h4 class="text-muted">Sélectionnez un administrateur pour gérer ses permissions</h4>
+                        <div class="empty-state">
+                            <i class="fas fa-user-circle"></i>
+                            <h4>Sélectionnez un administrateur pour gérer ses permissions</h4>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -444,7 +688,6 @@ if ($selectedAdminId) {
                 permsDiv.style.display = 'flex';
             } else {
                 permsDiv.style.display = 'none';
-                // Décocher toutes les permissions détaillées
                 permsDiv.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
             }
         }

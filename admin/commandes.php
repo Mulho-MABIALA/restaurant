@@ -17,6 +17,15 @@
 
     // Vérifier les permissions
     requireAccess($conn, $_SESSION['admin_id'], 'commandes');
+
+    // Récupérer les infos de l'admin
+    $stmt_admin = $conn->prepare("SELECT username, email FROM admin WHERE id = ?");
+    $stmt_admin->execute([$_SESSION['admin_id']]);
+    $admin_info = $stmt_admin->fetch(PDO::FETCH_ASSOC);
+    $admin_name = $admin_info['username'] ?? $_SESSION['admin_username'] ?? 'Admin';
+    $admin_email = $admin_info['email'] ?? 'admin@restaurant.com';
+    $admin_photo = null; // Photo non disponible dans la base de données
+
     // Fonction pour échapper les valeurs
     function e($value)
     {
@@ -296,6 +305,39 @@ $categories_disponibles = getAllCategories($conn);
         exit;
     }
 
+    // Action pour récupérer les détails complets d'une commande (avec produits)
+    if (isset($_POST['action']) && $_POST['action'] === 'get_commande_details' && isset($_POST['id'])) {
+        header('Content-Type: application/json');
+
+        try {
+            // Récupérer la commande
+            $stmt = $conn->prepare("SELECT * FROM commandes WHERE id = :id");
+            $stmt->execute(['id' => $_POST['id']]);
+            $commande = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($commande) {
+                // Récupérer les produits de la commande
+                $stmt = $conn->prepare("
+                    SELECT * FROM commande_details
+                    WHERE commande_id = :commande_id
+                ");
+                $stmt->execute(['commande_id' => $_POST['id']]);
+                $produits = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                echo json_encode([
+                    'success' => true,
+                    'commande' => $commande,
+                    'produits' => $produits
+                ]);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Commande non trouvée']);
+            }
+        } catch (PDOException $e) {
+            echo json_encode(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()]);
+        }
+        exit;
+    }
+
     // Gestion de la suppression AJAX
     if (isset($_POST['action']) && $_POST['action'] === 'supprimer' && isset($_POST['id'])) {
         header('Content-Type: application/json');
@@ -378,6 +420,7 @@ $categories_disponibles = getAllCategories($conn);
     <title>restaurant Mulho</title>
     <link rel="icon" type="image/x-icon" href="../assets/img/logo.jpg">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/cards-design.css">
     <style>
@@ -971,26 +1014,140 @@ $categories_disponibles = getAllCategories($conn);
         <!-- Main Content -->
         <div class="flex-1 flex flex-col overflow-hidden">
             <!-- Header -->
-            <header class="bg-white/80 backdrop-blur-md shadow-sm border-b border-gray-200 px-6 py-4">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h1 class="text-3xl font-bold text-gray-800">Gestion des Commandes</h1>
+            <header class="bg-slate-900 shadow-lg sticky top-0 z-40">
+                <div class="px-4 sm:px-6 lg:px-8 py-4">
+                    <div class="flex justify-between items-center">
+                        <!-- Section Titre -->
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 bg-teal-600 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-chart-line text-white text-lg"></i>
+                            </div>
+                            <div>
+                                <h1 class="text-2xl font-bold text-white">
+                                    Tableau de Bord
+                                </h1>
+                                <p class="text-gray-400 text-sm">
+                                    Bienvenue, <?= htmlspecialchars($admin_name) ?> ✨
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Contrôles -->
+                        <div class="flex items-center space-x-4" x-data="{ profileOpen: false }">
+                            <!-- Widget Date/Heure -->
+                            <div class="hidden sm:flex items-center space-x-5 bg-slate-800 rounded-xl px-5 py-3">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-10 h-10 bg-slate-700 rounded-lg flex items-center justify-center">
+                                        <i class="fas fa-calendar text-blue-400 text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs text-gray-400 uppercase">Aujourd'hui</p>
+                                        <p class="text-sm font-bold text-white"><?= date('d M Y') ?></p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-10 h-10 bg-slate-700 rounded-lg flex items-center justify-center">
+                                        <i class="fas fa-clock text-teal-400 text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs text-gray-400 uppercase">Heure</p>
+                                        <p class="text-sm font-bold text-white font-mono" id="live-clock"><?= date('H:i:s') ?></p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Menu Profil -->
+                            <div class="relative">
+                                <button
+                                    @click="profileOpen = !profileOpen"
+                                    class="relative w-12 h-12 rounded-xl flex items-center justify-center hover:opacity-90 transition-opacity focus:outline-none overflow-hidden"
+                                    type="button"
+                                >
+                                    <?php if (!empty($admin_photo) && file_exists(__DIR__ . '/' . $admin_photo)): ?>
+                                        <img src="<?= htmlspecialchars($admin_photo) ?>"
+                                             alt="Photo de profil"
+                                             class="w-full h-full object-cover rounded-xl">
+                                    <?php else: ?>
+                                        <div class="w-full h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                                            <span class="text-white font-bold text-base">
+                                                <?= strtoupper(substr($admin_name, 0, 1)) ?>
+                                            </span>
+                                        </div>
+                                    <?php endif; ?>
+                                    <div class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-400 border-2 border-slate-900 rounded-full"></div>
+                                </button>
+
+                                <!-- Dropdown Profil -->
+                                <div
+                                    x-show="profileOpen"
+                                    @click.away="profileOpen = false"
+                                    x-transition:enter="transition ease-out duration-200"
+                                    x-transition:enter-start="transform opacity-0 scale-95"
+                                    x-transition:enter-end="transform opacity-100 scale-100"
+                                    x-transition:leave="transition ease-in duration-150"
+                                    x-transition:leave-start="transform opacity-100 scale-100"
+                                    x-transition:leave-end="transform opacity-0 scale-95"
+                                    class="absolute right-0 mt-2 w-72 bg-slate-800 rounded-xl shadow-xl overflow-hidden z-50"
+                                    style="display: none;"
+                                >
+                                    <!-- En-tête -->
+                                    <div class="px-5 py-4 border-b border-slate-700">
+                                        <div class="flex items-center space-x-3">
+                                            <?php if (!empty($admin_photo) && file_exists(__DIR__ . '/' . $admin_photo)): ?>
+                                                <img src="<?= htmlspecialchars($admin_photo) ?>"
+                                                     alt="Photo de profil"
+                                                     class="w-12 h-12 object-cover rounded-lg">
+                                            <?php else: ?>
+                                                <div class="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                                                    <span class="text-white font-bold text-base"><?= strtoupper(substr($admin_name, 0, 1)) ?></span>
+                                                </div>
+                                            <?php endif; ?>
+                                            <div>
+                                                <p class="text-white font-semibold text-base"><?= htmlspecialchars($admin_name) ?></p>
+                                                <p class="text-gray-400 text-sm"><?= htmlspecialchars($admin_email) ?></p>
+                                            </div>
+                                        </div>
+                                        <div class="mt-3 flex items-center">
+                                            <span class="w-2 h-2 bg-green-400 rounded-full mr-2"></span>
+                                            <span class="text-green-400 text-sm">En ligne</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Menu -->
+                                    <div class="py-2">
+                                        <a href="profile.php" class="flex items-center px-5 py-3 hover:bg-slate-700 transition-colors">
+                                            <i class="fas fa-user text-blue-400 w-5"></i>
+                                            <span class="ml-3 text-white text-sm">Mon profil</span>
+                                            <span class="ml-auto text-gray-400">›</span>
+                                        </a>
+                                        <a href="settings.php" class="flex items-center px-5 py-3 hover:bg-slate-700 transition-colors">
+                                            <i class="fas fa-envelope text-purple-400 w-5"></i>
+                                            <span class="ml-3 text-white text-sm">Changer email</span>
+                                            <span class="ml-auto text-gray-400">›</span>
+                                        </a>
+                                        <div class="border-t border-slate-700 my-2"></div>
+                                        <a href="logout.php" class="flex items-center px-5 py-3 hover:bg-red-900/20 transition-colors">
+                                            <i class="fas fa-sign-out-alt text-red-400 w-5"></i>
+                                            <span class="ml-3 text-red-400 text-sm font-medium">Déconnexion</span>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="mb-6">
-    <button onclick="openCommandeManuelleModal()" 
-            class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-700 text-white font-semibold rounded-lg shadow-lg hover:from-green-700 hover:to-emerald-800 transform hover:scale-105 transition-all duration-200">
-        <i class="fas fa-plus-circle mr-3 text-lg"></i>
-        Nouvelle commande manuelle
-    </button>
-</div>
                 </div>
             </header>
 
             <!-- Main Content Area -->
             <main class="flex-1 overflow-auto p-6">
                 <!-- Section Header -->
-                <div class="mb-8">
-                    <h2 class="text-xs uppercase tracking-widest text-gray-800 font-semibold mb-8">Gerez les commandes</h2>
+                <div class="mb-8 flex justify-between items-center">
+                    <h2 class="text-xs uppercase tracking-widest text-gray-800 font-semibold">Gerez les commandes</h2>
+                    <button onclick="openCommandeManuelleModal()"
+                            class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-700 text-white font-semibold rounded-lg shadow-lg hover:from-green-700 hover:to-emerald-800 transform hover:scale-105 transition-all duration-200">
+                        <i class="fas fa-plus-circle mr-3 text-lg"></i>
+                        Nouvelle commande manuelle
+                    </button>
                 </div>
 
                 <!-- Statistiques Cards - Layout corrigé en 2 rangées -->
@@ -1111,6 +1268,21 @@ $categories_disponibles = getAllCategories($conn);
                 </div>
 
                 <div class="border-t border-gray-300 my-8"></div>
+
+                <!-- Tabs Navigation -->
+                <div class="mb-6">
+                    <div class="flex space-x-1 bg-gray-100 p-1 rounded-lg inline-flex">
+                        <button onclick="switchTab('actives')" id="tab-actives" class="tab-button px-6 py-2 rounded-md font-medium transition-all duration-200 bg-white text-gray-900 shadow-sm">
+                            <i class="fas fa-shopping-cart mr-2"></i>Commandes actives
+                        </button>
+                        <button onclick="switchTab('historique')" id="tab-historique" class="tab-button px-6 py-2 rounded-md font-medium transition-all duration-200 text-gray-600 hover:text-gray-900">
+                            <i class="fas fa-history mr-2"></i>Historique
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Contenu Commandes Actives -->
+                <div id="content-actives">
 
                 <!-- Section Header -->
                 <div class="mb-6">
@@ -1374,6 +1546,186 @@ endforeach; ?>
                         </table>
                     </div>
                 </div>
+
+                </div>
+                <!-- Fin Content Actives -->
+
+                <!-- Contenu Historique -->
+                <div id="content-historique" class="hidden">
+                    <!-- Filtres Historique -->
+                    <div class="bg-white rounded-2xl shadow-xl border border-gray-200 p-6 mb-6">
+                        <h3 class="text-lg font-semibold mb-4">Filtres Historique</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Recherche</label>
+                                <input type="text" id="hist-search" placeholder="Nom, email, téléphone..."
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Statut</label>
+                                <select id="hist-statut" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                                    <option value="">Tous les statuts</option>
+                                    <?php foreach ($statuts_disponibles as $statut): ?>
+                                        <option value="<?= e($statut) ?>"><?= e($statut) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Paiement</label>
+                                <select id="hist-paiement" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                                    <option value="">Tous</option>
+                                    <option value="Payé">Payé</option>
+                                    <option value="Impayé">Impayé</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                                <input type="date" id="hist-date" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Statistiques Historique -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                        <div class="dashboard-card card-blue">
+                            <div class="icon-wrapper icon-blue">
+                                <i class="fas fa-shopping-cart"></i>
+                            </div>
+                            <div class="card-content">
+                                <h3 class="card-title">Total Commandes</h3>
+                                <p class="card-value" id="hist-total"><?= count($commandes) ?></p>
+                            </div>
+                        </div>
+                        <div class="dashboard-card card-green">
+                            <div class="icon-wrapper icon-green">
+                                <i class="fas fa-coins"></i>
+                            </div>
+                            <div class="card-content">
+                                <h3 class="card-title">Total (FCFA)</h3>
+                                <p class="card-value" id="hist-montant"><?= number_format(array_sum(array_column($commandes, 'total')), 0, ',', ' ') ?></p>
+                            </div>
+                        </div>
+                        <div class="dashboard-card card-purple">
+                            <div class="icon-wrapper icon-purple">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <div class="card-content">
+                                <h3 class="card-title">Payées</h3>
+                                <p class="card-value" id="hist-payees"><?= count(array_filter($commandes, fn($c) => $c['statut_paiement'] === 'Payé')) ?></p>
+                            </div>
+                        </div>
+                        <div class="dashboard-card card-orange">
+                            <div class="icon-wrapper icon-orange">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                            <div class="card-content">
+                                <h3 class="card-title">Moyenne (FCFA)</h3>
+                                <p class="card-value" id="hist-moyenne"><?= count($commandes) > 0 ? number_format(array_sum(array_column($commandes, 'total')) / count($commandes), 0, ',', ' ') : 0 ?></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tableau Historique -->
+                    <div class="bg-white rounded-2xl shadow-xl border-2 border-gray-200 overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full border-collapse" id="table-historique">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">N°</th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Client</th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Contact</th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Table</th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Total</th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Statut</th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Paiement</th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php
+                                    $numero = count($commandes);
+                                    foreach ($commandes as $cmd):
+                                    ?>
+                                        <tr class="border-b border-gray-200 hover:bg-gray-50"
+                                            data-nom="<?= strtolower($cmd['nom_client']) ?>"
+                                            data-email="<?= strtolower($cmd['email']) ?>"
+                                            data-telephone="<?= $cmd['telephone'] ?>"
+                                            data-statut="<?= $cmd['statut'] ?>"
+                                            data-paiement="<?= $cmd['statut_paiement'] ?>"
+                                            data-date="<?= date('Y-m-d', strtotime($cmd['created_at'])) ?>">
+                                            <td class="px-6 py-4">
+                                                <div class="numero-commande"><?= $numero ?></div>
+                                            </td>
+                                            <td class="px-6 py-4">
+                                                <div class="flex items-center">
+                                                    <div class="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center mr-3">
+                                                        <span class="text-white font-medium text-sm"><?= strtoupper(substr(e($cmd['nom_client']), 0, 1)) ?></span>
+                                                    </div>
+                                                    <span class="font-medium"><?= e($cmd['nom_client']) ?></span>
+                                                </div>
+                                            </td>
+                                            <td class="px-6 py-4">
+                                                <div class="text-sm">
+                                                    <div><?= e($cmd['email']) ?></div>
+                                                    <div class="text-gray-500"><?= e($cmd['telephone']) ?></div>
+                                                </div>
+                                            </td>
+                                            <td class="px-6 py-4">
+                                                <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-semibold">
+                                                    #<?= e($cmd['num_table']) ?>
+                                                </span>
+                                            </td>
+                                            <td class="px-6 py-4">
+                                                <span class="font-bold text-gray-900"><?= number_format($cmd['total'] ?? 0, 0, ',', ' ') ?> FCFA</span>
+                                            </td>
+                                            <td class="px-6 py-4">
+                                                <?php
+                                                $badge_classes = [
+                                                    'En attente' => 'bg-yellow-100 text-yellow-800',
+                                                    'En préparation' => 'bg-blue-100 text-blue-800',
+                                                    'Prête' => 'bg-green-100 text-green-800',
+                                                    'Servie' => 'bg-purple-100 text-purple-800',
+                                                    'Annulée' => 'bg-red-100 text-red-800'
+                                                ];
+                                                $badge_class = $badge_classes[$cmd['statut']] ?? 'bg-gray-100 text-gray-800';
+                                                ?>
+                                                <span class="px-3 py-1 rounded-full text-xs font-semibold <?= $badge_class ?>">
+                                                    <?= e($cmd['statut']) ?>
+                                                </span>
+                                            </td>
+                                            <td class="px-6 py-4">
+                                                <?php if ($cmd['statut_paiement'] === 'Payé'): ?>
+                                                    <span class="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                                                        <i class="fas fa-check-circle mr-1"></i>Payé
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+                                                        <i class="fas fa-times-circle mr-1"></i>Impayé
+                                                    </span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="px-6 py-4 text-sm text-gray-600">
+                                                <?= date('d/m/Y H:i', strtotime($cmd['created_at'])) ?>
+                                            </td>
+                                            <td class="px-6 py-4">
+                                                <button onclick="viewCommandeDetails(<?= $cmd['id'] ?>)"
+                                                        class="text-blue-600 hover:text-blue-800 mr-2">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    <?php
+                                    $numero--;
+                                    endforeach;
+                                    ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <!-- Fin Content Historique -->
+
             </main>
         </div>
     </div>
@@ -1470,6 +1822,29 @@ endforeach; ?>
             </div>
         </div>
     </div>
+
+  <!-- Modal de visualisation des détails de commande -->
+  <div id="detailsCommandeModal" class="fixed inset-0 bg-black/50 modal-overlay flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto">
+      <div class="p-8">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-6 border-b pb-4">
+          <h3 class="text-2xl font-bold text-gray-800">
+            <i class="fas fa-receipt text-emerald-600 mr-2"></i>
+            Détails de la commande
+          </h3>
+          <button onclick="closeDetailsModal()" class="text-gray-400 hover:text-gray-600">
+            <i class="fas fa-times text-2xl"></i>
+          </button>
+        </div>
+
+        <!-- Contenu -->
+        <div id="details-content">
+          <!-- Le contenu sera injecté ici par JavaScript -->
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- ===== MODAL DE COMMANDE MANUELLE (à ajouter avant </body>) ===== -->
 <div id="commandeManuelleModal" class="fixed inset-0 bg-black/50 modal-overlay flex items-center justify-center z-50 hidden">
@@ -2741,6 +3116,246 @@ function updateTrendIndicator(card, current, total) {
 
         // Exemple d'appel périodique (toutes les 10 minutes)
         setInterval(checkStatusUpdates, 600000);
+
+        // ===== GESTION DES TABS =====
+        function switchTab(tab) {
+            // Gérer les boutons
+            const tabs = ['actives', 'historique'];
+            tabs.forEach(t => {
+                const btn = document.getElementById(`tab-${t}`);
+                const content = document.getElementById(`content-${t}`);
+
+                if (t === tab) {
+                    btn.classList.add('bg-white', 'text-gray-900', 'shadow-sm');
+                    btn.classList.remove('text-gray-600');
+                    content.classList.remove('hidden');
+                } else {
+                    btn.classList.remove('bg-white', 'text-gray-900', 'shadow-sm');
+                    btn.classList.add('text-gray-600');
+                    content.classList.add('hidden');
+                }
+            });
+        }
+
+        // ===== FILTRES HISTORIQUE =====
+        function applyHistFilters() {
+            const search = document.getElementById('hist-search').value.toLowerCase();
+            const statut = document.getElementById('hist-statut').value;
+            const paiement = document.getElementById('hist-paiement').value;
+            const date = document.getElementById('hist-date').value;
+
+            const rows = document.querySelectorAll('#table-historique tbody tr');
+            let visibleCount = 0;
+            let totalMontant = 0;
+            let payeesCount = 0;
+
+            rows.forEach(row => {
+                let show = true;
+
+                // Filtre recherche
+                if (search) {
+                    const nom = row.dataset.nom || '';
+                    const email = row.dataset.email || '';
+                    const telephone = row.dataset.telephone || '';
+                    if (!nom.includes(search) && !email.includes(search) && !telephone.includes(search)) {
+                        show = false;
+                    }
+                }
+
+                // Filtre statut
+                if (statut && row.dataset.statut !== statut) {
+                    show = false;
+                }
+
+                // Filtre paiement
+                if (paiement && row.dataset.paiement !== paiement) {
+                    show = false;
+                }
+
+                // Filtre date
+                if (date && row.dataset.date !== date) {
+                    show = false;
+                }
+
+                if (show) {
+                    row.style.display = '';
+                    visibleCount++;
+
+                    // Calculer statistiques
+                    const montantText = row.querySelector('td:nth-child(5) span').textContent;
+                    const montant = parseFloat(montantText.replace(/[^0-9]/g, ''));
+                    totalMontant += montant;
+
+                    if (row.dataset.paiement === 'Payé') {
+                        payeesCount++;
+                    }
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            // Mettre à jour les statistiques
+            document.getElementById('hist-total').textContent = visibleCount;
+            document.getElementById('hist-montant').textContent = totalMontant.toLocaleString('fr-FR');
+            document.getElementById('hist-payees').textContent = payeesCount;
+            document.getElementById('hist-moyenne').textContent = visibleCount > 0 ? Math.round(totalMontant / visibleCount).toLocaleString('fr-FR') : 0;
+        }
+
+        // Attacher les événements de filtrage
+        document.addEventListener('DOMContentLoaded', function() {
+            const histSearch = document.getElementById('hist-search');
+            const histStatut = document.getElementById('hist-statut');
+            const histPaiement = document.getElementById('hist-paiement');
+            const histDate = document.getElementById('hist-date');
+
+            if (histSearch) histSearch.addEventListener('input', applyHistFilters);
+            if (histStatut) histStatut.addEventListener('change', applyHistFilters);
+            if (histPaiement) histPaiement.addEventListener('change', applyHistFilters);
+            if (histDate) histDate.addEventListener('change', applyHistFilters);
+        });
+
+        // ===== FONCTION POUR AFFICHER LES DÉTAILS D'UNE COMMANDE =====
+        async function viewCommandeDetails(id) {
+            try {
+                const response = await fetch(window.location.href, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `action=get_commande_details&id=${id}`
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    const cmd = data.commande;
+                    const produits = data.produits || [];
+
+                    // Construire le HTML des détails
+                    let html = `
+                        <div class="space-y-6">
+                            <!-- Informations client -->
+                            <div class="bg-gray-50 rounded-lg p-4">
+                                <h4 class="font-semibold text-gray-800 mb-3 flex items-center">
+                                    <i class="fas fa-user text-emerald-600 mr-2"></i>
+                                    Informations Client
+                                </h4>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <p class="text-sm text-gray-600">Nom</p>
+                                        <p class="font-medium">${cmd.nom_client || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-gray-600">Email</p>
+                                        <p class="font-medium">${cmd.email || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-gray-600">Téléphone</p>
+                                        <p class="font-medium">${cmd.telephone || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-gray-600">Table</p>
+                                        <p class="font-medium">#${cmd.num_table || 'N/A'}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Produits -->
+                            <div class="bg-gray-50 rounded-lg p-4">
+                                <h4 class="font-semibold text-gray-800 mb-3 flex items-center">
+                                    <i class="fas fa-utensils text-emerald-600 mr-2"></i>
+                                    Produits commandés
+                                </h4>
+                                <div class="space-y-2">
+                                    ${produits.map(p => `
+                                        <div class="flex justify-between items-center py-2 border-b">
+                                            <div class="flex items-center">
+                                                <span class="font-medium">${p.nom_plat || 'Produit'}</span>
+                                                <span class="text-gray-500 ml-2">x${p.quantite || 1}</span>
+                                            </div>
+                                            <span class="font-semibold">${(p.prix_unitaire * p.quantite).toLocaleString('fr-FR')} FCFA</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+
+                            <!-- Statuts et paiement -->
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="bg-gray-50 rounded-lg p-4">
+                                    <p class="text-sm text-gray-600 mb-2">Statut</p>
+                                    <span class="px-3 py-1 rounded-full text-sm font-semibold ${getBadgeClass(cmd.statut)}">
+                                        ${cmd.statut}
+                                    </span>
+                                </div>
+                                <div class="bg-gray-50 rounded-lg p-4">
+                                    <p class="text-sm text-gray-600 mb-2">Paiement</p>
+                                    <span class="px-3 py-1 rounded-full text-sm font-semibold ${cmd.statut_paiement === 'Payé' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                        <i class="fas fa-${cmd.statut_paiement === 'Payé' ? 'check' : 'times'}-circle mr-1"></i>
+                                        ${cmd.statut_paiement}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Total -->
+                            <div class="bg-emerald-50 rounded-lg p-4 border-2 border-emerald-200">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-lg font-semibold text-gray-800">Total</span>
+                                    <span class="text-2xl font-bold text-emerald-600">${(cmd.total || 0).toLocaleString('fr-FR')} FCFA</span>
+                                </div>
+                            </div>
+
+                            <!-- Date -->
+                            <div class="text-sm text-gray-600">
+                                <i class="fas fa-calendar mr-2"></i>
+                                Commandé le ${new Date(cmd.created_at).toLocaleDateString('fr-FR', {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                })}
+                            </div>
+                        </div>
+                    `;
+
+                    document.getElementById('details-content').innerHTML = html;
+                    document.getElementById('detailsCommandeModal').classList.remove('hidden');
+                } else {
+                    alert('Erreur: ' + (data.message || 'Impossible de charger les détails'));
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert('Erreur de connexion');
+            }
+        }
+
+        function getBadgeClass(statut) {
+            const classes = {
+                'En attente': 'bg-yellow-100 text-yellow-800',
+                'En préparation': 'bg-blue-100 text-blue-800',
+                'Prête': 'bg-green-100 text-green-800',
+                'Servie': 'bg-purple-100 text-purple-800',
+                'Annulée': 'bg-red-100 text-red-800',
+                'En cours': 'bg-blue-100 text-blue-800'
+            };
+            return classes[statut] || 'bg-gray-100 text-gray-800';
+        }
+
+        function closeDetailsModal() {
+            document.getElementById('detailsCommandeModal').classList.add('hidden');
+        }
+
+        // Live clock update
+        setInterval(() => {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const clockElement = document.getElementById('live-clock');
+            if (clockElement) {
+                clockElement.textContent = `${hours}:${minutes}:${seconds}`;
+            }
+        }, 1000);
     </script>
 </body>
 </html>
