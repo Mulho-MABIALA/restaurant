@@ -1284,5 +1284,8 @@ $categories = $conn->query("SELECT DISTINCT categorie FROM stocks ORDER BY categ
             <p>Total: <?= $total_ingredients ?> ingrédients | Alertes: <?= $nb_alertes ?></p>
         </div>
     </div>
+
+    <!-- Footer -->
+    <?php include 'footer.php'; ?>
 </body>
 </html>

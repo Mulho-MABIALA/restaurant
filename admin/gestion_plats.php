@@ -984,5 +984,8 @@ try {
             }
         }, 1000);
     </script>
+
+    <!-- Footer -->
+    <?php include 'footer.php'; ?>
 </body>
 </html>

@@ -369,8 +369,16 @@ if (!empty($statistiques['jours'])) {
     <title>Dashboard TimeTracker Pro</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+
     <style>
+        .glass-morphism {
+            background: rgba(17, 24, 39, 0.9);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
         :root {
             --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             --success-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
@@ -460,45 +468,25 @@ if (!empty($statistiques['jours'])) {
         }
     </style>
 </head>
-<body class="bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
+<body class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div class="flex h-screen overflow-hidden">
+        <!-- Sidebar -->
+        <?php include 'sidebar.php'; ?>
 
-    <!-- Header Navigation -->
-    <header class="gradient-bg text-white shadow-2xl relative overflow-hidden">
-        <div class="absolute inset-0 bg-black opacity-10"></div>
-        <div class="container mx-auto px-6 py-4 relative z-10">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-4">
-                    <div class="p-2 bg-white bg-opacity-20 rounded-lg">
-                        <i class="fas fa-clock text-3xl"></i>
-                    </div>
-                    <div>
-                        <h1 class="text-3xl font-bold">TimeTracker Pro</h1>
-                        <p class="text-blue-100 text-sm">Tableau de bord intelligent</p>
-                    </div>
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Header -->
+            <header class="glass-morphism shadow-2xl border-b border-white/10 sticky top-0 z-40">
+                <div class="px-4 sm:px-6 lg:px-8 py-4">
+                    <h1 class="text-3xl font-bold text-white">
+                        👥 Gestion des Présences
+                    </h1>
                 </div>
-                <nav class="hidden md:flex space-x-8">
-                    <a href="badgeuse.php" class="hover:text-blue-200 transition-colors duration-300 flex items-center space-x-2">
-                        <i class="fas fa-fingerprint"></i>
-                        <span>Badgeuse</span>
-                    </a>
-                    <a href="presence.php" class="text-blue-200 border-b-2 border-blue-200 pb-1 flex items-center space-x-2">
-                        <i class="fas fa-chart-line"></i>
-                        <span>Dashboard</span>
-                    </a>
-                    <a href="#" class="hover:text-blue-200 transition-colors duration-300 flex items-center space-x-2">
-                        <i class="fas fa-file-alt"></i>
-                        <span>Rapports</span>
-                    </a>
-                    <a href="logout.php" class="hover:text-red-200 transition-colors duration-300 flex items-center space-x-2">
-                        <i class="fas fa-sign-out-alt"></i>
-                        <span>Déconnexion</span>
-                    </a>
-                </nav>
-            </div>
-        </div>
-    </header>
+            </header>
 
-    <div class="container mx-auto px-6 py-8">
+            <!-- Main content area -->
+            <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+                <div class="container mx-auto">
         
         <!-- Messages d'erreur -->
         <?php if (isset($error_message)): ?>
@@ -931,10 +919,16 @@ if (!empty($statistiques['jours'])) {
                 <span>•</span>
                 <span>🕒 Dernière mise à jour: <?= date('d/m/Y H:i') ?></span>
                 <span>•</span>
-                <span>👥 <?= count($employes) ?> employés au total</span>
+                    <span>👥 <?= count($employes) ?> employés au total</span>
+                </div>
             </div>
         </div>
-    </div>
+    </main>
+
+    <!-- Footer -->
+    <?php include 'footer.php'; ?>
+</div>
+</div>
 
     <!-- Scripts JavaScript -->
     <script>

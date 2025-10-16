@@ -51,8 +51,9 @@
     $date_filter      = $_GET['date_filter'] ?? '';
     $personnes_filter = $_GET['personnes_filter'] ?? '';
 
-    // Marquer toutes les réservations comme lues (optionnel)
-    $conn->query("UPDATE reservations SET statut = 'lu' WHERE statut = 'non_lu'");
+    // DÉSACTIVÉ : Ne pas marquer automatiquement comme lu pour garder les notifications
+    // Si vous voulez que les réservations soient marquées comme lues automatiquement, décommentez la ligne ci-dessous
+    // $conn->query("UPDATE reservations SET statut = 'lu' WHERE statut = 'non_lu'");
 
     // Suppression via AJAX
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'supprimer') {
@@ -182,6 +183,7 @@
     }
   </script>
   <link rel="stylesheet" href="assets/css/cards-design.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     @keyframes fadeIn {
       from { opacity: 0; }
@@ -196,6 +198,88 @@
 #sidebar {
     background: rgba(15, 23, 42, 0.95) !important;
     z-index: 50;
+}
+
+/* Style pour les lignes cliquables du tableau */
+tbody tr.cursor-pointer {
+    position: relative;
+}
+
+tbody tr.cursor-pointer:hover {
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+    transform: translateY(-1px);
+}
+
+tbody tr.cursor-pointer:active {
+    transform: translateY(0);
+}
+
+/* Icône "voir" au survol de la ligne */
+tbody tr.cursor-pointer::before {
+    content: '\f06e'; /* FontAwesome eye icon */
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    position: absolute;
+    left: -30px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #3b82f6;
+    font-size: 16px;
+    opacity: 0;
+    transition: all 0.3s ease;
+    pointer-events: none;
+}
+
+tbody tr.cursor-pointer:hover::before {
+    opacity: 1;
+    left: -25px;
+}
+
+/* Style pour l'info-bulle */
+#info-bulle-ligne {
+    transition: all 0.3s ease;
+}
+
+/* Styles pour un tableau plus compact */
+table {
+    font-size: 0.875rem;
+}
+
+tbody td {
+    vertical-align: middle;
+}
+
+/* Hauteur de ligne fixe pour uniformité */
+tbody tr {
+    height: 65px;
+}
+
+/* Amélioration du hover sur les boutons */
+button[title] {
+    position: relative;
+}
+
+button[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    white-space: nowrap;
+    z-index: 100;
+    margin-bottom: 5px;
+}
+
+/* Masquer l'icône œil sur les petits écrans */
+@media (max-width: 1400px) {
+    tbody tr.cursor-pointer::before {
+        display: none;
+    }
 }
 
 
@@ -230,7 +314,75 @@
             </div>
 
             <!-- Contrôles -->
-            <div class="flex items-center space-x-4" x-data="{ profileOpen: false }">
+            <div class="flex items-center space-x-4" x-data="{ profileOpen: false, notificationsOpen: false }">
+              <!-- Badge de Notifications -->
+              <div class="relative">
+                <button
+                  @click="notificationsOpen = !notificationsOpen"
+                  id="notification-button"
+                  class="relative w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center hover:bg-slate-700 transition-all focus:outline-none"
+                  type="button"
+                >
+                  <i class="fas fa-bell text-white text-lg"></i>
+                  <span id="notification-badge" class="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center animate-pulse hidden">
+                    0
+                  </span>
+                </button>
+
+                <!-- Panneau de Notifications -->
+                <div
+                  x-show="notificationsOpen"
+                  @click.away="notificationsOpen = false"
+                  x-transition:enter="transition ease-out duration-200"
+                  x-transition:enter-start="transform opacity-0 scale-95 translate-y-2"
+                  x-transition:enter-end="transform opacity-100 scale-100 translate-y-0"
+                  x-transition:leave="transition ease-in duration-150"
+                  x-transition:leave-start="transform opacity-100 scale-100 translate-y-0"
+                  x-transition:leave-end="transform opacity-0 scale-95 translate-y-2"
+                  class="absolute right-0 mt-2 w-96 bg-slate-800 rounded-xl shadow-2xl overflow-hidden z-50 max-h-[500px] overflow-y-auto"
+                  style="display: none;"
+                >
+                  <!-- En-tête Notifications -->
+                  <div class="px-5 py-4 border-b border-slate-700 bg-gradient-to-r from-blue-600 to-indigo-600">
+                    <div class="flex items-center justify-between">
+                      <h3 class="text-white font-bold text-base">Notifications</h3>
+                      <span id="notification-count" class="bg-white text-blue-600 px-2 py-1 rounded-full text-xs font-bold">0</span>
+                    </div>
+                  </div>
+
+                  <!-- Réservations du jour -->
+                  <div class="px-5 py-3 border-b border-slate-700 bg-slate-750">
+                    <div class="flex items-center justify-between mb-2">
+                      <h4 class="text-teal-400 font-semibold text-sm flex items-center">
+                        <i class="fas fa-calendar-day mr-2"></i>
+                        Aujourd'hui (<span id="today-count">0</span>)
+                      </h4>
+                    </div>
+                    <div id="today-reservations" class="space-y-2 max-h-48 overflow-y-auto">
+                      <!-- Chargées dynamiquement -->
+                    </div>
+                  </div>
+
+                  <!-- Nouvelles Réservations -->
+                  <div class="px-5 py-3">
+                    <h4 class="text-amber-400 font-semibold text-sm mb-2 flex items-center">
+                      <i class="fas fa-bell mr-2 animate-pulse"></i>
+                      Nouvelles réservations
+                    </h4>
+                    <div id="new-reservations" class="space-y-2">
+                      <!-- Chargées dynamiquement -->
+                    </div>
+                  </div>
+
+                  <!-- Footer -->
+                  <div class="px-5 py-3 border-t border-slate-700 bg-slate-900">
+                    <button onclick="window.location.reload()" class="w-full text-center text-sm text-blue-400 hover:text-blue-300 font-medium">
+                      <i class="fas fa-sync-alt mr-2"></i>Actualiser
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <!-- Widget Date/Heure -->
               <div class="hidden sm:flex items-center space-x-5 bg-slate-800 rounded-xl px-5 py-3">
                 <div class="flex items-center space-x-3">
@@ -477,6 +629,13 @@
                 </svg>
                 Nouvelle réservation
               </button>
+
+              <button type="button" onclick="marquerToutCommeLu()" class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl">
+                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                </svg>
+                Marquer tout comme lu
+              </button>
             </div>
           </form>
         </div>
@@ -495,25 +654,41 @@
 
         <!-- Content Actives -->
         <div id="content-actives">
+        <!-- Info-bulle cliquable -->
+        <div id="info-bulle-ligne" class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4 rounded-lg animate-fade-in">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center">
+              <i class="fas fa-info-circle text-blue-500 text-xl mr-3"></i>
+              <p class="text-sm text-blue-800">
+                <strong>Astuce :</strong> Cliquez directement sur une ligne du tableau pour voir les détails de la réservation.
+                <span class="text-blue-600">✨</span>
+              </p>
+            </div>
+            <button onclick="fermerInfoBulle()" class="text-blue-400 hover:text-blue-600 transition-colors ml-4">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+
         <!-- Tableau des réservations avec bordures visibles -->
         <div class="bg-white rounded-2xl shadow-xl border-2 border-gray-200 overflow-hidden animate-slide-up">
-          <div class="overflow-x-auto">
-            <table class="w-full border-collapse">
+          <div class="overflow-x-auto" style="min-height: 400px;">
+            <table class="w-full border-collapse" style="min-width: 1200px;">
              <thead>
   <tr class="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-300">
-    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">
+    <th class="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300" style="width: 60px;">
       <div class="flex items-center">
-        <span class="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+        <span class="w-2 h-2 bg-blue-500 rounded-full mr-1"></span>
         N°
       </div>
     </th>
-    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Client</th>
-    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Contact</th>
-    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Réservation</th>
-    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Personnes</th>
-    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Message</th>
-    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Statut</th>
-    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
+    <th class="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300" style="width: 150px;">Client</th>
+    <th class="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300" style="width: 180px;">Contact</th>
+    <th class="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300" style="width: 140px;">Réservation</th>
+    <th class="px-3 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300" style="width: 80px;">Pers.</th>
+    <th class="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300" style="width: 200px;">Message</th>
+    <th class="px-3 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300" style="width: 100px;">Statut</th>
+    <th class="px-3 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider" style="width: 220px;">Actions</th>
   </tr>
 </thead>
 
@@ -526,122 +701,90 @@
         // Le numéro commence par le total et décrémente pour chaque ligne
         $numero = $total_count - $index;
     ?>
-	  <tr class="hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 group border-b border-gray-200"
-	      data-reservation-id="<?php echo $res['id']?>">
-	    <td class="px-6 py-4 whitespace-nowrap border-r border-gray-200">
-	      <div class="flex items-center">
-	        <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+	  <tr class="hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 group border-b border-gray-200 cursor-pointer"
+	      data-reservation-id="<?php echo $res['id']?>"
+	      onclick="ouvrirModalDepuisLigne(event, <?php echo $res['id']?>)"
+	      title="Cliquez pour voir les détails">
+	    <td class="px-3 py-3 whitespace-nowrap border-r border-gray-200">
+	      <div class="flex items-center justify-center">
+	        <div class="w-7 h-7 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
 	          <span class="text-white text-xs font-bold"><?php echo $numero?></span>
 	        </div>
 	      </div>
 	    </td>
-	        <td class="px-6 py-4 whitespace-nowrap border-r border-gray-200">
+	        <td class="px-3 py-3 border-r border-gray-200">
 	          <div class="flex items-center">
-	            <div class="w-10 h-10 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center mr-3">
-	              <span class="text-white font-bold text-sm"><?php echo strtoupper(substr(htmlspecialchars($res['nom'] ?? ''), 0, 1))?></span>
+	            <div class="w-8 h-8 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center mr-2 flex-shrink-0">
+	              <span class="text-white font-bold text-xs"><?php echo strtoupper(substr(htmlspecialchars($res['nom'] ?? ''), 0, 1))?></span>
 	            </div>
-	            <div>
-	              <div class="text-sm font-semibold text-gray-900"><?php echo htmlspecialchars($res['nom'] ?? '', ENT_QUOTES, 'UTF-8')?></div>
-	            </div>
+	            <div class="text-sm font-semibold text-gray-900 truncate"><?php echo htmlspecialchars($res['nom'] ?? '', ENT_QUOTES, 'UTF-8')?></div>
 	          </div>
 	        </td>
-	        <td class="px-6 py-4 whitespace-nowrap border-r border-gray-200">
-	          <div class="text-sm text-gray-900 font-medium"><?php echo htmlspecialchars($res['email'] ?? '', ENT_QUOTES, 'UTF-8')?></div>
-	          <div class="text-sm text-gray-500 flex items-center mt-1">
-	            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-	              <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/>
-	            </svg>
+	        <td class="px-3 py-3 border-r border-gray-200">
+	          <div class="text-xs text-gray-900 font-medium truncate"><?php echo htmlspecialchars($res['email'] ?? '', ENT_QUOTES, 'UTF-8')?></div>
+	          <div class="text-xs text-gray-500 flex items-center mt-0.5">
+	            <i class="fas fa-phone text-xs mr-1"></i>
 	            <?php echo htmlspecialchars($res['telephone'] ?? '', ENT_QUOTES, 'UTF-8')?>
 	          </div>
 	        </td>
-	        <td class="px-6 py-4 whitespace-nowrap border-r border-gray-200">
+	        <td class="px-3 py-3 border-r border-gray-200">
 	          <div class="flex items-center">
-	            <svg class="w-4 h-4 text-blue-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-	              <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/>
-	            </svg>
+	            <i class="fas fa-calendar text-blue-500 mr-1.5 text-xs"></i>
 	            <div>
-	              <div class="text-sm font-semibold text-gray-900"><?php echo htmlspecialchars($res['date_reservation'] ?? '', ENT_QUOTES, 'UTF-8')?></div>
-	              <div class="text-sm text-gray-500"><?php echo htmlspecialchars($res['heure_reservation'] ?? '', ENT_QUOTES, 'UTF-8')?></div>
+	              <div class="text-xs font-semibold text-gray-900"><?php echo date('d/m/Y', strtotime($res['date_reservation'] ?? ''))?></div>
+	              <div class="text-xs text-gray-500"><?php echo substr($res['heure_reservation'] ?? '', 0, 5)?></div>
 	            </div>
 	          </div>
 	        </td>
-	        <td class="px-6 py-4 whitespace-nowrap border-r border-gray-200">
-	          <div class="flex items-center">
-	            <div class="w-8 h-8 bg-gradient-to-r from-orange-400 to-red-500 rounded-full flex items-center justify-center mr-2">
-	              <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-	                <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
-	              </svg>
+	        <td class="px-3 py-3 border-r border-gray-200 text-center">
+	          <div class="flex items-center justify-center">
+	            <div class="w-7 h-7 bg-gradient-to-r from-orange-400 to-red-500 rounded-full flex items-center justify-center">
+	              <i class="fas fa-users text-white text-xs"></i>
 	            </div>
-	            <span class="text-sm font-bold text-gray-900"><?php echo htmlspecialchars($res['personnes'] ?? '', ENT_QUOTES, 'UTF-8')?></span>
+	            <span class="text-sm font-bold text-gray-900 ml-1"><?php echo htmlspecialchars($res['personnes'] ?? '', ENT_QUOTES, 'UTF-8')?></span>
 	          </div>
 	        </td>
 	        <!-- NOUVELLE COLONNE MESSAGE -->
-	        <td class="px-6 py-4 border-r border-gray-200">
-	          <div class="max-w-xs">
+	        <td class="px-3 py-3 border-r border-gray-200">
+	          <div class="max-w-[200px]">
 	            <?php if (! empty($res['message'])): ?>
 	              <div class="flex items-start">
-	                <svg class="w-4 h-4 text-blue-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-	                  <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd"/>
-	                </svg>
-	                <div class="text-sm text-gray-700 line-clamp-2">
-	                  <?php echo htmlspecialchars(substr($res['message'], 0, 100) . (strlen($res['message']) > 100 ? '...' : ''), ENT_QUOTES, 'UTF-8')?>
+	                <i class="fas fa-comment text-blue-500 text-xs mr-1 mt-0.5 flex-shrink-0"></i>
+	                <div class="text-xs text-gray-700 truncate">
+	                  <?php echo htmlspecialchars(substr($res['message'], 0, 40) . (strlen($res['message']) > 40 ? '...' : ''), ENT_QUOTES, 'UTF-8')?>
 	                </div>
 	              </div>
-	              <?php if (strlen($res['message']) > 100): ?>
-	                <button onclick="showFullMessage('<?php echo htmlspecialchars(addslashes($res['message']), ENT_QUOTES, 'UTF-8')?>')"
-	                        class="text-xs text-blue-600 hover:text-blue-800 mt-1 font-medium">
-	                  Voir plus
-	                </button>
-	              <?php endif; ?>
 <?php else: ?>
               <span class="text-xs text-gray-400 italic flex items-center">
-                <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
-                </svg>
-                Aucun message
+                <i class="fas fa-minus-circle text-xs mr-1"></i>
+                Aucun
               </span>
             <?php endif; ?>
           </div>
         </td>
-        <td class="px-6 py-4 whitespace-nowrap border-r border-gray-200">
+        <td class="px-3 py-3 border-r border-gray-200 text-center">
           <?php if ($res['statut'] === 'non_lu'): ?>
-            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-amber-100 to-orange-100 text-amber-800 border border-amber-200">
-              <svg class="w-3 h-3 mr-1 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
-              </svg>
-              Non lu
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+              <i class="fas fa-circle text-xs mr-1 animate-pulse"></i>
+              Nouveau
             </span>
           <?php else: ?>
-            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-800 border border-emerald-200">
-              <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-              </svg>
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+              <i class="fas fa-check-circle text-xs mr-1"></i>
               Lu
             </span>
           <?php endif; ?>
         </td>
-        <td class="px-6 py-4 whitespace-nowrap">
-          <div class="flex space-x-2">
-            <button onclick="openViewModal(<?php echo $res['id']?>)" class="inline-flex items-center px-3 py-2 text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-all duration-200 hover:scale-105 border border-green-200">
-              <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
-                <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
-              </svg>
-              Voir
+        <td class="px-3 py-3 text-center">
+          <div class="flex items-center justify-center gap-1">
+            <button onclick="openViewModal(<?php echo $res['id']?>)" class="inline-flex items-center px-2 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-all duration-200 border border-green-200" title="Voir les détails">
+              <i class="fas fa-eye text-sm"></i>
             </button>
-            <button onclick="openEditModal(<?php echo $res['id']?>)" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all duration-200 hover:scale-105 border border-blue-200">
-              <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
-              </svg>
-              Modifier
+            <button onclick="openEditModal(<?php echo $res['id']?>)" class="inline-flex items-center px-2 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all duration-200 border border-blue-200" title="Modifier">
+              <i class="fas fa-edit text-sm"></i>
             </button>
-            <button onclick="confirmDelete(<?php echo $res['id']?>, '<?php echo htmlspecialchars($res['nom'], ENT_QUOTES)?>', '<?php echo date('d/m/Y', strtotime($res['date_reservation']))?>')" class="inline-flex items-center px-3 py-2 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-all duration-200 hover:scale-105 border border-red-200">
-              <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" clip-rule="evenodd"/>
-                <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3l1.5 1.5a1 1 0 01-1.414 1.414L10 10.414V6a1 1 0 011-1z" clip-rule="evenodd"/>
-                <path fill-rule="evenodd" d="M3 5a2 2 0 012-2h1a1 1 0 000 2H5v11a2 2 0 002 2h6a2 2 0 002-2V5h-1a1 1 0 100-2h1a2 2 0 012 2v11a4 4 0 01-4 4H7a4 4 0 01-4-4V5z" clip-rule="evenodd"/>
-              </svg>
-              Supprimer
+            <button onclick="confirmDelete(<?php echo $res['id']?>, '<?php echo htmlspecialchars($res['nom'], ENT_QUOTES)?>', '<?php echo date('d/m/Y', strtotime($res['date_reservation']))?>')" class="inline-flex items-center px-2 py-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-all duration-200 border border-red-200" title="Supprimer">
+              <i class="fas fa-trash text-sm"></i>
             </button>
           </div>
         </td>
@@ -1921,7 +2064,293 @@ setInterval(() => {
         clockElement.textContent = `${hours}:${minutes}:${seconds}`;
     }
 }, 1000);
+
+// ========== SYSTÈME DE NOTIFICATIONS ==========
+
+let dernierNombreReservations = <?php echo $nombre_nouvelles; ?>;
+let notificationSoundPlayed = false;
+
+// Créer un son de notification (beep)
+function playNotificationSound() {
+    // Utiliser l'API Web Audio pour créer un son
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        oscillator.frequency.value = 800;
+        oscillator.type = 'sine';
+
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.5);
+    } catch (e) {
+        console.log('Notification sonore non disponible');
+    }
+}
+
+// Formater la date en français
+function formatDateFr(dateString) {
+    const date = new Date(dateString);
+    const options = { day: '2-digit', month: 'short', year: 'numeric' };
+    return date.toLocaleDateString('fr-FR', options);
+}
+
+// Formater l'heure
+function formatHeure(heureString) {
+    return heureString.substring(0, 5);
+}
+
+// Mettre à jour les notifications
+function updateNotifications() {
+    fetch('get_nouvelles_reservations.php')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const nombreNouvelles = data.nombre_nouvelles;
+                const reservationsAujourdhui = data.reservations_aujourdhui;
+                const dernieresReservations = data.dernieres_reservations;
+
+                // Mettre à jour les badges
+                const badge = document.getElementById('notification-badge');
+                const countSpan = document.getElementById('notification-count');
+                const todayCount = document.getElementById('today-count');
+
+                if (nombreNouvelles > 0) {
+                    badge.textContent = nombreNouvelles;
+                    badge.classList.remove('hidden');
+                    countSpan.textContent = nombreNouvelles;
+
+                    // Si le nombre a augmenté, jouer le son
+                    if (nombreNouvelles > dernierNombreReservations) {
+                        playNotificationSound();
+                        showToast('Nouvelle réservation reçue !', 'success');
+                    }
+                } else {
+                    badge.classList.add('hidden');
+                    countSpan.textContent = '0';
+                }
+
+                dernierNombreReservations = nombreNouvelles;
+
+                // Mettre à jour le compteur des réservations du jour
+                todayCount.textContent = reservationsAujourdhui.length;
+
+                // Afficher les réservations du jour
+                const todayContainer = document.getElementById('today-reservations');
+                if (reservationsAujourdhui.length > 0) {
+                    todayContainer.innerHTML = reservationsAujourdhui.map(res => `
+                        <div class="bg-slate-700 rounded-lg p-3 hover:bg-slate-600 transition-colors border border-teal-500/30">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="font-semibold text-white text-sm">${res.nom}</span>
+                                <span class="text-teal-400 font-bold text-sm">${formatHeure(res.heure_reservation)}</span>
+                            </div>
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="text-gray-400">${res.personnes} pers.</span>
+                                <span class="text-gray-400">${res.telephone}</span>
+                            </div>
+                            ${res.message ? `<div class="mt-2 text-xs text-gray-300 italic">"${res.message.substring(0, 50)}${res.message.length > 50 ? '...' : ''}"</div>` : ''}
+                        </div>
+                    `).join('');
+                } else {
+                    todayContainer.innerHTML = `
+                        <div class="text-center py-4 text-gray-400 text-sm">
+                            <i class="fas fa-calendar-times mb-2"></i>
+                            <p>Aucune réservation aujourd'hui</p>
+                        </div>
+                    `;
+                }
+
+                // Afficher les nouvelles réservations
+                const newContainer = document.getElementById('new-reservations');
+                if (dernieresReservations.length > 0) {
+                    newContainer.innerHTML = dernieresReservations.map(res => `
+                        <div class="bg-slate-700 rounded-lg p-3 hover:bg-slate-600 transition-colors border-l-4 border-amber-500">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="font-semibold text-white text-sm">${res.nom}</span>
+                                <span class="bg-amber-500 text-white px-2 py-0.5 rounded text-xs font-bold">NEW</span>
+                            </div>
+                            <div class="text-xs text-gray-400 mb-1">
+                                <i class="fas fa-calendar mr-1"></i>${formatDateFr(res.date_reservation)} à ${formatHeure(res.heure_reservation)}
+                            </div>
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="text-gray-400"><i class="fas fa-users mr-1"></i>${res.personnes} personnes</span>
+                                <span class="text-gray-400">${res.telephone}</span>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    newContainer.innerHTML = `
+                        <div class="text-center py-4 text-gray-400 text-sm">
+                            <i class="fas fa-check-circle mb-2"></i>
+                            <p>Tout est à jour !</p>
+                        </div>
+                    `;
+                }
+
+                // Afficher un rappel si des réservations sont prévues aujourd'hui
+                if (reservationsAujourdhui.length > 0 && !notificationSoundPlayed) {
+                    showToast(`📅 ${reservationsAujourdhui.length} réservation(s) prévue(s) aujourd'hui`, 'info');
+                    notificationSoundPlayed = true;
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Erreur lors de la récupération des notifications:', error);
+        });
+}
+
+// Afficher un toast de notification
+function showToast(message, type = 'info') {
+    // Créer le toast s'il n'existe pas
+    let toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.id = 'toast-container';
+        toastContainer.className = 'fixed top-20 right-4 z-50 space-y-2';
+        document.body.appendChild(toastContainer);
+    }
+
+    const colors = {
+        success: 'from-green-500 to-emerald-600',
+        info: 'from-blue-500 to-indigo-600',
+        warning: 'from-amber-500 to-orange-600',
+        error: 'from-red-500 to-rose-600'
+    };
+
+    const icons = {
+        success: 'fa-check-circle',
+        info: 'fa-info-circle',
+        warning: 'fa-exclamation-triangle',
+        error: 'fa-times-circle'
+    };
+
+    const toast = document.createElement('div');
+    toast.className = `bg-gradient-to-r ${colors[type]} text-white px-6 py-4 rounded-xl shadow-2xl transform transition-all duration-300 flex items-center space-x-3 min-w-[300px] animate-slide-in`;
+    toast.innerHTML = `
+        <i class="fas ${icons[type]} text-2xl"></i>
+        <span class="font-medium">${message}</span>
+    `;
+
+    toastContainer.appendChild(toast);
+
+    // Animer l'entrée
+    setTimeout(() => {
+        toast.style.transform = 'translateX(0)';
+        toast.style.opacity = '1';
+    }, 10);
+
+    // Supprimer après 5 secondes
+    setTimeout(() => {
+        toast.style.transform = 'translateX(400px)';
+        toast.style.opacity = '0';
+        setTimeout(() => {
+            toast.remove();
+        }, 300);
+    }, 5000);
+}
+
+// Ouvrir le modal de visualisation en cliquant sur la ligne
+function ouvrirModalDepuisLigne(event, reservationId) {
+    // Ne pas ouvrir le modal si on clique sur un bouton
+    if (event.target.closest('button')) {
+        return;
+    }
+
+    // Ouvrir le modal de visualisation
+    openViewModal(reservationId);
+}
+
+// Fermer l'info-bulle et sauvegarder la préférence
+function fermerInfoBulle() {
+    const infoBulle = document.getElementById('info-bulle-ligne');
+    if (infoBulle) {
+        infoBulle.style.opacity = '0';
+        infoBulle.style.transform = 'translateY(-20px)';
+        setTimeout(() => {
+            infoBulle.remove();
+        }, 300);
+
+        // Sauvegarder la préférence
+        localStorage.setItem('infoBulleLigneFermee', 'true');
+    }
+}
+
+// Vérifier au chargement si l'info-bulle doit être cachée
+document.addEventListener('DOMContentLoaded', function() {
+    const infoBulleFermee = localStorage.getItem('infoBulleLigneFermee');
+    if (infoBulleFermee === 'true') {
+        const infoBulle = document.getElementById('info-bulle-ligne');
+        if (infoBulle) {
+            infoBulle.style.display = 'none';
+        }
+    }
+});
+
+// Marquer toutes les réservations comme lues
+function marquerToutCommeLu() {
+    if (!confirm('Voulez-vous marquer toutes les réservations comme lues ?')) {
+        return;
+    }
+
+    fetch('marquer_lu.php', {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            // Mettre à jour les notifications
+            updateNotifications();
+            // Rafraîchir la page après 1 seconde
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            showToast('Erreur : ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Erreur:', error);
+        showToast('Erreur de connexion', 'error');
+    });
+}
+
+// Mettre à jour les notifications au chargement de la page
+document.addEventListener('DOMContentLoaded', function() {
+    updateNotifications();
+
+    // Mettre à jour toutes les 30 secondes
+    setInterval(updateNotifications, 30000);
+});
+
+// Ajouter les styles pour l'animation du toast
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slide-in {
+        from {
+            transform: translateX(400px);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    .animate-slide-in {
+        animation: slide-in 0.3s ease-out;
+    }
+`;
+document.head.appendChild(style);
+
   </script>
 
+  <!-- Footer -->
+  <?php include 'footer.php'; ?>
 </body>
 </html>

@@ -9,25 +9,32 @@ if (!isset($_SESSION['admin_logged_in'])) {
 }
 
 /**
- * Fonction pour générer un code numérique unique
- * Utilise une méthode séquentielle garantissant l'unicité
+ * Fonction pour générer un code numérique unique à 5 chiffres
+ * Utilise une méthode aléatoire avec vérification pour garantir l'unicité
  */
 function generateUniqueCode($conn) {
-    // Trouver le dernier code utilisé
-    $stmt = $conn->prepare("
-        SELECT MAX(CAST(code_numerique AS UNSIGNED)) as max_code 
-        FROM employes 
-        WHERE code_numerique REGEXP '^[0-9]+$' 
-        AND code_numerique IS NOT NULL
-    ");
-    $stmt->execute();
-    $result = $stmt->fetch();
-    
-    // Si aucun code existe, commencer à 1000000000 (1 milliard)
-    // Sinon, prendre le suivant
-    $next_code = ($result && $result['max_code']) ? $result['max_code'] + 1 : 1000000000;
-    
-    return (string)$next_code;
+    $max_attempts = 100;
+    $attempt = 0;
+
+    do {
+        // Générer un code à 5 chiffres aléatoire (10000 à 99999)
+        $code = sprintf('%05d', mt_rand(10000, 99999));
+
+        // Vérifier s'il est unique
+        $stmt = $conn->prepare("SELECT COUNT(*) FROM employes WHERE code_numerique = ?");
+        $stmt->execute([$code]);
+        $exists = $stmt->fetchColumn() > 0;
+
+        $attempt++;
+
+        if (!$exists) {
+            return $code;
+        }
+
+    } while ($attempt < $max_attempts);
+
+    // Si échec après 100 tentatives, utiliser une combinaison timestamp
+    return substr(time(), -5);
 }
 
 /**
@@ -39,26 +46,64 @@ function isCodeUnique($conn, $code) {
     return !$stmt->fetch();
 }
 
+// Action pour nettoyer les doublons
+if (isset($_POST['fix_duplicates'])) {
+    try {
+        $conn->beginTransaction();
+
+        // Trouver tous les doublons
+        $stmt = $conn->query("
+            SELECT code_numerique, GROUP_CONCAT(id ORDER BY id) as ids
+            FROM employes
+            WHERE code_numerique IS NOT NULL AND code_numerique != ''
+            GROUP BY code_numerique
+            HAVING COUNT(*) > 1
+        ");
+        $doublons = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $corriges = 0;
+        foreach ($doublons as $doublon) {
+            $ids = explode(',', $doublon['ids']);
+            // Garder le premier ID, régénérer pour les autres
+            array_shift($ids); // Retirer le premier (on le garde)
+
+            foreach ($ids as $employee_id) {
+                $new_code = generateUniqueCode($conn);
+                $update_stmt = $conn->prepare("UPDATE employes SET code_numerique = ? WHERE id = ?");
+                $update_stmt->execute([$new_code, $employee_id]);
+                $corriges++;
+            }
+        }
+
+        $conn->commit();
+        $message = "✅ $corriges doublon(s) corrigé(s)";
+
+    } catch (Exception $e) {
+        $conn->rollBack();
+        $message = "❌ Erreur lors de la correction: " . $e->getMessage();
+    }
+}
+
 // Action pour régénérer les codes manquants
 if (isset($_POST['regenerate_codes'])) {
     try {
         $conn->beginTransaction();
-        
+
         $stmt = $conn->prepare("
-            SELECT id FROM employes 
+            SELECT id FROM employes
             WHERE statut = 'actif' AND (code_numerique IS NULL OR code_numerique = '')
             ORDER BY id
         ");
         $stmt->execute();
         $employes_sans_codes = $stmt->fetchAll(PDO::FETCH_COLUMN);
-        
+
         $codes_generes = 0;
         $erreurs = [];
-        
+
         foreach ($employes_sans_codes as $employee_id) {
             // Générer un code unique
             $numeric_code = generateUniqueCode($conn);
-            
+
             // Double vérification de l'unicité (sécurité supplémentaire)
             if (isCodeUnique($conn, $numeric_code)) {
                 $update_stmt = $conn->prepare("UPDATE employes SET code_numerique = ? WHERE id = ?");
@@ -71,12 +116,12 @@ if (isset($_POST['regenerate_codes'])) {
                 // Si par miracle le code n'est pas unique, en générer un autre
                 $attempt = 0;
                 $max_attempts = 10;
-                
+
                 while ($attempt < $max_attempts && !isCodeUnique($conn, $numeric_code)) {
                     $numeric_code = generateUniqueCode($conn);
                     $attempt++;
                 }
-                
+
                 if (isCodeUnique($conn, $numeric_code)) {
                     $update_stmt = $conn->prepare("UPDATE employes SET code_numerique = ? WHERE id = ?");
                     if ($update_stmt->execute([$numeric_code, $employee_id])) {
@@ -87,14 +132,14 @@ if (isset($_POST['regenerate_codes'])) {
                 }
             }
         }
-        
+
         $conn->commit();
-        
+
         $message = "✅ Codes générés pour $codes_generes employé(s)";
         if (!empty($erreurs)) {
             $message .= "<br>⚠️ Erreurs: " . implode("<br>", $erreurs);
         }
-        
+
     } catch (Exception $e) {
         $conn->rollBack();
         $message = "❌ Erreur lors de la génération: " . $e->getMessage();
@@ -209,7 +254,15 @@ $has_duplicates = !empty($doublons);
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     <style>
+        .glass-morphism {
+            background: rgba(17, 24, 39, 0.9);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
         @media print {
             .no-print { display: none !important; }
             .badge { page-break-after: auto; margin: 10mm; }
@@ -247,10 +300,26 @@ $has_duplicates = !empty($doublons);
         }
     </style>
 </head>
-<body class="bg-gray-100 p-4">
-    <div class="max-w-6xl mx-auto">
-        <div class="bg-white shadow-lg rounded-xl p-6 mb-6">
-            <h1 class="text-3xl font-bold mb-6 text-center text-indigo-600">Génération des badges QR</h1>
+<body class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div class="flex h-screen overflow-hidden">
+        <!-- Sidebar -->
+        <?php include 'sidebar.php'; ?>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Header -->
+            <header class="glass-morphism shadow-2xl border-b border-white/10 sticky top-0 z-40">
+                <div class="px-4 sm:px-6 lg:px-8 py-4">
+                    <h1 class="text-3xl font-bold text-white">
+                        🏷️ Générer des Badges
+                    </h1>
+                </div>
+            </header>
+
+            <!-- Main content area -->
+            <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+                <div class="max-w-6xl mx-auto">
+                    <div class="bg-white shadow-lg rounded-xl p-6 mb-6">
             
             <?php if (isset($message)): ?>
                 <div class="mb-4 p-4 rounded-lg <?= strpos($message, '❌') !== false ? 'bg-red-100 border border-red-400 text-red-700' : (strpos($message, '⚠️') !== false ? 'bg-yellow-100 border border-yellow-400 text-yellow-700' : 'bg-green-100 border border-green-400 text-green-700') ?>">
@@ -260,10 +329,21 @@ $has_duplicates = !empty($doublons);
             
             <?php if ($has_duplicates): ?>
                 <div class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
-                    <strong>⚠️ ATTENTION:</strong> Des doublons ont été détectés dans la base de données !
-                    <?php foreach ($doublons as $doublon): ?>
-                        <br>Code: <?= htmlspecialchars($doublon['code_numerique']) ?> (<?= $doublon['count'] ?> fois)
-                    <?php endforeach; ?>
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <strong>⚠️ ATTENTION:</strong> Des doublons ont été détectés dans la base de données !
+                            <?php foreach ($doublons as $doublon): ?>
+                                <br>Code: <?= htmlspecialchars($doublon['code_numerique']) ?> (<?= $doublon['count'] ?> fois)
+                            <?php endforeach; ?>
+                        </div>
+                        <form method="POST" class="ml-4">
+                            <button type="submit" name="fix_duplicates"
+                                    class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium shadow-lg transition-all"
+                                    onclick="return confirm('Corriger les doublons en générant de nouveaux codes pour les entrées dupliquées ?')">
+                                🔧 Corriger les doublons
+                            </button>
+                        </form>
+                    </div>
                 </div>
             <?php endif; ?>
             
@@ -592,5 +672,13 @@ $has_duplicates = !empty($doublons);
         });
     });
     </script>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Footer -->
+            <?php include 'footer.php'; ?>
+        </div>
+    </div>
 </body>
 </html>

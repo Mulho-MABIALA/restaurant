@@ -23,6 +23,9 @@ if ($adminId && isset($conn)) {
         $userRole = '';
     }
 }
+
+// Déterminer la page actuelle
+$currentPage = basename($_SERVER['PHP_SELF']);
 ?>
 
 <!DOCTYPE html>
@@ -117,14 +120,19 @@ if ($adminId && isset($conn)) {
             left: -100%;
             width: 100%;
             height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.15), transparent);
+            background: linear-gradient(90deg,
+                transparent,
+                rgba(99, 102, 241, 0.12),
+                rgba(129, 140, 248, 0.15),
+                transparent
+            );
             transition: left 0.8s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        
+
         .nav-item:hover::before {
             left: 100%;
         }
-        
+
         .nav-item::after {
             content: '';
             position: absolute;
@@ -132,25 +140,34 @@ if ($adminId && isset($conn)) {
             left: 0;
             width: 3px;
             height: 0;
-            background: linear-gradient(to bottom, #10b981, #34d399);
+            background: linear-gradient(to bottom, #818cf8, #6366f1);
             transition: all 0.3s ease;
             transform: translateY(-50%);
             border-radius: 0 3px 3px 0;
+            box-shadow: 0 0 8px rgba(99, 102, 241, 0.4);
         }
-        
+
         .nav-item:hover::after {
             height: 70%;
         }
         
         .active-nav {
-            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.3) 100%);
-            border: 1px solid rgba(16, 185, 129, 0.4);
-            box-shadow: 0 8px 32px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            background: linear-gradient(135deg,
+                rgba(79, 70, 229, 0.15) 0%,
+                rgba(99, 102, 241, 0.25) 50%,
+                rgba(79, 70, 229, 0.15) 100%
+            );
+            border: 1px solid rgba(99, 102, 241, 0.4);
+            box-shadow:
+                0 0 20px rgba(79, 70, 229, 0.2),
+                0 4px 16px rgba(99, 102, 241, 0.15),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
         }
-        
+
         .active-nav::after {
             height: 70%;
-            background: linear-gradient(to bottom, #34d399, #10b981);
+            background: linear-gradient(to bottom, #6366f1, #4f46e5);
+            box-shadow: 0 0 12px rgba(99, 102, 241, 0.6);
         }
         
         .nav-icon {
@@ -159,14 +176,14 @@ if ($adminId && isset($conn)) {
         
         .nav-item:hover .nav-icon {
             transform: scale(1.15) rotate(8deg);
-            color: #10b981;
-            filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.4));
+            color: #818cf8;
+            filter: drop-shadow(0 0 10px rgba(129, 140, 248, 0.5));
         }
-        
+
         .active-nav .nav-icon {
-            color: #34d399;
+            color: #a5b4fc;
             transform: scale(1.1);
-            filter: drop-shadow(0 0 8px rgba(52, 211, 153, 0.4));
+            filter: drop-shadow(0 0 12px rgba(165, 180, 252, 0.6));
         }
         
         .danger-hover:hover {
@@ -181,10 +198,18 @@ if ($adminId && isset($conn)) {
         }
         
         .sidebar-gradient {
-            background: linear-gradient(180deg, #0f172a 0%, #111827 25%, #1f2937 75%, #111827 100%);
+            background: linear-gradient(180deg,
+                #0a0e1a 0%,
+                #0f1419 15%,
+                #111827 30%,
+                #1a1f2e 60%,
+                #111827 85%,
+                #0f1419 100%
+            );
             position: relative;
+            box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
         }
-        
+
         .sidebar-gradient::before {
             content: '';
             position: absolute;
@@ -192,7 +217,10 @@ if ($adminId && isset($conn)) {
             left: 0;
             right: 0;
             bottom: 0;
-            background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, transparent 50%, rgba(245, 158, 11, 0.05) 100%);
+            background:
+                radial-gradient(circle at 20% 30%, rgba(79, 70, 229, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(16, 185, 129, 0.06) 0%, transparent 50%),
+                linear-gradient(135deg, rgba(99, 102, 241, 0.03) 0%, transparent 60%);
             pointer-events: none;
         }
         
@@ -210,12 +238,12 @@ if ($adminId && isset($conn)) {
         }
         
         .scrollbar-thin::-webkit-scrollbar-thumb {
-            background: linear-gradient(to bottom, rgba(16, 185, 129, 0.6), rgba(16, 185, 129, 0.3));
+            background: linear-gradient(to bottom, rgba(99, 102, 241, 0.6), rgba(79, 70, 229, 0.4));
             border-radius: 6px;
         }
-        
+
         .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-            background: linear-gradient(to bottom, rgba(16, 185, 129, 0.8), rgba(16, 185, 129, 0.5));
+            background: linear-gradient(to bottom, rgba(129, 140, 248, 0.8), rgba(99, 102, 241, 0.6));
         }
         
         .mobile-overlay {
@@ -233,10 +261,11 @@ if ($adminId && isset($conn)) {
             position: absolute;
             left: 0;
             bottom: 0;
-            width: 20px;
+            width: 24px;
             height: 2px;
-            background: linear-gradient(to right, #10b981, #34d399);
+            background: linear-gradient(to right, #6366f1, #818cf8, #a5b4fc);
             border-radius: 1px;
+            box-shadow: 0 0 6px rgba(99, 102, 241, 0.5);
         }
         
         .nav-description {
@@ -315,11 +344,12 @@ if ($adminId && isset($conn)) {
             top: 50%;
             width: 2px;
             height: 0;
-            background: #10b981;
+            background: linear-gradient(to bottom, #818cf8, #6366f1);
             transition: height 0.3s ease;
             transform: translateY(-50%);
+            box-shadow: 0 0 6px rgba(99, 102, 241, 0.5);
         }
-        
+
         .dropdown-item:hover::before {
             height: 60%;
         }
@@ -398,7 +428,7 @@ if ($adminId && isset($conn)) {
 </button>
 
 <!-- Sidebar -->
-<aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-80 sidebar-gradient shadow-2xl sidebar-mobile lg:relative lg:translate-x-0 animate-slide-in-left transition-all duration-300">
+<aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-80 sidebar-gradient shadow-2xl sidebar-mobile lg:relative lg:translate-x-0 transition-all duration-300">
 
     <!-- Floating decorative elements -->
     <div class="floating-elements sidebar-expanded-only">
@@ -412,13 +442,13 @@ if ($adminId && isset($conn)) {
         <!-- Logo et titre (masqué en mode réduit) -->
         <div class="flex items-center space-x-4 group cursor-pointer sidebar-expanded-only">
             <div class="relative">
-                <div class="w-14 h-14 bg-gradient-to-br from-primary via-primary-light to-accent rounded-2xl flex items-center justify-center logo-glow shadow-lg">
-                    <i class="fas fa-leaf text-white text-2xl"></i>
+                <div class="w-14 h-14 bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center logo-glow shadow-lg shadow-indigo-500/50">
+                    <i class="fas fa-utensils text-white text-2xl"></i>
                 </div>
-                <div class="absolute -top-2 -right-2 w-5 h-5 bg-gradient-to-r from-accent to-accent-light rounded-full animate-bounce-subtle shadow-lg"></div>
+                <div class="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-indigo-400 to-purple-500 rounded-full animate-bounce-subtle shadow-lg"></div>
             </div>
             <div>
-                <h1 class="text-2xl font-bold bg-gradient-to-r from-primary via-accent to-primary-light bg-clip-text text-transparent">
+                <h1 class="text-2xl font-bold bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-500 bg-clip-text text-transparent">
                     Jungle
                 </h1>
                 <p class="text-sm text-gray-400 font-medium opacity-90">Restaurant Admin</p>
@@ -443,10 +473,10 @@ if ($adminId && isset($conn)) {
         <?php if (canAccess($conn, $adminId, 'dashboard')): ?>
         <div class="space-y-3 animate-fade-in">
             <h2 class="section-title text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 flex items-center pb-2">
-                <div class="w-2 h-2 bg-primary rounded-full mr-3 animate-pulse-soft"></div>
+                <div class="w-2 h-2 bg-indigo-500 rounded-full mr-3 animate-pulse-soft shadow-lg shadow-indigo-500/50"></div>
                 Tableau de bord
             </h2>
-            <a href="dashboard.php" class="nav-item active-nav flex items-center px-4 py-4 text-white rounded-2xl transition-all duration-300 hover:shadow-2xl group">
+            <a href="dashboard.php" class="nav-item <?php echo ($currentPage === 'dashboard.php') ? 'active-nav' : ''; ?> flex items-center px-4 py-4 <?php echo ($currentPage === 'dashboard.php') ? 'text-white' : 'text-gray-300 hover:bg-surface-lighter/50 hover:text-white'; ?> rounded-2xl transition-all duration-300 hover:shadow-2xl group">
                 <div class="flex items-center justify-center w-12 h-12 bg-white/10 rounded-xl mr-4 group-hover:bg-white/20 transition-all duration-300 shimmer">
                     <i class="fas fa-chart-bar nav-icon text-lg"></i>
                 </div>
@@ -463,12 +493,12 @@ if ($adminId && isset($conn)) {
         <?php if (anyVisible($conn, $adminId, ['reservations', 'commandes', 'gestion_plats', 'categories_plats', 'gallery', 'admin_evenements', 'horaires', 'admin_newsletter', 'avis_admin'])): ?>
         <div class="space-y-3 animate-fade-in" style="animation-delay: 0.1s">
             <h2 class="section-title text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 flex items-center pb-2">
-                <div class="w-2 h-2 bg-accent rounded-full mr-3 animate-pulse-soft" style="animation-delay: 0.5s"></div>
+                <div class="w-2 h-2 bg-purple-500 rounded-full mr-3 animate-pulse-soft shadow-lg shadow-purple-500/50" style="animation-delay: 0.5s"></div>
                 Gestion Restaurant
             </h2>
             <div class="space-y-2">
                 <?php if (canAccess($conn, $adminId, 'reservations')): ?>
-                <a href="reservations.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
+                <a href="reservations.php" class="nav-item <?php echo ($currentPage === 'reservations.php') ? 'active-nav' : ''; ?> flex items-center px-4 py-4 <?php echo ($currentPage === 'reservations.php') ? 'text-white' : 'text-gray-300 hover:bg-surface-lighter/50 hover:text-white'; ?> rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-calendar-check nav-icon text-lg"></i>
                     </div>
@@ -481,7 +511,7 @@ if ($adminId && isset($conn)) {
                 <?php endif; ?>
                 
                 <?php if (canAccess($conn, $adminId, 'commandes')): ?>
-                <a href="commandes.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
+                <a href="commandes.php" class="nav-item <?php echo ($currentPage === 'commandes.php') ? 'active-nav' : ''; ?> flex items-center px-4 py-4 <?php echo ($currentPage === 'commandes.php') ? 'text-white' : 'text-gray-300 hover:bg-surface-lighter/50 hover:text-white'; ?> rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-receipt nav-icon text-lg"></i>
                     </div>
@@ -492,9 +522,22 @@ if ($adminId && isset($conn)) {
                     <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
                 </a>
                 <?php endif; ?>
-                
+
+                <?php if (canAccess($conn, $adminId, 'cuisine')): ?>
+                <a href="cuisine.php" class="nav-item <?php echo ($currentPage === 'cuisine.php') ? 'active-nav' : ''; ?> flex items-center px-4 py-4 <?php echo ($currentPage === 'cuisine.php') ? 'text-white' : 'text-gray-300 hover:bg-surface-lighter/50 hover:text-white'; ?> rounded-2xl transition-all duration-300 group hover:shadow-xl">
+                    <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
+                        <i class="fas fa-fire nav-icon text-lg"></i>
+                    </div>
+                    <div class="flex-1">
+                        <span class="font-medium text-base">Cuisine</span>
+                        <p class="nav-description text-sm text-gray-400 opacity-80">Préparation des plats</p>
+                    </div>
+                    <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
+                </a>
+                <?php endif; ?>
+
                 <?php if (canAccess($conn, $adminId, 'gestion_plats')): ?>
-                <a href="gestion_plats.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
+                <a href="gestion_plats.php" class="nav-item <?php echo ($currentPage === 'gestion_plats.php') ? 'active-nav' : ''; ?> flex items-center px-4 py-4 <?php echo ($currentPage === 'gestion_plats.php') ? 'text-white' : 'text-gray-300 hover:bg-surface-lighter/50 hover:text-white'; ?> rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-utensils nav-icon text-lg"></i>
                     </div>
@@ -507,7 +550,7 @@ if ($adminId && isset($conn)) {
                 <?php endif; ?>
                 
                 <?php if (canAccess($conn, $adminId, 'categories_plats')): ?>
-                <a href="categories_plats.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
+                <a href="categories_plats.php" class="nav-item <?php echo ($currentPage === 'categories_plats.php') ? 'active-nav' : ''; ?> flex items-center px-4 py-4 <?php echo ($currentPage === 'categories_plats.php') ? 'text-white' : 'text-gray-300 hover:bg-surface-lighter/50 hover:text-white'; ?> rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-folder nav-icon text-lg"></i>
                     </div>
@@ -520,7 +563,7 @@ if ($adminId && isset($conn)) {
                 <?php endif; ?>
         
                 <?php if (canAccess($conn, $adminId, 'gallery')): ?>
-                <a href="gallery.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
+                <a href="gallery.php" class="nav-item <?php echo ($currentPage === 'gallery.php') ? 'active-nav' : ''; ?> flex items-center px-4 py-4 <?php echo ($currentPage === 'gallery.php') ? 'text-white' : 'text-gray-300 hover:bg-surface-lighter/50 hover:text-white'; ?> rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-images nav-icon text-lg"></i>
                     </div>
@@ -533,7 +576,7 @@ if ($adminId && isset($conn)) {
                 <?php endif; ?>
                 
                 <?php if (canAccess($conn, $adminId, 'admin_evenements')): ?>
-                <a href="admin_evenements.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
+                <a href="admin_evenements.php" class="nav-item <?php echo ($currentPage === 'admin_evenements.php') ? 'active-nav' : ''; ?> flex items-center px-4 py-4 <?php echo ($currentPage === 'admin_evenements.php') ? 'text-white' : 'text-gray-300 hover:bg-surface-lighter/50 hover:text-white'; ?> rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-calendar-alt nav-icon text-lg"></i>
                     </div>
@@ -546,7 +589,7 @@ if ($adminId && isset($conn)) {
                 <?php endif; ?>
                 
                 <?php if (canAccess($conn, $adminId, 'horaires')): ?>
-                <a href="horaires.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
+                <a href="horaires.php" class="nav-item <?php echo ($currentPage === 'horaires.php') ? 'active-nav' : ''; ?> flex items-center px-4 py-4 <?php echo ($currentPage === 'horaires.php') ? 'text-white' : 'text-gray-300 hover:bg-surface-lighter/50 hover:text-white'; ?> rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-clock nav-icon text-lg"></i>
                     </div>
@@ -559,7 +602,7 @@ if ($adminId && isset($conn)) {
                 <?php endif; ?>
                 
                 <?php if (canAccess($conn, $adminId, 'admin_newsletter')): ?>
-                <a href="admin_newsletter.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
+                <a href="admin_newsletter.php" class="nav-item <?php echo ($currentPage === 'admin_newsletter.php') ? 'active-nav' : ''; ?> flex items-center px-4 py-4 <?php echo ($currentPage === 'admin_newsletter.php') ? 'text-white' : 'text-gray-300 hover:bg-surface-lighter/50 hover:text-white'; ?> rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-envelope nav-icon text-lg"></i>
                     </div>
@@ -572,7 +615,7 @@ if ($adminId && isset($conn)) {
                 <?php endif; ?>
         
                 <?php if (canAccess($conn, $adminId, 'avis_admin')): ?>
-                <a href="avis_admin.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
+                <a href="avis_admin.php" class="nav-item <?php echo ($currentPage === 'avis_admin.php') ? 'active-nav' : ''; ?> flex items-center px-4 py-4 <?php echo ($currentPage === 'avis_admin.php') ? 'text-white' : 'text-gray-300 hover:bg-surface-lighter/50 hover:text-white'; ?> rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-comments nav-icon text-lg"></i>
                     </div>
@@ -753,12 +796,12 @@ if ($adminId && isset($conn)) {
         <?php if (anyVisible($conn, $adminId, ['gestion_stock', 'gestion_employe', 'gestion_postes', 'planification_horaires', 'gestion_paie', 'badgeuse', 'presence', 'generate_badge', 'admin_gestion', 'gestion_droits', 'statistiques'])): ?>
         <div class="space-y-3 animate-fade-in" style="animation-delay: 0.2s">
             <h2 class="section-title text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 flex items-center pb-2">
-                <div class="w-2 h-2 bg-blue-500 rounded-full mr-3 animate-pulse-soft" style="animation-delay: 1s"></div>
+                <div class="w-2 h-2 bg-cyan-500 rounded-full mr-3 animate-pulse-soft shadow-lg shadow-cyan-500/50" style="animation-delay: 1s"></div>
                 Administration
             </h2>
             <div class="space-y-2">
                 <?php if (canAccess($conn, $adminId, 'gestion_stock')): ?>
-                <a href="gestion_stock.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
+                <a href="gestion_stock.php" class="nav-item <?php echo ($currentPage === 'gestion_stock.php') ? 'active-nav' : ''; ?> flex items-center px-4 py-4 <?php echo ($currentPage === 'gestion_stock.php') ? 'text-white' : 'text-gray-300 hover:bg-surface-lighter/50 hover:text-white'; ?> rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-boxes nav-icon text-lg"></i>
                     </div>
@@ -839,23 +882,31 @@ if ($adminId && isset($conn)) {
                                 <i class="fas fa-chevron-down text-xs transition-transform duration-300"
                                    :class="openPointage ? 'rotate-180' : ''"></i>
                             </button>
-                            
+
                             <!-- Sous-menus Pointage -->
-                            <div x-show="openPointage" class="ml-8 space-y-1 mt-1">
+                            <div x-show="openPointage"
+                                 x-transition:enter="transition ease-out duration-200"
+                                 x-transition:enter-start="opacity-0 transform -translate-y-2"
+                                 x-transition:enter-end="opacity-100 transform translate-y-0"
+                                 x-transition:leave="transition ease-in duration-150"
+                                 x-transition:leave-start="opacity-100 transform translate-y-0"
+                                 x-transition:leave-end="opacity-0 transform -translate-y-2"
+                                 class="ml-8 space-y-1 mt-1"
+                                 style="display: none;">
                                 <?php if (canAccess($conn, $adminId, 'badgeuse')): ?>
                                 <a href="badgeuse.php" class="dropdown-item flex items-center px-4 py-2 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                                     <i class="fas fa-id-card mr-3 w-5 text-sm"></i>
                                     <span class="font-medium">Badgeuse</span>
                                 </a>
                                 <?php endif; ?>
-                                
+
                                 <?php if (canAccess($conn, $adminId, 'presence')): ?>
                                 <a href="presence.php" class="dropdown-item flex items-center px-4 py-2 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                                     <i class="fas fa-user-check mr-3 w-5 text-sm"></i>
                                     <span class="font-medium">Présence</span>
                                 </a>
                                 <?php endif; ?>
-                                
+
                                 <?php if (canAccess($conn, $adminId, 'generate_badge')): ?>
                                 <a href="generate_badge.php" class="dropdown-item flex items-center px-4 py-2 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                                     <i class="fas fa-barcode mr-3 w-5 text-sm"></i>
@@ -870,7 +921,7 @@ if ($adminId && isset($conn)) {
                 <?php endif; ?>
                 
                 <?php if (canAccess($conn, $adminId, 'admin_gestion')): ?>
-                <a href="admin_gestion.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
+                <a href="admin_gestion.php" class="nav-item <?php echo ($currentPage === 'admin_gestion.php') ? 'active-nav' : ''; ?> flex items-center px-4 py-4 <?php echo ($currentPage === 'admin_gestion.php') ? 'text-white' : 'text-gray-300 hover:bg-surface-lighter/50 hover:text-white'; ?> rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-users-cog nav-icon text-lg"></i>
                     </div>
@@ -883,7 +934,7 @@ if ($adminId && isset($conn)) {
                 <?php endif; ?>
                 
                 <?php if (canAccess($conn, $adminId, 'gestion_droits') || $userRole === 'superadmin'): ?>
-                <a href="gestion_droits.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
+                <a href="gestion_droits.php" class="nav-item <?php echo ($currentPage === 'gestion_droits.php') ? 'active-nav' : ''; ?> flex items-center px-4 py-4 <?php echo ($currentPage === 'gestion_droits.php') ? 'text-white' : 'text-gray-300 hover:bg-surface-lighter/50 hover:text-white'; ?> rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-user-shield nav-icon text-lg"></i>
                     </div>
@@ -896,7 +947,7 @@ if ($adminId && isset($conn)) {
                 <?php endif; ?>
                 
                 <?php if (canAccess($conn, $adminId, 'statistiques')): ?>
-                <a href="statistiques.php" class="nav-item flex items-center px-4 py-4 text-gray-300 hover:bg-surface-lighter/50 hover:text-white rounded-2xl transition-all duration-300 group hover:shadow-xl">
+                <a href="statistiques.php" class="nav-item <?php echo ($currentPage === 'statistiques.php') ? 'active-nav' : ''; ?> flex items-center px-4 py-4 <?php echo ($currentPage === 'statistiques.php') ? 'text-white' : 'text-gray-300 hover:bg-surface-lighter/50 hover:text-white'; ?> rounded-2xl transition-all duration-300 group hover:shadow-xl">
                     <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
                         <i class="fas fa-chart-line nav-icon text-lg"></i>
                     </div>
@@ -918,9 +969,9 @@ if ($adminId && isset($conn)) {
             </div>
             <div class="relative flex justify-center">
                 <div class="bg-surface px-6 flex items-center space-x-3">
-                    <div class="w-2 h-2 bg-primary rounded-full animate-pulse-soft"></div>
-                    <div class="w-1.5 h-1.5 bg-accent rounded-full animate-pulse-soft" style="animation-delay: 0.3s"></div>
-                    <div class="w-2 h-2 bg-primary-light rounded-full animate-pulse-soft" style="animation-delay: 0.6s"></div>
+                    <div class="w-2 h-2 bg-indigo-500 rounded-full animate-pulse-soft shadow-sm shadow-indigo-500/50"></div>
+                    <div class="w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse-soft shadow-sm shadow-purple-500/50" style="animation-delay: 0.3s"></div>
+                    <div class="w-2 h-2 bg-cyan-500 rounded-full animate-pulse-soft shadow-sm shadow-cyan-500/50" style="animation-delay: 0.6s"></div>
                 </div>
             </div>
         </div>
@@ -952,9 +1003,9 @@ if ($adminId && isset($conn)) {
                         <p class="opacity-70">© 2024 Jungle Restaurant</p>
                     </div>
                     <div class="mt-3 flex justify-center space-x-2">
-                        <div class="w-1 h-1 bg-primary rounded-full animate-pulse-soft"></div>
-                        <div class="w-1 h-1 bg-accent rounded-full animate-pulse-soft" style="animation-delay: 0.2s"></div>
-                        <div class="w-1 h-1 bg-primary-light rounded-full animate-pulse-soft" style="animation-delay: 0.4s"></div>
+                        <div class="w-1 h-1 bg-indigo-500 rounded-full animate-pulse-soft"></div>
+                        <div class="w-1 h-1 bg-purple-500 rounded-full animate-pulse-soft" style="animation-delay: 0.2s"></div>
+                        <div class="w-1 h-1 bg-cyan-500 rounded-full animate-pulse-soft" style="animation-delay: 0.4s"></div>
                     </div>
                 </div>
             </div>

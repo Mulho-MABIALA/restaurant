@@ -606,15 +606,15 @@ if ($selectedAdminId) {
                                             $canCreate = isset($currentPermissions[$page['page_slug']]['create']) && 
                                                         $currentPermissions[$page['page_slug']]['create'] == 1;
                                             $canEdit = isset($currentPermissions[$page['page_slug']]['edit']) && 
-                                                      $currentPermissions[$page['page_slug']]['edit'] == 1;
+                                                    $currentPermissions[$page['page_slug']]['edit'] == 1;
                                             $canDelete = isset($currentPermissions[$page['page_slug']]['delete']) && 
                                                         $currentPermissions[$page['page_slug']]['delete'] == 1;
                                             ?>
                                             <div class="page-row" data-category="<?= $category ?>">
                                                 <div class="page-checkbox-wrapper">
                                                     <input type="checkbox" 
-                                                           class="custom-checkbox page-checkbox-input" 
-                                                           name="pages[]" 
+                                                        class="custom-checkbox page-checkbox-input" 
+                                                        name="pages[]" 
                                                            value="<?= htmlspecialchars($page['page_slug']) ?>"
                                                            id="page_<?= $page['id'] ?>"
                                                            data-page-id="<?= $page['id'] ?>"
@@ -716,5 +716,8 @@ if ($selectedAdminId) {
             });
         }
     </script>
+
+    <!-- Footer -->
+    <?php include 'footer.php'; ?>
 </body>
 </html>

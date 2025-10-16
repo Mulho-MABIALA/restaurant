@@ -239,7 +239,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Version html5-qrcode stable -->
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+
     <style>
+        .glass-morphism {
+            background: rgba(17, 24, 39, 0.9);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
         #qr-reader {
             width: 100% !important;
             max-width: 600px;
@@ -312,10 +321,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
         }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen p-4">
-    <div class="max-w-2xl mx-auto">
-        <div class="bg-white shadow-lg rounded-xl p-6">
-            <h1 class="text-3xl font-bold mb-6 text-center text-indigo-600">📱 Badgeuse QR Code</h1>
+<body class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div class="flex h-screen overflow-hidden">
+        <!-- Sidebar -->
+        <?php include 'sidebar.php'; ?>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Header -->
+            <header class="glass-morphism shadow-2xl border-b border-white/10 sticky top-0 z-40">
+                <div class="px-4 sm:px-6 lg:px-8 py-4">
+                    <h1 class="text-3xl font-bold text-white">
+                        📱 Badgeuse QR Code
+                    </h1>
+                </div>
+            </header>
+
+            <!-- Main content area -->
+            <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+                <div class="max-w-2xl mx-auto">
+                    <div class="bg-white shadow-lg rounded-xl p-6">
 
             <!-- Message d'état de chargement -->
             <div id="libraryStatus" class="mb-4 p-3 bg-blue-50 text-blue-700 rounded-lg text-center text-sm">
@@ -449,7 +474,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data'], $_POST['ac
                 <p><strong>Code manuel :</strong> Tapez votre code à 5 chiffres (visible sur votre badge)</p>
                 <p><strong>ID employé :</strong> En dernier recours, utilisez votre numéro d'employé</p>
                 <p class="text-xs">💡 Le code à 5 chiffres est plus sûr et évite les erreurs</p>
-            </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Footer -->
+            <?php include 'footer.php'; ?>
         </div>
     </div>
 

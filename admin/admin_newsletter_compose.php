@@ -172,44 +172,73 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Composer une Newsletter</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="assets/css/cards-design.css">
-    <script src="https://cdn.tiny.cloud/1/YOUR_API_KEY/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
+
+    <!-- Quill Editor (WYSIWYG gratuit) -->
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
     <style>
-        .nav-tab {
-            @apply px-4 py-2 text-sm font-medium text-gray-500 border-b-2 border-transparent hover:text-gray-700 hover:border-gray-300 cursor-pointer transition-colors;
+        /* Fix pour le sidebar */
+        #sidebar {
+            background: rgba(15, 23, 42, 0.95) !important;
+            z-index: 50;
         }
-        .nav-tab.active {
-            @apply text-blue-600 border-blue-600;
-        }
+
         .template-card {
-            @apply border-2 border-gray-200 rounded-lg p-4 cursor-pointer transition-all hover:border-blue-400;
+            border: 2px solid #e5e7eb;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .template-card:hover {
+            border-color: #60a5fa;
         }
         .template-card.selected {
-            @apply border-blue-500 bg-blue-50;
+            border-color: #3b82f6;
+            background-color: #eff6ff;
         }
-        .segment-chip {
-            @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2 mb-2;
+
+        /* Style pour Quill Editor */
+        #editor-container {
+            min-height: 400px;
+            background: white;
+        }
+        .ql-container {
+            font-size: 14px;
         }
     </style>
 </head>
-<body class="bg-gray-50">
-    <div class="container mx-auto p-6">
-        <!-- Header -->
-        <div class="mb-8">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h1 class="text-3xl font-bold text-gray-800 mb-2">
-                        <i class="fas fa-edit text-blue-600 mr-3"></i>
-                        Composer une Newsletter
-                    </h1>
-                    <p class="text-gray-600">Créez et envoyez des campagnes email personnalisées</p>
+<body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 min-h-screen">
+
+    <div class="flex h-screen overflow-hidden">
+
+        <?php include 'sidebar.php'; ?>
+
+        <div class="flex-1 overflow-y-auto">
+
+            <!-- Header -->
+            <header class="bg-slate-900 shadow-lg sticky top-0 z-40">
+                <div class="px-4 sm:px-6 lg:px-8 py-4">
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center">
+                                <i class="fas fa-edit text-white text-lg"></i>
+                            </div>
+                            <div>
+                                <h1 class="text-2xl font-bold text-white">Composer une Newsletter</h1>
+                                <p class="text-gray-400 text-sm">Créez et envoyez des campagnes email</p>
+                            </div>
+                        </div>
+                        <a href="admin_newsletter_campaigns.php" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors text-sm font-medium">
+                            <i class="fas fa-arrow-left mr-2"></i>Retour aux campagnes
+                        </a>
+                    </div>
                 </div>
-                <a href="admin_newsletter_campaigns.php" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors">
-                    <i class="fas fa-arrow-left mr-2"></i>Retour aux campagnes
-                </a>
-            </div>
-        </div>
+            </header>
+
+            <div class="p-8">
 
         <!-- Messages -->
         <?php if (isset($_SESSION['success_message'])): ?>
@@ -299,30 +328,34 @@ try {
                         
                         <div class="mb-4">
                             <div class="flex flex-wrap gap-2 mb-3">
-                                <button type="button" onclick="insertVariable('{{first_name}}')" 
+                                <button type="button" onclick="insertVariable('{{first_name}}')"
                                         class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-sm">
                                     {{first_name}}
                                 </button>
-                                <button type="button" onclick="insertVariable('{{last_name}}')" 
+                                <button type="button" onclick="insertVariable('{{last_name}}')"
                                         class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-sm">
                                     {{last_name}}
                                 </button>
-                                <button type="button" onclick="insertVariable('{{email}}')" 
+                                <button type="button" onclick="insertVariable('{{email}}')"
                                         class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-sm">
                                     {{email}}
                                 </button>
-                                <button type="button" onclick="insertVariable('{{unsubscribe_link}}')" 
+                                <button type="button" onclick="insertVariable('{{unsubscribe_link}}')"
                                         class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-sm">
                                     {{unsubscribe_link}}
                                 </button>
                             </div>
                         </div>
-                        
-                        <textarea id="emailContent" name="email_content" class="w-full h-64 p-3 border border-gray-300 rounded-md">
+
+                        <!-- Éditeur Quill -->
+                        <div id="editor-container" class="border border-gray-300 rounded-md">
                             <h2>Bienvenue {{first_name}} !</h2>
                             <p>Votre contenu email ici...</p>
                             <p><a href="{{unsubscribe_link}}">Se désabonner</a></p>
-                        </textarea>
+                        </div>
+
+                        <!-- Champ caché pour stocker le contenu HTML -->
+                        <input type="hidden" id="emailContent" name="email_content">
                     </div>
                 </div>
 
@@ -441,6 +474,8 @@ try {
                 </div>
             </div>
         </form>
+            </div>
+        </div>
     </div>
 
     <!-- Modal de prévisualisation -->
@@ -463,21 +498,19 @@ try {
     </div>
 
     <script>
-    // Initialisation TinyMCE
-    tinymce.init({
-        selector: '#emailContent',
-        height: 400,
-        plugins: [
-            'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
-            'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
-            'insertdatetime', 'media', 'table', 'help', 'wordcount'
-        ],
-        toolbar: 'undo redo | blocks | bold italic forecolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | removeformat | help',
-        content_css: 'https://cdn.tailwindcss.com',
-        setup: function(editor) {
-            editor.on('change', function() {
-                updatePreview();
-            });
+    // Initialisation de Quill Editor
+    var quill = new Quill('#editor-container', {
+        theme: 'snow',
+        modules: {
+            toolbar: [
+                [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+                ['bold', 'italic', 'underline', 'strike'],
+                [{ 'color': [] }, { 'background': [] }],
+                [{ 'align': [] }],
+                [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                ['link', 'image'],
+                ['clean']
+            ]
         }
     });
 
@@ -523,7 +556,7 @@ try {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    tinymce.get('emailContent').setContent(data.content);
+                    quill.root.innerHTML = data.content;
                 }
             })
             .catch(error => console.error('Erreur:', error));
@@ -548,8 +581,8 @@ try {
     }
 
     function insertVariable(variable) {
-        const editor = tinymce.get('emailContent');
-        editor.execCommand('mceInsertContent', false, variable);
+        const range = quill.getSelection(true);
+        quill.insertText(range.index, variable);
     }
 
     function sendTest() {
@@ -563,7 +596,7 @@ try {
         formData.append('action', 'send_test');
         formData.append('test_email', testEmail);
         formData.append('email_subject', document.querySelector('input[name="email_subject"]').value);
-        formData.append('email_content', tinymce.get('emailContent').getContent());
+        formData.append('email_content', quill.root.innerHTML);
 
         fetch('', {
             method: 'POST',
@@ -582,7 +615,7 @@ try {
 
     function previewEmail(device) {
         const subject = document.querySelector('input[name="email_subject"]').value;
-        const content = tinymce.get('emailContent').getContent();
+        const content = quill.root.innerHTML;
         
         const previewContent = document.getElementById('previewContent');
         const modal = document.getElementById('previewModal');
@@ -622,9 +655,12 @@ try {
 
     // Validation du formulaire
     document.getElementById('campaignForm').addEventListener('submit', function(e) {
+        // Synchroniser le contenu avant validation
+        document.getElementById('emailContent').value = quill.root.innerHTML;
+
         const campaignName = document.querySelector('input[name="campaign_name"]').value.trim();
         const emailSubject = document.querySelector('input[name="email_subject"]').value.trim();
-        const emailContent = tinymce.get('emailContent').getContent().trim();
+        const emailContent = quill.root.innerHTML.trim();
         
         if (!campaignName || !emailSubject || !emailContent) {
             e.preventDefault();
@@ -668,7 +704,7 @@ try {
             formData.append('action', 'auto_save');
             formData.append('campaign_name', document.querySelector('input[name="campaign_name"]').value);
             formData.append('email_subject', document.querySelector('input[name="email_subject"]').value);
-            formData.append('email_content', tinymce.get('emailContent').getContent());
+            formData.append('email_content', quill.root.innerHTML);
             
             fetch('ajax/auto_save.php', {
                 method: 'POST',

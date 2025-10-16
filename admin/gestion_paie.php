@@ -2,11 +2,6 @@
 session_start();
 require_once '../config.php';
 
-// ============================================
-// VÉRIFICATIONS DE SÉCURITÉ
-// ============================================
-
-// 1. Vérification authentification admin
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     if (isset($_GET['action'])) {
         http_response_code(401);
@@ -17,7 +12,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     exit;
 }
 
-// 2. Vérification des permissions (à adapter selon votre système de rôles)
 function checkPermission($action) {
     $adminRole = $_SESSION['admin_role'] ?? 'admin';
     
@@ -31,12 +25,8 @@ function checkPermission($action) {
         return in_array($adminRole, $restrictedActions[$action]);
     }
     
-    return true; // Actions non restreintes
+    return true;
 }
-
-// ============================================
-// INITIALISATION DES MANAGERS
-// ============================================
 
 require_once 'classes/EmployeesManager.php';
 require_once 'classes/PresenceManager.php';
@@ -45,7 +35,6 @@ require_once 'classes/PostesManager.php';
 require_once 'classes/SecurityManager.php';
 require_once 'classes/AuditManager.php';
 require_once 'classes/PayrollCalculator.php';
-require_once 'classes/BulletinPDFGenerateur.php';
 
 $employeesManager = new EmployeesManager($conn);
 $presenceManager = new PresenceManager($conn);
@@ -54,9 +43,14 @@ $postesManager = new PostesManager($conn);
 $auditManager = new AuditManager($conn);
 $payrollCalculator = new PayrollCalculator($conn);
 
-// ============================================
-// FONCTIONS UTILITAIRES SÉCURISÉES
-// ============================================
+// Fonctions utilitaires
+function h($str) {
+    return htmlspecialchars($str ?? '', ENT_QUOTES, 'UTF-8');
+}
+
+function formaterMontant($montant) {
+    return number_format($montant, 0, ',', ' ') . ' FCFA';
+}
 
 function getHorairesEmploye($conn, $employeId, $date) {
     $semaine_debut = date('Y-m-d', strtotime('monday', strtotime($date)));
@@ -70,7 +64,6 @@ function getHorairesEmploye($conn, $employeId, $date) {
     
     $jour_fr = $jours_mapping[$jour_semaine] ?? 'lundi';
     
-    // CORRECTION: Utilisation de requête préparée
     $stmt = $conn->prepare("
         SELECT {$jour_fr}_debut as heure_debut_prevue,
                {$jour_fr}_fin as heure_fin_prevue
@@ -115,23 +108,8 @@ function determinerStatutPresence($presence, $horairePlanifie) {
     return ($heureArrivee > $heureDebut) ? 'retard' : 'present';
 }
 
-/**
- * Fonction utilitaire pour échapper les sorties HTML
- * Protection contre les attaques XSS
- */
-function h($str) {
-    return htmlspecialchars($str ?? '', ENT_QUOTES, 'UTF-8');
-}
-
-/**
- * Fonction utilitaire pour formater les montants en FCFA
- */
-function formaterMontant($montant) {
-    return number_format($montant, 0, ',', ' ') . ' FCFA';
-}
-
 function calculerHeuresParRapportPlanification($conn, $employeId, $mois, $annee) {
-    $premierjour = "$annee-$mois-01";
+    $premierjour = "$annee-" . str_pad($mois, 2, '0', STR_PAD_LEFT) . "-01";
     $dernierjour = date('Y-m-t', strtotime($premierjour));
     
     $result = [
@@ -141,10 +119,10 @@ function calculerHeuresParRapportPlanification($conn, $employeId, $mois, $annee)
         'jours_en_pause' => 0,
         'nb_retards' => 0,
         'nb_absences' => 0,
-        'taux_presence' => 0
+        'taux_presence' => 0,
+        'details_par_jour' => []
     ];
     
-    // CORRECTION: Utilisation de requête préparée au lieu de query()
     $stmt = $conn->prepare("
         SELECT DATE(heure_arrivee) as date_presence, heure_arrivee, heure_depart
         FROM presences 
@@ -170,6 +148,9 @@ function calculerHeuresParRapportPlanification($conn, $employeId, $mois, $annee)
         
         $statut = determinerStatutPresence($presenceJour, $horairePlanifie);
         
+        $heuresPlanifiees = 0;
+        $heuresReelles = 0;
+        
         if ($horairePlanifie['est_programme']) {
             $debut = new DateTime($horairePlanifie['heure_debut']);
             $fin = new DateTime($horairePlanifie['heure_fin']);
@@ -193,11 +174,20 @@ function calculerHeuresParRapportPlanification($conn, $employeId, $mois, $annee)
             $result['jours_en_pause']++;
         }
         
+        $result['details_par_jour'][] = [
+            'date' => $dateStr,
+            'statut' => $statut,
+            'heures_planifiees' => $heuresPlanifiees,
+            'heures_reelles' => $heuresReelles,
+            'horaire_planifie' => $horairePlanifie
+        ];
+        
         $dateActuelle->add(new DateInterval('P1D'));
     }
     
-    $joursProgrammes = ($result['heures_planifiees_total'] > 0) ? 
-        ceil($result['heures_planifiees_total'] / 8) : 0;
+    $joursProgrammes = count(array_filter($result['details_par_jour'], function($jour) {
+        return $jour['heures_planifiees'] > 0;
+    }));
         
     $result['taux_presence'] = $joursProgrammes > 0 ? 
         ($result['jours_travailles'] / $joursProgrammes) * 100 : 0;
@@ -205,16 +195,12 @@ function calculerHeuresParRapportPlanification($conn, $employeId, $mois, $annee)
     return $result;
 }
 
-// ============================================
 // TRAITEMENT DES ACTIONS AJAX
-// ============================================
-
 if (isset($_GET['action'])) {
     header('Content-Type: application/json');
     
     $action = $_GET['action'];
     
-    // CORRECTION: Validation CSRF pour TOUTES les actions de modification
     $writeActions = [
         'generer_bulletin', 'modifier_bulletin', 'supprimer_bulletin', 'valider_bulletin',
         'creer_conge', 'valider_conge', 'creer_avance', 'valider_avance',
@@ -231,124 +217,99 @@ if (isset($_GET['action'])) {
         }
     }
     
-    // CORRECTION: Vérification des permissions
     if (!checkPermission($action)) {
         http_response_code(403);
         echo json_encode(['success' => false, 'error' => 'Permission refusée']);
         exit;
     }
     
-    // CORRECTION: Rate limiting simple (à améliorer avec Redis/Memcached en production)
-    if (!isset($_SESSION['rate_limit'])) {
-        $_SESSION['rate_limit'] = ['count' => 0, 'time' => time()];
-    }
-    
-    if (time() - $_SESSION['rate_limit']['time'] > 60) {
-        $_SESSION['rate_limit'] = ['count' => 0, 'time' => time()];
-    }
-    
-    $_SESSION['rate_limit']['count']++;
-    
-    if ($_SESSION['rate_limit']['count'] > 100) {
-        http_response_code(429);
-        echo json_encode(['success' => false, 'error' => 'Trop de requêtes']);
-        exit;
-    }
-    
     try {
         switch ($action) {
-            case 'get_employes':
-                $filters = [];
-                if (isset($_GET['statut'])) $filters['statut'] = $_GET['statut'];
-                if (isset($_GET['departement_id'])) $filters['departement_id'] = (int)$_GET['departement_id'];
-                if (isset($_GET['search'])) $filters['search'] = $_GET['search'];
+            case 'get_presences_jour':
+                $date = $_GET['date'] ?? date('Y-m-d');
                 
-                $employes = $employeesManager->getAllEmployees($filters);
-                echo json_encode(['success' => true, 'employes' => $employes]);
+                $stmt = $conn->prepare("
+                    SELECT 
+                        e.id as employe_id,
+                        e.nom,
+                        e.prenom,
+                        p_poste.nom as poste_nom,
+                        e.statut,
+                        pr.heure_arrivee,
+                        pr.heure_depart,
+                        DATE_FORMAT(pr.heure_arrivee, '%H:%i') as heure_arrivee_format,
+                        DATE_FORMAT(pr.heure_depart, '%H:%i') as heure_depart_format
+                    FROM employes e
+                    LEFT JOIN postes p_poste ON e.poste_id = p_poste.id
+                    LEFT JOIN presences pr ON e.id = pr.employe_id 
+                        AND DATE(pr.heure_arrivee) = ?
+                    WHERE e.statut = 'actif'
+                    ORDER BY e.nom, e.prenom
+                ");
+                
+                $stmt->execute([$date]);
+                $presences = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                foreach ($presences as &$presence) {
+                    $horairePlanifie = getHorairesEmploye($conn, $presence['employe_id'], $date);
+                    $presence['statut_presence'] = determinerStatutPresence($presence, $horairePlanifie);
+                }
+                
+                echo json_encode(['success' => true, 'presences' => $presences]);
                 break;
                 
-            case 'calculate_payroll_with_presences':
-                $input = json_decode(file_get_contents('php://input'), true);
+            case 'get_details_presence_employe':
+                $employeId = (int)$_GET['employe_id'];
+                $date = $_GET['date'] ?? date('Y-m-d');
                 
-                $validation = SecurityManager::validateInput($input, [
-                    'employe_id' => ['required' => true, 'type' => 'numeric'],
-                    'mois' => ['required' => true, 'type' => 'numeric', 'min' => 1, 'max' => 12],
-                    'annee' => ['required' => true, 'type' => 'numeric', 'min' => 2020, 'max' => 2100]
+                $stmt = $conn->prepare("
+                    SELECT e.*, p.nom as poste_nom, d.nom as departement_nom, 
+                           p.heures_semaine, p.heures_mois
+                    FROM employes e
+                    LEFT JOIN postes p ON e.poste_id = p.id
+                    LEFT JOIN departements d ON e.departement_id = d.id
+                    WHERE e.id = ?
+                ");
+                $stmt->execute([$employeId]);
+                $employe = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$employe) {
+                    throw new Exception('Employé non trouvé');
+                }
+                
+                $stmt = $conn->prepare("
+                    SELECT *, 
+                           DATE_FORMAT(heure_arrivee, '%H:%i') as heure_arrivee_format,
+                           DATE_FORMAT(heure_depart, '%H:%i') as heure_depart_format,
+                           TIMESTAMPDIFF(HOUR, heure_arrivee, heure_depart) as heures_travaillees
+                    FROM presences
+                    WHERE employe_id = ? AND DATE(heure_arrivee) = ?
+                ");
+                $stmt->execute([$employeId, $date]);
+                $presenceJour = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                $horairePlanifie = getHorairesEmploye($conn, $employeId, $date);
+                
+                if ($presenceJour) {
+                    $presenceJour['statut_presence'] = determinerStatutPresence($presenceJour, $horairePlanifie);
+                }
+                
+                $mois = date('n', strtotime($date));
+                $annee = date('Y', strtotime($date));
+                
+                $statsResult = calculerHeuresParRapportPlanification($conn, $employeId, $mois, $annee);
+                
+                echo json_encode([
+                    'success' => true,
+                    'employe' => $employe,
+                    'presence_jour' => $presenceJour,
+                    'horaire_planifie' => $horairePlanifie,
+                    'stats_mois' => $statsResult
                 ]);
-                
-                if (!empty($validation)) {
-                    throw new Exception('Données invalides: ' . implode(', ', $validation));
-                }
-                
-                // CORRECTION: Transaction pour garantir la cohérence
-                $conn->beginTransaction();
-                
-                try {
-                    $stmt = $conn->prepare("
-                        SELECT e.*, p.heures_semaine, p.heures_mois, p.salaire_base
-                        FROM employes e
-                        LEFT JOIN postes p ON e.poste_id = p.id
-                        WHERE e.id = ? FOR UPDATE
-                    ");
-                    $stmt->execute([$input['employe_id']]);
-                    $employe = $stmt->fetch(PDO::FETCH_ASSOC);
-                    
-                    if (!$employe) {
-                        throw new Exception('Employé non trouvé');
-                    }
-                    
-                    $statsPresences = calculerHeuresParRapportPlanification(
-                        $conn, 
-                        $input['employe_id'], 
-                        $input['mois'], 
-                        $input['annee']
-                    );
-                    
-                    $heuresPlanifiees = $employe['heures_mois'] ?? 173;
-                    $heuresReelles = $statsPresences['heures_reelles_total'];
-                    $salaireBase = $employe['salaire_base'] ?? $employe['salaire'];
-                    
-                    $heuresSupp = max(0, $heuresReelles - $heuresPlanifiees);
-                    $heuresManquantes = max(0, $heuresPlanifiees - $heuresReelles);
-                    $tauxHoraire = $salaireBase / $heuresPlanifiees;
-                    
-                    $calculData = [
-                        'employe_id' => $input['employe_id'],
-                        'mois' => $input['mois'],
-                        'annee' => $input['annee'],
-                        'salaire_base' => $salaireBase,
-                        'heures_planifiees' => $heuresPlanifiees,
-                        'heures_reelles' => $heuresReelles,
-                        'heures_supplementaires' => $heuresSupp,
-                        'heures_manquantes' => $heuresManquantes,
-                        'montant_heures_supp' => $heuresSupp * $tauxHoraire * 1.25,
-                        'deduction_absences' => $heuresManquantes * $tauxHoraire,
-                        'taux_presence' => $statsPresences['taux_presence'],
-                        'nb_retards' => $statsPresences['nb_retards'],
-                        'nb_absences' => $statsPresences['nb_absences']
-                    ];
-                    
-                    $conn->commit();
-                    echo json_encode(['success' => true, 'calcul' => $calculData]);
-                    
-                } catch (Exception $e) {
-                    $conn->rollBack();
-                    throw $e;
-                }
                 break;
                 
             case 'ajouter_presence_manuelle':
                 $input = json_decode(file_get_contents('php://input'), true);
-                
-                $validation = SecurityManager::validateInput($input, [
-                    'employe_id' => ['required' => true, 'type' => 'numeric'],
-                    'date' => ['required' => true, 'type' => 'date'],
-                    'heure_arrivee' => ['required' => true, 'pattern' => '/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/']
-                ]);
-                
-                if (!empty($validation)) {
-                    throw new Exception('Données invalides: ' . implode(', ', $validation));
-                }
                 
                 $conn->beginTransaction();
                 
@@ -356,7 +317,6 @@ if (isset($_GET['action'])) {
                     $stmt = $conn->prepare("
                         SELECT id FROM presences 
                         WHERE employe_id = ? AND DATE(heure_arrivee) = ?
-                        FOR UPDATE
                     ");
                     $stmt->execute([$input['employe_id'], $input['date']]);
                     
@@ -368,10 +328,6 @@ if (isset($_GET['action'])) {
                     $heureDepart = null;
                     
                     if (!empty($input['heure_depart'])) {
-                        if (!preg_match('/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/', $input['heure_depart'])) {
-                            throw new Exception('Format heure de départ invalide');
-                        }
-                        
                         $heureDepart = $input['date'] . ' ' . $input['heure_depart'];
                         
                         if (strtotime($heureDepart) <= strtotime($heureArrivee)) {
@@ -380,21 +336,15 @@ if (isset($_GET['action'])) {
                     }
                     
                     $stmt = $conn->prepare("
-                        INSERT INTO presences (employe_id, heure_arrivee, heure_depart, commentaire, ajout_manuel, date_creation)
-                        VALUES (?, ?, ?, ?, 1, NOW())
+                        INSERT INTO presences (employe_id, heure_arrivee, heure_depart, commentaire, date_creation)
+                        VALUES (?, ?, ?, ?, NOW())
                     ");
                     
                     $stmt->execute([
                         $input['employe_id'],
                         $heureArrivee,
                         $heureDepart,
-                        filter_var($input['commentaire'] ?? 'Ajout manuel', FILTER_SANITIZE_STRING)
-                    ]);
-                    
-                    $auditManager->logPayrollAction('ADD_PRESENCE_MANUAL', [
-                        'employe_id' => $input['employe_id'],
-                        'date' => $input['date'],
-                        'admin_id' => $_SESSION['admin_id'] ?? 1
+                        $input['commentaire'] ?? 'Ajout manuel'
                     ]);
                     
                     $conn->commit();
@@ -411,84 +361,192 @@ if (isset($_GET['action'])) {
                 }
                 break;
                 
-            // Ajouter les autres cases ici avec les mêmes corrections...
-            
+            case 'valider_bulletin':
+                $input = json_decode(file_get_contents('php://input'), true);
+                $bulletinId = (int)$input['bulletin_id'];
+                
+                $stmt = $conn->prepare("
+                    UPDATE bulletins_paie 
+                    SET statut = 'valide', date_validation = NOW()
+                    WHERE id = ?
+                ");
+                $stmt->execute([$bulletinId]);
+                
+                echo json_encode(['success' => true, 'message' => 'Bulletin validé']);
+                break;
+                
+            case 'get_dashboard_stats_advanced':
+                $stmt = $conn->query("SELECT COUNT(*) as total_actifs FROM employes WHERE statut = 'actif'");
+                $statsEmployes = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                $mois = date('n');
+                $annee = date('Y');
+                
+                $stmt = $conn->prepare("
+                    SELECT COUNT(*) as bulletins_generes, SUM(salaire_net) as masse_salariale
+                    FROM bulletins_paie
+                    WHERE mois = ? AND annee = ?
+                ");
+                $stmt->execute([$mois, $annee]);
+                $statsPaie = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                $stmt = $conn->prepare("
+                    SELECT 
+                        COUNT(DISTINCT employe_id) as employes_avec_presences,
+                        AVG(TIMESTAMPDIFF(HOUR, heure_arrivee, heure_depart)) as heures_moyennes_par_jour
+                    FROM presences
+                    WHERE MONTH(heure_arrivee) = ? AND YEAR(heure_arrivee) = ?
+                ");
+                $stmt->execute([$mois, $annee]);
+                $statsPresences = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                $stmt = $conn->query("SELECT COUNT(*) FROM conges WHERE statut = 'en_attente'");
+                $conges_attente = $stmt->fetchColumn();
+                
+                $stmt = $conn->query("SELECT COUNT(*) FROM avances_salaire WHERE statut = 'en_attente'");
+                $avances_attente = $stmt->fetchColumn();
+                
+                $stmt = $conn->query("SELECT COUNT(*) FROM primes_employes WHERE valide = 0");
+                $primes_attente = $stmt->fetchColumn();
+                
+                $stmt = $conn->query("
+                    SELECT d.nom, COUNT(e.id) as nb_employes
+                    FROM departements d
+                    LEFT JOIN employes e ON d.id = e.departement_id AND e.statut = 'actif'
+                    GROUP BY d.id, d.nom
+                ");
+                $departements = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                echo json_encode([
+                    'success' => true,
+                    'stats' => [
+                        'employes' => $statsEmployes,
+                        'paie' => $statsPaie,
+                        'presences' => array_merge($statsPresences, [
+                            'total_employes_actifs' => $statsEmployes['total_actifs']
+                        ]),
+                        'conges_attente' => $conges_attente,
+                        'avances_attente' => $avances_attente,
+                        'primes_attente' => $primes_attente,
+                        'departements' => $departements
+                    ]
+                ]);
+                break;
+                
             default:
                 http_response_code(404);
                 echo json_encode(['success' => false, 'error' => 'Action non reconnue']);
         }
         
     } catch (Exception $e) {
-        // CORRECTION: Ne pas exposer les détails techniques
-        error_log("Erreur action {$action}: " . $e->getMessage() . " | User: " . ($_SESSION['admin_id'] ?? 'unknown'));
-        
-        // Message générique pour le client
+        error_log("Erreur action {$action}: " . $e->getMessage());
         echo json_encode([
             'success' => false, 
-            'error' => 'Une erreur est survenue. Veuillez réessayer ou contacter l\'administrateur.'
+            'error' => $e->getMessage()
         ]);
     }
     exit;
 }
 
-// ============================================
 // CHARGEMENT DES DONNÉES POUR L'INTERFACE
-// ============================================
-
 try {
     $employes = $employeesManager->getAllEmployees(['statut' => 'actif']);
-    $bulletins = $paieManager->getBulletins(['mois' => date('n'), 'annee' => date('Y')]);
     
-    $statsEmployes = $employeesManager->getEmployeeStatistics();
-    $statsPaie = $paieManager->getPayrollStatistics();
+    $stmt = $conn->prepare("
+        SELECT b.*, 
+               e.nom as employe_nom, 
+               e.prenom as employe_prenom,
+               p.nom as poste_nom,
+               0 as avec_presences
+        FROM bulletins_paie b
+        LEFT JOIN employes e ON b.employe_id = e.id
+        LEFT JOIN postes p ON e.poste_id = p.id
+        WHERE b.mois = ? AND b.annee = ?
+        ORDER BY b.date_creation DESC
+    ");
+    $stmt->execute([date('n'), date('Y')]);
+    $bulletins = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
+    $stmt = $conn->query("SELECT COUNT(*) FROM employes WHERE statut = 'actif'");
+    $employes_actifs = $stmt->fetchColumn();
+    
+    $masse_salariale = 0;
+    foreach ($bulletins as $bulletin) {
+        $masse_salariale += floatval($bulletin['salaire_net'] ?? 0);
+    }
+    
+    $stmt = $conn->query("SELECT COUNT(*) FROM conges WHERE statut = 'en_attente'");
+    $conges_count = $stmt->fetchColumn();
+
+    $stmt = $conn->query("SELECT COUNT(*) FROM avances_salaire WHERE statut = 'en_attente'");
+    $avances_count = $stmt->fetchColumn();
+
+    $stmt = $conn->query("SELECT COUNT(*) FROM primes_employes WHERE valide = 0");
+    $primes_count = $stmt->fetchColumn();
+
     $stats = [
-        'employes_actifs' => $statsEmployes['total_actifs'] ?? 0,
+        'employes_actifs' => intval($employes_actifs),
         'bulletins_mois' => count($bulletins),
-        'masse_salariale' => array_sum(array_column($bulletins, 'salaire_net')),
-        'conges_attente' => 0,
-        'avances_attente' => 0,
-        'primes_attente' => 0
+        'masse_salariale' => floatval($masse_salariale),
+        'conges_attente' => intval($conges_count),
+        'avances_attente' => intval($avances_count),
+        'primes_attente' => intval($primes_count)
     ];
-    
-    // Récupération sécurisée des demandes en attente
-    $stmt = $conn->prepare("
-        SELECT COUNT(*) as total FROM conges WHERE statut = 'en_attente'
-    ");
-    $stmt->execute();
-    $stats['conges_attente'] = $stmt->fetchColumn();
-    
-    $stmt = $conn->prepare("
-        SELECT COUNT(*) as total FROM avances_salaire WHERE statut = 'en_attente'
-    ");
-    $stmt->execute();
-    $stats['avances_attente'] = $stmt->fetchColumn();
-    
-    $stmt = $conn->prepare("
-        SELECT COUNT(*) as total FROM primes_employes WHERE valide = 0
-    ");
-    $stmt->execute();
-    $stats['primes_attente'] = $stmt->fetchColumn();
-    
+
     $postes = $postesManager->getAllPostes();
     $departements = $postesManager->getDepartements();
     $csrf_token = SecurityManager::generateCSRFToken();
-    
+
+    $stmt = $conn->prepare("
+        SELECT c.*, e.nom, e.prenom, e.email
+        FROM conges c
+        LEFT JOIN employes e ON c.employe_id = e.id
+        WHERE c.statut = 'en_attente' 
+        ORDER BY c.date_creation DESC
+    ");
+    $stmt->execute();
+    $conges_attente = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $stmt = $conn->prepare("
+        SELECT a.*, e.nom, e.prenom
+        FROM avances_salaire a
+        LEFT JOIN employes e ON a.id_employe = e.id
+        WHERE a.statut = 'en_attente' 
+        ORDER BY a.date_demande DESC
+    ");
+    $stmt->execute();
+    $avances_attente = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $stmt = $conn->prepare("
+        SELECT p.*, e.nom, e.prenom, tp.nom as type_prime_nom
+        FROM primes_employes p
+        LEFT JOIN employes e ON p.id_employe = e.id
+        LEFT JOIN type_primes tp ON p.id_type_prime = tp.id
+        WHERE p.valide = 0 
+        ORDER BY p.created_at DESC
+    ");
+    $stmt->execute();
+    $primes_attente = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
 } catch (Exception $e) {
     error_log("Erreur chargement données: " . $e->getMessage());
     
     $employes = [];
     $bulletins = [];
-    $stats = ['employes_actifs' => 0, 'bulletins_mois' => 0, 'masse_salariale' => 0];
+    $stats = [
+        'employes_actifs' => 0,
+        'bulletins_mois' => 0,
+        'masse_salariale' => 0,
+        'conges_attente' => 0,
+        'avances_attente' => 0,
+        'primes_attente' => 0
+    ];
     $postes = [];
     $departements = [];
     $csrf_token = '';
+    $conges_attente = [];
+    $avances_attente = [];
+    $primes_attente = [];
 }
-
-// CORRECTION: Sécurisation des sorties
-$employes = SecurityManager::sanitizeOutput($employes);
-$bulletins = SecurityManager::sanitizeOutput($bulletins);
-$postes = SecurityManager::sanitizeOutput($postes);
-$departements = SecurityManager::sanitizeOutput($departements);
 
 include 'views/paie/index.php';

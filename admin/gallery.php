@@ -1662,5 +1662,8 @@ foreach ($allImages as $img) {
             initLightbox();
         });
     </script>
+
+    <!-- Footer -->
+    <?php include 'footer.php'; ?>
 </body>
 </html>

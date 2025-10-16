@@ -2148,5 +2148,8 @@ try {
             }, 5000);
         }
     </script>
+
+    <!-- Footer -->
+    <?php include 'footer.php'; ?>
 </body>
 </html>

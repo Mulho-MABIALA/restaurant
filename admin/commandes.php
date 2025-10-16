@@ -158,25 +158,21 @@ if (isset($_POST['action']) && $_POST['action'] === 'creer_commande_manuelle') {
         
         $commande_id = $conn->lastInsertId();
         
-        // Insérer les détails de la commande (si vous avez une table commande_details)
+        // Insérer les détails de la commande
         foreach ($produits as $produit) {
             $stmt_detail = $conn->prepare("
                 INSERT INTO commande_details (
-                    commande_id, plat_id, nom_plat, 
-                    prix_unitaire, quantite, total
+                    commande_id, nom_plat, quantite, prix
                 ) VALUES (
-                    :commande_id, :plat_id, :nom_plat,
-                    :prix_unitaire, :quantite, :total
+                    :commande_id, :nom_plat, :quantite, :prix
                 )
             ");
-            
+
             $stmt_detail->execute([
                 'commande_id' => $commande_id,
-                'plat_id' => $produit['id'],
                 'nom_plat' => $produit['nom'],
-                'prix_unitaire' => $produit['prix'],
                 'quantite' => $produit['quantite'],
-                'total' => $produit['prix'] * $produit['quantite']
+                'prix' => $produit['prix']
             ]);
         }
         
@@ -451,12 +447,39 @@ $categories_disponibles = getAllCategories($conn);
         }
 
         .table-row {
-            transition: all 0.2s ease;
+            transition: all 0.3s ease;
             border-bottom: 1px solid #e5e7eb;
+            position: relative;
         }
 
-        .table-row:hover {
-            background-color: #f9fafb;
+        .table-row.cursor-pointer:hover {
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+            transform: translateY(-1px);
+        }
+
+        .table-row.cursor-pointer:active {
+            transform: translateY(0);
+        }
+
+        /* Icône "voir" au survol de la ligne */
+        .table-row.cursor-pointer::before {
+            content: '\f06e';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            position: absolute;
+            left: -30px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #3b82f6;
+            font-size: 16px;
+            opacity: 0;
+            transition: all 0.3s ease;
+            pointer-events: none;
+        }
+
+        .table-row.cursor-pointer:hover::before {
+            opacity: 1;
+            left: -25px;
         }
 
         .table-row:last-child {
@@ -475,25 +498,25 @@ $categories_disponibles = getAllCategories($conn);
             border-right: none;
         }
 
-        /* Style pour les numéros de commande comme dans l'image */
-        .numero-commande {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
-            color: white;
-            font-weight: bold;
-            font-size: 16px;
-            border-radius: 12px;
-            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
-            transition: all 0.3s ease;
+        /* Styles pour un tableau compact */
+        tbody td {
+            vertical-align: middle;
         }
 
-        .numero-commande:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(59, 130, 246, 0.4);
+        /* Hauteur de ligne fixe pour uniformité */
+        tbody tr {
+            height: 60px;
+        }
+
+        /* Style pour le tableau */
+        table {
+            min-width: 1400px;
+            table-layout: fixed;
+        }
+
+        /* Forcer l'affichage des colonnes */
+        thead th, tbody td {
+            box-sizing: border-box;
         }
 
         .action-btn {
@@ -592,7 +615,7 @@ $categories_disponibles = getAllCategories($conn);
 
 .produit-image {
     width: 100%;
-    height: 120px;
+    height: 70px;
     object-fit: cover;
     background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
 }
@@ -745,9 +768,9 @@ $categories_disponibles = getAllCategories($conn);
 
 .produit-placeholder {
     width: 100%;
-    height: 140px;
+    height: 70px;
     background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-    border-radius: 12px;
+    border-radius: 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -809,14 +832,16 @@ $categories_disponibles = getAllCategories($conn);
 
 .produit-nom {
     font-weight: 600;
-    font-size: 14px;
+    font-size: 10px;
     color: #1f2937;
-    margin-bottom: 4px;
-    line-height: 1.3;
+    margin-bottom: 2px;
+    line-height: 1.2;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    min-height: 24px;
 }
 
 .produit-prix {
@@ -1001,10 +1026,43 @@ $categories_disponibles = getAllCategories($conn);
     .quantite-btn {
         transition: all 0.2s ease;
     }
-    
+
     .quantite-btn:hover {
         background: #e5e7eb !important;
-    } 
+    }
+
+    /* Badge panier animé */
+    #headerItemCount {
+        animation: none;
+    }
+
+    #headerItemCount.pulse-badge {
+        animation: pulseBadge 0.5s ease;
+    }
+
+    @keyframes pulseBadge {
+        0%, 100% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.3);
+        }
+    }
+
+    /* Styles pour l'impression */
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        #printArea, #printArea * {
+            visibility: visible;
+        }
+        #printArea {
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+    }
     </style>
 </head>
 <body>
@@ -1033,7 +1091,75 @@ $categories_disponibles = getAllCategories($conn);
                         </div>
 
                         <!-- Contrôles -->
-                        <div class="flex items-center space-x-4" x-data="{ profileOpen: false }">
+                        <div class="flex items-center space-x-4" x-data="{ profileOpen: false, notificationsOpen: false }">
+                            <!-- Badge de Notifications -->
+                            <div class="relative">
+                                <button
+                                    @click="notificationsOpen = !notificationsOpen"
+                                    id="notification-button-commandes"
+                                    class="relative w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center hover:bg-slate-700 transition-all focus:outline-none"
+                                    type="button"
+                                >
+                                    <i class="fas fa-bell text-white text-lg"></i>
+                                    <span id="notification-badge-commandes" class="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center animate-pulse hidden">
+                                        0
+                                    </span>
+                                </button>
+
+                                <!-- Panneau de Notifications -->
+                                <div
+                                    x-show="notificationsOpen"
+                                    @click.away="notificationsOpen = false"
+                                    x-transition:enter="transition ease-out duration-200"
+                                    x-transition:enter-start="transform opacity-0 scale-95 translate-y-2"
+                                    x-transition:enter-end="transform opacity-100 scale-100 translate-y-0"
+                                    x-transition:leave="transition ease-in duration-150"
+                                    x-transition:leave-start="transform opacity-100 scale-100 translate-y-0"
+                                    x-transition:leave-end="transform opacity-0 scale-95 translate-y-2"
+                                    class="absolute right-0 mt-2 w-96 bg-slate-800 rounded-xl shadow-2xl overflow-hidden z-50 max-h-[500px] overflow-y-auto"
+                                    style="display: none;"
+                                >
+                                    <!-- En-tête Notifications -->
+                                    <div class="px-5 py-4 border-b border-slate-700 bg-gradient-to-r from-emerald-600 to-teal-600">
+                                        <div class="flex items-center justify-between">
+                                            <h3 class="text-white font-bold text-base">Notifications Commandes</h3>
+                                            <span id="notification-count-commandes" class="bg-white text-emerald-600 px-2 py-1 rounded-full text-xs font-bold">0</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Commandes du jour -->
+                                    <div class="px-5 py-3 border-b border-slate-700 bg-slate-750">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <h4 class="text-teal-400 font-semibold text-sm flex items-center">
+                                                <i class="fas fa-calendar-day mr-2"></i>
+                                                Aujourd'hui (<span id="today-count-commandes">0</span>)
+                                            </h4>
+                                        </div>
+                                        <div id="today-commandes" class="space-y-2 max-h-48 overflow-y-auto">
+                                            <!-- Chargées dynamiquement -->
+                                        </div>
+                                    </div>
+
+                                    <!-- Nouvelles Commandes -->
+                                    <div class="px-5 py-3">
+                                        <h4 class="text-amber-400 font-semibold text-sm mb-2 flex items-center">
+                                            <i class="fas fa-bell mr-2 animate-pulse"></i>
+                                            Nouvelles commandes
+                                        </h4>
+                                        <div id="new-commandes" class="space-y-2">
+                                            <!-- Chargées dynamiquement -->
+                                        </div>
+                                    </div>
+
+                                    <!-- Footer -->
+                                    <div class="px-5 py-3 border-t border-slate-700 bg-slate-900">
+                                        <button onclick="window.location.reload()" class="w-full text-center text-sm text-emerald-400 hover:text-emerald-300 font-medium">
+                                            <i class="fas fa-sync-alt mr-2"></i>Actualiser
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- Widget Date/Heure -->
                             <div class="hidden sm:flex items-center space-x-5 bg-slate-800 rounded-xl px-5 py-3">
                                 <div class="flex items-center space-x-3">
@@ -1344,6 +1470,17 @@ $categories_disponibles = getAllCategories($conn);
                     <h2 class="text-xs uppercase tracking-widest text-gray-600 font-semibold mb-4">LISTE DES COMMANDES</h2>
                 </div>
 
+                <!-- Info scroll horizontal -->
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4 rounded-lg">
+                    <div class="flex items-center">
+                        <i class="fas fa-info-circle text-blue-500 text-xl mr-3"></i>
+                        <p class="text-sm text-blue-800">
+                            <strong>Astuce :</strong> Cliquez sur une ligne pour voir les détails. Faites défiler horizontalement pour voir toutes les colonnes.
+                            <span class="text-blue-600">→</span>
+                        </p>
+                    </div>
+                </div>
+
                 <!-- Tableau des Commandes avec bordures visibles -->
                 <div class="bg-white/80 backdrop-blur-md shadow-md table-wrapper">
                     <div class="px-6 py-4 bg-gray-50/80 border-b-2 border-gray-300">
@@ -1356,35 +1493,35 @@ $categories_disponibles = getAllCategories($conn);
                         <table class="min-w-full">
                             <thead class="bg-gray-50/80">
                                 <tr class="table-header">
-                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider table-cell">
-                                        <i class="fas fa-hashtag mr-2"></i>N°
+                                    <th class="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300" style="width: 80px; min-width: 80px;">
+                                        <i class="fas fa-hashtag mr-1"></i>N°
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider table-cell">
-                                        <i class="fas fa-user mr-2"></i>Client
+                                    <th class="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300" style="width: 200px; min-width: 200px;">
+                                        <i class="fas fa-user mr-1"></i>Client
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider table-cell">
-                                        <i class="fas fa-phone mr-2"></i>Contact
+                                    <th class="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300" style="width: 250px; min-width: 250px;">
+                                        <i class="fas fa-phone mr-1"></i>Contact
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider table-cell">
-                                    <i class="fas fa-table mr-2"></i>N°table
+                                    <th class="px-3 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300" style="width: 80px; min-width: 80px;">
+                                    <i class="fas fa-table mr-1"></i>Table
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider table-cell">
-                                        <i class="fas fa-coins mr-2"></i>Total (FCFA)
+                                    <th class="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300" style="width: 120px;">
+                                        <i class="fas fa-coins mr-1"></i>Total
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider table-cell">
-                                        <i class="fas fa-tasks mr-2"></i>Statut
+                                    <th class="px-3 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300" style="width: 110px;">
+                                        <i class="fas fa-tasks mr-1"></i>Statut
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider table-cell">
-                                        <i class="fas fa-credit-card mr-2"></i>Paiement
+                                    <th class="px-3 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300" style="width: 100px;">
+                                        <i class="fas fa-credit-card mr-1"></i>Paiement
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider table-cell">
-                                        <i class="fas fa-eye mr-2"></i>Vu
+                                    <th class="px-3 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300" style="width: 90px;">
+                                        <i class="fas fa-eye mr-1"></i>Vu
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider table-cell">
-                                        <i class="fas fa-calendar mr-2"></i>Date
+                                    <th class="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300" style="width: 130px;">
+                                        <i class="fas fa-calendar mr-1"></i>Date
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider table-cell">
-                                        <i class="fas fa-cogs mr-2"></i>Actions
+                                    <th class="px-3 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider" style="width: 140px;">
+                                        <i class="fas fa-cogs mr-1"></i>Actions
                                     </th>
                                 </tr>
                             </thead>
@@ -1408,54 +1545,59 @@ $categories_disponibles = getAllCategories($conn);
     $numero_affichage = $total_commandes;
     foreach ($commandes as $cmd):
 ?>
-    <tr class="table-row" id="commande-<?php echo $cmd['id']?>">
-        <td class="px-6 py-4 whitespace-nowrap table-cell">
-            <div class="numero-commande">
-                <?php echo $numero_affichage?>
-            </div>
-        </td>
-        <!-- ... reste du contenu de la ligne ... -->
-        <td class="px-6 py-4 whitespace-nowrap table-cell">
-            <div class="flex items-center">
-                <div class="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center mr-3">
-                    <span class="text-white font-medium text-sm"><?php echo strtoupper(substr(e($cmd['nom_client']), 0, 1))?></span>
+    <tr class="table-row cursor-pointer hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200"
+        id="commande-<?php echo $cmd['id']?>"
+        data-commande-id="<?php echo $cmd['id']?>"
+        onclick="ouvrirModalDepuisLigne(event, <?php echo $cmd['id']?>)"
+        title="Cliquez pour voir les détails">
+        <td class="px-3 py-3 whitespace-nowrap border-r border-gray-200">
+            <div class="flex items-center justify-center">
+                <div class="w-7 h-7 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                    <span class="text-white text-xs font-bold"><?php echo $numero_affichage?></span>
                 </div>
-                <span class="text-base font-medium text-gray-800">
-    <?php if (($cmd['type_commande'] ?? 'en_ligne') === 'manuelle'): ?>
-        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2">
-            <i class="fas fa-user-edit mr-1"></i>MANUELLE
-        </span>
-    <?php endif; ?>
-    <?php echo e($cmd['nom_client'])?>
-</span>
             </div>
         </td>
-        <td class="px-6 py-4 table-cell">
-            <div class="space-y-1">
-                <div class="text-sm text-gray-800 flex items-center">
-                    <i class="fas fa-envelope text-gray-400 mr-2 text-xs"></i>
+        <td class="px-3 py-3 border-r border-gray-200">
+            <div class="flex items-center">
+                <div class="w-8 h-8 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center mr-2 flex-shrink-0">
+                    <span class="text-white font-bold text-xs"><?php echo strtoupper(substr(e($cmd['nom_client']), 0, 1))?></span>
+                </div>
+                <div class="truncate">
+                    <?php if (($cmd['type_commande'] ?? 'en_ligne') === 'manuelle'): ?>
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                            <i class="fas fa-user-edit text-xs"></i>
+                        </span>
+                    <?php endif; ?>
+                    <span class="text-sm font-semibold text-gray-900"><?php echo e($cmd['nom_client'])?></span>
+                </div>
+            </div>
+        </td>
+        <td class="px-3 py-3 border-r border-gray-200">
+            <div class="space-y-0.5">
+                <div class="text-xs text-gray-900 font-medium truncate flex items-center">
+                    <i class="fas fa-envelope text-gray-400 mr-1 text-xs"></i>
                     <?php echo e($cmd['email'])?>
                 </div>
-                <div class="text-sm text-gray-500 flex items-center">
-                    <i class="fas fa-phone text-gray-400 mr-2 text-xs"></i>
+                <div class="text-xs text-gray-500 flex items-center">
+                    <i class="fas fa-phone text-gray-400 mr-1 text-xs"></i>
                     <?php echo e($cmd['telephone'])?>
                 </div>
             </div>
         </td>
-        <td class="px-6 py-4 whitespace-nowrap table-cell">
+        <td class="px-3 py-3 whitespace-nowrap border-r border-gray-200 text-center">
             <div class="flex items-center justify-center">
-                <span class="text-base font-bold text-gray-800 bg-blue-100 rounded-full w-8 h-8 flex items-center justify-center">
+                <span class="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center text-sm font-bold text-gray-800">
                     <?php echo e($cmd['num_table'] ?? 'N/A')?>
                 </span>
             </div>
         </td>
-        <td class="px-6 py-4 whitespace-nowrap table-cell">
+        <td class="px-3 py-3 whitespace-nowrap border-r border-gray-200">
             <div class="flex items-center">
-                <i class="fas fa-coins text-emerald-500 mr-2"></i>
-                <span class="text-base font-bold text-gray-800"><?php echo number_format($cmd['total'], 0)?> FCFA</span>
+                <i class="fas fa-coins text-emerald-500 mr-1.5 text-xs"></i>
+                <span class="text-sm font-bold text-gray-800"><?php echo number_format($cmd['total'], 0)?> FCFA</span>
             </div>
         </td>
-        <td class="px-6 py-4 whitespace-nowrap table-cell">
+        <td class="px-3 py-3 whitespace-nowrap border-r border-gray-200 text-center">
             <?php
                 $statutClass = '';
                 $statutIcon  = '';
@@ -1482,59 +1624,69 @@ $categories_disponibles = getAllCategories($conn);
                         $statutIcon  = 'fas fa-question-circle';
                 }
             ?>
-            <span class="status-badge <?php echo $statutClass?> flex items-center" id="statut-<?php echo $cmd['id']?>">
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold <?php echo $statutClass?> border" id="statut-<?php echo $cmd['id']?>">
                 <i class="<?php echo $statutIcon?> mr-1 text-xs"></i>
                 <?php echo e($cmd['statut'])?>
             </span>
         </td>
-        <td class="px-6 py-4 whitespace-nowrap table-cell">
+        <td class="px-3 py-3 whitespace-nowrap border-r border-gray-200 text-center">
             <?php
                 $statutPaiement = $cmd['statut_paiement'] ?? 'Impayé';
-                $paiementClass  = $statutPaiement === 'Payé' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800';
+                $paiementClass  = $statutPaiement === 'Payé' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-orange-100 text-orange-800 border-orange-200';
                 $paiementIcon   = $statutPaiement === 'Payé' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle';
             ?>
-            <span class="status-badge <?php echo $paiementClass?> flex items-center" id="paiement-<?php echo $cmd['id']?>">
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold <?php echo $paiementClass?> border" id="paiement-<?php echo $cmd['id']?>">
                 <i class="<?php echo $paiementIcon?> mr-1 text-xs"></i>
                 <?php echo e($statutPaiement)?>
             </span>
         </td>
-        <td class="px-6 py-4 whitespace-nowrap table-cell">
+        <td class="px-3 py-3 whitespace-nowrap border-r border-gray-200 text-center">
             <?php if ($cmd['vu_admin']): ?>
-                <span class="status-badge bg-green-100 text-green-800 flex items-center" id="vu-<?php echo $cmd['id']?>">
-                    <i class="fas fa-eye text-xs mr-1"></i>
-                    Consulté
+                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200" id="vu-<?php echo $cmd['id']?>">
+                    <i class="fas fa-check-circle text-xs mr-1"></i>
+                    Lu
                 </span>
             <?php else: ?>
-                <span class="status-badge bg-red-100 text-red-800 flex items-center" id="vu-<?php echo $cmd['id']?>">
-                    <i class="fas fa-exclamation text-xs mr-1"></i>
+                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200" id="vu-<?php echo $cmd['id']?>">
+                    <i class="fas fa-circle text-xs mr-1 animate-pulse"></i>
                     Nouveau
                 </span>
             <?php endif; ?>
         </td>
-        <td class="px-6 py-4 whitespace-nowrap table-cell">
-            <div class="flex items-center text-sm text-gray-500">
-                <i class="fas fa-calendar-alt text-gray-400 mr-2"></i>
-                <?php echo e($cmd['date_commande'] ?? $cmd['created_at'] ?? 'Non défini')?>
+        <td class="px-3 py-3 border-r border-gray-200">
+            <div class="flex items-center text-xs text-gray-500">
+                <i class="fas fa-calendar text-gray-400 mr-1.5 text-xs"></i>
+                <div>
+                    <?php
+                        $date = $cmd['date_commande'] ?? $cmd['created_at'] ?? 'Non défini';
+                        if ($date !== 'Non défini') {
+                            echo date('d/m/Y', strtotime($date));
+                            echo '<br><span class="text-xs text-gray-400">' . date('H:i', strtotime($date)) . '</span>';
+                        } else {
+                            echo $date;
+                        }
+                    ?>
+                </div>
             </div>
         </td>
-        <td class="px-6 py-4 whitespace-nowrap table-cell">
-            <div class="flex space-x-2">
+        <td class="px-3 py-3 text-center">
+            <div class="flex items-center justify-center gap-1">
                 <a href="recu.php?id=<?php echo $cmd['id']?>"
                    target="_blank"
-                   class="action-btn btn-voir">
-                    <i class="fas fa-eye"></i>
-                    Voir
+                   class="inline-flex items-center px-2 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-all duration-200 border border-green-200"
+                   title="Voir le reçu">
+                    <i class="fas fa-eye text-sm"></i>
                 </a>
                 <button onclick="openEditModal(<?php echo $cmd['id']?>, '<?php echo $numero_affichage?>')"
-       class="action-btn btn-modifier">
-    <i class="fas fa-edit"></i>
-    Modifier
-</button>
-<button onclick="confirmDelete(<?php echo $cmd['id']?>, '<?php echo e($cmd['nom_client'])?>', '<?php echo $numero_affichage?>')"
-       class="action-btn btn-supprimer">
-    <i class="fas fa-trash"></i>
-    Supprimer
-</button>
+                   class="inline-flex items-center px-2 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all duration-200 border border-blue-200"
+                   title="Modifier">
+                    <i class="fas fa-edit text-sm"></i>
+                </button>
+                <button onclick="confirmDelete(<?php echo $cmd['id']?>, '<?php echo e($cmd['nom_client'])?>', '<?php echo $numero_affichage?>')"
+                   class="inline-flex items-center px-2 py-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-all duration-200 border border-red-200"
+                   title="Supprimer">
+                    <i class="fas fa-trash text-sm"></i>
+                </button>
             </div>
         </td>
     </tr>
@@ -1860,15 +2012,27 @@ endforeach; ?>
                     <p class="text-green-100">Sélectionnez les produits pour créer une commande</p>
                 </div>
             </div>
-            <button onclick="closeCommandeManuelleModal()" class="text-white/80 hover:text-white transition-colors">
-                <i class="fas fa-times text-2xl"></i>
-            </button>
+
+            <!-- Boutons d'action du header -->
+            <div class="flex items-center space-x-4">
+                <!-- Bouton Panier -->
+                <button onclick="openPanierModal()" class="relative bg-white/20 hover:bg-white/30 px-6 py-3 rounded-lg transition-all duration-300 flex items-center space-x-3">
+                    <i class="fas fa-shopping-cart text-xl"></i>
+                    <span class="font-semibold">Panier</span>
+                    <span id="headerItemCount" class="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full min-w-[24px] text-center">0</span>
+                </button>
+
+                <!-- Bouton Fermer -->
+                <button onclick="closeCommandeManuelleModal()" class="text-white/80 hover:text-white transition-colors">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
         </div>
 
         <!-- Contenu principal -->
         <div class="flex-1 flex overflow-hidden">
-            <!-- Panel gauche - Produits -->
-            <div class="flex-1 flex flex-col border-r border-gray-200">
+            <!-- Panel produits (pleine largeur maintenant) -->
+            <div class="flex-1 flex flex-col">
                 <!-- Barre de recherche et navigation -->
                 <div class="p-6 border-b border-gray-200 bg-gray-50">
 
@@ -1897,98 +2061,139 @@ endforeach; ?>
                 </div>
 
                 <!-- Grille des produits -->
-                <div class="flex-1 overflow-auto p-6">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" id="produitsGrid">
+                <div class="flex-1 overflow-auto p-4">
+                    <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2" id="produitsGrid">
                         <!-- Les produits seront chargés dynamiquement -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- Panel droit - Panier -->
-            <div class="w-96 flex flex-col bg-gray-50">
-                <!-- Header du panier -->
-                <div class="p-6 border-b border-gray-200">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-bold text-gray-800">Récapitulatif</h3>
-                        <span class="bg-green-100 text-green-800 text-sm font-medium px-3 py-1 rounded-full" id="itemCount">0 article</span>
-                    </div>
-                    
-                    <!-- Informations client -->
-                    <div class="space-y-3">
-                        <div class="relative">
-                            <input type="number" id="numTable" placeholder="N° de table *" min="1" 
-                                   class="w-full px-3 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-center font-bold text-lg">
-                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <i class="fas fa-table text-gray-400"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Liste des articles -->
-                <div class="flex-1 overflow-auto p-6">
-                    <div id="panierItems" class="space-y-3">
-                        <!-- Message panier vide -->
-                        <div id="panierVide" class="text-center py-12">
-                            <div class="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <i class="fas fa-shopping-cart text-gray-400 text-xl"></i>
-                            </div>
-                            <p class="text-gray-500">Aucun article sélectionné</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Section remise et total -->
-                <div class="border-t border-gray-200 p-6 space-y-4">
-                    <!-- Options de remise -->
-                    <div class="space-y-3">
-                        <label class="block text-sm font-medium text-gray-700">Remise</label>
-                        <div class="grid grid-cols-2 gap-3">
-                            <button onclick="toggleRemiseType('pourcentage')" id="btnRemisePourcentage" 
-                                    class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors">
-                                <i class="fas fa-percent mr-2"></i>%
-                            </button>
-                            <button onclick="toggleRemiseType('montant')" id="btnRemiseMontant" 
-                                    class="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors">
-                                <i class="fas fa-coins mr-2"></i>FCFA
-                            </button>
-                        </div>
-                        <input type="number" id="remiseValeur" placeholder="Valeur de la remise" min="0" step="0.01"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 hidden">
-                    </div>
-
-                    <!-- Totaux -->
-                    <div class="space-y-2">
-                        <div class="flex justify-between text-sm">
-                            <span class="text-gray-600">Sous-total :</span>
-                            <span id="sousTotal">0 FCFA</span>
-                        </div>
-                        <div class="flex justify-between text-sm text-green-600" id="ligneRemise" style="display: none;">
-                            <span>Remise :</span>
-                            <span id="montantRemise">-0 FCFA</span>
-                        </div>
-                        <div class="flex justify-between text-lg font-bold border-t pt-2">
-                            <span>Total :</span>
-                            <span id="totalFinal" class="text-green-600">0 FCFA</span>
-                        </div>
-                    </div>
-
-                    <!-- Boutons d'action -->
-                    <div class="grid grid-cols-2 gap-3 pt-4">
-                        <button onclick="viderPanier()" 
-                                class="px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-                            <i class="fas fa-trash mr-2"></i>Vider
-                        </button>
-                        <button onclick="effectuerPaiement()" id="btnPayer"
-                                class="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium">
-                            Enregistrer
-                        </button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- ===== MODAL PANIER ===== -->
+<div id="panierModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm modal-overlay flex items-center justify-center z-[60] hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[95vh] m-4 flex flex-col overflow-hidden">
+        <!-- Header du panier -->
+        <div class="bg-gradient-to-r from-green-600 via-green-500 to-emerald-600 text-white p-6 flex items-center justify-between">
+            <div class="flex items-center">
+                <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center mr-4 animate-float">
+                    <i class="fas fa-shopping-basket text-2xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-3xl font-bold">Récapitulatif de commande</h3>
+                    <p class="text-green-50 text-sm mt-1">Vérifiez et validez votre commande</p>
+                </div>
+            </div>
+            <button onclick="closePanierModal()" class="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-lg flex items-center justify-center transition-all">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+
+        <!-- Contenu du panier -->
+        <div class="flex-1 overflow-auto bg-gray-50">
+            <!-- Informations table -->
+            <div class="p-6 border-b-2 border-gray-300 bg-white">
+                <label class="block text-sm font-bold text-gray-700 mb-3 flex items-center">
+                    <i class="fas fa-table text-green-600 mr-2"></i>
+                    Numéro de table <span class="text-red-500 ml-1">*</span>
+                </label>
+                <div class="relative">
+                    <input type="number" id="numTable" placeholder="Entrez le N° de table" min="1"
+                           class="w-full px-5 py-4 pl-14 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-green-200 focus:border-green-500 text-center font-bold text-2xl transition-all">
+                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <i class="fas fa-hashtag text-gray-400 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Liste des articles -->
+            <div class="p-6">
+                <h4 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                    <i class="fas fa-list text-green-600 mr-2"></i>
+                    Articles commandés
+                </h4>
+                <div id="panierItems" class="space-y-4">
+                    <!-- Message panier vide -->
+                    <div id="panierVide" class="text-center py-16 bg-white rounded-xl border-2 border-dashed border-gray-300">
+                        <div class="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-shopping-cart text-gray-400 text-3xl"></i>
+                        </div>
+                        <p class="text-gray-500 text-lg font-medium">Aucun article sélectionné</p>
+                        <p class="text-gray-400 text-sm mt-2">Ajoutez des produits pour commencer</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer avec totaux et actions -->
+        <div class="border-t-4 border-gray-300 p-6 bg-white space-y-5">
+            <!-- Options de remise -->
+            <div class="space-y-3">
+                <label class="block text-base font-bold text-gray-700 flex items-center">
+                    <i class="fas fa-percent-circle text-green-600 mr-2"></i>
+                    Remise (Optionnel)
+                </label>
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="toggleRemiseType('pourcentage')" id="btnRemisePourcentage"
+                            class="px-4 py-3 border-2 border-gray-300 rounded-xl text-sm font-semibold hover:bg-green-50 hover:border-green-400 transition-all">
+                        <i class="fas fa-percent mr-2"></i>Pourcentage
+                    </button>
+                    <button onclick="toggleRemiseType('montant')" id="btnRemiseMontant"
+                            class="px-4 py-3 border-2 border-gray-300 rounded-xl text-sm font-semibold hover:bg-green-50 hover:border-green-400 transition-all">
+                        <i class="fas fa-coins mr-2"></i>Montant fixe
+                    </button>
+                </div>
+                <input type="number" id="remiseValeur" placeholder="Entrez la valeur de la remise" min="0" step="0.01"
+                       class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-green-200 focus:border-green-500 transition-all hidden">
+            </div>
+
+            <!-- Totaux -->
+            <div class="space-y-4 bg-gradient-to-br from-gray-50 to-gray-100 p-5 rounded-2xl border-2 border-gray-200 shadow-inner">
+                <div class="flex justify-between items-center text-base">
+                    <span class="text-gray-600 font-semibold flex items-center">
+                        <i class="fas fa-calculator text-gray-400 mr-2"></i>Sous-total
+                    </span>
+                    <span id="sousTotal" class="font-bold text-gray-800 text-lg">0 FCFA</span>
+                </div>
+                <div class="flex justify-between items-center text-base text-green-600" id="ligneRemise" style="display: none;">
+                    <span class="font-semibold flex items-center">
+                        <i class="fas fa-tag text-green-500 mr-2"></i>Remise
+                    </span>
+                    <span id="montantRemise" class="font-bold text-lg">-0 FCFA</span>
+                </div>
+                <div class="flex justify-between items-center text-2xl font-bold border-t-2 border-gray-300 pt-4 mt-2">
+                    <span class="flex items-center text-gray-800">
+                        <i class="fas fa-receipt text-green-600 mr-2 text-xl"></i>Total
+                    </span>
+                    <span id="totalFinal" class="text-green-600">0 FCFA</span>
+                </div>
+            </div>
+
+            <!-- Boutons d'action -->
+            <div class="grid grid-cols-3 gap-3 pt-3">
+                <button onclick="viderPanier()"
+                        class="px-4 py-4 bg-red-50 border-2 border-red-300 text-red-600 rounded-xl hover:bg-red-100 hover:border-red-400 transition-all font-semibold shadow-sm">
+                    <i class="fas fa-trash mb-1"></i>
+                    <div class="text-xs">Vider</div>
+                </button>
+                <button onclick="imprimerRecu()"
+                        class="px-4 py-4 bg-blue-50 border-2 border-blue-300 text-blue-600 rounded-xl hover:bg-blue-100 hover:border-blue-400 transition-all font-semibold shadow-sm">
+                    <i class="fas fa-print mb-1"></i>
+                    <div class="text-xs">Imprimer</div>
+                </button>
+                <button onclick="effectuerPaiement()" id="btnPayer"
+                        class="px-4 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all font-bold shadow-lg hover:shadow-xl transform hover:scale-105">
+                    <i class="fas fa-check-circle mb-1"></i>
+                    <div class="text-sm">Valider</div>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== ZONE D'IMPRESSION (masquée) ===== -->
+<div id="printArea" class="hidden"></div>
 
 
     <!-- Toast Notification Container -->
@@ -2278,6 +2483,204 @@ endforeach; ?>
         modal.classList.add('hidden');
     }
 
+    // Fonctions pour gérer le modal panier
+    function openPanierModal() {
+        const panierModal = document.getElementById('panierModal');
+        panierModal.classList.remove('hidden');
+        updatePanierDisplay();
+        updateTotaux();
+    }
+
+    function closePanierModal() {
+        const panierModal = document.getElementById('panierModal');
+        panierModal.classList.add('hidden');
+    }
+
+    // Fonction pour imprimer le reçu
+    function imprimerRecu() {
+        if (panier.length === 0) {
+            showToast('Le panier est vide', 'error');
+            return;
+        }
+
+        const numTable = document.getElementById('numTable').value;
+        if (!numTable) {
+            showToast('Veuillez saisir un numéro de table', 'error');
+            return;
+        }
+
+        // Calculer les totaux
+        const sousTotal = panier.reduce((sum, item) => sum + (item.prix * item.quantite), 0);
+        let montantRemise = 0;
+
+        if (remiseType === 'pourcentage') {
+            montantRemise = (sousTotal * remiseValeur) / 100;
+        } else if (remiseType === 'montant') {
+            montantRemise = remiseValeur;
+        }
+
+        const total = sousTotal - montantRemise;
+        const dateNow = new Date();
+        const dateStr = dateNow.toLocaleDateString('fr-FR');
+        const heureStr = dateNow.toLocaleTimeString('fr-FR');
+
+        // Générer le HTML du reçu
+        let recuHTML = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Reçu - Table ${numTable}</title>
+            <style>
+                @media print {
+                    @page { margin: 0; }
+                    body { margin: 1cm; }
+                }
+                body {
+                    font-family: 'Courier New', monospace;
+                    width: 80mm;
+                    margin: 0 auto;
+                    padding: 10px;
+                }
+                .header {
+                    text-align: center;
+                    border-bottom: 2px dashed #000;
+                    padding-bottom: 10px;
+                    margin-bottom: 10px;
+                }
+                .restaurant-name {
+                    font-size: 20px;
+                    font-weight: bold;
+                    margin-bottom: 5px;
+                }
+                .info-line {
+                    font-size: 11px;
+                    margin: 2px 0;
+                }
+                .section {
+                    margin: 15px 0;
+                }
+                .item-line {
+                    display: flex;
+                    justify-content: space-between;
+                    margin: 5px 0;
+                    font-size: 12px;
+                }
+                .item-name {
+                    flex: 1;
+                }
+                .item-qty {
+                    width: 30px;
+                    text-align: center;
+                }
+                .item-price {
+                    width: 80px;
+                    text-align: right;
+                }
+                .separator {
+                    border-top: 1px dashed #000;
+                    margin: 10px 0;
+                }
+                .total-line {
+                    display: flex;
+                    justify-content: space-between;
+                    font-size: 13px;
+                    margin: 5px 0;
+                }
+                .total-line.grand-total {
+                    font-size: 16px;
+                    font-weight: bold;
+                    border-top: 2px solid #000;
+                    padding-top: 5px;
+                    margin-top: 10px;
+                }
+                .footer {
+                    text-align: center;
+                    margin-top: 20px;
+                    border-top: 2px dashed #000;
+                    padding-top: 10px;
+                    font-size: 11px;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <div class="restaurant-name">RESTAURANT JUNGLE</div>
+                <div class="info-line">Abidjan, Côte d'Ivoire</div>
+                <div class="info-line">Tél: +225 XX XX XX XX XX</div>
+                <div class="info-line">Date: ${dateStr} ${heureStr}</div>
+            </div>
+
+            <div class="section">
+                <div class="info-line" style="font-weight: bold; text-align: center; font-size: 14px;">
+                    TABLE N° ${numTable}
+                </div>
+            </div>
+
+            <div class="separator"></div>
+
+            <div class="section">
+                <div style="font-weight: bold; margin-bottom: 10px;">ARTICLES:</div>
+        `;
+
+        // Ajouter les articles
+        panier.forEach(item => {
+            recuHTML += `
+                <div class="item-line">
+                    <span class="item-name">${item.nom}</span>
+                    <span class="item-qty">x${item.quantite}</span>
+                    <span class="item-price">${parseInt(item.prix * item.quantite)} FCFA</span>
+                </div>
+            `;
+        });
+
+        recuHTML += `
+            </div>
+
+            <div class="separator"></div>
+
+            <div class="section">
+                <div class="total-line">
+                    <span>Sous-total:</span>
+                    <span>${parseInt(sousTotal)} FCFA</span>
+                </div>
+        `;
+
+        if (montantRemise > 0) {
+            recuHTML += `
+                <div class="total-line" style="color: green;">
+                    <span>Remise${remiseType === 'pourcentage' ? ' (' + remiseValeur + '%)' : ''}:</span>
+                    <span>-${parseInt(montantRemise)} FCFA</span>
+                </div>
+            `;
+        }
+
+        recuHTML += `
+                <div class="total-line grand-total">
+                    <span>TOTAL:</span>
+                    <span>${parseInt(total)} FCFA</span>
+                </div>
+            </div>
+
+            <div class="footer">
+                <div style="margin-top: 10px;">Merci de votre visite!</div>
+                <div style="margin-top: 5px;">À bientôt</div>
+            </div>
+        </body>
+        </html>
+        `;
+
+        // Créer une fenêtre d'impression
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(recuHTML);
+        printWindow.document.close();
+
+        // Attendre que le contenu soit chargé puis imprimer
+        printWindow.onload = function() {
+            printWindow.print();
+        };
+    }
+
     // Fonction pour charger les produits - CORRIGÉE
     function chargerProduits() {
         console.log("Tentative de chargement des produits...");
@@ -2394,35 +2797,64 @@ endforeach; ?>
         
         grid.innerHTML = '';
         produitsToShow.forEach(produit => {
+            // Debug: afficher les infos du produit
+            if (produit.image) {
+                console.log('Produit:', produit.nom, 'Image:', produit.image);
+            }
+
             // Vérifier si le produit est dans le panier
             const itemInPanier = panier.find(item => item.id == produit.id);
             const quantiteInPanier = itemInPanier ? itemInPanier.quantite : 0;
-            
+
             const card = document.createElement('div');
             card.className = 'produit-card bg-white shadow-sm border border-gray-100';
+
+            // Gérer les différents formats d'image (image, image_url, ou chemin complet)
+            const imagePath = produit.image || produit.image_url || '';
+
+            // Construire le bon chemin d'image
+            let imageSrc = '';
+            if (imagePath) {
+                // Si le chemin commence par uploads/, ajouter ../
+                if (imagePath.startsWith('uploads/')) {
+                    imageSrc = '../' + imagePath;
+                }
+                // Si c'est juste un nom de fichier, ajouter ../uploads/
+                else if (!imagePath.includes('/')) {
+                    imageSrc = '../uploads/' + imagePath;
+                }
+                // Sinon utiliser tel quel
+                else {
+                    imageSrc = imagePath;
+                }
+            }
+
+            const imageHtml = imageSrc ?
+                `<img src="${imageSrc}"
+                      alt="${produit.nom}"
+                      class="produit-image"
+                      onerror="console.log('Erreur image:', this.src); this.style.display='none'; this.nextElementSibling.style.display='flex';">`
+                : '';
+
             card.innerHTML = `
                 <div class="relative">
-                    ${produit.image_url ? 
-                        `<img src="../${produit.image_url}" alt="${produit.nom}" class="produit-image" onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.style.display='flex';">` 
-                        : ''
-                    }
-                    <div class="produit-placeholder" style="${produit.image_url ? 'display: none;' : ''}">
-                        <i class="fas fa-utensils text-gray-300 text-3xl"></i>
+                    ${imageHtml}
+                    <div class="produit-placeholder" style="${imagePath ? 'display: none;' : 'display: flex;'}">
+                        <i class="fas fa-utensils text-gray-300 text-xl"></i>
                     </div>
-                    
-                    <div class="produit-badge">${parseInt(produit.prix)} FCFA</div>
-                    
-                    ${quantiteInPanier > 0 ? `<div class="produit-quantity-badge">${quantiteInPanier}</div>` : ''}
+
+                    <div class="produit-badge text-[10px] px-2 py-0.5">${parseInt(produit.prix)}</div>
+
+                    ${quantiteInPanier > 0 ? `<div class="produit-quantity-badge text-xs">${quantiteInPanier}</div>` : ''}
                 </div>
-                
-                <div class="produit-info p-3">
-                    <h3 class="produit-nom font-semibold text-gray-800 mb-2">${produit.nom}</h3>
-                    <div class="flex items-center justify-between">
-                        <span class="produit-prix font-bold text-green-600">${parseInt(produit.prix)} FCFA</span>
-                        <button onclick="ajouterAuPanier(${produit.id})" 
-                                class="btn-ajouter px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors ${quantiteInPanier > 0 ? 'bg-green-700' : ''}">
-                            <i class="fas fa-plus mr-1"></i>
-                            Ajouter
+
+                <div class="produit-info p-1.5">
+                    <h3 class="produit-nom font-semibold text-gray-800 mb-1 text-[11px] leading-tight">${produit.nom}</h3>
+                    <div class="flex items-center justify-between gap-1">
+                        <span class="produit-prix font-bold text-green-600 text-xs">${parseInt(produit.prix)}</span>
+                        <button onclick="ajouterAuPanier(${produit.id})"
+                                class="btn-ajouter px-1.5 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition-colors ${quantiteInPanier > 0 ? 'bg-green-700' : ''}">
+                            <i class="fas fa-plus text-[10px]"></i>
                         </button>
                     </div>
                 </div>
@@ -2438,9 +2870,9 @@ endforeach; ?>
             console.error("Produit non trouvé:", produitId);
             return;
         }
-        
+
         const existingItemIndex = panier.findIndex(item => item.id == produitId);
-        
+
         if (existingItemIndex >= 0) {
             // Produit déjà dans le panier, augmenter la quantité
             panier[existingItemIndex].quantite++;
@@ -2451,14 +2883,23 @@ endforeach; ?>
                 nom: produit.nom,
                 prix: parseFloat(produit.prix),
                 quantite: 1,
-                image: produit.image_url || null
+                image: produit.image || produit.image_url || null
             });
         }
-        
+
         updatePanierDisplay();
         updateTotaux();
         updateProductBadges(); // Mettre à jour les badges sur les produits
-        
+
+        // Animer le badge du panier
+        const headerBadge = document.getElementById('headerItemCount');
+        if (headerBadge) {
+            headerBadge.classList.add('pulse-badge');
+            setTimeout(() => {
+                headerBadge.classList.remove('pulse-badge');
+            }, 500);
+        }
+
         // Animation de feedback
         showToast(`${produit.nom} ajouté au panier`, 'success');
     }
@@ -2504,56 +2945,75 @@ endforeach; ?>
     function updatePanierDisplay() {
         const panierItems = document.getElementById('panierItems');
         const panierVide = document.getElementById('panierVide');
-        const itemCount = document.getElementById('itemCount');
-        
+        const headerItemCount = document.getElementById('headerItemCount');
+
         if (panier.length === 0) {
             panierVide.style.display = 'block';
             panierItems.innerHTML = '';
             panierItems.appendChild(panierVide);
-            itemCount.textContent = '0 article';
+            if (headerItemCount) headerItemCount.textContent = '0';
             return;
         }
-        
+
         panierVide.style.display = 'none';
         const totalItems = panier.reduce((sum, item) => sum + item.quantite, 0);
-        itemCount.textContent = `${totalItems} article${totalItems > 1 ? 's' : ''}`;
-        
+        if (headerItemCount) headerItemCount.textContent = totalItems;
+
         panierItems.innerHTML = '';
         
         panier.forEach((item, index) => {
             const itemDiv = document.createElement('div');
-            itemDiv.className = 'panier-item bg-white rounded-lg p-4 border border-gray-200 mb-3';
+            itemDiv.className = 'panier-item bg-white rounded-xl p-5 border-2 border-gray-200 shadow-sm hover:shadow-md transition-all';
+
+            const imageHtml = item.image ?
+                `<img src="${item.image.startsWith('uploads/') ? '../' + item.image : (item.image.includes('/') ? item.image : '../uploads/' + item.image)}"
+                      alt="${item.nom}"
+                      class="w-16 h-16 object-cover rounded-lg"
+                      onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg flex items-center justify-center\\'><i class=\\'fas fa-utensils text-gray-400 text-xl\\'></i></div>';")>`
+                :
+                `<div class="w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-utensils text-gray-400 text-xl"></i>
+                </div>`;
+
             itemDiv.innerHTML = `
-                <div class="flex items-start justify-between mb-3">
-                    <div class="flex items-start">
-                        ${item.image ? 
-                            `<img src="../${item.image}" alt="${item.nom}" class="w-12 h-12 object-cover rounded-md mr-3" onerror="this.onerror=null; this.style.display='none';">` 
-                            : 
-                            `<div class="w-12 h-12 bg-gray-100 rounded-md flex items-center justify-center mr-3">
-                                <i class="fas fa-utensils text-gray-400"></i>
-                            </div>`
-                        }
-                        <div>
-                            <h4 class="font-medium text-gray-800">${item.nom}</h4>
-                            <p class="text-sm text-gray-500">${parseInt(item.prix)} FCFA l'unité</p>
+                <!-- Ligne 1: Image + Infos + Supprimer -->
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center flex-1">
+                        ${imageHtml}
+                        <div class="ml-4 flex-1">
+                            <h4 class="font-bold text-gray-900 text-base mb-1">${item.nom}</h4>
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                                    <i class="fas fa-tag text-green-600 mr-1"></i>${parseInt(item.prix)} FCFA
+                                </span>
+                            </div>
                         </div>
                     </div>
-                    <button onclick="retirerDuPanier(${index})" class="text-red-500 hover:text-red-700 ml-2 mt-1">
-                        <i class="fas fa-times"></i>
+                    <button onclick="retirerDuPanier(${index})"
+                            class="ml-3 w-8 h-8 bg-red-100 text-red-600 hover:bg-red-200 rounded-lg flex items-center justify-center transition-all">
+                        <i class="fas fa-trash text-sm"></i>
                     </button>
                 </div>
-                <div class="flex items-center justify-between">
-                    <div class="quantite-controls flex items-center">
-                        <button onclick="modifierQuantite(${index}, -1)" class="quantite-btn w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-                            <i class="fas fa-minus text-gray-600"></i>
-                        </button>
-                        <span class="text-lg font-medium w-10 text-center mx-2">${item.quantite}</span>
-                        <button onclick="modifierQuantite(${index}, 1)" class="quantite-btn w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-                            <i class="fas fa-plus text-gray-600"></i>
-                        </button>
+
+                <!-- Ligne 2: Contrôles quantité + Prix total -->
+                <div class="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                    <div class="flex items-center">
+                        <span class="text-sm font-medium text-gray-600 mr-3">Quantité:</span>
+                        <div class="flex items-center gap-2 bg-white rounded-lg border-2 border-gray-200 px-2">
+                            <button onclick="modifierQuantite(${index}, -1)"
+                                    class="w-8 h-8 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded transition-all flex items-center justify-center">
+                                <i class="fas fa-minus"></i>
+                            </button>
+                            <span class="text-lg font-bold text-gray-900 min-w-[30px] text-center">${item.quantite}</span>
+                            <button onclick="modifierQuantite(${index}, 1)"
+                                    class="w-8 h-8 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded transition-all flex items-center justify-center">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="text-right">
-                        <div class="text-lg font-bold text-green-600">${parseInt(item.prix * item.quantite)} FCFA</div>
+                        <div class="text-xs text-gray-500 mb-0.5">Total</div>
+                        <div class="text-xl font-bold text-green-600">${parseInt(item.prix * item.quantite)} <span class="text-sm">FCFA</span></div>
                     </div>
                 </div>
             `;
@@ -3345,6 +3805,17 @@ function updateTrendIndicator(card, current, total) {
             document.getElementById('detailsCommandeModal').classList.add('hidden');
         }
 
+        // Ouvrir le modal en cliquant sur la ligne
+        function ouvrirModalDepuisLigne(event, commandeId) {
+            // Ne pas ouvrir le modal si on clique sur un bouton ou un lien
+            if (event.target.closest('button') || event.target.closest('a')) {
+                return;
+            }
+
+            // Ouvrir le modal de visualisation des détails
+            viewCommandeDetails(commandeId);
+        }
+
         // Live clock update
         setInterval(() => {
             const now = new Date();
@@ -3356,6 +3827,198 @@ function updateTrendIndicator(card, current, total) {
                 clockElement.textContent = `${hours}:${minutes}:${seconds}`;
             }
         }, 1000);
+
+        // ========== SYSTÈME DE NOTIFICATIONS COMMANDES ==========
+
+        let dernierNombreCommandes = 0;
+        let notificationSoundPlayed = false;
+
+        // Créer un son de notification
+        function playNotificationSound() {
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                oscillator.frequency.value = 800;
+                oscillator.type = 'sine';
+
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.5);
+            } catch (e) {
+                console.log('Notification sonore non disponible');
+            }
+        }
+
+        // Formater la date
+        function formatDateFr(dateString) {
+            const date = new Date(dateString);
+            const options = { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' };
+            return date.toLocaleDateString('fr-FR', options);
+        }
+
+        // Formater le montant
+        function formatMontant(montant) {
+            return new Intl.NumberFormat('fr-FR').format(montant) + ' FCFA';
+        }
+
+        // Mettre à jour les notifications
+        function updateNotificationsCommandes() {
+            fetch('get_nouvelles_commandes.php')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const nombreNouvelles = data.nombre_nouvelles;
+                        const commandesAujourdhui = data.commandes_aujourdhui;
+                        const dernieresCommandes = data.dernieres_commandes;
+
+                        // Mettre à jour les badges
+                        const badge = document.getElementById('notification-badge-commandes');
+                        const countSpan = document.getElementById('notification-count-commandes');
+                        const todayCount = document.getElementById('today-count-commandes');
+
+                        if (nombreNouvelles > 0) {
+                            badge.textContent = nombreNouvelles;
+                            badge.classList.remove('hidden');
+                            countSpan.textContent = nombreNouvelles;
+
+                            // Si le nombre a augmenté, jouer le son
+                            if (nombreNouvelles > dernierNombreCommandes) {
+                                playNotificationSound();
+                                showToastCommande('Nouvelle commande reçue !', 'success');
+                            }
+                        } else {
+                            badge.classList.add('hidden');
+                            countSpan.textContent = '0';
+                        }
+
+                        dernierNombreCommandes = nombreNouvelles;
+
+                        // Mettre à jour le compteur des commandes du jour
+                        todayCount.textContent = commandesAujourdhui.length;
+
+                        // Afficher les commandes du jour
+                        const todayContainer = document.getElementById('today-commandes');
+                        if (commandesAujourdhui.length > 0) {
+                            todayContainer.innerHTML = commandesAujourdhui.map(cmd => `
+                                <div class="bg-slate-700 rounded-lg p-3 hover:bg-slate-600 transition-colors border border-teal-500/30">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="font-semibold text-white text-sm">${cmd.nom_client}</span>
+                                        <span class="text-teal-400 font-bold text-sm">Table ${cmd.num_table || 'N/A'}</span>
+                                    </div>
+                                    <div class="flex items-center justify-between text-xs">
+                                        <span class="text-gray-400">${formatMontant(cmd.total)}</span>
+                                        <span class="text-gray-400">${cmd.telephone}</span>
+                                    </div>
+                                    <div class="mt-1 text-xs">
+                                        <span class="px-2 py-0.5 rounded ${cmd.statut === 'En cours' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-green-500/20 text-green-400'}">${cmd.statut}</span>
+                                    </div>
+                                </div>
+                            `).join('');
+                        } else {
+                            todayContainer.innerHTML = `
+                                <div class="text-center py-4 text-gray-400 text-sm">
+                                    <i class="fas fa-calendar-times mb-2"></i>
+                                    <p>Aucune commande aujourd'hui</p>
+                                </div>
+                            `;
+                        }
+
+                        // Afficher les nouvelles commandes
+                        const newContainer = document.getElementById('new-commandes');
+                        if (dernieresCommandes.length > 0) {
+                            newContainer.innerHTML = dernieresCommandes.map(cmd => `
+                                <div class="bg-slate-700 rounded-lg p-3 hover:bg-slate-600 transition-colors border-l-4 border-amber-500">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="font-semibold text-white text-sm">${cmd.nom_client}</span>
+                                        <span class="bg-amber-500 text-white px-2 py-0.5 rounded text-xs font-bold">NEW</span>
+                                    </div>
+                                    <div class="text-xs text-gray-400 mb-1">
+                                        <i class="fas fa-calendar mr-1"></i>${formatDateFr(cmd.created_at)}
+                                    </div>
+                                    <div class="flex items-center justify-between text-xs">
+                                        <span class="text-emerald-400 font-bold">${formatMontant(cmd.total)}</span>
+                                        <span class="text-gray-400">Table ${cmd.num_table || 'N/A'}</span>
+                                    </div>
+                                </div>
+                            `).join('');
+                        } else {
+                            newContainer.innerHTML = `
+                                <div class="text-center py-4 text-gray-400 text-sm">
+                                    <i class="fas fa-check-circle mb-2"></i>
+                                    <p>Tout est à jour !</p>
+                                </div>
+                            `;
+                        }
+
+                        // Afficher un rappel si des commandes sont prévues aujourd'hui
+                        if (commandesAujourdhui.length > 0 && !notificationSoundPlayed) {
+                            showToastCommande(`📋 ${commandesAujourdhui.length} commande(s) aujourd'hui`, 'info');
+                            notificationSoundPlayed = true;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Erreur lors de la récupération des notifications:', error);
+                });
+        }
+
+        // Afficher un toast de notification
+        function showToastCommande(message, type = 'info') {
+            let toastContainer = document.getElementById('toast-container-commandes');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.id = 'toast-container-commandes';
+                toastContainer.className = 'fixed top-20 right-4 z-50 space-y-2';
+                document.body.appendChild(toastContainer);
+            }
+
+            const colors = {
+                success: 'from-green-500 to-emerald-600',
+                info: 'from-blue-500 to-indigo-600',
+                warning: 'from-amber-500 to-orange-600',
+                error: 'from-red-500 to-rose-600'
+            };
+
+            const icons = {
+                success: 'fa-check-circle',
+                info: 'fa-info-circle',
+                warning: 'fa-exclamation-triangle',
+                error: 'fa-times-circle'
+            };
+
+            const toast = document.createElement('div');
+            toast.className = `bg-gradient-to-r ${colors[type]} text-white px-6 py-4 rounded-xl shadow-2xl transform transition-all duration-300 flex items-center space-x-3 min-w-[300px]`;
+            toast.innerHTML = `
+                <i class="fas ${icons[type]} text-2xl"></i>
+                <span class="font-medium">${message}</span>
+            `;
+
+            toastContainer.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.transform = 'translateX(400px)';
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 5000);
+        }
+
+        // Initialiser les notifications au chargement
+        document.addEventListener('DOMContentLoaded', function() {
+            updateNotificationsCommandes();
+            // Mettre à jour toutes les 30 secondes
+            setInterval(updateNotificationsCommandes, 30000);
+        });
+
     </script>
+
+    <!-- Footer -->
+    <?php include 'footer.php'; ?>
 </body>
 </html>

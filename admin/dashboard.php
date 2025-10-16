@@ -1305,7 +1305,7 @@ if ($admin_id > 0) {
                         <h3 class="text-3xl font-bold text-corporate mb-2">Actions Rapides</h3>
                         <p class="text-text-secondary">Accédez rapidement aux fonctions principales</p>
                     </div>
-                    
+
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                         <!-- Nouvelle Réservation -->
                         <a href="reservations.php" class="group">
@@ -1317,7 +1317,7 @@ if ($admin_id > 0) {
                                 <p class="text-text-secondary text-sm">Ajouter une réservation client</p>
                             </div>
                         </a>
-                        
+
                         <!-- Ajouter Plat -->
                         <a href="ajouter_plat.php" class="group">
                             <div class="glass-morphism p-6 rounded-2xl text-center hover:bg-white/10 transition-all duration-300 hover:scale-105 border border-white/10">
@@ -1328,7 +1328,7 @@ if ($admin_id > 0) {
                                 <p class="text-text-secondary text-sm">Enrichir le menu</p>
                             </div>
                         </a>
-                        
+
                         <!-- Voir Commandes -->
                         <a href="commandes.php" class="group">
                             <div class="glass-morphism p-6 rounded-2xl text-center hover:bg-white/10 transition-all duration-300 hover:scale-105 border border-white/10">
@@ -1339,7 +1339,7 @@ if ($admin_id > 0) {
                                 <p class="text-text-secondary text-sm">Gérer les commandes</p>
                             </div>
                         </a>
-                        
+
                         <!-- Paramètres -->
                         <a href="settings.php" class="group">
                             <div class="glass-morphism p-6 rounded-2xl text-center hover:bg-white/10 transition-all duration-300 hover:scale-105 border border-white/10">
@@ -1353,6 +1353,9 @@ if ($admin_id > 0) {
                     </div>
                 </div>
             </main>
+
+            <!-- Footer -->
+            <?php include 'footer.php'; ?>
         </div>
     </div>
 

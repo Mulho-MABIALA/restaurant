@@ -1973,10 +1973,24 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
     <link rel="icon" type="image/x-icon" href="../assets/img/logo.jpg">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     <!-- <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> -->
     <link rel="stylesheet" href="employe.css">
+    <style>
+        .glass-morphism {
+            background: rgba(17, 24, 39, 0.9);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
     <div class="flex h-screen overflow-hidden">
         <!-- Sidebar -->
         <?php include 'sidebar.php'; ?>
@@ -1984,160 +1998,193 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
         <!-- Contenu Principal -->
         <div class="flex-1 overflow-y-auto">
             <!-- Header avec bouton d'ajout -->
-            <div class="bg-white shadow-sm border-b border-gray-200">
-                <div class="px-8 py-6">
+            <header class="glass-morphism shadow-2xl border-b border-white/10 sticky top-0 z-40">
+                <div class="px-4 sm:px-6 lg:px-8 py-6">
                     <div class="flex items-center justify-between">
                         <div>
-                            <h1 class="text-3xl font-bold text-gray-900">
-                                <i class="fas fa-users mr-3 text-blue-600"></i>
+                            <h1 class="text-4xl font-bold text-white">
+                                <i class="fas fa-users mr-3 text-primary"></i>
                                 Gestion des Employés
                             </h1>
-                            <p class="text-gray-600 mt-1">Gérez votre équipe et les informations RH</p>
+                            <p class="text-gray-300 mt-2">Gérez votre équipe et les informations RH</p>
                         </div>
-                        <button onclick="openAddModal()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg transition duration-200 shadow-lg">
+                        <button onclick="openAddModal()" class="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 py-3 rounded-xl transition duration-300 shadow-xl hover:shadow-2xl transform hover:scale-105">
                             <i class="fas fa-plus mr-2"></i>Ajouter Employé
                         </button>
                     </div>
                 </div>
-            </div>
+            </header>
 
             <!-- Statistiques Dashboard -->
-            <div class="px-8 py-6">
+            <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
             <!-- Employés Actifs -->
-            <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale stat-card-actifs">
-                <div class="flex items-center">
-                    <div class="p-3 rounded-full bg-blue-100 text-blue-600">
-                        <i class="fas fa-users text-xl"></i>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">Employés Actifs</p>
-                        <p class="text-2xl font-bold text-gray-900" id="totalActifs">0</p>
+            <div class="relative group">
+                <div class="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl blur opacity-20 group-hover:opacity-30 transition-opacity"></div>
+                <div class="relative glass-card p-6 rounded-2xl hover:scale-105 transition-transform duration-300">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-14 h-14 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-xl flex items-center justify-center shadow-lg">
+                                <i class="fas fa-users text-white text-xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-400">Employés Actifs</p>
+                                <p class="text-3xl font-bold text-white" id="totalActifs">0</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Présents Aujourd'hui -->
-           <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale border-2 border-gray-200">
-                <div class="flex items-center">
-                    <div class="p-3 rounded-full bg-green-100 text-green-600">
-                        <i class="fas fa-check-circle text-xl"></i>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">Présents</p>
-                        <p class="text-2xl font-bold text-gray-900" id="presentsAujourdhui">0</p>
+            <div class="relative group">
+                <div class="absolute inset-0 bg-gradient-to-r from-green-600 to-emerald-600 rounded-2xl blur opacity-20 group-hover:opacity-30 transition-opacity"></div>
+                <div class="relative glass-card p-6 rounded-2xl hover:scale-105 transition-transform duration-300">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-14 h-14 bg-gradient-to-br from-green-600 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
+                                <i class="fas fa-check-circle text-white text-xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-400">Présents</p>
+                                <p class="text-3xl font-bold text-white" id="presentsAujourdhui">0</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Absents -->
-           <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale border-2 border-gray-200">
-                <div class="flex items-center">
-                    <div class="p-3 rounded-full bg-red-100 text-red-600">
-                        <i class="fas fa-times-circle text-xl"></i>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">Absents</p>
-                        <p class="text-2xl font-bold text-gray-900" id="absentsAujourdhui">0</p>
+            <div class="relative group">
+                <div class="absolute inset-0 bg-gradient-to-r from-red-600 to-rose-600 rounded-2xl blur opacity-20 group-hover:opacity-30 transition-opacity"></div>
+                <div class="relative glass-card p-6 rounded-2xl hover:scale-105 transition-transform duration-300">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-14 h-14 bg-gradient-to-br from-red-600 to-rose-600 rounded-xl flex items-center justify-center shadow-lg">
+                                <i class="fas fa-times-circle text-white text-xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-400">Absents</p>
+                                <p class="text-3xl font-bold text-white" id="absentsAujourdhui">0</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- En Retard -->
-           <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale border-2 border-gray-200">
-                <div class="flex items-center">
-                    <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
-                        <i class="fas fa-clock text-xl"></i>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">En Retard</p>
-                        <p class="text-2xl font-bold text-gray-900" id="retardsAujourdhui">0</p>
-                    </div>
-                </div>
-            </div>
-           <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale border-2 border-gray-200">
-                <div class="flex items-center">
-                    <div class="p-3 rounded-full bg-gray-100 text-gray-600">
-                        <i class="fas fa-user-slash text-xl"></i>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">Inactifs</p>
-                        <p class="text-2xl font-bold text-gray-900" id="totalInactifs">0</p>
+            <div class="relative group">
+                <div class="absolute inset-0 bg-gradient-to-r from-yellow-600 to-orange-600 rounded-2xl blur opacity-20 group-hover:opacity-30 transition-opacity"></div>
+                <div class="relative glass-card p-6 rounded-2xl hover:scale-105 transition-transform duration-300">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-14 h-14 bg-gradient-to-br from-yellow-600 to-orange-600 rounded-xl flex items-center justify-center shadow-lg">
+                                <i class="fas fa-clock text-white text-xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-400">En Retard</p>
+                                <p class="text-3xl font-bold text-white" id="retardsAujourdhui">0</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            <!-- Inactifs -->
+            <div class="relative group">
+                <div class="absolute inset-0 bg-gradient-to-r from-gray-600 to-slate-600 rounded-2xl blur opacity-20 group-hover:opacity-30 transition-opacity"></div>
+                <div class="relative glass-card p-6 rounded-2xl hover:scale-105 transition-transform duration-300">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-14 h-14 bg-gradient-to-br from-gray-600 to-slate-600 rounded-xl flex items-center justify-center shadow-lg">
+                                <i class="fas fa-user-slash text-white text-xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-400">Inactifs</p>
+                                <p class="text-3xl font-bold text-white" id="totalInactifs">0</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Administrateurs -->
-           <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale border-2 border-gray-200">
-                <div class="flex items-center">
-                    <div class="p-3 rounded-full bg-orange-100 text-orange-600">
-                        <i class="fas fa-crown text-xl"></i>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">Admins</p>
-                        <p class="text-2xl font-bold text-gray-900" id="totalAdmins">0</p>
+            <div class="relative group">
+                <div class="absolute inset-0 bg-gradient-to-r from-orange-600 to-amber-600 rounded-2xl blur opacity-20 group-hover:opacity-30 transition-opacity"></div>
+                <div class="relative glass-card p-6 rounded-2xl hover:scale-105 transition-transform duration-300">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-14 h-14 bg-gradient-to-br from-orange-600 to-amber-600 rounded-xl flex items-center justify-center shadow-lg">
+                                <i class="fas fa-crown text-white text-xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-400">Admins</p>
+                                <p class="text-3xl font-bold text-white" id="totalAdmins">0</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 <!-- Section Tableau de Bord Avancé -->
-<div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale stat-card-actifs">
-    <h2 class="text-xl font-semibold mb-6">Tableau de Bord RH Avancé</h2>
+<div class="glass-card rounded-2xl shadow-xl p-6 mb-8">
+    <h2 class="text-2xl font-semibold mb-6 text-white">Tableau de Bord RH Avancé</h2>
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div class="bg-blue-50 p-4 rounded-lg">
+        <div class="glass-card p-4 rounded-xl border border-blue-500/20">
             <div class="flex items-center">
-                <div class="p-2 rounded-full bg-blue-100 text-blue-600 mr-3">
+                <div class="p-2 rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 text-white mr-3">
                     <i class="fas fa-users"></i>
                 </div>
                 <div>
-                    <p class="text-sm font-medium text-blue-600">Effectif Total</p>
-                    <p class="text-2xl font-bold" id="totalEmployes">0</p>
+                    <p class="text-sm font-medium text-gray-400">Effectif Total</p>
+                    <p class="text-2xl font-bold text-white" id="totalEmployes">0</p>
                 </div>
             </div>
         </div>
 
-        <div class="bg-green-50 p-4 rounded-lg">
+        <div class="glass-card p-4 rounded-xl border border-green-500/20">
             <div class="flex items-center">
-                <div class="p-2 rounded-full bg-green-100 text-green-600 mr-3">
+                <div class="p-2 rounded-full bg-gradient-to-br from-green-600 to-emerald-600 text-white mr-3">
                     <i class="fas fa-user-check"></i>
                 </div>
                 <div>
-                    <p class="text-sm font-medium text-green-600">Taux de Présence</p>
-                    <p class="text-2xl font-bold" id="tauxPresence">0%</p>
+                    <p class="text-sm font-medium text-gray-400">Taux de Présence</p>
+                    <p class="text-2xl font-bold text-white" id="tauxPresence">0%</p>
                 </div>
             </div>
         </div>
 
-        <div class="bg-purple-50 p-4 rounded-lg">
+        <div class="glass-card p-4 rounded-xl border border-purple-500/20">
             <div class="flex items-center">
-                <div class="p-2 rounded-full bg-purple-100 text-purple-600 mr-3">
+                <div class="p-2 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 text-white mr-3">
                     <i class="fas fa-money-bill-wave"></i>
                 </div>
                 <div>
-                    <p class="text-sm font-medium text-purple-600">Masse Salariale</p>
-                    <p class="text-2xl font-bold" id="masseSalariale">0 FCFA</p>
+                    <p class="text-sm font-medium text-gray-400">Masse Salariale</p>
+                    <p class="text-2xl font-bold text-white" id="masseSalariale">0 FCFA</p>
                 </div>
             </div>
         </div>
 
-        <div class="bg-orange-50 p-4 rounded-lg">
+        <div class="glass-card p-4 rounded-xl border border-orange-500/20">
             <div class="flex items-center">
-                <div class="p-2 rounded-full bg-orange-100 text-orange-600 mr-3">
+                <div class="p-2 rounded-full bg-gradient-to-br from-orange-600 to-amber-600 text-white mr-3">
                     <i class="fas fa-clock"></i>
                 </div>
                 <div>
-                    <p class="text-sm font-medium text-orange-600">Retard Moyen</p>
-                    <p class="text-2xl font-bold" id="retardMoyen">0 min</p>
+                    <p class="text-sm font-medium text-gray-400">Retard Moyen</p>
+                    <p class="text-2xl font-bold text-white" id="retardMoyen">0 min</p>
                 </div>
             </div>
         </div>
     </div>
-<div class="bg-gray-50 p-4 rounded-lg">
-    <h3 class="text-lg font-semibold mb-4">Générer un Rapport Personnalisé</h3>
+<div class="glass-card p-4 rounded-xl border border-white/10">
+    <h3 class="text-lg font-semibold mb-4 text-white">Générer un Rapport Personnalisé</h3>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Type de Rapport</label>
-            <select id="reportType" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+            <label class="block text-sm font-medium text-gray-300 mb-2">Type de Rapport</label>
+            <select id="reportType" class="w-full px-3 py-2 bg-slate-700/50 border border-white/10 rounded-lg text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50">
                 <option value="presences">Présences et Retards</option>
                 <option value="salaires">Salaires et Coûts</option>
                 <option value="effectifs">Effectifs et Démographie</option>
@@ -2145,47 +2192,47 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
             </select>
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Date Début</label>
-            <input type="date" id="reportStartDate" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+            <label class="block text-sm font-medium text-gray-300 mb-2">Date Début</label>
+            <input type="date" id="reportStartDate" class="w-full px-3 py-2 bg-slate-700/50 border border-white/10 rounded-lg text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50">
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Date Fin</label>
-            <input type="date" id="reportEndDate" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+            <label class="block text-sm font-medium text-gray-300 mb-2">Date Fin</label>
+            <input type="date" id="reportEndDate" class="w-full px-3 py-2 bg-slate-700/50 border border-white/10 rounded-lg text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50">
         </div>
     </div>
-    <button onclick="generateCustomReport()" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+    <button onclick="generateCustomReport()" class="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white px-4 py-2 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl">
         <i class="fas fa-file-export mr-2"></i>Générer le Rapport
     </button>
 
     <!-- Indicateur de chargement -->
     <div id="reportLoading" class="hidden mt-4 text-center">
-        <i class="fas fa-spinner fa-spin text-blue-500 text-2xl"></i>
-        <p class="text-gray-600">Génération du rapport en cours...</p>
+        <i class="fas fa-spinner fa-spin text-blue-400 text-2xl"></i>
+        <p class="text-gray-300">Génération du rapport en cours...</p>
     </div>
 </div>
 
 <!-- Modal pour afficher les rapports -->
-<div id="reportModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
+<div id="reportModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden z-50">
     <div class="flex items-center justify-center min-h-screen p-4">
-        <div class="bg-white rounded-lg max-w-6xl w-full max-h-screen overflow-y-auto">
-            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                <h3 id="reportModalTitle" class="text-lg font-semibold text-gray-900">Rapport Personnalisé</h3>
-                <button onclick="closeReportModal()" class="text-gray-500 hover:text-gray-700">
+        <div class="glass-morphism rounded-2xl max-w-6xl w-full max-h-screen overflow-y-auto shadow-2xl">
+            <div class="px-6 py-4 border-b border-white/10 flex justify-between items-center">
+                <h3 id="reportModalTitle" class="text-lg font-semibold text-white">Rapport Personnalisé</h3>
+                <button onclick="closeReportModal()" class="text-gray-400 hover:text-white transition-colors">
                     <i class="fas fa-times text-xl"></i>
                 </button>
             </div>
             <div class="p-6">
-                <div id="reportContent" class="mb-6">
+                <div id="reportContent" class="mb-6 text-white">
                     <!-- Le contenu du rapport sera chargé ici -->
                 </div>
                 <div class="flex justify-end space-x-3">
-                    <button onclick="exportReportToPDF()" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">
+                    <button onclick="exportReportToPDF()" class="px-4 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white rounded-lg transition-all duration-300 shadow-lg">
                         <i class="fas fa-file-pdf mr-2"></i>Exporter en PDF
                     </button>
-                    <button onclick="exportReportToExcel()" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+                    <button onclick="exportReportToExcel()" class="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg transition-all duration-300 shadow-lg">
                         <i class="fas fa-file-excel mr-2"></i>Exporter en Excel
                     </button>
-                    <button onclick="closeReportModal()" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+                    <button onclick="closeReportModal()" class="px-4 py-2 border border-white/20 rounded-lg text-gray-300 hover:bg-white/10 transition-all duration-300">
                         Fermer
                     </button>
                 </div>
@@ -2193,31 +2240,31 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
         </div>
     </div>
 </div>
-<div class="bg-white rounded-lg shadow-md p-6 mb-6 card-shadow border-2 border-gray-200">
+<div class="glass-card rounded-2xl shadow-xl p-6 mb-6">
     <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
         <!-- Champ de recherche -->
         <div>
             <input type="text" id="searchInput" placeholder="Rechercher par nom, email..."
-                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                class="w-full px-4 py-2 bg-slate-700/50 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
         </div>
 
         <!-- Filtre département -->
         <div>
-            <select id="filterDepartement" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <select id="filterDepartement" class="w-full px-4 py-2 bg-slate-700/50 border border-white/10 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                 <option value="">Tous les départements</option>
             </select>
         </div>
 
         <!-- Filtre poste -->
         <div>
-            <select id="filterPoste" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <select id="filterPoste" class="w-full px-4 py-2 bg-slate-700/50 border border-white/10 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                 <option value="">Tous les postes</option>
             </select>
         </div>
 
         <!-- Filtre contrat -->
         <div>
-            <select id="filterContrat" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <select id="filterContrat" class="w-full px-4 py-2 bg-slate-700/50 border border-white/10 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                 <option value="">Tous les contrats</option>
                 <option value="CDI">CDI</option>
                 <option value="CDD">CDD</option>
@@ -2230,7 +2277,7 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
 
         <!-- Filtre statut -->
         <div>
-            <select id="filterStatut" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <select id="filterStatut" class="w-full px-4 py-2 bg-slate-700/50 border border-white/10 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                 <option value="">Tous les statuts</option>
                 <option value="actif">Actif</option>
                 <option value="en_conge">En congé</option>
@@ -2241,45 +2288,45 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
 
         <!-- NOUVEAU: Boutons d'action -->
         <div class="flex space-x-2">
-            <button onclick="applyFilters()" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition duration-200">
+            <button onclick="applyFilters()" class="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-lg transition-all duration-300 shadow-lg">
                 <i class="fas fa-search mr-2"></i>Filtrer
             </button>
-            <button onclick="resetFilters()" class="px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition duration-200" title="Réinitialiser">
+            <button onclick="resetFilters()" class="px-3 py-2 bg-gradient-to-r from-gray-600 to-slate-600 hover:from-gray-700 hover:to-slate-700 text-white rounded-lg transition-all duration-300 shadow-lg" title="Réinitialiser">
                 <i class="fas fa-undo"></i>
             </button>
         </div>
     </div>
 </div>
 
-    <div class="bg-white rounded-lg shadow-md p-6 card-shadow hover-scale stat-card-actifs">
-    <h2 class="text-xl font-semibold mb-6">Génération des Bulletins de Paie</h2>
-    <p class="text-gray-600 mb-4">Gérez la paie, primes, congés et générez les bulletins professionnels.</p>
-    <a href="gestion_paie.php" class="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition-colors inline-flex items-center">
+    <div class="glass-card rounded-2xl shadow-xl p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-6 text-white">Génération des Bulletins de Paie</h2>
+    <p class="text-gray-300 mb-4">Gérez la paie, primes, congés et générez les bulletins professionnels.</p>
+    <a href="gestion_paie.php" class="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white px-6 py-3 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl inline-flex items-center">
         <i class="fas fa-calculator mr-2"></i>Accéder à la Gestion de Paie
     </a>
 </div>
 
 <!-- 6. MODIFICATION DE LA SECTION TABLEAU POUR AJOUTER LES BORDURES -->
-<div id="tableView" class="bg-white rounded-lg shadow-md overflow-hidden card-shadow table-visible-borders border-2 border-gray-200">
+<div id="tableView" class="glass-card rounded-2xl shadow-xl overflow-hidden">
     <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
+        <table class="min-w-full divide-y divide-white/10">
+            <thead class="glass-morphism">
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Photo</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employé</th>
-                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Département</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Poste</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contrat</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Présence</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salaire</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Heures/Mois</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documents</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Photo</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Employé</th>
+                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-300 uppercase tracking-wider">Département</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Poste</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Contrat</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Contact</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Statut</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Présence</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Salaire</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Heures/Mois</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Documents</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
                 </tr>
             </thead>
-            <tbody id="employeesTableBody" class="bg-white divide-y divide-gray-200">
+            <tbody id="employeesTableBody" class="divide-y divide-white/5">
                 <!-- Les employés seront chargés ici -->
             </tbody>
         </table>
@@ -3975,5 +4022,8 @@ function exportReportToExcel() {
         </div> <!-- Fin div px-8 py-6 -->
         </div> <!-- Fin flex-1 overflow-y-auto -->
     </div> <!-- Fin flex h-screen -->
+
+    <!-- Footer -->
+    <?php include 'footer.php'; ?>
 </body>
 </html>

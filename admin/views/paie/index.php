@@ -535,24 +535,30 @@
     </style>
 </head>
 <body class="bg-gray-50">
-    
+
     <!-- Injection des données PHP en JavaScript -->
     <script>
-        // Données réelles injectées depuis PHP
-        window.initialData = {
-            employes: <?php echo json_encode($employes); ?>,
-            bulletins: <?php echo json_encode($bulletins); ?>,
-            stats: <?php echo json_encode($stats); ?>,
-            conges_attente: <?php echo json_encode($conges_attente); ?>,
-            avances_attente: <?php echo json_encode($avances_attente); ?>,
-            primes_attente: <?php echo json_encode($primes_attente); ?>,
-            postes: <?php echo json_encode($postes); ?>,
-            departements: <?php echo json_encode($departements); ?>,
-            csrf_token: '<?php echo $csrf_token; ?>'
-        };
+      window.initialData = {
+    employes: <?php echo json_encode($employes, JSON_HEX_TAG | JSON_HEX_QUOT | JSON_HEX_AMP); ?>,
+    bulletins: <?php echo json_encode($bulletins, JSON_HEX_TAG | JSON_HEX_QUOT | JSON_HEX_AMP); ?>,
+    stats: <?php echo json_encode($stats, JSON_HEX_TAG | JSON_HEX_QUOT | JSON_HEX_AMP); ?>,
+    conges_attente: <?php echo json_encode($conges_attente, JSON_HEX_TAG | JSON_HEX_QUOT | JSON_HEX_AMP); ?>,
+    avances_attente: <?php echo json_encode($avances_attente, JSON_HEX_TAG | JSON_HEX_QUOT | JSON_HEX_AMP); ?>,
+    primes_attente: <?php echo json_encode($primes_attente, JSON_HEX_TAG | JSON_HEX_QUOT | JSON_HEX_AMP); ?>,
+    postes: <?php echo json_encode($postes, JSON_HEX_TAG | JSON_HEX_QUOT | JSON_HEX_AMP); ?>,
+    departements: <?php echo json_encode($departements, JSON_HEX_TAG | JSON_HEX_QUOT | JSON_HEX_AMP); ?>,
+    csrf_token: <?php echo json_encode($csrf_token, JSON_HEX_TAG | JSON_HEX_QUOT | JSON_HEX_AMP); ?>
+};
     </script>
 
-    <div class="container mx-auto px-4 py-6">
+    <!-- Structure avec sidebar -->
+    <div class="flex h-screen overflow-hidden">
+        <!-- Sidebar -->
+        <?php include __DIR__ . '/../../sidebar.php'; ?>
+
+        <!-- Contenu principal -->
+        <div class="flex-1 overflow-y-auto">
+            <div class="container mx-auto px-4 py-6">
         <!-- Header principal -->
         <div class="mb-8">
             <div class="gradient-bg text-white rounded-lg p-6 mb-6">
@@ -623,7 +629,7 @@
                         </div>
                         <div class="ml-3">
                             <p class="text-xs font-medium text-gray-500">Congés en attente</p>
-                            <p class="text-xl font-bold text-gray-900" id="stat-conges"><?php echo h($stats['conges_attente']); ?></p>
+                            <p class="text-xl font-bold text-gray-900" id="stat-conges"><?php echo h($stats['conges_attente'] ?? 0); ?></p>
                         </div>
                     </div>
                 </div>
@@ -635,7 +641,7 @@
                         </div>
                         <div class="ml-3">
                             <p class="text-xs font-medium text-gray-500">Avances en attente</p>
-                            <p class="text-xl font-bold text-gray-900" id="stat-avances"><?php echo h($stats['avances_attente']); ?></p>
+                            <p class="text-xl font-bold text-gray-900" id="stat-avances"><?php echo h($stats['avances_attente'] ?? 0); ?></p>
                         </div>
                     </div>
                 </div>
@@ -1457,25 +1463,32 @@ async function genererBulletinClassique() {
 // ================== CHARGEMENT DES DONNÉES ==================
 async function chargerBulletins() {
     try {
-        const filters = {
-            mois: document.getElementById('filtre-mois')?.value || '',
-            annee: document.getElementById('filtre-annee')?.value || '',
-            statut: document.getElementById('filtre-statut')?.value || '',
-            employe_id: document.getElementById('filtre-employe')?.value || ''
-        };
+        // Utiliser les bulletins déjà chargés depuis PHP
+        let bulletinsFiltres = [...bulletins];
 
-        // Nettoyer les filtres vides
-        Object.keys(filters).forEach(key => {
-            if (!filters[key]) delete filters[key];
-        });
+        // Appliquer les filtres si présents
+        const mois = document.getElementById('filtre-mois')?.value;
+        const annee = document.getElementById('filtre-annee')?.value;
+        const statut = document.getElementById('filtre-statut')?.value;
+        const employe_id = document.getElementById('filtre-employe')?.value;
 
-        const result = await Utils.apiCall('get_bulletins', filters);
-        
-        if (result.success) {
-            afficherBulletins(result.bulletins);
-            document.getElementById('total-bulletins').textContent = result.bulletins.length;
-        } else {
-            console.error('Erreur chargement bulletins:', result.error);
+        if (mois) {
+            bulletinsFiltres = bulletinsFiltres.filter(b => b.mois == mois);
+        }
+        if (annee) {
+            bulletinsFiltres = bulletinsFiltres.filter(b => b.annee == annee);
+        }
+        if (statut) {
+            bulletinsFiltres = bulletinsFiltres.filter(b => b.statut == statut);
+        }
+        if (employe_id) {
+            bulletinsFiltres = bulletinsFiltres.filter(b => b.employe_id == employe_id);
+        }
+
+        afficherBulletins(bulletinsFiltres);
+        const totalElement = document.getElementById('total-bulletins');
+        if (totalElement) {
+            totalElement.textContent = bulletinsFiltres.length;
         }
     } catch (error) {
         console.error('Erreur:', error);
@@ -1485,7 +1498,14 @@ async function chargerBulletins() {
 function afficherBulletins(bulletins) {
     const tbody = document.getElementById('tableau-bulletins');
     
-    if (bulletins.length === 0) {
+    if (!tbody) {
+        console.error('Élément tableau-bulletins introuvable');
+        return;
+    }
+    
+    console.log('Affichage de', bulletins.length, 'bulletins');
+    
+    if (!bulletins || bulletins.length === 0) {
         tbody.innerHTML = `
             <tr>
                 <td colspan="8" class="text-center py-8">
@@ -1502,22 +1522,42 @@ function afficherBulletins(bulletins) {
     }
 
     tbody.innerHTML = bulletins.map(bulletin => {
-        const employe = employes.find(emp => emp.id == bulletin.employe_id);
-        const bulletinId = bulletin.id_bulletin || bulletin.id;
-        const avecPresences = bulletin.avec_presences ? '<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Avec présences</span>' : '';
+        console.log('Traitement bulletin:', bulletin);
+        
+        // CORRECTION: Gestion flexible des noms d'employés
+        const employeNom = bulletin.employe_nom || bulletin.nom || '';
+        const employePrenom = bulletin.employe_prenom || bulletin.prenom || '';
+        const posteNom = bulletin.poste_nom || 'Poste non défini';
+        
+        // CORRECTION: ID du bulletin
+        const bulletinId = bulletin.id || bulletin.id_bulletin;
+        
+        if (!bulletinId) {
+            console.error('Bulletin sans ID:', bulletin);
+            return '';
+        }
+        
+        const avecPresences = bulletin.avec_presences ? 
+            '<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Avec présences</span>' : '';
+        
+        // CORRECTION: Formatage sécurisé de la période
+        let periode = 'Non définie';
+        if (bulletin.mois && bulletin.annee) {
+            periode = Utils.formatPeriod(bulletin.mois, bulletin.annee);
+        }
         
         return `
             <tr class="hover:bg-gray-50">
                 <td class="px-6 py-4 whitespace-nowrap">
                     <div class="text-sm font-medium text-gray-900">
-                        ${employe ? `${employe.prenom} ${employe.nom}` : 'Employé inconnu'}
+                        ${employePrenom} ${employeNom}
                     </div>
                     <div class="text-sm text-gray-500">
-                        ${employe ? (employe.poste_nom || 'Poste non défini') : ''}
+                        ${posteNom}
                     </div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ${bulletin.mois && bulletin.annee ? Utils.formatPeriod(bulletin.mois, bulletin.annee) : 'Non définie'}
+                    ${periode}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     ${Utils.formatAmount(bulletin.salaire_net || 0)}
@@ -1564,9 +1604,10 @@ function afficherBulletins(bulletins) {
                 </td>
             </tr>
         `;
-    }).join('');
+    }).filter(row => row !== '').join('');
+    
+    console.log('Affichage terminé');
 }
-
 // ================== GESTION CONGÉS COMPLÈTE ==================
 function ouvrirModalConge() {
     const content = `
@@ -5486,174 +5527,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-function getHorairesEmploye($conn, $employeId, $date) {
-    $semaine_debut = date('Y-m-d', strtotime('monday', strtotime($date)));
-    $jour_semaine = strtolower(date('l', strtotime($date))); // lundi, mardi, etc.
-    
-    // Traduire en français
-    $jours_mapping = [
-        'monday' => 'lundi',
-        'tuesday' => 'mardi', 
-        'wednesday' => 'mercredi',
-        'thursday' => 'jeudi',
-        'friday' => 'vendredi',
-        'saturday' => 'samedi',
-        'sunday' => 'dimanche'
-    ];
-    
-    $jour_fr = $jours_mapping[$jour_semaine] ?? 'lundi';
-    
-    $stmt = $conn->prepare("
-        SELECT 
-            {$jour_fr}_debut as heure_debut_prevue,
-            {$jour_fr}_fin as heure_fin_prevue
-        FROM horaires 
-        WHERE employe_id = ? AND semaine_debut = ?
-    ");
-    
-    $stmt->execute([$employeId, $semaine_debut]);
-    $horaire = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if ($horaire && $horaire['heure_debut_prevue'] && $horaire['heure_fin_prevue']) {
-        return [
-            'heure_debut' => $horaire['heure_debut_prevue'],
-            'heure_fin' => $horaire['heure_fin_prevue'],
-            'est_programme' => true
-        ];
-    }
-    
-    // Si pas d'horaire spécifique, récupérer les horaires par défaut de l'employé
-    $stmt2 = $conn->prepare("SELECT heure_debut, heure_fin FROM employes WHERE id = ?");
-    $stmt2->execute([$employeId]);
-    $employe = $stmt2->fetch(PDO::FETCH_ASSOC);
-    
-    return [
-        'heure_debut' => $employe['heure_debut'] ?? '08:00:00',
-        'heure_fin' => $employe['heure_fin'] ?? '17:00:00',
-        'est_programme' => false
-    ];
-}
-
-// 2. FONCTION POUR DÉTERMINER LE STATUT DE PRÉSENCE CORRECT
-function determinerStatutPresence($presence, $horairePlanifie) {
-    // Si pas d'horaire programmé pour ce jour = PAUSE (pas absent)
-    if (!$horairePlanifie['est_programme']) {
-        return 'pause';
-    }
-    
-    // Si pas de présence enregistrée = ABSENT
-    if (!$presence || !$presence['heure_arrivee']) {
-        return 'absent';
-    }
-    
-    // Comparer avec l'heure prévue (avec tolérance de 15 minutes)
-    $heureArrivee = new DateTime($presence['heure_arrivee']);
-    $heureDebut = new DateTime($horairePlanifie['heure_debut']);
-    $heureDebut->add(new DateInterval('PT15M')); // Tolérance de 15 minutes
-    
-    if ($heureArrivee > $heureDebut) {
-        return 'retard';
-    }
-    
-    return 'present';
-}
-
-// 3. FONCTION POUR CALCULER LES HEURES TRAVAILLÉES PAR RAPPORT À LA PLANIFICATION
-function calculerHeuresParRapportPlanification($conn, $employeId, $mois, $annee) {
-    $premierjour = "$annee-$mois-01";
-    $dernierjour = date('Y-m-t', strtotime($premierjour));
-    
-    $result = [
-        'heures_planifiees_total' => 0,
-        'heures_reelles_total' => 0,
-        'jours_travailles' => 0,
-        'jours_en_pause' => 0,
-        'nb_retards' => 0,
-        'nb_absences' => 0,
-        'taux_presence' => 0,
-        'details_par_jour' => []
-    ];
-    
-    // Récupérer toutes les présences du mois
-    $stmt = $conn->prepare("
-        SELECT DATE(heure_arrivee) as date_presence, heure_arrivee, heure_depart
-        FROM presences 
-        WHERE employe_id = ? 
-        AND DATE(heure_arrivee) BETWEEN ? AND ?
-    ");
-    $stmt->execute([$employeId, $premierjour, $dernierjour]);
-    $presences = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Parcourir tous les jours du mois
-    $dateActuelle = new DateTime($premierjour);
-    $dateFin = new DateTime($dernierjour);
-    
-    while ($dateActuelle <= $dateFin) {
-        $dateStr = $dateActuelle->format('Y-m-d');
-        $horairePlanifie = getHorairesEmploye($conn, $employeId, $dateStr);
-        
-        // Trouver la présence pour ce jour
-        $presenceJour = null;
-        foreach ($presences as $presence) {
-            if ($presence['date_presence'] == $dateStr) {
-                $presenceJour = $presence;
-                break;
-            }
-        }
-        
-        $statut = determinerStatutPresence($presenceJour, $horairePlanifie);
-        
-        $heuresPlanifiees = 0;
-        $heuresReelles = 0;
-        
-        if ($horairePlanifie['est_programme']) {
-            // Calculer les heures planifiées
-            $debut = new DateTime($horairePlanifie['heure_debut']);
-            $fin = new DateTime($horairePlanifie['heure_fin']);
-            $heuresPlanifiees = ($fin->getTimestamp() - $debut->getTimestamp()) / 3600;
-            
-            $result['heures_planifiees_total'] += $heuresPlanifiees;
-            
-            if ($presenceJour && $presenceJour['heure_arrivee'] && $presenceJour['heure_depart']) {
-                $arrivee = new DateTime($presenceJour['heure_arrivee']);
-                $depart = new DateTime($presenceJour['heure_depart']);
-                $heuresReelles = ($depart->getTimestamp() - $arrivee->getTimestamp()) / 3600;
-                $result['heures_reelles_total'] += $heuresReelles;
-                $result['jours_travailles']++;
-            } else if ($statut === 'absent') {
-                $result['nb_absences']++;
-            }
-            
-            if ($statut === 'retard') {
-                $result['nb_retards']++;
-            }
-        } else {
-            $result['jours_en_pause']++;
-        }
-        
-        $result['details_par_jour'][] = [
-            'date' => $dateStr,
-            'statut' => $statut,
-            'heures_planifiees' => $heuresPlanifiees,
-            'heures_reelles' => $heuresReelles,
-            'horaire_planifie' => $horairePlanifie
-        ];
-        
-        $dateActuelle->add(new DateInterval('P1D'));
-    }
-    
-    // Calculer le taux de présence (jours travaillés / jours programmés)
-    $joursProgrammes = ($result['heures_planifiees_total'] > 0) ? 
-        count(array_filter($result['details_par_jour'], function($jour) {
-            return $jour['heures_planifiees'] > 0;
-        })) : 0;
-        
-    $result['taux_presence'] = $joursProgrammes > 0 ? 
-        ($result['jours_travailles'] / $joursProgrammes) * 100 : 0;
-    
-    return $result;
-}
-
+// ================== FONCTIONS UTILITAIRES ==================
 function updateStatsDisplay() {
     const elements = {
         'stat-employes': stats.employes_actifs,
@@ -5976,5 +5850,10 @@ window.afficherIncoherences = afficherIncoherences;
 
 console.log('Système RH intégré avec présences chargé avec succès');
     </script>
+
+            </div> <!-- Fin container -->
+        </div> <!-- Fin flex-1 overflow-y-auto -->
+    </div> <!-- Fin flex h-screen -->
+
 </body>
 </html>

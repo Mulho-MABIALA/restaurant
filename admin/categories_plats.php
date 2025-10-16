@@ -397,5 +397,8 @@ if (isset($_GET['message']) && !$message) {
             });
         });
     </script>
+
+    <!-- Footer -->
+    <?php include 'footer.php'; ?>
 </body>
 </html>

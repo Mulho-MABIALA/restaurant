@@ -1,8 +1,11 @@
 <?php
-require_once '../../config.php'; 
-require_once '../admin/permissions.php';// ⚠️ ton config.php doit créer $conn = new PDO(...)
-requireAccess($conn, $_SESSION['admin_id'], 'annoces_public');
+session_start();
+require_once '../../config.php';
+require_once '../permissions.php';
+requireAccess($conn, $_SESSION['admin_id'], 'annonces_public');
+
 $message = "";
+$messageType = "";
 
 // Traitement des actions
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
@@ -16,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $date_debut = !empty($_POST['date_debut']) ? $_POST['date_debut'] : null;
                 $date_fin = !empty($_POST['date_fin']) ? $_POST['date_fin'] : null;
 
-                $query = "INSERT INTO annonce_public (titre, contenu, type_annonce, couleur, date_debut, date_fin) 
+                $query = "INSERT INTO annonce_public (titre, contenu, type_annonce, couleur, date_debut, date_fin)
                           VALUES (:titre, :contenu, :type, :couleur, :date_debut, :date_fin)";
                 $stmt = $conn->prepare($query);
                 $success = $stmt->execute([
@@ -28,15 +31,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     ':date_fin' => $date_fin
                 ]);
 
-                $message = $success 
-                    ? "<div class='alert alert-success alert-dismissible fade show' role='alert'>
-                        <i class='fas fa-check-circle me-2'></i>Annonce ajoutée avec succès!
-                        <button type='button' class='btn-close' data-bs-dismiss='alert'></button>
-                       </div>"
-                    : "<div class='alert alert-danger alert-dismissible fade show' role='alert'>
-                        <i class='fas fa-exclamation-circle me-2'></i>Erreur lors de l'ajout
-                        <button type='button' class='btn-close' data-bs-dismiss='alert'></button>
-                       </div>";
+                if ($success) {
+                    $message = "Annonce ajoutée avec succès!";
+                    $messageType = "success";
+                } else {
+                    $message = "Erreur lors de l'ajout";
+                    $messageType = "error";
+                }
                 break;
 
             case 'modifier':
@@ -49,9 +50,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $date_debut = !empty($_POST['date_debut']) ? $_POST['date_debut'] : null;
                 $date_fin = !empty($_POST['date_fin']) ? $_POST['date_fin'] : null;
 
-                $query = "UPDATE annonce_public 
-                          SET titre = :titre, contenu = :contenu, type_annonce = :type, 
-                              couleur = :couleur, statut = :statut, 
+                $query = "UPDATE annonce_public
+                          SET titre = :titre, contenu = :contenu, type_annonce = :type,
+                              couleur = :couleur, statut = :statut,
                               date_debut = :date_debut, date_fin = :date_fin
                           WHERE id = :id";
                 $stmt = $conn->prepare($query);
@@ -66,15 +67,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     ':id' => $id
                 ]);
 
-                $message = $success 
-                    ? "<div class='alert alert-success alert-dismissible fade show' role='alert'>
-                        <i class='fas fa-check-circle me-2'></i>Annonce modifiée avec succès!
-                        <button type='button' class='btn-close' data-bs-dismiss='alert'></button>
-                       </div>"
-                    : "<div class='alert alert-danger alert-dismissible fade show' role='alert'>
-                        <i class='fas fa-exclamation-circle me-2'></i>Erreur lors de la modification
-                        <button type='button' class='btn-close' data-bs-dismiss='alert'></button>
-                       </div>";
+                if ($success) {
+                    $message = "Annonce modifiée avec succès!";
+                    $messageType = "success";
+                } else {
+                    $message = "Erreur lors de la modification";
+                    $messageType = "error";
+                }
                 break;
 
             case 'supprimer':
@@ -83,37 +82,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $stmt = $conn->prepare($query);
                 $success = $stmt->execute([':id' => $id]);
 
-                $message = $success 
-                    ? "<div class='alert alert-success alert-dismissible fade show' role='alert'>
-                        <i class='fas fa-check-circle me-2'></i>Annonce supprimée avec succès!
-                        <button type='button' class='btn-close' data-bs-dismiss='alert'></button>
-                       </div>"
-                    : "<div class='alert alert-danger alert-dismissible fade show' role='alert'>
-                        <i class='fas fa-exclamation-circle me-2'></i>Erreur lors de la suppression
-                        <button type='button' class='btn-close' data-bs-dismiss='alert'></button>
-                       </div>";
+                if ($success) {
+                    $message = "Annonce supprimée avec succès!";
+                    $messageType = "success";
+                } else {
+                    $message = "Erreur lors de la suppression";
+                    $messageType = "error";
+                }
                 break;
         }
     }
-}
-
-/**
- * Nettoie les annonces expirées et déjà inactives
- */
-function nettoyerAnnoncesExpirees() {
-    global $pdo;
-
-    $date_aujourd_hui = date('Y-m-d');
-
-    $sql = "DELETE FROM annonce_public 
-            WHERE date_fin IS NOT NULL 
-            AND date_fin < :date 
-            AND statut = 'inactive'";
-
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([':date' => $date_aujourd_hui]);
-
-    return $stmt->rowCount();
 }
 
 /**
@@ -121,18 +99,14 @@ function nettoyerAnnoncesExpirees() {
  */
 function desactiverAnnoncesExpirees() {
     global $conn;
-
     $date_aujourd_hui = date('Y-m-d');
-
-    $sql = "UPDATE annonce_public 
-            SET statut = 'inactive' 
-            WHERE date_fin IS NOT NULL 
-            AND date_fin < :date 
+    $sql = "UPDATE annonce_public
+            SET statut = 'inactive'
+            WHERE date_fin IS NOT NULL
+            AND date_fin < :date
             AND statut = 'active'";
-
     $stmt = $conn->prepare($sql);
     $stmt->execute([':date' => $date_aujourd_hui]);
-
     return $stmt->rowCount();
 }
 
@@ -141,31 +115,26 @@ function desactiverAnnoncesExpirees() {
  */
 function getStatistiquesAnnonces() {
     global $conn;
-
     $stats = [];
 
-    // Total des annonces
     $stmt = $conn->query("SELECT COUNT(*) as total FROM annonce_public");
     $stats['total'] = $stmt->fetchColumn();
 
-    // Annonces actives
     $stmt = $conn->query("SELECT COUNT(*) as actives FROM annonce_public WHERE statut = 'active'");
     $stats['actives'] = $stmt->fetchColumn();
 
-    // Annonces par type
-    $stmt = $conn->query("SELECT type_annonce, COUNT(*) as count 
-                         FROM annonce_public 
-                         WHERE statut = 'active' 
+    $stmt = $conn->query("SELECT type_annonce, COUNT(*) as count
+                         FROM annonce_public
+                         WHERE statut = 'active'
                          GROUP BY type_annonce");
     $stats['par_type'] = [];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $stats['par_type'][$row['type_annonce']] = $row['count'];
     }
 
-    // Annonces expirées aujourd'hui
     $date_aujourd_hui = date('Y-m-d');
-    $stmt = $conn->prepare("SELECT COUNT(*) as expirees 
-                           FROM annonce_public 
+    $stmt = $conn->prepare("SELECT COUNT(*) as expirees
+                           FROM annonce_public
                            WHERE date_fin = :date");
     $stmt->execute([':date' => $date_aujourd_hui]);
     $stats['expire_aujourdhui'] = $stmt->fetchColumn();
@@ -173,15 +142,11 @@ function getStatistiquesAnnonces() {
     return $stats;
 }
 
-// Récupération des annonces
 $query = "SELECT * FROM annonce_public ORDER BY date_creation DESC";
 $stmt = $conn->query($query);
 $annonces = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Récupération des statistiques
 $stats = getStatistiquesAnnonces();
-
-// Désactiver automatiquement les annonces expirées
 desactiverAnnoncesExpirees();
 ?>
 
@@ -190,1109 +155,387 @@ desactiverAnnoncesExpirees();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestion des Annonces Publiques</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+    <title>Gestion des Annonces Publiques - Restaurant Jungle</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary': '#10b981',
+                        'primary-dark': '#059669',
+                        'primary-light': '#34d399',
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        :root {
-            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --success-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-            --warning-gradient: linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%);
-            --danger-gradient: linear-gradient(135deg, #fd79a8 0%, #fdcb6e 100%);
-            --info-gradient: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
-        }
-
-        body {
-            background: #f8f9fa;
-            min-height: 100vh;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        /* Header simple sans fond bleu */
-        .main-header {
-            background: transparent;
-            color: #2c3e50;
-            padding: 2rem 0 1rem 0;
-            margin-bottom: 2rem;
-        }
-
-        .main-header h1 {
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: #2c3e50;
-            margin-bottom: 0.5rem;
-        }
-
-        .main-header p {
-            color: #6c757d;
-            font-size: 1.1rem;
-        }
-
-        .date-info {
-            background: #fff;
-            padding: 0.75rem 1.5rem;
-            border-radius: 50px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            color: #495057;
-            font-weight: 500;
-        }
-
-        .stats-card {
-            background: white;
-            border: none;
-            border-radius: 16px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-            transition: all 0.2s ease;
-            overflow: hidden;
-            position: relative;
-            border-top: 4px solid;
-        }
-
-        .stats-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.12);
-        }
-
-        .stats-card.primary { border-top-color: #667eea; }
-        .stats-card.success { border-top-color: #4ade80; }
-        .stats-card.warning { border-top-color: #fbbf24; }
-        .stats-card.danger { border-top-color: #f87171; }
-        .stats-card.info { border-top-color: #60a5fa; }
-
-        .stats-card .card-body {
-            color: #374151;
-            padding: 1.5rem;
-        }
-
-        .stats-number {
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: #111827;
-            margin: 0.5rem 0;
-        }
-
-        .stats-icon {
-            position: absolute;
-            right: 1.5rem;
-            top: 1.5rem;
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-        }
-
-        .stats-card.primary .stats-icon {
-            background: rgba(102, 126, 234, 0.1);
-            color: #667eea;
-        }
-
-        .stats-card.success .stats-icon {
-            background: rgba(74, 222, 128, 0.1);
-            color: #4ade80;
-        }
-
-        .stats-card.warning .stats-icon {
-            background: rgba(251, 191, 36, 0.1);
-            color: #fbbf24;
-        }
-
-        .stats-card.danger .stats-icon {
-            background: rgba(248, 113, 113, 0.1);
-            color: #f87171;
-        }
-
-        .stats-card.info .stats-icon {
-            background: rgba(96, 165, 250, 0.1);
-            color: #60a5fa;
-        }
-
-        .stats-title {
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: #6b7280;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin: 0;
-        }
-
-        .stats-subtitle {
-            font-size: 0.75rem;
-            color: #9ca3af;
-            margin-top: 0.25rem;
-            display: flex;
-            align-items: center;
-        }
-
-        .stats-trend {
-            color: #10b981;
-            font-weight: 600;
-        }
-
-        .modern-card {
-            border: none;
-            border-radius: 20px;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.1);
-            backdrop-filter: blur(10px);
-            background: rgba(255, 255, 255, 0.9);
-            transition: all 0.3s ease;
-        }
-
-        .modern-card:hover {
-            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
-        }
-
-        .card-header.modern {
-            background: var(--primary-gradient);
-            color: white;
-            border: none;
-            border-radius: 20px 20px 0 0 !important;
-            padding: 1.5rem;
-        }
-
-        .btn-modern {
-            border-radius: 50px;
-            padding: 0.75rem 2rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            transition: all 0.3s ease;
-            border: none;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .btn-modern:before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: left 0.5s;
-        }
-
-        .btn-modern:hover:before {
-            left: 100%;
-        }
-
-        .btn-primary.btn-modern {
-            background: var(--primary-gradient);
-        }
-
-        .btn-success.btn-modern {
-            background: var(--success-gradient);
-        }
-
-        /* Nouveau style pour les tableaux */
-        .elegant-table {
-            background: #ffffff;
-            border-radius: 20px;
-            overflow: hidden;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-            border: 1px solid #e5e7eb;
-        }
-
-        .elegant-table thead th {
-            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-            color: #334155;
-            font-weight: 700;
-            font-size: 0.875rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            border: none;
-            padding: 1.5rem 1rem;
-            position: relative;
-        }
-
-        .elegant-table thead th::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 1rem;
-            right: 1rem;
-            height: 2px;
-            background: linear-gradient(90deg, #667eea, #764ba2);
-            border-radius: 1px;
-        }
-
-        .elegant-table tbody tr {
-            border: none;
-            transition: all 0.3s ease;
-            background: #ffffff;
-        }
-
-        .elegant-table tbody tr:hover {
-            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-            transform: scale(1.01);
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.1);
-        }
-
-        .elegant-table tbody tr:nth-child(even) {
-            background: #fafbfc;
-        }
-
-        .elegant-table tbody tr:nth-child(even):hover {
-            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-        }
-
-        .elegant-table tbody td {
-            padding: 1.25rem 1rem;
-            border: none;
-            vertical-align: middle;
-            border-bottom: 1px solid #f1f5f9;
-        }
-
-        .elegant-table tbody tr:last-child td {
-            border-bottom: none;
-        }
-
-        /* Style pour les badges dans le tableau */
-        .table-badge {
-            padding: 0.5rem 1rem;
-            border-radius: 25px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            border: none;
-        }
-
-        .table-badge.badge-id {
-            background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
-            color: #475569;
-        }
-
-        .table-badge.badge-menu {
-            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-            color: white;
-        }
-
-        .table-badge.badge-site {
-            background: linear-gradient(135deg, #6b7280, #374151);
-            color: white;
-        }
-
-        .table-badge.badge-active {
-            background: linear-gradient(135deg, #10b981, #059669);
-            color: white;
-        }
-
-        .table-badge.badge-inactive {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-            color: white;
-        }
-
-        /* Styles pour les détails de l'annonce */
-        .annonce-title {
-            font-weight: 700;
-            font-size: 1rem;
-            margin-bottom: 0.5rem;
-            display: flex;
-            align-items: center;
-        }
-
-        .annonce-content {
-            font-size: 0.875rem;
-            color: #64748b;
-            background: #f8fafc;
-            padding: 0.5rem 0.75rem;
-            border-radius: 8px;
-            border-left: 3px solid #cbd5e1;
-        }
-
-        .date-info-table {
-            font-size: 0.8rem;
-        }
-
-        .date-label {
-            font-weight: 600;
-            color: #475569;
-        }
-
-        .date-value {
-            color: #64748b;
-        }
-
-        /* Boutons d'action améliorés */
-        .action-buttons {
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        .action-btn {
-            width: 36px;
-            height: 36px;
-            border-radius: 18px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: none;
-            font-size: 0.875rem;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        }
-
-        .action-btn.btn-edit {
-            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-            color: white;
-        }
-
-        .action-btn.btn-delete {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-            color: white;
-        }
-
-        .action-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-        }
-
-        .badge-modern {
-            border-radius: 50px;
-            padding: 0.5rem 1rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .form-control-modern {
-            border-radius: 15px;
-            border: 2px solid #e9ecef;
-            padding: 0.75rem 1rem;
-            transition: all 0.3s ease;
-        }
-
-        .form-control-modern:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-        }
-
-        /* Modal styles simplifiés mais jolis */
-        .modal-content {
-            border-radius: 15px;
-            border: none;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-        }
-
-        .modal-header {
-            background: #f8f9fa;
-            color: #2c3e50;
-            border: none;
-            border-radius: 15px 15px 0 0;
-            padding: 1.5rem;
-            border-bottom: 1px solid #dee2e6;
-        }
-
-        .modal-title {
-            font-weight: 600;
-            font-size: 1.25rem;
-        }
-
-        .modal-body {
-            padding: 2rem;
-        }
-
-        .modal-footer {
-            background: #f8f9fa;
-            border: none;
-            border-top: 1px solid #dee2e6;
-            border-radius: 0 0 15px 15px;
-            padding: 1rem 2rem;
-        }
-
-        .btn-close {
-            background-size: 1.5em;
-        }
-
-        .pulse {
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% {
-                box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.7);
-            }
-            70% {
-                box-shadow: 0 0 0 10px rgba(102, 126, 234, 0);
-            }
-            100% {
-                box-shadow: 0 0 0 0 rgba(102, 126, 234, 0);
-            }
-        }
-
-        .floating-btn {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            z-index: 1000;
-            border-radius: 50%;
-            width: 60px;
-            height: 60px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.3);
-        }
-
-        /* Responsive Design */
-        @media (max-width: 1200px) {
-            .stats-number {
-                font-size: 2.2rem;
-            }
-        }
-
-        @media (max-width: 992px) {
-            .main-header h1 {
-                font-size: 2rem;
-            }
-            
-            .main-header p {
-                font-size: 1rem;
-            }
-            
-            .date-info {
-                margin-top: 1rem;
-                text-align: center;
-            }
-            
-            .stats-number {
-                font-size: 2rem;
-            }
-            
-            .stats-icon {
-                width: 40px;
-                height: 40px;
-                font-size: 1.25rem;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .main-header {
-                padding: 1rem 0;
-                text-align: center;
-            }
-            
-            .main-header h1 {
-                font-size: 1.75rem;
-            }
-            
-            .main-header .col-md-4 {
-                text-align: center !important;
-            }
-            
-            .elegant-table {
-                font-size: 0.875rem;
-            }
-            
-            .elegant-table thead th,
-            .elegant-table tbody td {
-                padding: 0.75rem 0.5rem;
-            }
-            
-            .stats-card .card-body {
-                padding: 1rem;
-            }
-            
-            .stats-number {
-                font-size: 1.8rem;
-            }
-            
-            .stats-icon {
-                width: 36px;
-                height: 36px;
-                font-size: 1rem;
-                right: 1rem;
-                top: 1rem;
-            }
-            
-            .stats-title {
-                font-size: 0.75rem;
-            }
-            
-            .action-btn {
-                width: 32px;
-                height: 32px;
-                font-size: 0.75rem;
-            }
-            
-            .modal-body {
-                padding: 1rem;
-            }
-            
-            .modal-footer {
-                padding: 1rem;
-            }
-            
-            .btn-modern {
-                padding: 0.5rem 1.5rem;
-                font-size: 0.875rem;
-            }
-            
-            .floating-btn {
-                width: 50px;
-                height: 50px;
-                font-size: 1.25rem;
-                bottom: 20px;
-                right: 20px;
-            }
-        }
-
-        @media (max-width: 576px) {
-            .main-header h1 {
-                font-size: 1.5rem;
-            }
-            
-            .container {
-                padding: 0 15px;
-            }
-            
-            .modern-card {
-                border-radius: 15px;
-            }
-            
-            .card-header.modern {
-                border-radius: 15px 15px 0 0 !important;
-                padding: 1rem;
-            }
-            
-            .stats-number {
-                font-size: 1.6rem;
-            }
-            
-            .action-buttons {
-                flex-direction: column;
-                gap: 0.25rem;
-            }
-            
-            .action-btn {
-                width: 28px;
-                height: 28px;
-            }
-            
-            /* Table responsive pour mobile */
-            .table-responsive {
-                border-radius: 15px;
-            }
-            
-            .elegant-table {
-                border-radius: 15px;
-            }
-        }
-
-        /* Amélioration de l'affichage des formulaires sur mobile */
-        @media (max-width: 768px) {
-            .form-control-modern {
-                font-size: 16px; /* Évite le zoom sur iOS */
-            }
-            
-            .modal-dialog {
-                margin: 0.5rem;
-            }
-            
-            .modal-content {
-                border-radius: 10px;
-            }
+        .glass-morphism {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        .animate-float {
+            animation: float 3s ease-in-out infinite;
         }
     </style>
 </head>
-<body>
-    <!-- Header simplifié -->
-    <div class="main-header">
-        <div class="container">
-            <div class="row align-items-center">
-                <div class="col-md-8">
-                    <h1 class="mb-0">
-                        <i class="fas fa-bullhorn me-3"></i>
-                        Gestion des Annonces Publiques
-                    </h1>
-                    <p class="mb-0 mt-2">Gérez vos annonces publiques en temps réel</p>
-                </div>
-                <div class="col-md-4 text-end">
-                    <div class="date-info">
-                        <i class="fas fa-calendar-alt me-2"></i>
-                        <?= date('d/m/Y H:i') ?>
+<body class="bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200">
+
+    <div class="flex h-screen overflow-hidden">
+        <!-- Sidebar -->
+        <?php include '../sidebar.php'; ?>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Header -->
+            <header class="glass-morphism shadow-lg border-b border-gray-200">
+                <div class="px-4 sm:px-6 lg:px-8 py-6">
+                    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                        <div class="flex-1">
+                            <div class="flex items-center space-x-4">
+                                <div class="w-14 h-14 bg-gradient-to-br from-primary via-primary-light to-yellow-500 rounded-2xl flex items-center justify-center shadow-lg animate-float">
+                                    <i class="fas fa-bullhorn text-white text-2xl"></i>
+                                </div>
+                                <div>
+                                    <h1 class="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-primary to-yellow-500 bg-clip-text text-transparent">
+                                        Annonces Publiques
+                                    </h1>
+                                    <p class="text-gray-600 text-sm font-medium mt-1">Gérez vos annonces en temps réel</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <div class="hidden sm:flex items-center space-x-3 bg-white rounded-2xl px-6 py-4 shadow-md">
+                                <div class="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-calendar text-primary"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500 font-medium uppercase">Aujourd'hui</p>
+                                    <p class="text-sm font-bold text-gray-800"><?= date('d/m/Y H:i') ?></p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </header>
+
+            <!-- Main content -->
+            <main class="flex-1 overflow-y-auto">
+                <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8" x-data="{ modalOpen: false, currentAnnonce: null }">
+
+                    <!-- Messages -->
+                    <?php if ($message): ?>
+                        <div class="mb-6 p-4 rounded-lg <?= $messageType === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' ?> flex items-center">
+                            <i class="fas <?= $messageType === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle' ?> mr-3"></i>
+                            <?= htmlspecialchars($message) ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <!-- Stats Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        <div class="bg-white rounded-2xl shadow-lg p-6 border-t-4 border-purple-500 hover:shadow-xl transition-all duration-300">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-xs font-semibold text-gray-500 uppercase">Total</p>
+                                    <h3 class="text-4xl font-bold text-gray-800 mt-2"><?= $stats['total'] ?></h3>
+                                    <p class="text-sm text-gray-500 mt-2"><i class="fas fa-chart-line mr-1"></i>Toutes catégories</p>
+                                </div>
+                                <div class="w-14 h-14 bg-purple-100 rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-bullhorn text-2xl text-purple-500"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-2xl shadow-lg p-6 border-t-4 border-green-500 hover:shadow-xl transition-all duration-300">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-xs font-semibold text-gray-500 uppercase">Actives</p>
+                                    <h3 class="text-4xl font-bold text-gray-800 mt-2"><?= $stats['actives'] ?></h3>
+                                    <p class="text-sm text-gray-500 mt-2"><i class="fas fa-eye mr-1"></i>Visibles</p>
+                                </div>
+                                <div class="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-check-circle text-2xl text-green-500"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-2xl shadow-lg p-6 border-t-4 border-blue-500 hover:shadow-xl transition-all duration-300">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-xs font-semibold text-gray-500 uppercase">Menu</p>
+                                    <h3 class="text-4xl font-bold text-gray-800 mt-2"><?= $stats['par_type']['menu'] ?? 0 ?></h3>
+                                    <p class="text-sm text-gray-500 mt-2"><i class="fas fa-utensils mr-1"></i>Restaurant</p>
+                                </div>
+                                <div class="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-utensils text-2xl text-blue-500"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-2xl shadow-lg p-6 border-t-4 border-yellow-500 hover:shadow-xl transition-all duration-300">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-xs font-semibold text-gray-500 uppercase">Expirent</p>
+                                    <h3 class="text-4xl font-bold text-gray-800 mt-2"><?= $stats['expire_aujourdhui'] ?></h3>
+                                    <p class="text-sm text-gray-500 mt-2"><i class="fas fa-clock mr-1"></i>Aujourd'hui</p>
+                                </div>
+                                <div class="w-14 h-14 bg-yellow-100 rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-clock text-2xl text-yellow-500"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Form Card -->
+                    <div class="bg-white rounded-2xl shadow-lg mb-8 overflow-hidden">
+                        <div class="bg-gradient-to-r from-primary to-primary-dark px-6 py-4">
+                            <h2 class="text-xl font-bold text-white flex items-center">
+                                <i class="fas fa-plus mr-3"></i>Créer une Nouvelle Annonce
+                            </h2>
+                        </div>
+                        <div class="p-6">
+                            <form method="POST" class="space-y-6">
+                                <input type="hidden" name="action" value="ajouter">
+                                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    <div>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                            <i class="fas fa-heading mr-2"></i>Titre *
+                                        </label>
+                                        <input type="text" name="titre" required
+                                               class="w-full px-4 py-3 rounded-xl border-2 border-gray-300 focus:border-primary focus:ring focus:ring-primary/20 transition-all">
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                                <i class="fas fa-tag mr-2"></i>Type *
+                                            </label>
+                                            <select name="type_annonce" required
+                                                    class="w-full px-4 py-3 rounded-xl border-2 border-gray-300 focus:border-primary focus:ring focus:ring-primary/20 transition-all">
+                                                <option value="site">🌐 Site</option>
+                                                <option value="menu">🍽️ Menu</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                                <i class="fas fa-palette mr-2"></i>Couleur
+                                            </label>
+                                            <input type="color" name="couleur" value="#10b981"
+                                                   class="w-full h-12 rounded-xl border-2 border-gray-300 cursor-pointer">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                        <i class="fas fa-align-left mr-2"></i>Contenu *
+                                    </label>
+                                    <textarea name="contenu" required rows="4"
+                                              class="w-full px-4 py-3 rounded-xl border-2 border-gray-300 focus:border-primary focus:ring focus:ring-primary/20 transition-all"></textarea>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                            <i class="fas fa-calendar-plus mr-2"></i>Date début
+                                        </label>
+                                        <input type="date" name="date_debut"
+                                               class="w-full px-4 py-3 rounded-xl border-2 border-gray-300 focus:border-primary focus:ring focus:ring-primary/20 transition-all">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                            <i class="fas fa-calendar-minus mr-2"></i>Date fin
+                                        </label>
+                                        <input type="date" name="date_fin"
+                                               class="w-full px-4 py-3 rounded-xl border-2 border-gray-300 focus:border-primary focus:ring focus:ring-primary/20 transition-all">
+                                    </div>
+                                </div>
+                                <div class="text-center">
+                                    <button type="submit" class="bg-gradient-to-r from-primary to-primary-dark text-white px-8 py-4 rounded-xl font-semibold hover:shadow-2xl transform hover:scale-105 transition-all duration-300">
+                                        <i class="fas fa-rocket mr-2"></i>Publier l'Annonce
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Table Card -->
+                    <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+                        <div class="bg-gradient-to-r from-primary to-primary-dark px-6 py-4">
+                            <h2 class="text-xl font-bold text-white flex items-center justify-between">
+                                <span><i class="fas fa-list mr-3"></i>Annonces Existantes (<?= count($annonces) ?>)</span>
+                                <span class="text-sm font-normal bg-white/20 px-4 py-2 rounded-full"><?= $stats['actives'] ?> actives</span>
+                            </h2>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <?php if (empty($annonces)): ?>
+                                <div class="text-center py-12">
+                                    <i class="fas fa-inbox fa-4x text-gray-300 mb-4"></i>
+                                    <h4 class="text-xl text-gray-500">Aucune annonce trouvée</h4>
+                                    <p class="text-gray-400">Créez votre première annonce ci-dessus</p>
+                                </div>
+                            <?php else: ?>
+                                <table class="w-full">
+                                    <thead class="bg-gray-100">
+                                        <tr>
+                                            <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">ID</th>
+                                            <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Détails</th>
+                                            <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Type</th>
+                                            <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Statut</th>
+                                            <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Période</th>
+                                            <th class="px-6 py-4 text-center text-xs font-bold text-gray-700 uppercase">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-200">
+                                        <?php foreach ($annonces as $annonce): ?>
+                                        <tr class="hover:bg-gray-50 transition-colors">
+                                            <td class="px-6 py-4">
+                                                <span class="bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-sm font-semibold">#<?= $annonce['id'] ?></span>
+                                            </td>
+                                            <td class="px-6 py-4">
+                                                <div class="font-bold text-gray-800 mb-1 flex items-center" style="color: <?= $annonce['couleur'] ?>;">
+                                                    <i class="fas fa-circle text-xs mr-2"></i>
+                                                    <?= htmlspecialchars($annonce['titre']) ?>
+                                                </div>
+                                                <div class="text-sm text-gray-600 bg-gray-50 px-3 py-2 rounded-lg">
+                                                    <?= htmlspecialchars(substr($annonce['contenu'], 0, 80)) ?><?= strlen($annonce['contenu']) > 80 ? '...' : '' ?>
+                                                </div>
+                                            </td>
+                                            <td class="px-6 py-4">
+                                                <span class="<?= $annonce['type_annonce'] == 'menu' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800' ?> px-4 py-2 rounded-full text-sm font-semibold">
+                                                    <?= $annonce['type_annonce'] == 'menu' ? '🍽️ Menu' : '🌐 Site' ?>
+                                                </span>
+                                            </td>
+                                            <td class="px-6 py-4">
+                                                <span class="<?= $annonce['statut'] == 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' ?> px-4 py-2 rounded-full text-sm font-semibold">
+                                                    <i class="fas <?= $annonce['statut'] == 'active' ? 'fa-check' : 'fa-times' ?> mr-1"></i>
+                                                    <?= ucfirst($annonce['statut']) ?>
+                                                </span>
+                                            </td>
+                                            <td class="px-6 py-4 text-sm">
+                                                <div class="text-gray-600">
+                                                    <i class="fas fa-play text-green-500 mr-1"></i><?= $annonce['date_debut'] ?: 'Immédiat' ?>
+                                                </div>
+                                                <div class="text-gray-600">
+                                                    <i class="fas fa-stop text-red-500 mr-1"></i><?= $annonce['date_fin'] ?: 'Illimité' ?>
+                                                </div>
+                                            </td>
+                                            <td class="px-6 py-4">
+                                                <div class="flex items-center justify-center space-x-2">
+                                                    <button @click="currentAnnonce = <?= htmlspecialchars(json_encode($annonce)) ?>; modalOpen = true"
+                                                            class="bg-blue-500 hover:bg-blue-600 text-white w-10 h-10 rounded-lg transition-all">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                    <form method="POST" onsubmit="return confirm('Confirmer la suppression ?')" class="inline">
+                                                        <input type="hidden" name="action" value="supprimer">
+                                                        <input type="hidden" name="id" value="<?= $annonce['id'] ?>">
+                                                        <button type="submit" class="bg-red-500 hover:bg-red-600 text-white w-10 h-10 rounded-lg transition-all">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
+                    <!-- Modal Edit -->
+                    <div x-show="modalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" x-cloak style="display: none;">
+                        <div @click.away="modalOpen = false" class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                            <div class="bg-gradient-to-r from-primary to-primary-dark px-6 py-4 flex justify-between items-center">
+                                <h3 class="text-xl font-bold text-white"><i class="fas fa-edit mr-2"></i>Modifier l'Annonce</h3>
+                                <button @click="modalOpen = false" class="text-white hover:text-gray-200">
+                                    <i class="fas fa-times text-2xl"></i>
+                                </button>
+                            </div>
+                            <form method="POST" class="p-6 space-y-4">
+                                <input type="hidden" name="action" value="modifier">
+                                <input type="hidden" name="id" x-model="currentAnnonce?.id">
+
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Titre *</label>
+                                    <input type="text" name="titre" x-model="currentAnnonce?.titre" required
+                                           class="w-full px-4 py-2 rounded-lg border-2 border-gray-300 focus:border-primary">
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Contenu *</label>
+                                    <textarea name="contenu" x-model="currentAnnonce?.contenu" required rows="4"
+                                              class="w-full px-4 py-2 rounded-lg border-2 border-gray-300 focus:border-primary"></textarea>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Type *</label>
+                                        <select name="type_annonce" x-model="currentAnnonce?.type_annonce" required
+                                                class="w-full px-4 py-2 rounded-lg border-2 border-gray-300 focus:border-primary">
+                                            <option value="site">🌐 Site</option>
+                                            <option value="menu">🍽️ Menu</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Statut</label>
+                                        <select name="statut" x-model="currentAnnonce?.statut"
+                                                class="w-full px-4 py-2 rounded-lg border-2 border-gray-300 focus:border-primary">
+                                            <option value="active">✅ Active</option>
+                                            <option value="inactive">❌ Inactive</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-3 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Couleur</label>
+                                        <input type="color" name="couleur" x-model="currentAnnonce?.couleur"
+                                               class="w-full h-10 rounded-lg border-2 border-gray-300">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Date début</label>
+                                        <input type="date" name="date_debut" x-model="currentAnnonce?.date_debut"
+                                               class="w-full px-4 py-2 rounded-lg border-2 border-gray-300 focus:border-primary">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Date fin</label>
+                                        <input type="date" name="date_fin" x-model="currentAnnonce?.date_fin"
+                                               class="w-full px-4 py-2 rounded-lg border-2 border-gray-300 focus:border-primary">
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-end space-x-3 pt-4">
+                                    <button type="button" @click="modalOpen = false"
+                                            class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all">
+                                        Annuler
+                                    </button>
+                                    <button type="submit"
+                                            class="px-6 py-2 bg-gradient-to-r from-primary to-primary-dark text-white rounded-lg hover:shadow-lg transition-all">
+                                        <i class="fas fa-save mr-2"></i>Enregistrer
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                </div>
+            </main>
         </div>
     </div>
 
-    <div class="container">
-        <?php if (isset($message)) echo $message; ?>
-
-        <!-- Cartes de statistiques -->
-        <div class="row mb-4">
-            <div class="col-lg-3 col-md-6 mb-3">
-                <div class="card stats-card primary h-100">
-                    <div class="card-body position-relative">
-                        <div class="stats-icon">
-                            <i class="fas fa-bullhorn"></i>
-                        </div>
-                        <h6 class="stats-title">Total des annonces</h6>
-                        <div class="stats-number"><?= $stats['total'] ?></div>
-                        <div class="stats-subtitle">
-                            <i class="fas fa-chart-line me-1"></i>
-                            <span class="stats-trend">Toutes catégories</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-lg-3 col-md-6 mb-3">
-                <div class="card stats-card success h-100">
-                    <div class="card-body position-relative">
-                        <div class="stats-icon">
-                            <i class="fas fa-check-circle"></i>
-                        </div>
-                        <h6 class="stats-title">Annonces actives</h6>
-                        <div class="stats-number"><?= $stats['actives'] ?></div>
-                        <div class="stats-subtitle">
-                            <i class="fas fa-eye me-1"></i>
-                            <span class="stats-trend">Visibles publiquement</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-lg-3 col-md-6 mb-3">
-                <div class="card stats-card info h-100">
-                    <div class="card-body position-relative">
-                        <div class="stats-icon">
-                            <i class="fas fa-utensils"></i>
-                        </div>
-                        <h6 class="stats-title">Annonces menu</h6>
-                        <div class="stats-number"><?= $stats['par_type']['menu'] ?? 0 ?></div>
-                        <div class="stats-subtitle">
-                            <i class="fas fa-restaurant me-1"></i>
-                            <span class="stats-trend">Restaurant actif</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-lg-3 col-md-6 mb-3">
-                <div class="card stats-card warning h-100">
-                    <div class="card-body position-relative">
-                        <div class="stats-icon">
-                            <i class="fas fa-clock"></i>
-                        </div>
-                        <h6 class="stats-title">Expirent aujourd'hui</h6>
-                        <div class="stats-number"><?= $stats['expire_aujourdhui'] ?></div>
-                        <div class="stats-subtitle">
-                            <i class="fas fa-exclamation-triangle me-1"></i>
-                            <span class="stats-trend">À vérifier</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Formulaire d'ajout -->
-        <div class="card modern-card mb-4">
-            <div class="card-header modern">
-                <h5 class="mb-0">
-                    <i class="fas fa-plus me-2"></i>
-                    Créer une Nouvelle Annonce
-                </h5>
-            </div>
-            <div class="card-body p-4">
-                <form method="POST">
-                    <input type="hidden" name="action" value="ajouter">
-                    <div class="row">
-                        <div class="col-lg-6 col-md-12">
-                            <div class="mb-3">
-                                <label for="titre" class="form-label fw-bold">
-                                    <i class="fas fa-heading me-1"></i>Titre de l'annonce *
-                                </label>
-                                <input type="text" class="form-control form-control-modern" id="titre" name="titre" required placeholder="Saisissez le titre...">
-                            </div>
-                        </div>
-                        <div class="col-lg-3 col-md-6">
-                            <div class="mb-3">
-                                <label for="type_annonce" class="form-label fw-bold">
-                                    <i class="fas fa-tag me-1"></i>Type d'annonce *
-                                </label>
-                                <select class="form-select form-control-modern" id="type_annonce" name="type_annonce" required>
-                                    <option value="site">🌐 Site général</option>
-                                    <option value="menu">🍽️ Menu restaurant</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-lg-3 col-md-6">
-                            <div class="mb-3">
-                                <label for="couleur" class="form-label fw-bold">
-                                    <i class="fas fa-palette me-1"></i>Couleur
-                                </label>
-                                <input type="color" class="form-control form-control-modern form-control-color" id="couleur" name="couleur" value="#667eea">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="contenu" class="form-label fw-bold">
-                            <i class="fas fa-align-left me-1"></i>Contenu de l'annonce *
-                        </label>
-                        <textarea class="form-control form-control-modern" id="contenu" name="contenu" rows="4" required placeholder="Rédigez votre annonce..."></textarea>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="date_debut" class="form-label fw-bold">
-                                    <i class="fas fa-calendar-plus me-1"></i>Date de début
-                                </label>
-                                <input type="date" class="form-control form-control-modern" id="date_debut" name="date_debut">
-                                <small class="text-muted">Laissez vide pour durée illimitée</small>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="date_fin" class="form-label fw-bold">
-                                    <i class="fas fa-calendar-minus me-1"></i>Date de fin
-                                </label>
-                                <input type="date" class="form-control form-control-modern" id="date_fin" name="date_fin">
-                                <small class="text-muted">Optionnel</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="text-center">
-                        <button type="submit" class="btn btn-primary btn-modern pulse">
-                            <i class="fas fa-rocket me-2"></i>Publier l'Annonce
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- Liste des annonces -->
-        <div class="card modern-card">
-            <div class="card-header modern d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">
-                    <i class="fas fa-list me-2"></i>
-                    Annonces Existantes (<?= count($annonces) ?>)
-                </h5>
-                <div class="d-flex gap-2">
-                    <span class="badge badge-modern bg-light text-dark">
-                        <i class="fas fa-eye me-1"></i><?= $stats['actives'] ?> actives
-                    </span>
-                </div>
-            </div>
-            <div class="card-body p-0">
-                <?php if (empty($annonces)): ?>
-                    <div class="text-center py-5">
-                        <i class="fas fa-inbox fa-4x text-muted mb-3"></i>
-                        <h4 class="text-muted">Aucune annonce trouvée</h4>
-                        <p class="text-muted">Créez votre première annonce en utilisant le formulaire ci-dessus</p>
-                    </div>
-                <?php else: ?>
-                    <div class="table-responsive">
-                        <table class="table elegant-table mb-0">
-                            <thead>
-                                <tr>
-                                    <th><i class="fas fa-hashtag me-1"></i>ID</th>
-                                    <th><i class="fas fa-info-circle me-1"></i>Détails</th>
-                                    <th><i class="fas fa-tag me-1"></i>Type</th>
-                                    <th><i class="fas fa-toggle-on me-1"></i>Statut</th>
-                                    <th><i class="fas fa-calendar me-1"></i>Période</th>
-                                    <th class="text-center"><i class="fas fa-cogs me-1"></i>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($annonces as $annonce): ?>
-                                <tr>
-                                    <td>
-                                        <span class="table-badge badge-id">#<?= $annonce['id'] ?></span>
-                                    </td>
-                                    <td>
-                                        <div class="annonce-title" style="color: <?= $annonce['couleur'] ?>;">
-                                            <i class="fas fa-circle me-2" style="font-size: 0.6rem;"></i>
-                                            <?= htmlspecialchars($annonce['titre']) ?>
-                                        </div>
-                                        <div class="annonce-content">
-                                            <?= htmlspecialchars(substr($annonce['contenu'], 0, 80)) ?>
-                                            <?= strlen($annonce['contenu']) > 80 ? '...' : '' ?>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span class="table-badge <?= $annonce['type_annonce'] == 'menu' ? 'badge-menu' : 'badge-site' ?>">
-                                            <?= $annonce['type_annonce'] == 'menu' ? '🍽️ Menu' : '🌐 Site' ?>
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <span class="table-badge <?= $annonce['statut'] == 'active' ? 'badge-active' : 'badge-inactive' ?>">
-                                            <i class="fas <?= $annonce['statut'] == 'active' ? 'fa-check' : 'fa-times' ?> me-1"></i>
-                                            <?= ucfirst($annonce['statut']) ?>
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div class="date-info-table">
-                                            <div class="mb-2">
-                                                <span class="date-label">
-                                                    <i class="fas fa-play text-success me-1"></i>Début:
-                                                </span>
-                                                <span class="date-value"><?= $annonce['date_debut'] ?: 'Immédiat' ?></span>
-                                            </div>
-                                            <div>
-                                                <span class="date-label">
-                                                    <i class="fas fa-stop text-danger me-1"></i>Fin:
-                                                </span>
-                                                <span class="date-value"><?= $annonce['date_fin'] ?: 'Illimité' ?></span>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="text-center">
-                                        <div class="action-buttons justify-content-center">
-                                            <button class="action-btn btn-edit" 
-                                                    onclick="modifierAnnonce(<?= htmlspecialchars(json_encode($annonce)) ?>)"
-                                                    title="Modifier l'annonce">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                            <button class="action-btn btn-delete" 
-                                                    onclick="supprimerAnnonce(<?= $annonce['id'] ?>)"
-                                                    title="Supprimer l'annonce">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                <?php endif; ?>
-            </div>
-        </div>
-    </div>
-
-    <!-- Bouton flottant pour remonter en haut -->
-    <button class="btn btn-primary floating-btn" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Retour en haut">
+    <!-- Floating Button -->
+    <button onclick="window.scrollTo({top: 0, behavior: 'smooth'})"
+            class="fixed bottom-8 right-8 bg-gradient-to-r from-primary to-primary-dark text-white w-14 h-14 rounded-full shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-110 z-40">
         <i class="fas fa-arrow-up"></i>
     </button>
 
-    <!-- Modal de modification simplifié -->
-    <div class="modal fade" id="modalModifier" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">
-                        <i class="fas fa-edit me-2"></i>Modifier l'Annonce
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <form method="POST" id="formModifier">
-                    <div class="modal-body">
-                        <input type="hidden" name="action" value="modifier">
-                        <input type="hidden" name="id" id="mod_id">
-                        
-                        <div class="row">
-                            <div class="col-lg-8">
-                                <div class="mb-3">
-                                    <label for="mod_titre" class="form-label fw-bold">
-                                        <i class="fas fa-heading me-1"></i>Titre *
-                                    </label>
-                                    <input type="text" class="form-control form-control-modern" id="mod_titre" name="titre" required>
-                                </div>
-                            </div>
-                            <div class="col-lg-4">
-                                <div class="mb-3">
-                                    <label for="mod_type_annonce" class="form-label fw-bold">
-                                        <i class="fas fa-tag me-1"></i>Type *
-                                    </label>
-                                    <select class="form-select form-control-modern" id="mod_type_annonce" name="type_annonce" required>
-                                        <option value="site">🌐 Site général</option>
-                                        <option value="menu">🍽️ Menu restaurant</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="mod_contenu" class="form-label fw-bold">
-                                <i class="fas fa-align-left me-1"></i>Contenu *
-                            </label>
-                            <textarea class="form-control form-control-modern" id="mod_contenu" name="contenu" rows="4" required></textarea>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-lg-3">
-                                <div class="mb-3">
-                                    <label for="mod_statut" class="form-label fw-bold">
-                                        <i class="fas fa-toggle-on me-1"></i>Statut
-                                    </label>
-                                    <select class="form-select form-control-modern" id="mod_statut" name="statut">
-                                        <option value="active">✅ Active</option>
-                                        <option value="inactive">❌ Inactive</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="col-lg-3">
-                                <div class="mb-3">
-                                    <label for="mod_couleur" class="form-label fw-bold">
-                                        <i class="fas fa-palette me-1"></i>Couleur
-                                    </label>
-                                    <input type="color" class="form-control form-control-modern form-control-color" id="mod_couleur" name="couleur">
-                                </div>
-                            </div>
-                            <div class="col-lg-3">
-                                <div class="mb-3">
-                                    <label for="mod_date_debut" class="form-label fw-bold">
-                                        <i class="fas fa-calendar-plus me-1"></i>Date début
-                                    </label>
-                                    <input type="date" class="form-control form-control-modern" id="mod_date_debut" name="date_debut">
-                                </div>
-                            </div>
-                            <div class="col-lg-3">
-                                <div class="mb-3">
-                                    <label for="mod_date_fin" class="form-label fw-bold">
-                                        <i class="fas fa-calendar-minus me-1"></i>Date fin
-                                    </label>
-                                    <input type="date" class="form-control form-control-modern" id="mod_date_fin" name="date_fin">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                            <i class="fas fa-times me-2"></i>Annuler
-                        </button>
-                        <button type="submit" class="btn btn-success btn-modern">
-                            <i class="fas fa-save me-2"></i>Enregistrer
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Animation au chargement de la page
-        document.addEventListener('DOMContentLoaded', function() {
-            // Animation des cartes de statistiques
-            const statsCards = document.querySelectorAll('.stats-card');
-            statsCards.forEach((card, index) => {
-                card.style.opacity = '0';
-                card.style.transform = 'translateY(30px)';
-                setTimeout(() => {
-                    card.style.transition = 'all 0.6s ease';
-                    card.style.opacity = '1';
-                    card.style.transform = 'translateY(0)';
-                }, index * 100);
-            });
-
-            // Effet de comptage animé pour les statistiques
-            const numbers = document.querySelectorAll('.stats-number');
-            numbers.forEach(number => {
-                const target = parseInt(number.textContent);
-                const increment = target / 30;
-                let current = 0;
-                
-                const timer = setInterval(() => {
-                    current += increment;
-                    if (current >= target) {
-                        current = target;
-                        clearInterval(timer);
-                    }
-                    number.textContent = Math.floor(current);
-                }, 50);
-            });
-        });
-
-        function modifierAnnonce(annonce) {
-            // Remplir le formulaire modal avec les données
-            document.getElementById('mod_id').value = annonce.id;
-            document.getElementById('mod_titre').value = annonce.titre;
-            document.getElementById('mod_contenu').value = annonce.contenu;
-            document.getElementById('mod_type_annonce').value = annonce.type_annonce;
-            document.getElementById('mod_couleur').value = annonce.couleur;
-            document.getElementById('mod_statut').value = annonce.statut;
-            document.getElementById('mod_date_debut').value = annonce.date_debut;
-            document.getElementById('mod_date_fin').value = annonce.date_fin;
-            
-            // Afficher le modal avec animation
-            const modal = new bootstrap.Modal(document.getElementById('modalModifier'));
-            modal.show();
-        }
-
-        function supprimerAnnonce(id) {
-            // Confirmation simple mais efficace
-            const confirmation = confirm('⚠️ Êtes-vous sûr de vouloir supprimer cette annonce ?\n\nCette action est irréversible.');
-            
-            if (confirmation) {
-                // Créer et soumettre le formulaire de suppression
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.innerHTML = `
-                    <input type="hidden" name="action" value="supprimer">
-                    <input type="hidden" name="id" value="${id}">
-                `;
-                document.body.appendChild(form);
-                form.submit();
-            }
-        }
-
-        // Auto-hide alerts après 5 secondes
-        document.addEventListener('DOMContentLoaded', function() {
-            const alerts = document.querySelectorAll('.alert');
-            alerts.forEach(alert => {
-                setTimeout(() => {
-                    const bsAlert = new bootstrap.Alert(alert);
-                    if (bsAlert) {
-                        bsAlert.close();
-                    }
-                }, 5000);
-            });
-        });
-
-        // Validation en temps réel du formulaire
-        document.addEventListener('DOMContentLoaded', function() {
-            const forms = document.querySelectorAll('form');
-            forms.forEach(form => {
-                const inputs = form.querySelectorAll('input[required], textarea[required], select[required]');
-                inputs.forEach(input => {
-                    input.addEventListener('input', function() {
-                        if (this.value.trim() !== '') {
-                            this.classList.remove('is-invalid');
-                            this.classList.add('is-valid');
-                        } else {
-                            this.classList.remove('is-valid');
-                            this.classList.add('is-invalid');
-                        }
-                    });
-                });
-            });
-        });
-
-        // Mise à jour automatique des dates minimales
-        document.addEventListener('DOMContentLoaded', function() {
-            const today = new Date().toISOString().split('T')[0];
-            const dateInputs = document.querySelectorAll('input[type="date"]');
-            dateInputs.forEach(input => {
-                if (input.name.includes('debut') || input.name.includes('fin')) {
-                    input.min = today;
-                }
-            });
-        });
-
-        // Gestion responsive du tableau
-        window.addEventListener('resize', function() {
-            const table = document.querySelector('.elegant-table');
-            const container = document.querySelector('.table-responsive');
-            
-            if (window.innerWidth < 768 && table && container) {
-                // Ajout d'un scroll indicator sur mobile
-                if (!container.querySelector('.scroll-indicator')) {
-                    const indicator = document.createElement('div');
-                    indicator.className = 'scroll-indicator text-center text-muted py-2';
-                    indicator.innerHTML = '<small><i class="fas fa-arrows-alt-h me-1"></i>Faites défiler horizontalement</small>';
-                    container.appendChild(indicator);
-                }
-            }
-        });
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
 </body>
 </html>

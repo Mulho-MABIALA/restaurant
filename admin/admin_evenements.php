@@ -445,5 +445,8 @@ if (isset($_GET['get_event']) && isset($_GET['id'])) {
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('date_evenement').setAttribute('min', today);
     </script>
+
+    <!-- Footer -->
+    <?php include 'footer.php'; ?>
 </body>
 </html>
