@@ -188,200 +188,728 @@ if (isset($_GET['get_event']) && isset($_GET['id'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Administration - Gestion des Événements</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Gestion des Événements - Restaurant Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        .admin-header {
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 2rem 0;
+            min-height: 100vh;
+        }
+
+        .main-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .content-wrapper {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+
+        .page-header {
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .page-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 0.5rem;
+        }
+
+        .page-subtitle {
+            color: #64748b;
+            font-size: 1rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
             margin-bottom: 2rem;
         }
-        .event-card {
-            border: none;
-            border-radius: 15px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s ease;
+
+        .stat-card {
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
-        .event-card:hover {
+
+        .stat-card:hover {
             transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
         }
+
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .stat-icon.purple {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .stat-icon.blue {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+        }
+
+        .stat-icon.green {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .stat-content h3 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .stat-content p {
+            color: #64748b;
+            font-size: 0.875rem;
+        }
+
+        .content-card {
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #f1f5f9;
+        }
+
+        .card-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #475569;
+        }
+
+        .btn-sm {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+        }
+
+        .events-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0 0.5rem;
+        }
+
+        .events-table thead th {
+            color: #64748b;
+            font-weight: 600;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            padding: 1rem;
+            text-align: left;
+            border: none;
+        }
+
+        .events-table tbody tr {
+            background: #f8fafc;
+            transition: all 0.3s ease;
+        }
+
+        .events-table tbody tr:hover {
+            background: #f1f5f9;
+            transform: scale(1.01);
+        }
+
+        .events-table tbody td {
+            padding: 1.25rem 1rem;
+            vertical-align: middle;
+            border: none;
+        }
+
+        .events-table tbody tr td:first-child {
+            border-radius: 12px 0 0 12px;
+        }
+
+        .events-table tbody tr td:last-child {
+            border-radius: 0 12px 12px 0;
+        }
+
         .event-image {
             width: 80px;
             height: 80px;
+            border-radius: 12px;
             object-fit: cover;
-            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
         }
-        .btn-custom {
-            border-radius: 25px;
+
+        .event-image-placeholder {
+            width: 80px;
+            height: 80px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #94a3b8;
         }
+
+        .event-title {
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 0.25rem;
+        }
+
+        .event-description {
+            color: #64748b;
+            font-size: 0.875rem;
+        }
+
+        .event-date {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #475569;
+            margin-bottom: 0.25rem;
+        }
+
+        .event-location {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #475569;
+        }
+
+        .badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .alert {
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .alert-success {
+            background: #d1fae5;
+            border-left: 4px solid #10b981;
+            color: #065f46;
+        }
+
+        .alert-danger {
+            background: #fee2e2;
+            border-left: 4px solid #ef4444;
+            color: #991b1b;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 700px;
+            max-height: 85vh;
+            overflow: visible;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-body {
+            max-height: calc(85vh - 200px);
+            overflow-y: auto;
+        }
+
+        /* Cacher la scrollbar mais garder la fonctionnalité */
+        .modal-body::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .modal-body::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .modal-body::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+
+        .modal-body::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
         .modal-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
+            padding: 1.5rem 2rem;
+            border-radius: 20px 20px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            transition: background 0.3s ease;
+        }
+
+        .modal-close:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .modal-body {
+            padding: 2rem;
+        }
+
+        .modal-footer {
+            padding: 1.5rem 2rem;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            color: #475569;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        textarea.form-control {
+            resize: vertical;
+            min-height: 120px;
+        }
+
+        .form-text {
+            color: #94a3b8;
+            font-size: 0.75rem;
+            margin-top: 0.5rem;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #94a3b8;
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        @media (max-width: 768px) {
+            .content-wrapper {
+                padding: 1rem;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .events-table {
+                font-size: 0.875rem;
+            }
         }
     </style>
 </head>
 
-<body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 min-h-screen">
-    <div class="flex h-screen overflow-hidden">
+<body>
+    <div class="main-container">
         <?php include 'sidebar.php'; ?>
-        <div class="flex-1 p-4 overflow-y-auto">
-            <header class="admin-header text-center">
-                <h1 class="display-4">Gestion des Événements</h1>
-                <p class="lead">Ajoutez, modifiez ou supprimez des événements pour votre restaurant.</p>
-            </header>
 
-       
-
-    <div class="container">
-        <?php if ($message): ?>
-            <div class="alert alert-<?= $messageType === 'error' ? 'danger' : 'success' ?> alert-dismissible fade show">
-                <i class="fas fa-<?= $messageType === 'error' ? 'exclamation-triangle' : 'check-circle' ?> me-2"></i>
-                <?= htmlspecialchars($message) ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <div class="content-wrapper">
+            <!-- Page Header -->
+            <div class="page-header">
+                <h1 class="page-title"><i class="fas fa-calendar-alt mr-3"></i>Gestion des Événements</h1>
+                <p class="page-subtitle">Créez et gérez les événements de votre restaurant</p>
             </div>
-        <?php endif; ?>
 
-        <div class="row mb-4">
-            <div class="col-12">
-                <button class="btn btn-primary btn-custom" data-bs-toggle="modal" data-bs-target="#eventModal">
-                    <i class="fas fa-plus me-2"></i>Ajouter un événement
-                </button>
-            </div>
-        </div>
-
-        <div class="row">
-            <div class="col-12">
-                <div class="card event-card">
-                    <div class="card-header bg-white">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-list me-2"></i>Liste des événements
-                        </h5>
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon purple">
+                        <i class="fas fa-calendar-check"></i>
                     </div>
-                    <div class="card-body">
-                        <?php if (empty($evenements)): ?>
-                            <p class="text-muted text-center py-4">
-                                <i class="fas fa-calendar-times fa-3x mb-3"></i><br>
-                                Aucun événement trouvé
-                            </p>
-                        <?php else: ?>
-                            <div class="table-responsive">
-                                <table class="table table-hover">
-                                    <thead>
-                                        <tr>
-                                            <th>Image</th>
-                                            <th>Titre</th>
-                                            <th>Date & Heure</th>
-                                            <th>Lieu</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($evenements as $evenement): ?>
-                                            <tr>
-                                                <td>
-                                                    <?php if ($evenement['image']): ?>
-                                                        <img src="uploads/evenements/<?= htmlspecialchars($evenement['image']) ?>" 
-                                                             class="event-image" alt="Image événement">
-                                                    <?php else: ?>
-                                                        <div class="event-image bg-light d-flex align-items-center justify-content-center">
-                                                            <i class="fas fa-image text-muted"></i>
-                                                        </div>
-                                                    <?php endif; ?>
-                                                </td>
-                                                <td>
-                                                    <strong><?= htmlspecialchars($evenement['titre']) ?></strong>
-                                                    <br><small class="text-muted"><?= substr(htmlspecialchars($evenement['description']), 0, 50) ?>...</small>
-                                                </td>
-                                                <td>
-                                                    <i class="fas fa-calendar me-1"></i><?= date('d/m/Y', strtotime($evenement['date_evenement'])) ?>
-                                                    <br><i class="fas fa-clock me-1"></i><?= date('H:i', strtotime($evenement['heure_evenement'])) ?>
-                                                </td>
-                                                <td>
-                                                    <i class="fas fa-map-marker-alt me-1"></i><?= htmlspecialchars($evenement['lieu']) ?>
-                                                </td>
-                                                <td>
-                                                    <button class="btn btn-outline-primary btn-sm btn-custom me-1" 
-                                                            onclick="modifierEvenement(<?= $evenement['id'] ?>)">
-                                                        <i class="fas fa-edit"></i>
-                                                    </button>
-                                                    <button class="btn btn-outline-danger btn-sm btn-custom" 
-                                                            onclick="supprimerEvenement(<?= $evenement['id'] ?>, '<?= addslashes($evenement['titre']) ?>')">
-                                                        <i class="fas fa-trash"></i>
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php endif; ?>
+                    <div class="stat-content">
+                        <h3><?= count($evenements) ?></h3>
+                        <p>Événements total</p>
                     </div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-icon blue">
+                        <i class="fas fa-calendar-day"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3><?= count(array_filter($evenements, fn($e) => strtotime($e['date_evenement']) >= strtotime('today'))) ?></h3>
+                        <p>Événements à venir</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon green">
+                        <i class="fas fa-calendar-times"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3><?= count(array_filter($evenements, fn($e) => strtotime($e['date_evenement']) < strtotime('today'))) ?></h3>
+                        <p>Événements passés</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alert Messages -->
+            <?php if ($message): ?>
+                <div class="alert alert-<?= $messageType === 'error' ? 'danger' : 'success' ?>">
+                    <i class="fas fa-<?= $messageType === 'error' ? 'exclamation-circle' : 'check-circle' ?> fa-lg"></i>
+                    <span><?= htmlspecialchars($message) ?></span>
+                </div>
+            <?php endif; ?>
+
+            <!-- Main Content Card -->
+            <div class="content-card">
+                <div class="card-header">
+                    <h2 class="card-title"><i class="fas fa-list mr-2"></i>Liste des événements</h2>
+                    <button class="btn btn-primary" onclick="openModal()">
+                        <i class="fas fa-plus"></i>
+                        Nouvel événement
+                    </button>
+                </div>
+
+                <?php if (empty($evenements)): ?>
+                    <div class="empty-state">
+                        <i class="fas fa-calendar-times"></i>
+                        <h3 style="color: #64748b; margin-bottom: 0.5rem;">Aucun événement</h3>
+                        <p>Commencez par créer votre premier événement</p>
+                    </div>
+                <?php else: ?>
+                    <table class="events-table">
+                        <thead>
+                            <tr>
+                                <th>Image</th>
+                                <th>Événement</th>
+                                <th>Date & Heure</th>
+                                <th>Lieu</th>
+                                <th>Statut</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($evenements as $evenement):
+                                $isPast = strtotime($evenement['date_evenement']) < strtotime('today');
+                            ?>
+                                <tr>
+                                    <td>
+                                        <?php if ($evenement['image']): ?>
+                                            <img src="uploads/evenements/<?= htmlspecialchars($evenement['image']) ?>"
+                                                 class="event-image" alt="<?= htmlspecialchars($evenement['titre']) ?>">
+                                        <?php else: ?>
+                                            <div class="event-image-placeholder">
+                                                <i class="fas fa-image fa-2x"></i>
+                                            </div>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <div class="event-title"><?= htmlspecialchars($evenement['titre']) ?></div>
+                                        <div class="event-description">
+                                            <?= substr(htmlspecialchars($evenement['description'] ?? ''), 0, 60) ?>...
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="event-date">
+                                            <i class="fas fa-calendar"></i>
+                                            <?= date('d/m/Y', strtotime($evenement['date_evenement'])) ?>
+                                        </div>
+                                        <div class="event-date">
+                                            <i class="fas fa-clock"></i>
+                                            <?= date('H:i', strtotime($evenement['heure_evenement'])) ?>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="event-location">
+                                            <i class="fas fa-map-marker-alt"></i>
+                                            <?= htmlspecialchars($evenement['lieu']) ?>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-<?= $isPast ? 'warning' : 'success' ?>">
+                                            <?= $isPast ? 'Passé' : 'À venir' ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div style="display: flex; gap: 0.5rem;">
+                                            <button class="btn btn-success btn-sm"
+                                                    onclick="modifierEvenement(<?= $evenement['id'] ?>)"
+                                                    title="Modifier">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="btn btn-danger btn-sm"
+                                                    onclick="supprimerEvenement(<?= $evenement['id'] ?>, '<?= addslashes($evenement['titre']) ?>')"
+                                                    title="Supprimer">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
             </div>
         </div>
     </div>
 
     <!-- Modal pour ajouter/modifier un événement -->
-    <div class="modal fade" id="eventModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="modalTitle">
-                        <i class="fas fa-plus-circle me-2"></i>Ajouter un événement
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+    <div class="modal" id="eventModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">
+                    <i class="fas fa-plus-circle"></i> Nouvel événement
+                </h3>
+                <button type="button" class="modal-close" onclick="closeModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="eventForm" method="POST" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <input type="hidden" name="action" id="formAction" value="ajouter">
+                    <input type="hidden" name="id" id="eventId">
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Titre de l'événement *</label>
+                            <input type="text" class="form-control" name="titre" id="titre" required placeholder="Ex: Soirée Jazz">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Lieu *</label>
+                            <input type="text" class="form-control" name="lieu" id="lieu" required placeholder="Ex: Restaurant La Belle Vie">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Date *</label>
+                            <input type="date" class="form-control" name="date_evenement" id="date_evenement" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Heure *</label>
+                            <input type="time" class="form-control" name="heure_evenement" id="heure_evenement" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" name="description" id="description" placeholder="Décrivez votre événement..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Image de l'événement</label>
+                        <input type="file" class="form-control" name="image" id="image" accept="image/*">
+                        <div class="form-text">Formats acceptés : JPEG, PNG, GIF, WebP • Taille max : 5MB</div>
+                        <div id="currentImage" style="margin-top: 1rem;"></div>
+                    </div>
                 </div>
-                <form id="eventForm" method="POST" enctype="multipart/form-data">
-                    <div class="modal-body">
-                        <input type="hidden" name="action" id="formAction" value="ajouter">
-                        <input type="hidden" name="id" id="eventId">
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Titre *</label>
-                                <input type="text" class="form-control" name="titre" id="titre" required>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Lieu *</label>
-                                <input type="text" class="form-control" name="lieu" id="lieu" required>
-                            </div>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Date *</label>
-                                <input type="date" class="form-control" name="date_evenement" id="date_evenement" required>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Heure *</label>
-                                <input type="time" class="form-control" name="heure_evenement" id="heure_evenement" required>
-                            </div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Description</label>
-                            <textarea class="form-control" name="description" id="description" rows="4"></textarea>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Image</label>
-                            <input type="file" class="form-control" name="image" id="image" accept="image/*">
-                            <div class="form-text">Formats acceptés : JPEG, PNG, GIF, WebP. Taille max : 5MB</div>
-                            <div id="currentImage" class="mt-2"></div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary btn-custom" data-bs-dismiss="modal">Annuler</button>
-                        <button type="submit" class="btn btn-primary btn-custom" id="submitBtn">
-                            <i class="fas fa-save me-2"></i>Enregistrer
-                        </button>
-                    </div>
-                </form>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">
+                        <i class="fas fa-times"></i> Annuler
+                    </button>
+                    <button type="submit" class="btn btn-primary" id="submitBtn">
+                        <i class="fas fa-save"></i> Enregistrer
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de confirmation de suppression -->
+    <div class="modal" id="deleteModal">
+        <div class="modal-content" style="max-width: 380px; border-radius: 16px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); overflow: visible;">
+            <div style="padding: 1.5rem 1.5rem; text-align: center;">
+                <!-- Icône d'avertissement -->
+                <div style="width: 70px; height: 70px; background: #fee2e2; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem;">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 2rem; color: #dc2626;"></i>
+                </div>
+
+                <!-- Titre -->
+                <h2 style="color: #1e293b; margin-bottom: 0.75rem; font-size: 1.35rem; font-weight: 700;">Confirmer la suppression</h2>
+
+                <!-- Message -->
+                <p style="color: #64748b; margin-bottom: 0.875rem; font-size: 0.875rem; line-height: 1.5;">Vous êtes sur le point de supprimer définitivement l'événement :</p>
+
+                <!-- Info événement -->
+                <div style="background: #f8fafc; border-radius: 8px; padding: 0.875rem; margin-bottom: 0.875rem; border: 1px solid #e2e8f0;">
+                    <p style="font-weight: 600; color: #1e293b; font-size: 0.95rem; margin: 0;" id="deleteEventInfo"></p>
+                </div>
+
+                <!-- Avertissement -->
+                <p style="color: #dc2626; font-weight: 600; font-size: 0.875rem; margin-bottom: 1.25rem;">Cette action est irréversible !</p>
+
+                <!-- Boutons -->
+                <div style="display: flex; gap: 0.625rem;">
+                    <button type="button" onclick="closeDeleteModal()"
+                            style="flex: 1; padding: 0.75rem 1rem; background: #e5e7eb; color: #374151; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">
+                        Annuler
+                    </button>
+                    <button type="button" id="confirmDeleteBtn" onclick="confirmDeleteEvent()"
+                            style="flex: 1; padding: 0.75rem 1rem; background: #dc2626; color: white; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">
+                        Supprimer
+                    </button>
+                </div>
             </div>
         </div>
     </div>
+
+    <style>
+        #deleteModal button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        #deleteModal button:active {
+            transform: translateY(0);
+        }
+
+        #deleteModal button:first-of-type:hover {
+            background: #d1d5db;
+        }
+
+        #deleteModal button:last-of-type:hover {
+            background: #b91c1c;
+        }
+    </style>
 
     <!-- Formulaire caché pour suppression -->
     <form id="deleteForm" method="POST" style="display: none;">
@@ -389,13 +917,39 @@ if (isset($_GET['get_event']) && isset($_GET['id'])) {
         <input type="hidden" name="id" id="deleteId">
     </form>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        let eventToDelete = null;
+        let eventTitleToDelete = '';
+
+        // Ouvrir le modal
+        function openModal() {
+            document.getElementById('eventModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        // Fermer le modal
+        function closeModal() {
+            document.getElementById('eventModal').classList.remove('active');
+            document.body.style.overflow = 'auto';
+            resetForm();
+        }
+
+        // Réinitialiser le formulaire
+        function resetForm() {
+            document.getElementById('eventForm').reset();
+            document.getElementById('modalTitle').innerHTML = '<i class="fas fa-plus-circle"></i> Nouvel événement';
+            document.getElementById('formAction').value = 'ajouter';
+            document.getElementById('eventId').value = '';
+            document.getElementById('submitBtn').innerHTML = '<i class="fas fa-save"></i> Enregistrer';
+            document.getElementById('currentImage').innerHTML = '';
+        }
+
+        // Modifier un événement
         function modifierEvenement(id) {
             fetch(`?get_event=1&id=${id}`)
                 .then(response => response.json())
                 .then(data => {
-                    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit me-2"></i>Modifier un événement';
+                    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit"></i> Modifier l\'événement';
                     document.getElementById('formAction').value = 'modifier';
                     document.getElementById('eventId').value = data.id;
                     document.getElementById('titre').value = data.titre;
@@ -403,20 +957,22 @@ if (isset($_GET['get_event']) && isset($_GET['id'])) {
                     document.getElementById('date_evenement').value = data.date_evenement;
                     document.getElementById('heure_evenement').value = data.heure_evenement;
                     document.getElementById('description').value = data.description || '';
-                    document.getElementById('submitBtn').innerHTML = '<i class="fas fa-save me-2"></i>Modifier';
-                    
+                    document.getElementById('submitBtn').innerHTML = '<i class="fas fa-save"></i> Modifier';
+
                     // Afficher l'image actuelle
                     const currentImageDiv = document.getElementById('currentImage');
                     if (data.image) {
                         currentImageDiv.innerHTML = `
-                            <small class="text-muted">Image actuelle :</small><br>
-                            <img src="uploads/evenements/${data.image}" class="img-thumbnail" style="max-width: 200px;">
+                            <div style="background: #f1f5f9; padding: 1rem; border-radius: 10px;">
+                                <small style="color: #64748b; font-weight: 600;">Image actuelle :</small><br>
+                                <img src="uploads/evenements/${data.image}" style="max-width: 100%; height: auto; border-radius: 8px; margin-top: 0.5rem;">
+                            </div>
                         `;
                     } else {
                         currentImageDiv.innerHTML = '';
                     }
-                    
-                    new bootstrap.Modal(document.getElementById('eventModal')).show();
+
+                    openModal();
                 })
                 .catch(error => {
                     alert('Erreur lors du chargement de l\'événement');
@@ -424,26 +980,62 @@ if (isset($_GET['get_event']) && isset($_GET['id'])) {
                 });
         }
 
+        // Ouvrir le modal de confirmation de suppression
         function supprimerEvenement(id, titre) {
-            if (confirm(`Êtes-vous sûr de vouloir supprimer l'événement "${titre}" ?`)) {
-                document.getElementById('deleteId').value = id;
-                document.getElementById('deleteForm').submit();
-            }
+            eventToDelete = id;
+            eventTitleToDelete = titre;
+            document.getElementById('deleteEventInfo').textContent = titre;
+            document.getElementById('deleteModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
         }
 
-        // Réinitialiser le formulaire quand le modal se ferme
-        document.getElementById('eventModal').addEventListener('hidden.bs.modal', function () {
-            document.getElementById('eventForm').reset();
-            document.getElementById('modalTitle').innerHTML = '<i class="fas fa-plus-circle me-2"></i>Ajouter un événement';
-            document.getElementById('formAction').value = 'ajouter';
-            document.getElementById('eventId').value = '';
-            document.getElementById('submitBtn').innerHTML = '<i class="fas fa-save me-2"></i>Enregistrer';
-            document.getElementById('currentImage').innerHTML = '';
+        // Fermer le modal de suppression
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').classList.remove('active');
+            document.body.style.overflow = 'auto';
+            eventToDelete = null;
+            eventTitleToDelete = '';
+            document.getElementById('deleteEventInfo').textContent = '';
+
+            // Réinitialiser le bouton
+            const confirmBtn = document.getElementById('confirmDeleteBtn');
+            confirmBtn.innerHTML = '<i class="fas fa-trash"></i> Supprimer définitivement';
+            confirmBtn.disabled = false;
+        }
+
+        // Confirmer la suppression
+        function confirmDeleteEvent() {
+            if (!eventToDelete) return;
+
+            const confirmBtn = document.getElementById('confirmDeleteBtn');
+
+            // Animation de chargement
+            confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Suppression...';
+            confirmBtn.disabled = true;
+
+            // Soumettre le formulaire
+            document.getElementById('deleteId').value = eventToDelete;
+            document.getElementById('deleteForm').submit();
+        }
+
+        // Fermer les modals en cliquant à l'extérieur
+        document.getElementById('eventModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+
+        document.getElementById('deleteModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeDeleteModal();
+            }
         });
 
         // Définir la date minimum à aujourd'hui
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('date_evenement').setAttribute('min', today);
+        document.addEventListener('DOMContentLoaded', function() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('date_evenement').setAttribute('min', today);
+        });
     </script>
 
     <!-- Footer -->

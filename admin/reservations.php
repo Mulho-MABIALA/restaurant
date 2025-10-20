@@ -50,6 +50,7 @@
     $search           = $_GET['search'] ?? '';
     $date_filter      = $_GET['date_filter'] ?? '';
     $personnes_filter = $_GET['personnes_filter'] ?? '';
+    $active_tab       = $_GET['tab'] ?? 'actives'; // 'actives' ou 'historique'
 
     // DÉSACTIVÉ : Ne pas marquer automatiquement comme lu pour garder les notifications
     // Si vous voulez que les réservations soient marquées comme lues automatiquement, décommentez la ligne ci-dessous
@@ -81,6 +82,14 @@
           FROM reservations WHERE 1=1";
     $params = [];
 
+    // Filtre selon l'onglet actif
+    if ($active_tab === 'actives') {
+        // Réservations actives : réservations non annulées (futures ou en attente de traitement)
+        // On inclut aussi les réservations passées non traitées pour ne rien perdre
+        $query .= " AND (statut = 'non_lu' OR (statut != 'annule' AND date_reservation >= CURDATE()))";
+    }
+    // Pour 'historique', on affiche tout
+
     // Recherche
     if (! empty($search)) {
         $query .= " AND (nom LIKE ? OR email LIKE ? OR telephone LIKE ?)";
@@ -106,11 +115,52 @@
         }
     }
 
+    // Pagination
+    $items_per_page = 10;
+    $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+    $offset = ($page - 1) * $items_per_page;
+
+    // Compter le total (pour la pagination)
+    $queryCount = str_replace(
+        "SELECT id, nom, email, telephone, personnes, date_reservation, heure_reservation, message, date_envoi, statut FROM reservations",
+        "SELECT COUNT(*) as total FROM reservations",
+        $query
+    );
+    $stmtCount = $conn->prepare($queryCount);
+    $stmtCount->execute($params);
+    $total_items = $stmtCount->fetch()['total'] ?? 0;
+    $total_pages = ceil($total_items / $items_per_page);
+
     // Récupération paginée - MODIFIÉ : Tri par date_envoi DESC pour avoir les plus récentes en haut
-    $queryWithLimit = $query . " ORDER BY date_envoi DESC, id DESC";
+    $queryWithLimit = $query . " ORDER BY date_envoi DESC, id DESC LIMIT :limit OFFSET :offset";
     $stmt           = $conn->prepare($queryWithLimit);
-    $stmt->execute($params);
+
+    // Bind des paramètres de pagination
+    $stmt->bindValue(':limit', $items_per_page, PDO::PARAM_INT);
+    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+
+    // Bind des autres paramètres
+    foreach ($params as $key => $value) {
+        $stmt->bindValue($key, $value);
+    }
+
+    $stmt->execute();
     $reservations = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // DEBUG: Afficher le nombre total
+    echo "<!-- DEBUG: Total items = $total_items, Total pages = $total_pages, Onglet = $active_tab -->";
+    echo "<!-- DEBUG: Query = " . htmlspecialchars($queryWithLimit) . " -->";
+    echo "<!-- DEBUG: Nombre de résultats = " . count($reservations) . " -->";
+
+    // Pour les statistiques de l'historique, récupérer toutes les réservations (sans pagination)
+    if ($active_tab === 'historique') {
+        $queryAllHist = "SELECT * FROM reservations WHERE 1=1";
+        $stmtAllHist = $conn->prepare($queryAllHist);
+        $stmtAllHist->execute();
+        $all_reservations_hist = $stmtAllHist->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+        $all_reservations_hist = $reservations;
+    }
 
     // Nouvelles réservations
     $stmt_nouvelles   = $conn->query("SELECT COUNT(*) AS total FROM reservations WHERE statut = 'non_lu'");
@@ -643,17 +693,17 @@ button[title]:hover::after {
         <!-- Onglets -->
         <div class="mb-6 border-b border-gray-200">
             <nav class="-mb-px flex space-x-8">
-                <button onclick="switchTab('actives')" id="tab-actives" class="tab-button border-b-2 border-blue-500 py-4 px-1 text-sm font-medium text-blue-600">
+                <a href="?tab=actives" id="tab-actives" class="tab-button border-b-2 <?= $active_tab === 'actives' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' ?> py-4 px-1 text-sm font-medium">
                     <i class="fas fa-calendar-check mr-2"></i>Réservations Actives
-                </button>
-                <button onclick="switchTab('historique')" id="tab-historique" class="tab-button border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                </a>
+                <a href="?tab=historique" id="tab-historique" class="tab-button border-b-2 <?= $active_tab === 'historique' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' ?> py-4 px-1 text-sm font-medium">
                     <i class="fas fa-history mr-2"></i>Historique
-                </button>
+                </a>
             </nav>
         </div>
 
         <!-- Content Actives -->
-        <div id="content-actives">
+        <div id="content-actives" <?= $active_tab !== 'actives' ? 'style="display:none;"' : '' ?>>
         <!-- Info-bulle cliquable -->
         <div id="info-bulle-ligne" class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4 rounded-lg animate-fade-in">
           <div class="flex items-center justify-between">
@@ -794,11 +844,27 @@ button[title]:hover::after {
     <tr>
       <td colspan="8" class="text-center py-12">
         <div class="flex flex-col items-center">
-          <svg class="w-16 h-16 text-gray-300 mb-4" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
-          </svg>
-          <p class="text-gray-500 text-lg font-medium">Aucune réservation trouvée</p>
-          <p class="text-gray-400 text-sm mt-1">Essayez de modifier vos critères de recherche</p>
+          <div class="bg-blue-100 p-4 rounded-full mb-4">
+            <i class="fas fa-calendar-times text-blue-500 text-4xl"></i>
+          </div>
+          <p class="text-gray-700 text-xl font-semibold mb-2">Aucune réservation active</p>
+          <p class="text-gray-500 text-sm mb-4">
+            <?php if ($active_tab === 'actives'): ?>
+              Il n'y a pas de réservations futures ou en attente.
+            <?php else: ?>
+              Aucune réservation ne correspond à vos critères de recherche.
+            <?php endif; ?>
+          </p>
+          <div class="flex gap-3 mt-4">
+            <?php if (!empty($search) || !empty($date_filter) || !empty($personnes_filter)): ?>
+              <a href="?tab=<?= $active_tab ?>" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                <i class="fas fa-redo mr-2"></i>Réinitialiser les filtres
+              </a>
+            <?php endif; ?>
+            <a href="?tab=historique" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+              <i class="fas fa-history mr-2"></i>Voir l'historique
+            </a>
+          </div>
         </div>
       </td>
     </tr>
@@ -806,11 +872,83 @@ button[title]:hover::after {
 </tbody>
             </table>
           </div>
+
+          <!-- Pagination -->
+          <?php if ($total_pages > 1): ?>
+          <div class="px-6 py-4 border-t-2 border-gray-200 bg-gray-50">
+              <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+                  <!-- Info pagination -->
+                  <div class="text-sm text-gray-600">
+                      Affichage de <span class="font-semibold"><?= min($offset + 1, $total_items) ?></span> à
+                      <span class="font-semibold"><?= min($offset + $items_per_page, $total_items) ?></span> sur
+                      <span class="font-semibold"><?= $total_items ?></span> réservations
+                  </div>
+
+                  <!-- Boutons pagination -->
+                  <div class="flex items-center gap-2">
+                      <?php
+                      // Construire les paramètres GET pour conserver les filtres
+                      $query_params = [];
+                      if (!empty($search)) $query_params[] = 'search=' . urlencode($search);
+                      if (!empty($date_filter)) $query_params[] = 'date_filter=' . urlencode($date_filter);
+                      if (!empty($personnes_filter)) $query_params[] = 'personnes_filter=' . urlencode($personnes_filter);
+                      if (!empty($active_tab)) $query_params[] = 'tab=' . urlencode($active_tab);
+                      $query_string = !empty($query_params) ? '&' . implode('&', $query_params) : '';
+                      ?>
+
+                      <!-- Première page -->
+                      <?php if ($page > 1): ?>
+                          <a href="?page=1<?= $query_string ?>"
+                             class="px-3 py-2 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
+                              <i class="fas fa-angle-double-left"></i>
+                          </a>
+                      <?php endif; ?>
+
+                      <!-- Page précédente -->
+                      <?php if ($page > 1): ?>
+                          <a href="?page=<?= $page - 1 ?><?= $query_string ?>"
+                             class="px-3 py-2 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
+                              <i class="fas fa-angle-left"></i>
+                          </a>
+                      <?php endif; ?>
+
+                      <!-- Numéros de pages -->
+                      <?php
+                      $start_page = max(1, $page - 2);
+                      $end_page = min($total_pages, $page + 2);
+
+                      for ($i = $start_page; $i <= $end_page; $i++):
+                      ?>
+                          <a href="?page=<?= $i ?><?= $query_string ?>"
+                             class="px-4 py-2 <?= $i === $page ? 'bg-blue-600 text-white border-2 border-blue-600' : 'bg-white text-gray-700 border-2 border-gray-300 hover:bg-gray-100' ?> rounded-lg font-semibold transition-colors">
+                              <?= $i ?>
+                          </a>
+                      <?php endfor; ?>
+
+                      <!-- Page suivante -->
+                      <?php if ($page < $total_pages): ?>
+                          <a href="?page=<?= $page + 1 ?><?= $query_string ?>"
+                             class="px-3 py-2 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
+                              <i class="fas fa-angle-right"></i>
+                          </a>
+                      <?php endif; ?>
+
+                      <!-- Dernière page -->
+                      <?php if ($page < $total_pages): ?>
+                          <a href="?page=<?= $total_pages ?><?= $query_string ?>"
+                             class="px-3 py-2 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
+                              <i class="fas fa-angle-double-right"></i>
+                          </a>
+                      <?php endif; ?>
+                  </div>
+              </div>
+          </div>
+          <?php endif; ?>
         </div>
         </div>
 
         <!-- Content Historique -->
-        <div id="content-historique" class="hidden">
+        <div id="content-historique" <?= $active_tab !== 'historique' ? 'style="display:none;"' : '' ?>>
             <!-- Filtres Historique -->
             <div class="bg-white rounded-2xl shadow-xl border border-gray-200 p-6 mb-6">
                 <h3 class="text-lg font-semibold mb-4">Filtres Historique</h3>
@@ -855,7 +993,7 @@ button[title]:hover::after {
                     </div>
                     <div class="card-content">
                         <h3 class="card-title">Total Réservations</h3>
-                        <p class="card-value" id="hist-total"><?= count($reservations) ?></p>
+                        <p class="card-value" id="hist-total"><?= count($all_reservations_hist) ?></p>
                     </div>
                 </div>
                 <div class="dashboard-card card-green">
@@ -864,7 +1002,7 @@ button[title]:hover::after {
                     </div>
                     <div class="card-content">
                         <h3 class="card-title">Total Personnes</h3>
-                        <p class="card-value" id="hist-personnes"><?= array_sum(array_column($reservations, 'personnes')) ?></p>
+                        <p class="card-value" id="hist-personnes"><?= array_sum(array_column($all_reservations_hist, 'personnes')) ?></p>
                     </div>
                 </div>
                 <div class="dashboard-card card-purple">
@@ -873,7 +1011,7 @@ button[title]:hover::after {
                     </div>
                     <div class="card-content">
                         <h3 class="card-title">Moyenne/Résa</h3>
-                        <p class="card-value" id="hist-moyenne"><?= count($reservations) > 0 ? round(array_sum(array_column($reservations, 'personnes')) / count($reservations), 1) : 0 ?></p>
+                        <p class="card-value" id="hist-moyenne"><?= count($all_reservations_hist) > 0 ? round(array_sum(array_column($all_reservations_hist, 'personnes')) / count($all_reservations_hist), 1) : 0 ?></p>
                     </div>
                 </div>
                 <div class="dashboard-card card-orange">
@@ -882,7 +1020,7 @@ button[title]:hover::after {
                     </div>
                     <div class="card-content">
                         <h3 class="card-title">Plus Grande Résa</h3>
-                        <p class="card-value" id="hist-max"><?= !empty($reservations) ? max(array_column($reservations, 'personnes')) : 0 ?></p>
+                        <p class="card-value" id="hist-max"><?= !empty($all_reservations_hist) ? max(array_column($all_reservations_hist, 'personnes')) : 0 ?></p>
                     </div>
                 </div>
             </div>
@@ -970,6 +1108,72 @@ button[title]:hover::after {
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Pagination Historique -->
+                <?php if ($total_pages > 1): ?>
+                <div class="px-6 py-4 border-t-2 border-gray-200 bg-gray-50">
+                    <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+                        <!-- Info pagination -->
+                        <div class="text-sm text-gray-600">
+                            Affichage de <span class="font-semibold"><?= min($offset + 1, $total_items) ?></span> à
+                            <span class="font-semibold"><?= min($offset + $items_per_page, $total_items) ?></span> sur
+                            <span class="font-semibold"><?= $total_items ?></span> réservations
+                        </div>
+
+                        <!-- Boutons pagination -->
+                        <div class="flex items-center gap-2">
+                            <?php
+                            // Utilise le même query_string que pour les réservations actives
+                            ?>
+
+                            <!-- Première page -->
+                            <?php if ($page > 1): ?>
+                                <a href="?page=1<?= $query_string ?>"
+                                   class="px-3 py-2 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
+                                    <i class="fas fa-angle-double-left"></i>
+                                </a>
+                            <?php endif; ?>
+
+                            <!-- Page précédente -->
+                            <?php if ($page > 1): ?>
+                                <a href="?page=<?= $page - 1 ?><?= $query_string ?>"
+                                   class="px-3 py-2 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
+                                    <i class="fas fa-angle-left"></i>
+                                </a>
+                            <?php endif; ?>
+
+                            <!-- Numéros de pages -->
+                            <?php
+                            $start_page = max(1, $page - 2);
+                            $end_page = min($total_pages, $page + 2);
+
+                            for ($i = $start_page; $i <= $end_page; $i++):
+                            ?>
+                                <a href="?page=<?= $i ?><?= $query_string ?>"
+                                   class="px-4 py-2 <?= $i === $page ? 'bg-blue-600 text-white border-2 border-blue-600' : 'bg-white text-gray-700 border-2 border-gray-300 hover:bg-gray-100' ?> rounded-lg font-semibold transition-colors">
+                                    <?= $i ?>
+                                </a>
+                            <?php endfor; ?>
+
+                            <!-- Page suivante -->
+                            <?php if ($page < $total_pages): ?>
+                                <a href="?page=<?= $page + 1 ?><?= $query_string ?>"
+                                   class="px-3 py-2 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
+                                    <i class="fas fa-angle-right"></i>
+                                </a>
+                            <?php endif; ?>
+
+                            <!-- Dernière page -->
+                            <?php if ($page < $total_pages): ?>
+                                <a href="?page=<?= $total_pages ?><?= $query_string ?>"
+                                   class="px-3 py-2 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
+                                    <i class="fas fa-angle-double-right"></i>
+                                </a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -1003,41 +1207,53 @@ button[title]:hover::after {
             <div>
               <label for="edit_nom" class="block text-sm font-semibold text-gray-700 mb-2">
                 <span class="flex items-center">
-                  <svg class="w-4 h-4 mr-2 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                  <svg class="w-4 h-4 mr-2 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                     <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/>
                   </svg>
                   Nom complet *
+                  <svg class="w-4 h-4 ml-2 text-gray-400" fill="currentColor" viewBox="0 0 20 20" title="Non modifiable">
+                    <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+                  </svg>
                 </span>
               </label>
-              <input type="text" id="edit_nom" name="nom" required
-                     class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-400">
+              <input type="text" id="edit_nom" name="nom" required readonly
+                     class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-600 cursor-not-allowed"
+                     title="Ce champ ne peut pas être modifié">
             </div>
 
             <div>
               <label for="edit_email" class="block text-sm font-semibold text-gray-700 mb-2">
                 <span class="flex items-center">
-                  <svg class="w-4 h-4 mr-2 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                  <svg class="w-4 h-4 mr-2 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/>
                     <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/>
                   </svg>
                   Email *
+                  <svg class="w-4 h-4 ml-2 text-gray-400" fill="currentColor" viewBox="0 0 20 20" title="Non modifiable">
+                    <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+                  </svg>
                 </span>
               </label>
-              <input type="email" id="edit_email" name="email" required
-                     class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-400">
+              <input type="email" id="edit_email" name="email" required readonly
+                     class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-600 cursor-not-allowed"
+                     title="Ce champ ne peut pas être modifié">
             </div>
 
             <div>
               <label for="edit_telephone" class="block text-sm font-semibold text-gray-700 mb-2">
                 <span class="flex items-center">
-                  <svg class="w-4 h-4 mr-2 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                  <svg class="w-4 h-4 mr-2 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/>
                   </svg>
                   Téléphone *
+                  <svg class="w-4 h-4 ml-2 text-gray-400" fill="currentColor" viewBox="0 0 20 20" title="Non modifiable">
+                    <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+                  </svg>
                 </span>
               </label>
-              <input type="tel" id="edit_telephone" name="telephone" required
-                     class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-400">
+              <input type="tel" id="edit_telephone" name="telephone" required readonly
+                     class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-600 cursor-not-allowed"
+                     title="Ce champ ne peut pas être modifié">
             </div>
 
             <div>

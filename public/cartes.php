@@ -1,5 +1,7 @@
 <?php
+session_start();
 require_once '../config.php';
+require_once 'includes/language.php';
 
 try {
     // Récupération des catégories et des plats
@@ -34,7 +36,7 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>La Carte - Restaurant</title>
+    <title><?= t('nav.carte') ?> - Restaurant</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -761,16 +763,16 @@ try {
     <section class="hero-section" id="hero">
         <div class="hero-content">
             <h1 class="restaurant-title">
-                La Carte
+                <?= t('nav.carte') ?>
             </h1>
-            
+
             <p class="subtitle">
-                Cuisine Bistrot Revisitée
+                <?= t('menu.subtitle_carte') ?>
             </p>
         </div>
 
         <div class="scroll-to-menu" onclick="scrollToMenu()">
-            <p class="text-sm opacity-75 mb-2">Découvrez notre menu</p>
+            <p class="text-sm opacity-75 mb-2"><?= t('menu.discover_our_menu') ?></p>
             <i class="fas fa-chevron-down text-xl"></i>
         </div>
     </section>
@@ -778,8 +780,8 @@ try {
     <!-- Menu Section -->
     <section class="menu-section" id="menu">
         <div class="container mx-auto">
-            <h1 class="main-title">La Carte</h1>
-            <p class="menu-subtitle">Découvrez la nouvelle carte 2025, créative & audacieuse !</p>
+            <h1 class="main-title"><?= t('nav.carte') ?></h1>
+            <p class="menu-subtitle"><?= t('menu.discover_menu_2025') ?></p>
             
             <!-- Navigation -->
             <div class="nav-container">
@@ -799,7 +801,7 @@ try {
                             <?php $index++; ?>
                         <?php endforeach; ?>
                     <?php else: ?>
-                        <div class="nav-category active" data-category="0">Menu à venir</div>
+                        <div class="nav-category active" data-category="0"><?= t('menu.coming_soon') ?></div>
                     <?php endif; ?>
                 </div>
                 
@@ -872,8 +874,8 @@ try {
                     <div class="category-content active">
                         <div class="empty-state">
                             <i class="fas fa-utensils"></i>
-                            <h3>Menu en préparation</h3>
-                            <p>Notre chef travaille sur de délicieux plats pour vous.<br>Revenez bientôt !</p>
+                            <h3><?= t('menu.in_preparation') ?></h3>
+                            <p><?= t('menu.chef_working') ?><br><?= t('menu.come_back_soon') ?></p>
                         </div>
                     </div>
                 <?php endif; ?>
@@ -884,7 +886,7 @@ try {
     <!-- Gallery Section -->
     <section class="gallery-section" id="gallery">
         <div class="container mx-auto">
-            <h2 class="gallery-title">Galerie</h2>
+            <h2 class="gallery-title"><?= t('nav.gallery') ?></h2>
             
             <div class="gallery-grid" id="galleryGrid">
                 <!-- Les images seront générées par PHP -->
@@ -927,8 +929,8 @@ try {
                 ?>
                     <div style="grid-column: 1 / -1; text-align: center; padding: 5rem 1rem; color: rgba(255, 255, 255, 0.6);">
                         <i class="fas fa-images" style="font-size: 4rem; color: rgba(212, 175, 55, 0.3); margin-bottom: 2rem; display: block;"></i>
-                        <h3 style="font-family: 'Playfair Display', serif; font-size: 1.5rem; margin-bottom: 1rem; color: #D4AF37;">Galerie en construction</h3>
-                        <p style="font-size: 1.1rem;">Les images de nos délicieux plats arrivent bientôt !</p>
+                        <h3 style="font-family: 'Playfair Display', serif; font-size: 1.5rem; margin-bottom: 1rem; color: #D4AF37;"><?= t('menu.gallery_construction') ?></h3>
+                        <p style="font-size: 1.1rem;"><?= t('menu.images_coming_soon') ?></p>
                     </div>
                 <?php endif; ?>
             </div>

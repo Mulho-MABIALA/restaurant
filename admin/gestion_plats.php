@@ -36,32 +36,61 @@ try {
     $idsCategorie = array_column($categories, 'id');
     $hasFilter = $filtreCategorie && in_array($filtreCategorie, $idsCategorie);
 
-    $query = "SELECT p.id, p.nom, p.description, p.prix, p.image, p.disponible, c.nom AS categorie_nom 
+    // Pagination
+    $items_per_page = 10;
+    $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+    $offset = ($page - 1) * $items_per_page;
+
+    // Requête pour compter le total
+    $queryCount = "SELECT COUNT(*) as total FROM plats p";
+    if ($hasFilter) {
+        $queryCount .= " WHERE p.categorie_id = :categorie_id";
+    }
+    $stmtCount = $conn->prepare($queryCount);
+    if ($hasFilter) {
+        $stmtCount->execute(['categorie_id' => $filtreCategorie]);
+    } else {
+        $stmtCount->execute();
+    }
+    $total_items = $stmtCount->fetch()['total'];
+    $total_pages = ceil($total_items / $items_per_page);
+
+    // Requête pour récupérer les plats avec pagination
+    $query = "SELECT p.id, p.nom, p.description, p.prix, p.image, p.disponible, c.nom AS categorie_nom
               FROM plats p
               LEFT JOIN categories c ON p.categorie_id = c.id";
     if ($hasFilter) {
         $query .= " WHERE p.categorie_id = :categorie_id";
     }
 
-    $query .= " ORDER BY p.nom ASC";
+    $query .= " ORDER BY p.nom ASC LIMIT :limit OFFSET :offset";
 
     // Préparation
     $stmt = $conn->prepare($query);
+    $stmt->bindValue(':limit', $items_per_page, PDO::PARAM_INT);
+    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
 
     // Exécution
     if ($hasFilter) {
-        $stmt->execute(['categorie_id' => $filtreCategorie]);
-    } else {
-        $stmt->execute();
+        $stmt->bindValue(':categorie_id', $filtreCategorie, PDO::PARAM_INT);
     }
+    $stmt->execute();
 
     $plats = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Statistiques
+    // Statistiques (utiliser le total global, pas juste la page actuelle)
     $totalCategories = count($categories);
-    $totalPlats = count($plats);
-    $platsDisponibles = count(array_filter($plats, fn($plat) => $plat['disponible'] == 1));
-    $platsBloqués = $totalPlats - $platsDisponibles;
+    $totalPlats = $total_items; // Total de tous les plats
+
+    // Pour les statistiques disponibles/bloqués, on doit compter sur toute la base
+    $stmtStats = $conn->query("SELECT disponible, COUNT(*) as count FROM plats GROUP BY disponible");
+    $statsDisponibilite = [];
+    while ($row = $stmtStats->fetch()) {
+        $statsDisponibilite[$row['disponible']] = $row['count'];
+    }
+    $platsDisponibles = $statsDisponibilite[1] ?? 0;
+    $platsBloqués = $statsDisponibilite[0] ?? 0;
+
     $platCountByCategory = array_reduce($plats, function($acc, $plat) {
         $acc[$plat['categorie_nom']] = ($acc[$plat['categorie_nom']] ?? 0) + 1;
         return $acc;
@@ -490,9 +519,9 @@ try {
                                         </td>
                                         
                                         <td class="px-6 py-4 whitespace-nowrap hidden lg:table-cell">
-                                            <?php if (!empty($plat['image']) && file_exists('../uploads/' . $plat['image'])): ?>
-                                                <img src="../uploads/<?= htmlspecialchars($plat['image']) ?>" 
-                                                     class="h-12 w-12 rounded-lg object-cover border border-gray-200 <?= $isBlocked ? 'grayscale' : '' ?>" 
+                                            <?php if (!empty($plat['image']) && file_exists('../public/uploads/' . $plat['image'])): ?>
+                                                <img src="../public/uploads/<?= htmlspecialchars($plat['image']) ?>"
+                                                     class="h-12 w-12 rounded-lg object-cover border border-gray-200 <?= $isBlocked ? 'grayscale' : '' ?>"
                                                      alt="<?= htmlspecialchars($plat['nom']) ?>">
                                             <?php else: ?>
                                                 <div class="h-12 w-12 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
@@ -561,6 +590,68 @@ try {
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- Pagination -->
+                    <?php if ($total_pages > 1): ?>
+                    <div class="px-6 py-4 border-t-2 border-gray-200 bg-gray-50">
+                        <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+                            <!-- Info pagination -->
+                            <div class="text-sm text-gray-600">
+                                Affichage de <span class="font-semibold"><?= min($offset + 1, $total_items) ?></span> à
+                                <span class="font-semibold"><?= min($offset + $items_per_page, $total_items) ?></span> sur
+                                <span class="font-semibold"><?= $total_items ?></span> plats
+                            </div>
+
+                            <!-- Boutons pagination -->
+                            <div class="flex items-center gap-2">
+                                <!-- Première page -->
+                                <?php if ($page > 1): ?>
+                                    <a href="?page=1<?= $hasFilter ? '&categorie='.$filtreCategorie : '' ?>"
+                                       class="px-3 py-2 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
+                                        <i class="fas fa-angle-double-left"></i>
+                                    </a>
+                                <?php endif; ?>
+
+                                <!-- Page précédente -->
+                                <?php if ($page > 1): ?>
+                                    <a href="?page=<?= $page - 1 ?><?= $hasFilter ? '&categorie='.$filtreCategorie : '' ?>"
+                                       class="px-3 py-2 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
+                                        <i class="fas fa-angle-left"></i>
+                                    </a>
+                                <?php endif; ?>
+
+                                <!-- Numéros de pages -->
+                                <?php
+                                $start_page = max(1, $page - 2);
+                                $end_page = min($total_pages, $page + 2);
+
+                                for ($i = $start_page; $i <= $end_page; $i++):
+                                ?>
+                                    <a href="?page=<?= $i ?><?= $hasFilter ? '&categorie='.$filtreCategorie : '' ?>"
+                                       class="px-4 py-2 <?= $i === $page ? 'bg-blue-600 text-white border-2 border-blue-600' : 'bg-white text-gray-700 border-2 border-gray-300 hover:bg-gray-100' ?> rounded-lg font-semibold transition-colors">
+                                        <?= $i ?>
+                                    </a>
+                                <?php endfor; ?>
+
+                                <!-- Page suivante -->
+                                <?php if ($page < $total_pages): ?>
+                                    <a href="?page=<?= $page + 1 ?><?= $hasFilter ? '&categorie='.$filtreCategorie : '' ?>"
+                                       class="px-3 py-2 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
+                                        <i class="fas fa-angle-right"></i>
+                                    </a>
+                                <?php endif; ?>
+
+                                <!-- Dernière page -->
+                                <?php if ($page < $total_pages): ?>
+                                    <a href="?page=<?= $total_pages ?><?= $hasFilter ? '&categorie='.$filtreCategorie : '' ?>"
+                                       class="px-3 py-2 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
+                                        <i class="fas fa-angle-double-right"></i>
+                                    </a>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -807,8 +898,8 @@ try {
             if (plat.image) {
                 imageContainer.innerHTML = `
                     <div class="relative inline-block">
-                        <img src="../uploads/${plat.image}" 
-                             class="h-24 w-24 rounded-lg object-cover shadow-md border-2 border-gray-200" 
+                        <img src="../public/uploads/${plat.image}"
+                             class="h-24 w-24 rounded-lg object-cover shadow-md border-2 border-gray-200"
                              alt="${plat.nom}">
                         <div class="absolute -top-2 -right-2 bg-green-500 text-white p-1 rounded-full text-xs">
                             <i class="fas fa-check"></i>

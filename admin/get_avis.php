@@ -5,20 +5,20 @@ header('Content-Type: application/json');
 
 try {
     // Récupérer uniquement les avis validés
-    $stmt = $conn->prepare("SELECT nom, message, note, date_creation FROM avis WHERE valide = 1 ORDER BY date_creation DESC");
+    $stmt = $conn->prepare("SELECT message, note, date_creation FROM avis WHERE valide = 1 ORDER BY date_creation DESC");
     $stmt->execute();
     $avis = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
+
     $html = '';
     foreach ($avis as $avi) {
-        $stars = str_repeat('<i class="fas fa-star text-warning"></i>', $avi['note']) . 
+        $stars = str_repeat('<i class="fas fa-star text-warning"></i>', $avi['note']) .
                  str_repeat('<i class="far fa-star text-warning"></i>', 5 - $avi['note']);
-        
+
         $html .= '
         <div class="col-md-6" data-aos="fade-up">
             <div class="avis-card">
                 <div class="avis-header">
-                    <h4>' . htmlspecialchars($avi['nom']) . '</h4>
+                    <h4><i class="fas fa-user-circle"></i> Client anonyme</h4>
                     <div class="client-note">' . $stars . '</div>
                 </div>
                 <p class="mb-0">' . nl2br(htmlspecialchars($avi['message'])) . '</p>

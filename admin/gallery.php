@@ -15,10 +15,10 @@ if (!isset($_SESSION['admin_id'])) {
 }
 
 requireAccess($conn, $_SESSION['admin_id'], 'gallery');
-define('UPLOAD_URL', 'http://localhost/restaurant/uploads/gallery/');
-define('DISHES_UPLOAD_URL', 'http://localhost/restaurant/uploads/'); // URL pour les images de plats
+define('UPLOAD_URL', 'http://localhost/restaurant/public/uploads/gallery/');
+define('DISHES_UPLOAD_URL', 'http://localhost/restaurant/public/uploads/'); // URL pour les images de plats
 define('MAX_FILE_SIZE', 2 * 1024 * 1024); // 2 Mo max
-define('UPLOAD_DIR', __DIR__ . '/../uploads/gallery/');
+define('UPLOAD_DIR', __DIR__ . '/../public/uploads/gallery/');
 $ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
 // ===== GESTION AJAX =====
@@ -1592,7 +1592,7 @@ foreach ($allImages as $img) {
 
         function createImageCard(image) {
             const title = image.title ? image.title : 'Sans titre';
-            const imageUrl = '../uploads/gallery/' + image.filename;
+            const imageUrl = '../public/uploads/gallery/' + image.filename;
             const index = galleryImages.length;
 
             return `

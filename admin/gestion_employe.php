@@ -1977,20 +1977,29 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
     <!-- <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> -->
     <link rel="stylesheet" href="employe.css">
     <style>
-        .glass-morphism {
-            background: rgba(17, 24, 39, 0.9);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
         }
-        .glass-card {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        .card:hover {
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+            transform: translateY(-2px);
+        }
+        .stat-card {
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            transition: all 0.3s ease;
+        }
+        .stat-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
     </style>
 </head>
-<body class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+<body class="min-h-screen bg-gray-50">
     <div class="flex h-screen overflow-hidden">
         <!-- Sidebar -->
         <?php include 'sidebar.php'; ?>
@@ -1998,17 +2007,17 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
         <!-- Contenu Principal -->
         <div class="flex-1 overflow-y-auto">
             <!-- Header avec bouton d'ajout -->
-            <header class="glass-morphism shadow-2xl border-b border-white/10 sticky top-0 z-40">
+            <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
                 <div class="px-4 sm:px-6 lg:px-8 py-6">
                     <div class="flex items-center justify-between">
                         <div>
-                            <h1 class="text-4xl font-bold text-white">
-                                <i class="fas fa-users mr-3 text-primary"></i>
+                            <h1 class="text-3xl font-bold text-gray-800">
+                                <i class="fas fa-users mr-3 text-green-600"></i>
                                 Gestion des Employés
                             </h1>
-                            <p class="text-gray-300 mt-2">Gérez votre équipe et les informations RH</p>
+                            <p class="text-gray-600 mt-2">Gérez votre équipe et les informations RH</p>
                         </div>
-                        <button onclick="openAddModal()" class="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 py-3 rounded-xl transition duration-300 shadow-xl hover:shadow-2xl transform hover:scale-105">
+                        <button onclick="openAddModal()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg transition duration-200 shadow-sm hover:shadow-md">
                             <i class="fas fa-plus mr-2"></i>Ajouter Employé
                         </button>
                     </div>
@@ -2017,254 +2026,110 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
 
             <!-- Statistiques Dashboard -->
             <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
             <!-- Employés Actifs -->
-            <div class="relative group">
-                <div class="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl blur opacity-20 group-hover:opacity-30 transition-opacity"></div>
-                <div class="relative glass-card p-6 rounded-2xl hover:scale-105 transition-transform duration-300">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center space-x-4">
-                            <div class="w-14 h-14 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-xl flex items-center justify-center shadow-lg">
-                                <i class="fas fa-users text-white text-xl"></i>
-                            </div>
-                            <div>
-                                <p class="text-sm font-medium text-gray-400">Employés Actifs</p>
-                                <p class="text-3xl font-bold text-white" id="totalActifs">0</p>
-                            </div>
-                        </div>
+            <div class="stat-card">
+                <div class="flex items-center space-x-4">
+                    <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-users text-purple-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-600">Employés Actifs</p>
+                        <p class="text-2xl font-bold text-gray-800" id="totalActifs">0</p>
                     </div>
                 </div>
             </div>
 
             <!-- Présents Aujourd'hui -->
-            <div class="relative group">
-                <div class="absolute inset-0 bg-gradient-to-r from-green-600 to-emerald-600 rounded-2xl blur opacity-20 group-hover:opacity-30 transition-opacity"></div>
-                <div class="relative glass-card p-6 rounded-2xl hover:scale-105 transition-transform duration-300">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center space-x-4">
-                            <div class="w-14 h-14 bg-gradient-to-br from-green-600 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
-                                <i class="fas fa-check-circle text-white text-xl"></i>
-                            </div>
-                            <div>
-                                <p class="text-sm font-medium text-gray-400">Présents</p>
-                                <p class="text-3xl font-bold text-white" id="presentsAujourdhui">0</p>
-                            </div>
-                        </div>
+            <div class="stat-card">
+                <div class="flex items-center space-x-4">
+                    <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-check-circle text-green-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-600">Présents</p>
+                        <p class="text-2xl font-bold text-gray-800" id="presentsAujourdhui">0</p>
                     </div>
                 </div>
             </div>
 
             <!-- Absents -->
-            <div class="relative group">
-                <div class="absolute inset-0 bg-gradient-to-r from-red-600 to-rose-600 rounded-2xl blur opacity-20 group-hover:opacity-30 transition-opacity"></div>
-                <div class="relative glass-card p-6 rounded-2xl hover:scale-105 transition-transform duration-300">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center space-x-4">
-                            <div class="w-14 h-14 bg-gradient-to-br from-red-600 to-rose-600 rounded-xl flex items-center justify-center shadow-lg">
-                                <i class="fas fa-times-circle text-white text-xl"></i>
-                            </div>
-                            <div>
-                                <p class="text-sm font-medium text-gray-400">Absents</p>
-                                <p class="text-3xl font-bold text-white" id="absentsAujourdhui">0</p>
-                            </div>
-                        </div>
+            <div class="stat-card">
+                <div class="flex items-center space-x-4">
+                    <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-times-circle text-red-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-600">Absents</p>
+                        <p class="text-2xl font-bold text-gray-800" id="absentsAujourdhui">0</p>
                     </div>
                 </div>
             </div>
 
             <!-- En Retard -->
-            <div class="relative group">
-                <div class="absolute inset-0 bg-gradient-to-r from-yellow-600 to-orange-600 rounded-2xl blur opacity-20 group-hover:opacity-30 transition-opacity"></div>
-                <div class="relative glass-card p-6 rounded-2xl hover:scale-105 transition-transform duration-300">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center space-x-4">
-                            <div class="w-14 h-14 bg-gradient-to-br from-yellow-600 to-orange-600 rounded-xl flex items-center justify-center shadow-lg">
-                                <i class="fas fa-clock text-white text-xl"></i>
-                            </div>
-                            <div>
-                                <p class="text-sm font-medium text-gray-400">En Retard</p>
-                                <p class="text-3xl font-bold text-white" id="retardsAujourdhui">0</p>
-                            </div>
-                        </div>
+            <div class="stat-card">
+                <div class="flex items-center space-x-4">
+                    <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-clock text-orange-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-600">En Retard</p>
+                        <p class="text-2xl font-bold text-gray-800" id="retardsAujourdhui">0</p>
                     </div>
                 </div>
             </div>
 
             <!-- Inactifs -->
-            <div class="relative group">
-                <div class="absolute inset-0 bg-gradient-to-r from-gray-600 to-slate-600 rounded-2xl blur opacity-20 group-hover:opacity-30 transition-opacity"></div>
-                <div class="relative glass-card p-6 rounded-2xl hover:scale-105 transition-transform duration-300">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center space-x-4">
-                            <div class="w-14 h-14 bg-gradient-to-br from-gray-600 to-slate-600 rounded-xl flex items-center justify-center shadow-lg">
-                                <i class="fas fa-user-slash text-white text-xl"></i>
-                            </div>
-                            <div>
-                                <p class="text-sm font-medium text-gray-400">Inactifs</p>
-                                <p class="text-3xl font-bold text-white" id="totalInactifs">0</p>
-                            </div>
-                        </div>
+            <div class="stat-card">
+                <div class="flex items-center space-x-4">
+                    <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-user-slash text-gray-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-600">Inactifs</p>
+                        <p class="text-2xl font-bold text-gray-800" id="totalInactifs">0</p>
                     </div>
                 </div>
             </div>
 
             <!-- Administrateurs -->
-            <div class="relative group">
-                <div class="absolute inset-0 bg-gradient-to-r from-orange-600 to-amber-600 rounded-2xl blur opacity-20 group-hover:opacity-30 transition-opacity"></div>
-                <div class="relative glass-card p-6 rounded-2xl hover:scale-105 transition-transform duration-300">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center space-x-4">
-                            <div class="w-14 h-14 bg-gradient-to-br from-orange-600 to-amber-600 rounded-xl flex items-center justify-center shadow-lg">
-                                <i class="fas fa-crown text-white text-xl"></i>
-                            </div>
-                            <div>
-                                <p class="text-sm font-medium text-gray-400">Admins</p>
-                                <p class="text-3xl font-bold text-white" id="totalAdmins">0</p>
-                            </div>
-                        </div>
+            <div class="stat-card">
+                <div class="flex items-center space-x-4">
+                    <div class="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-crown text-amber-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-600">Admins</p>
+                        <p class="text-2xl font-bold text-gray-800" id="totalAdmins">0</p>
                     </div>
                 </div>
             </div>
         </div>
-<!-- Section Tableau de Bord Avancé -->
-<div class="glass-card rounded-2xl shadow-xl p-6 mb-8">
-    <h2 class="text-2xl font-semibold mb-6 text-white">Tableau de Bord RH Avancé</h2>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div class="glass-card p-4 rounded-xl border border-blue-500/20">
-            <div class="flex items-center">
-                <div class="p-2 rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 text-white mr-3">
-                    <i class="fas fa-users"></i>
-                </div>
-                <div>
-                    <p class="text-sm font-medium text-gray-400">Effectif Total</p>
-                    <p class="text-2xl font-bold text-white" id="totalEmployes">0</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="glass-card p-4 rounded-xl border border-green-500/20">
-            <div class="flex items-center">
-                <div class="p-2 rounded-full bg-gradient-to-br from-green-600 to-emerald-600 text-white mr-3">
-                    <i class="fas fa-user-check"></i>
-                </div>
-                <div>
-                    <p class="text-sm font-medium text-gray-400">Taux de Présence</p>
-                    <p class="text-2xl font-bold text-white" id="tauxPresence">0%</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="glass-card p-4 rounded-xl border border-purple-500/20">
-            <div class="flex items-center">
-                <div class="p-2 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 text-white mr-3">
-                    <i class="fas fa-money-bill-wave"></i>
-                </div>
-                <div>
-                    <p class="text-sm font-medium text-gray-400">Masse Salariale</p>
-                    <p class="text-2xl font-bold text-white" id="masseSalariale">0 FCFA</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="glass-card p-4 rounded-xl border border-orange-500/20">
-            <div class="flex items-center">
-                <div class="p-2 rounded-full bg-gradient-to-br from-orange-600 to-amber-600 text-white mr-3">
-                    <i class="fas fa-clock"></i>
-                </div>
-                <div>
-                    <p class="text-sm font-medium text-gray-400">Retard Moyen</p>
-                    <p class="text-2xl font-bold text-white" id="retardMoyen">0 min</p>
-                </div>
-            </div>
-        </div>
-    </div>
-<div class="glass-card p-4 rounded-xl border border-white/10">
-    <h3 class="text-lg font-semibold mb-4 text-white">Générer un Rapport Personnalisé</h3>
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-        <div>
-            <label class="block text-sm font-medium text-gray-300 mb-2">Type de Rapport</label>
-            <select id="reportType" class="w-full px-3 py-2 bg-slate-700/50 border border-white/10 rounded-lg text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50">
-                <option value="presences">Présences et Retards</option>
-                <option value="salaires">Salaires et Coûts</option>
-                <option value="effectifs">Effectifs et Démographie</option>
-                <option value="turnover">Turnover et Rotation</option>
-            </select>
-        </div>
-        <div>
-            <label class="block text-sm font-medium text-gray-300 mb-2">Date Début</label>
-            <input type="date" id="reportStartDate" class="w-full px-3 py-2 bg-slate-700/50 border border-white/10 rounded-lg text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50">
-        </div>
-        <div>
-            <label class="block text-sm font-medium text-gray-300 mb-2">Date Fin</label>
-            <input type="date" id="reportEndDate" class="w-full px-3 py-2 bg-slate-700/50 border border-white/10 rounded-lg text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50">
-        </div>
-    </div>
-    <button onclick="generateCustomReport()" class="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white px-4 py-2 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl">
-        <i class="fas fa-file-export mr-2"></i>Générer le Rapport
-    </button>
-
-    <!-- Indicateur de chargement -->
-    <div id="reportLoading" class="hidden mt-4 text-center">
-        <i class="fas fa-spinner fa-spin text-blue-400 text-2xl"></i>
-        <p class="text-gray-300">Génération du rapport en cours...</p>
-    </div>
-</div>
-
-<!-- Modal pour afficher les rapports -->
-<div id="reportModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden z-50">
-    <div class="flex items-center justify-center min-h-screen p-4">
-        <div class="glass-morphism rounded-2xl max-w-6xl w-full max-h-screen overflow-y-auto shadow-2xl">
-            <div class="px-6 py-4 border-b border-white/10 flex justify-between items-center">
-                <h3 id="reportModalTitle" class="text-lg font-semibold text-white">Rapport Personnalisé</h3>
-                <button onclick="closeReportModal()" class="text-gray-400 hover:text-white transition-colors">
-                    <i class="fas fa-times text-xl"></i>
-                </button>
-            </div>
-            <div class="p-6">
-                <div id="reportContent" class="mb-6 text-white">
-                    <!-- Le contenu du rapport sera chargé ici -->
-                </div>
-                <div class="flex justify-end space-x-3">
-                    <button onclick="exportReportToPDF()" class="px-4 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white rounded-lg transition-all duration-300 shadow-lg">
-                        <i class="fas fa-file-pdf mr-2"></i>Exporter en PDF
-                    </button>
-                    <button onclick="exportReportToExcel()" class="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg transition-all duration-300 shadow-lg">
-                        <i class="fas fa-file-excel mr-2"></i>Exporter en Excel
-                    </button>
-                    <button onclick="closeReportModal()" class="px-4 py-2 border border-white/20 rounded-lg text-gray-300 hover:bg-white/10 transition-all duration-300">
-                        Fermer
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-<div class="glass-card rounded-2xl shadow-xl p-6 mb-6">
+<div class="card p-6 mb-6">
     <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
         <!-- Champ de recherche -->
         <div>
             <input type="text" id="searchInput" placeholder="Rechercher par nom, email..."
-                class="w-full px-4 py-2 bg-slate-700/50 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                class="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-green-500">
         </div>
 
         <!-- Filtre département -->
         <div>
-            <select id="filterDepartement" class="w-full px-4 py-2 bg-slate-700/50 border border-white/10 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <select id="filterDepartement" class="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-800 focus:ring-2 focus:ring-green-500 focus:border-green-500">
                 <option value="">Tous les départements</option>
             </select>
         </div>
 
         <!-- Filtre poste -->
         <div>
-            <select id="filterPoste" class="w-full px-4 py-2 bg-slate-700/50 border border-white/10 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <select id="filterPoste" class="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-800 focus:ring-2 focus:ring-green-500 focus:border-green-500">
                 <option value="">Tous les postes</option>
             </select>
         </div>
 
         <!-- Filtre contrat -->
         <div>
-            <select id="filterContrat" class="w-full px-4 py-2 bg-slate-700/50 border border-white/10 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <select id="filterContrat" class="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-800 focus:ring-2 focus:ring-green-500 focus:border-green-500">
                 <option value="">Tous les contrats</option>
                 <option value="CDI">CDI</option>
                 <option value="CDD">CDD</option>
@@ -2277,7 +2142,7 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
 
         <!-- Filtre statut -->
         <div>
-            <select id="filterStatut" class="w-full px-4 py-2 bg-slate-700/50 border border-white/10 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <select id="filterStatut" class="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-800 focus:ring-2 focus:ring-green-500 focus:border-green-500">
                 <option value="">Tous les statuts</option>
                 <option value="actif">Actif</option>
                 <option value="en_conge">En congé</option>
@@ -2288,59 +2153,97 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
 
         <!-- NOUVEAU: Boutons d'action -->
         <div class="flex space-x-2">
-            <button onclick="applyFilters()" class="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-lg transition-all duration-300 shadow-lg">
+            <button onclick="applyFilters()" class="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all duration-200 shadow-sm">
                 <i class="fas fa-search mr-2"></i>Filtrer
             </button>
-            <button onclick="resetFilters()" class="px-3 py-2 bg-gradient-to-r from-gray-600 to-slate-600 hover:from-gray-700 hover:to-slate-700 text-white rounded-lg transition-all duration-300 shadow-lg" title="Réinitialiser">
+            <button onclick="resetFilters()" class="px-3 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-all duration-200 shadow-sm" title="Réinitialiser">
                 <i class="fas fa-undo"></i>
             </button>
         </div>
     </div>
 </div>
 
-    <div class="glass-card rounded-2xl shadow-xl p-6 mb-6">
-    <h2 class="text-xl font-semibold mb-6 text-white">Génération des Bulletins de Paie</h2>
-    <p class="text-gray-300 mb-4">Gérez la paie, primes, congés et générez les bulletins professionnels.</p>
-    <a href="gestion_paie.php" class="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white px-6 py-3 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl inline-flex items-center">
+    <div class="card p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-4 text-gray-800">Génération des Bulletins de Paie</h2>
+    <p class="text-gray-600 mb-4">Gérez la paie, primes, congés et générez les bulletins professionnels.</p>
+    <a href="gestion_paie.php" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg transition-all duration-200 shadow-sm inline-flex items-center">
         <i class="fas fa-calculator mr-2"></i>Accéder à la Gestion de Paie
     </a>
 </div>
 
 <!-- 6. MODIFICATION DE LA SECTION TABLEAU POUR AJOUTER LES BORDURES -->
-<div id="tableView" class="glass-card rounded-2xl shadow-xl overflow-hidden">
+<div id="tableView" class="card overflow-hidden">
     <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-white/10">
-            <thead class="glass-morphism">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Photo</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Employé</th>
-                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-300 uppercase tracking-wider">Département</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Poste</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Contrat</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Contact</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Statut</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Présence</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Salaire</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Heures/Mois</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Documents</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Photo</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Employé</th>
+                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">Département</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Poste</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Contrat</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Contact</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Statut</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Présence</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Salaire</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Heures/Mois</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Documents</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Actions</th>
                 </tr>
             </thead>
-            <tbody id="employeesTableBody" class="divide-y divide-white/5">
+            <tbody id="employeesTableBody" class="divide-y divide-gray-200 bg-white">
                 <!-- Les employés seront chargés ici -->
             </tbody>
         </table>
+    </div>
+
+    <!-- Pagination -->
+    <div id="paginationContainer" class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 mt-4 rounded-lg shadow">
+        <div class="flex-1 flex justify-between sm:hidden">
+            <button onclick="changePage(currentPage - 1)" id="prevPageMobile" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                Précédent
+            </button>
+            <button onclick="changePage(currentPage + 1)" id="nextPageMobile" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                Suivant
+            </button>
+        </div>
+        <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+            <div>
+                <p class="text-sm text-gray-700">
+                    Affichage de
+                    <span class="font-medium" id="startRange">1</span>
+                    à
+                    <span class="font-medium" id="endRange">10</span>
+                    sur
+                    <span class="font-medium" id="totalEmployees">0</span>
+                    employés
+                </p>
+            </div>
+            <div>
+                <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" id="paginationNumbers">
+                    <!-- Les numéros de page seront générés ici -->
+                </nav>
+            </div>
+        </div>
     </div>
 </div>
 
     </div>
 
     <!-- Modal Ajouter/Modifier Employé -->
-    <div id="employeeModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
+    <div id="employeeModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 transition-opacity duration-300" onclick="closeModalOnBackdrop(event)">
         <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="bg-white rounded-lg max-w-4xl w-full max-h-screen overflow-y-auto">
-                <div class="px-6 py-4 border-b border-gray-200">
-                    <h3 id="modalTitle" class="text-lg font-semibold text-gray-900">Ajouter un employé</h3>
+            <div class="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl transform transition-all duration-300" onclick="event.stopPropagation()">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-green-600 to-emerald-600">
+                    <div class="flex items-center justify-between">
+                        <h3 id="modalTitle" class="text-xl font-bold text-white">
+                            <i class="fas fa-user-plus mr-2"></i>
+                            Ajouter un employé
+                        </h3>
+                        <button type="button" onclick="closeModal()" class="text-white hover:text-gray-200 transition-colors duration-200">
+                            <i class="fas fa-times text-2xl"></i>
+                        </button>
+                    </div>
                 </div>
 
                 <form id="employeeForm" class="p-6" enctype="multipart/form-data">
@@ -2351,38 +2254,55 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
                     <div class="mb-6 text-center">
                         <div class="relative inline-block">
                             <img id="photoPreview" src="uploads/photos/default-avatar.png"
-                                class="w-24 h-24 rounded-full border-4 border-gray-200 object-cover">
-                            <label for="photo" class="absolute bottom-0 right-0 bg-blue-600 text-white rounded-full p-2 cursor-pointer hover:bg-blue-700">
+                                class="w-32 h-32 rounded-full border-4 border-green-200 object-cover shadow-lg">
+                            <label for="photo" class="absolute bottom-0 right-0 bg-green-600 text-white rounded-full p-3 cursor-pointer hover:bg-green-700 shadow-md transition-all duration-200 hover:scale-110">
                                 <i class="fas fa-camera text-sm"></i>
-                                <input type="file" id="photo" name="photo" accept="image/*" class="hidden">
+                                <input type="file" id="photo" name="photo" accept="image/*" class="hidden" onchange="previewPhoto(event)">
                             </label>
                         </div>
+                        <p class="text-sm text-gray-500 mt-2">Cliquez sur l'icône pour ajouter une photo</p>
                     </div>
 
                     <!-- Informations personnelles -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                        <div>
-                            <label for="nom" class="block text-sm font-medium text-gray-700 mb-2">Nom *</label>
-                            <input type="text" id="nom" name="nom" required
-                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <div class="mb-6">
+                        <div class="flex items-center mb-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-user text-green-600"></i>
+                            </div>
+                            <h4 class="ml-3 text-lg font-semibold text-gray-800">Informations personnelles</h4>
                         </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
+                            <div>
+                                <label for="nom" class="block text-sm font-medium text-gray-700 mb-2">
+                                    <i class="fas fa-user mr-1 text-gray-400"></i>Nom *
+                                </label>
+                                <input type="text" id="nom" name="nom" required
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
+                            </div>
 
-                        <div>
-                            <label for="prenom" class="block text-sm font-medium text-gray-700 mb-2">Prénom *</label>
-                            <input type="text" id="prenom" name="prenom" required
-                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                        </div>
+                            <div>
+                                <label for="prenom" class="block text-sm font-medium text-gray-700 mb-2">
+                                    <i class="fas fa-user mr-1 text-gray-400"></i>Prénom *
+                                </label>
+                                <input type="text" id="prenom" name="prenom" required
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
+                            </div>
 
-                        <div>
-                            <label for="email" class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
-                            <input type="email" id="email" name="email" required
-                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                        </div>
+                            <div>
+                                <label for="email" class="block text-sm font-medium text-gray-700 mb-2">
+                                    <i class="fas fa-envelope mr-1 text-gray-400"></i>Email *
+                                </label>
+                                <input type="email" id="email" name="email" required
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
+                            </div>
 
-                        <div>
-                            <label for="telephone" class="block text-sm font-medium text-gray-700 mb-2">Téléphone</label>
-                            <input type="tel" id="telephone" name="telephone"
-                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <div>
+                                <label for="telephone" class="block text-sm font-medium text-gray-700 mb-2">
+                                    <i class="fas fa-phone mr-1 text-gray-400"></i>Téléphone
+                                </label>
+                                <input type="tel" id="telephone" name="telephone"
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
+                            </div>
                         </div>
                     </div>
                     <!-- Dans la section "Informations personnelles" -->
@@ -2402,8 +2322,197 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
 
     <div>
         <label for="nationalite" class="block text-sm font-medium text-gray-700 mb-2">Nationalité</label>
-        <input type="text" id="nationalite" name="nationalite"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+        <select id="nationalite" name="nationalite"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
+            <option value="">Sélectionner un pays</option>
+            <option value="Afghanistan">Afghanistan</option>
+            <option value="Afrique du Sud">Afrique du Sud</option>
+            <option value="Albanie">Albanie</option>
+            <option value="Algérie">Algérie</option>
+            <option value="Allemagne">Allemagne</option>
+            <option value="Andorre">Andorre</option>
+            <option value="Angola">Angola</option>
+            <option value="Arabie Saoudite">Arabie Saoudite</option>
+            <option value="Argentine">Argentine</option>
+            <option value="Arménie">Arménie</option>
+            <option value="Australie">Australie</option>
+            <option value="Autriche">Autriche</option>
+            <option value="Azerbaïdjan">Azerbaïdjan</option>
+            <option value="Bahamas">Bahamas</option>
+            <option value="Bahreïn">Bahreïn</option>
+            <option value="Bangladesh">Bangladesh</option>
+            <option value="Barbade">Barbade</option>
+            <option value="Belgique">Belgique</option>
+            <option value="Belize">Belize</option>
+            <option value="Bénin">Bénin</option>
+            <option value="Bhoutan">Bhoutan</option>
+            <option value="Biélorussie">Biélorussie</option>
+            <option value="Birmanie">Birmanie</option>
+            <option value="Bolivie">Bolivie</option>
+            <option value="Bosnie-Herzégovine">Bosnie-Herzégovine</option>
+            <option value="Botswana">Botswana</option>
+            <option value="Brésil">Brésil</option>
+            <option value="Brunei">Brunei</option>
+            <option value="Bulgarie">Bulgarie</option>
+            <option value="Burkina Faso">Burkina Faso</option>
+            <option value="Burundi">Burundi</option>
+            <option value="Cambodge">Cambodge</option>
+            <option value="Cameroun">Cameroun</option>
+            <option value="Canada">Canada</option>
+            <option value="Cap-Vert">Cap-Vert</option>
+            <option value="Chili">Chili</option>
+            <option value="Chine">Chine</option>
+            <option value="Chypre">Chypre</option>
+            <option value="Colombie">Colombie</option>
+            <option value="Comores">Comores</option>
+            <option value="Congo">Congo</option>
+            <option value="Corée du Nord">Corée du Nord</option>
+            <option value="Corée du Sud">Corée du Sud</option>
+            <option value="Costa Rica">Costa Rica</option>
+            <option value="Côte d'Ivoire">Côte d'Ivoire</option>
+            <option value="Croatie">Croatie</option>
+            <option value="Cuba">Cuba</option>
+            <option value="Danemark">Danemark</option>
+            <option value="Djibouti">Djibouti</option>
+            <option value="Dominique">Dominique</option>
+            <option value="Égypte">Égypte</option>
+            <option value="Émirats Arabes Unis">Émirats Arabes Unis</option>
+            <option value="Équateur">Équateur</option>
+            <option value="Érythrée">Érythrée</option>
+            <option value="Espagne">Espagne</option>
+            <option value="Estonie">Estonie</option>
+            <option value="Eswatini">Eswatini</option>
+            <option value="États-Unis">États-Unis</option>
+            <option value="Éthiopie">Éthiopie</option>
+            <option value="Fidji">Fidji</option>
+            <option value="Finlande">Finlande</option>
+            <option value="France">France</option>
+            <option value="Gabon">Gabon</option>
+            <option value="Gambie">Gambie</option>
+            <option value="Géorgie">Géorgie</option>
+            <option value="Ghana">Ghana</option>
+            <option value="Grèce">Grèce</option>
+            <option value="Grenade">Grenade</option>
+            <option value="Guatemala">Guatemala</option>
+            <option value="Guinée">Guinée</option>
+            <option value="Guinée équatoriale">Guinée équatoriale</option>
+            <option value="Guinée-Bissau">Guinée-Bissau</option>
+            <option value="Guyana">Guyana</option>
+            <option value="Haïti">Haïti</option>
+            <option value="Honduras">Honduras</option>
+            <option value="Hongrie">Hongrie</option>
+            <option value="Inde">Inde</option>
+            <option value="Indonésie">Indonésie</option>
+            <option value="Irak">Irak</option>
+            <option value="Iran">Iran</option>
+            <option value="Irlande">Irlande</option>
+            <option value="Islande">Islande</option>
+            <option value="Israël">Israël</option>
+            <option value="Italie">Italie</option>
+            <option value="Jamaïque">Jamaïque</option>
+            <option value="Japon">Japon</option>
+            <option value="Jordanie">Jordanie</option>
+            <option value="Kazakhstan">Kazakhstan</option>
+            <option value="Kenya">Kenya</option>
+            <option value="Kirghizistan">Kirghizistan</option>
+            <option value="Kiribati">Kiribati</option>
+            <option value="Koweït">Koweït</option>
+            <option value="Laos">Laos</option>
+            <option value="Lesotho">Lesotho</option>
+            <option value="Lettonie">Lettonie</option>
+            <option value="Liban">Liban</option>
+            <option value="Liberia">Liberia</option>
+            <option value="Libye">Libye</option>
+            <option value="Liechtenstein">Liechtenstein</option>
+            <option value="Lituanie">Lituanie</option>
+            <option value="Luxembourg">Luxembourg</option>
+            <option value="Macédoine du Nord">Macédoine du Nord</option>
+            <option value="Madagascar">Madagascar</option>
+            <option value="Malaisie">Malaisie</option>
+            <option value="Malawi">Malawi</option>
+            <option value="Maldives">Maldives</option>
+            <option value="Mali">Mali</option>
+            <option value="Malte">Malte</option>
+            <option value="Maroc">Maroc</option>
+            <option value="Maurice">Maurice</option>
+            <option value="Mauritanie">Mauritanie</option>
+            <option value="Mexique">Mexique</option>
+            <option value="Moldavie">Moldavie</option>
+            <option value="Monaco">Monaco</option>
+            <option value="Mongolie">Mongolie</option>
+            <option value="Monténégro">Monténégro</option>
+            <option value="Mozambique">Mozambique</option>
+            <option value="Namibie">Namibie</option>
+            <option value="Nauru">Nauru</option>
+            <option value="Népal">Népal</option>
+            <option value="Nicaragua">Nicaragua</option>
+            <option value="Niger">Niger</option>
+            <option value="Nigeria">Nigeria</option>
+            <option value="Norvège">Norvège</option>
+            <option value="Nouvelle-Zélande">Nouvelle-Zélande</option>
+            <option value="Oman">Oman</option>
+            <option value="Ouganda">Ouganda</option>
+            <option value="Ouzbékistan">Ouzbékistan</option>
+            <option value="Pakistan">Pakistan</option>
+            <option value="Palaos">Palaos</option>
+            <option value="Panama">Panama</option>
+            <option value="Papouasie-Nouvelle-Guinée">Papouasie-Nouvelle-Guinée</option>
+            <option value="Paraguay">Paraguay</option>
+            <option value="Pays-Bas">Pays-Bas</option>
+            <option value="Pérou">Pérou</option>
+            <option value="Philippines">Philippines</option>
+            <option value="Pologne">Pologne</option>
+            <option value="Portugal">Portugal</option>
+            <option value="Qatar">Qatar</option>
+            <option value="RD Congo">RD Congo</option>
+            <option value="République Centrafricaine">République Centrafricaine</option>
+            <option value="République Dominicaine">République Dominicaine</option>
+            <option value="République Tchèque">République Tchèque</option>
+            <option value="Roumanie">Roumanie</option>
+            <option value="Royaume-Uni">Royaume-Uni</option>
+            <option value="Russie">Russie</option>
+            <option value="Rwanda">Rwanda</option>
+            <option value="Saint-Marin">Saint-Marin</option>
+            <option value="Sainte-Lucie">Sainte-Lucie</option>
+            <option value="Salvador">Salvador</option>
+            <option value="Samoa">Samoa</option>
+            <option value="Sénégal" selected>Sénégal</option>
+            <option value="Serbie">Serbie</option>
+            <option value="Seychelles">Seychelles</option>
+            <option value="Sierra Leone">Sierra Leone</option>
+            <option value="Singapour">Singapour</option>
+            <option value="Slovaquie">Slovaquie</option>
+            <option value="Slovénie">Slovénie</option>
+            <option value="Somalie">Somalie</option>
+            <option value="Soudan">Soudan</option>
+            <option value="Soudan du Sud">Soudan du Sud</option>
+            <option value="Sri Lanka">Sri Lanka</option>
+            <option value="Suède">Suède</option>
+            <option value="Suisse">Suisse</option>
+            <option value="Suriname">Suriname</option>
+            <option value="Syrie">Syrie</option>
+            <option value="Tadjikistan">Tadjikistan</option>
+            <option value="Tanzanie">Tanzanie</option>
+            <option value="Tchad">Tchad</option>
+            <option value="Thaïlande">Thaïlande</option>
+            <option value="Timor oriental">Timor oriental</option>
+            <option value="Togo">Togo</option>
+            <option value="Tonga">Tonga</option>
+            <option value="Trinité-et-Tobago">Trinité-et-Tobago</option>
+            <option value="Tunisie">Tunisie</option>
+            <option value="Turkménistan">Turkménistan</option>
+            <option value="Turquie">Turquie</option>
+            <option value="Tuvalu">Tuvalu</option>
+            <option value="Ukraine">Ukraine</option>
+            <option value="Uruguay">Uruguay</option>
+            <option value="Vanuatu">Vanuatu</option>
+            <option value="Vatican">Vatican</option>
+            <option value="Venezuela">Venezuela</option>
+            <option value="Vietnam">Vietnam</option>
+            <option value="Yémen">Yémen</option>
+            <option value="Zambie">Zambie</option>
+            <option value="Zimbabwe">Zimbabwe</option>
+        </select>
     </div>
 
     <div>
@@ -2575,7 +2684,7 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
                         <div>
                             <label for="poste" class="block text-sm font-medium text-gray-700 mb-2">Poste *</label>
                             <select id="poste" name="poste_id" required onchange="updatePosteInfo()"
-                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
                                 <option value="">Sélectionner un poste</option>
                             </select>
                         </div>
@@ -2586,7 +2695,7 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
                                 <span id="salaireRange" class="text-xs text-gray-500"></span>
                             </label>
                             <input type="number" id="salaire" name="salaire" min="0" step="1"
-                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
                         </div>
                     </div>
 
@@ -2610,18 +2719,18 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
                         <div>
                             <label for="dateEmbauche" class="block text-sm font-medium text-gray-700 mb-2">Date d'embauche *</label>
                             <input type="date" id="dateEmbauche" name="date_embauche" required
-                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
                         </div>
 
                         <div>
                             <label for="heureDebut" class="block text-sm font-medium text-gray-700 mb-2">Heure début</label>
                             <input type="time" id="heureDebut" name="heure_debut" value="08:00"
-                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
                         </div>
                                                 <div>
                             <label for="heureFin" class="block text-sm font-medium text-gray-700 mb-2">Heure fin</label>
                             <input type="time" id="heureFin" name="heure_fin" value="17:00"
-                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
                         </div>
                     </div>
 
@@ -2630,7 +2739,7 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
                         <div>
                             <label for="statut" class="block text-sm font-medium text-gray-700 mb-2">Statut</label>
                             <select id="statut" name="statut"
-                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500">
                                 <option value="actif">Actif</option>
                                 <option value="en_conge">En congé</option>
                                 <option value="absent">Absent</option>
@@ -2641,7 +2750,7 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
                         <div class="flex items-end">
                             <label class="flex items-center">
                                 <input type="checkbox" id="isAdmin" name="is_admin" value="1"
-                                    class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                    class="rounded border-gray-300 text-green-600 focus:ring-green-500">
                                 <span class="ml-2 text-sm text-gray-700">
                                     <i class="fas fa-crown text-yellow-500 mr-1"></i>
                                     Administrateur
@@ -2681,14 +2790,16 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
                         </div>
                     </div>
 
-                    <div class="mt-6 flex justify-end space-x-3">
+                    <div class="mt-8 flex justify-end space-x-3 border-t border-gray-200 pt-6">
                         <button type="button" onclick="closeModal()"
-                                class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition duration-200">
+                                class="px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 flex items-center">
+                            <i class="fas fa-times mr-2"></i>
                             Annuler
                         </button>
                         <button type="submit"
-                                class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-200">
-                            <i class="fas fa-save mr-2"></i>Enregistrer
+                                class="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:from-green-700 hover:to-emerald-700 transition-all duration-200 shadow-md hover:shadow-lg flex items-center">
+                            <i class="fas fa-save mr-2"></i>
+                            Enregistrer
                         </button>
                     </div>
                 </form>
@@ -2713,7 +2824,7 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
                 <div id="presenceHistoryContent" class="mb-6">
                     <!-- Le contenu sera chargé ici -->
                     <div class="text-center py-8">
-                        <i class="fas fa-spinner fa-spin text-blue-500 text-2xl mb-2"></i>
+                        <i class="fas fa-spinner fa-spin text-green-600 text-2xl mb-2"></i>
                         <p>Chargement de l'historique...</p>
                     </div>
                 </div>
@@ -2732,6 +2843,9 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
     <script>
      // Variables globales
 let employees = [];
+let currentPage = 1;
+let itemsPerPage = 10;
+let totalPages = 1;
 let postes = [];
 let departements = [];
 
@@ -2970,7 +3084,7 @@ function displayTableView(employeesList) {
         console.error('Élément employeesTableBody non trouvé');
         return;
     }
-    
+
     tbody.innerHTML = '';
 
     if (!Array.isArray(employeesList) || employeesList.length === 0) {
@@ -2982,15 +3096,28 @@ function displayTableView(employeesList) {
                 </td>
             </tr>
         `;
+        updatePaginationInfo(0, 0, 0);
         return;
     }
 
-    employeesList.forEach(employee => {
+    // Calculer la pagination
+    totalPages = Math.ceil(employeesList.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = Math.min(startIndex + itemsPerPage, employeesList.length);
+
+    // Afficher uniquement les employés de la page actuelle
+    const employeesToDisplay = employeesList.slice(startIndex, endIndex);
+
+    employeesToDisplay.forEach(employee => {
         const row = createEmployeeRow(employee);
         tbody.appendChild(row);
     });
-    
-    console.log(`${employeesList.length} lignes ajoutées au tableau`);
+
+    // Mettre à jour les informations de pagination
+    updatePaginationInfo(startIndex + 1, endIndex, employeesList.length);
+    renderPaginationButtons();
+
+    console.log(`Page ${currentPage}/${totalPages}: ${employeesToDisplay.length} employés affichés sur ${employeesList.length} au total`);
 }
 
 function createEmployeeRow(employee) {
@@ -3022,7 +3149,7 @@ function createEmployeeRow(employee) {
                 presenceIcon = 'fas fa-clock';
                 break;
             case 'parti':
-                presenceClass = 'bg-blue-100 text-blue-800';
+                presenceClass = 'bg-purple-100 text-purple-800';
                 presenceText = 'Parti';
                 presenceIcon = 'fas fa-sign-out-alt';
                 break;
@@ -3110,8 +3237,8 @@ function createEmployeeRow(employee) {
         </td>
         <td class="px-6 py-4 whitespace-nowrap text-sm ${employee.statut === 'inactif' ? 'text-gray-500' : 'text-gray-900'}">
             <div class="flex items-center">
-                <i class="fas fa-clock ${employee.statut === 'inactif' ? 'text-gray-400' : 'text-blue-500'} mr-1"></i>
-                <span class="font-medium ${employee.statut === 'inactif' ? 'text-gray-400' : 'text-blue-600'}">
+                <i class="fas fa-clock ${employee.statut === 'inactif' ? 'text-gray-400' : 'text-purple-600'} mr-1"></i>
+                <span class="font-medium ${employee.statut === 'inactif' ? 'text-gray-400' : 'text-purple-700'}">
                     ${employee.heures_par_mois || '0'}h
                 </span>
             </div>
@@ -3121,19 +3248,19 @@ function createEmployeeRow(employee) {
             <div class="flex flex-col space-y-1">
                 ${employee.cv ? `
                     <a href="uploads/documents/${employee.cv}" target="_blank"
-                    class="text-blue-600 hover:text-blue-800 text-xs flex items-center">
+                    class="text-purple-600 hover:text-purple-800 text-xs flex items-center">
                         <i class="fas fa-file-pdf mr-1 text-red-500"></i>CV
                     </a>
                 ` : '<span class="text-red-500 text-xs">Manquant</span>'}
                 ${employee.contrat ? `
                     <a href="uploads/documents/${employee.contrat}" target="_blank"
-                    class="text-blue-600 hover:text-blue-800 text-xs flex items-center">
+                    class="text-purple-600 hover:text-purple-800 text-xs flex items-center">
                         <i class="fas fa-file-contract mr-1 text-green-500"></i>Contrat
                     </a>
                 ` : '<span class="text-red-500 text-xs">Manquant</span>'}
                 ${employee.piece_identite ? `
                     <a href="uploads/documents/${employee.piece_identite}" target="_blank"
-                    class="text-blue-600 hover:text-blue-800 text-xs flex items-center">
+                    class="text-purple-600 hover:text-purple-800 text-xs flex items-center">
                         <i class="fas fa-id-card mr-1 text-purple-500"></i>Pièce ID
                     </a>
                 ` : '<span class="text-red-500 text-xs">Manquant</span>'}
@@ -3141,7 +3268,7 @@ function createEmployeeRow(employee) {
         </td>
         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
             <div class="flex space-x-2">
-                <button onclick="viewEmployee(${employee.id})" class="text-blue-600 hover:text-blue-900" title="Voir détails">
+                <button onclick="viewEmployee(${employee.id})" class="text-purple-600 hover:text-purple-900" title="Voir détails">
                     <i class="fas fa-eye"></i>
                 </button>
                 ${employee.statut !== 'inactif' ? `
@@ -3172,12 +3299,127 @@ function createEmployeeRow(employee) {
     return row;
 }
 
+// ===== FONCTIONS DE PAGINATION =====
+
+function updatePaginationInfo(start, end, total) {
+    const startRange = document.getElementById('startRange');
+    const endRange = document.getElementById('endRange');
+    const totalEmployees = document.getElementById('totalEmployees');
+
+    if (startRange) startRange.textContent = start;
+    if (endRange) endRange.textContent = end;
+    if (totalEmployees) totalEmployees.textContent = total;
+}
+
+function renderPaginationButtons() {
+    const paginationNumbers = document.getElementById('paginationNumbers');
+    if (!paginationNumbers) return;
+
+    paginationNumbers.innerHTML = '';
+
+    // Bouton Précédent
+    const prevButton = document.createElement('button');
+    prevButton.onclick = () => changePage(currentPage - 1);
+    prevButton.disabled = currentPage === 1;
+    prevButton.className = `relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${
+        currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-50'
+    }`;
+    prevButton.innerHTML = '<i class="fas fa-chevron-left"></i>';
+    paginationNumbers.appendChild(prevButton);
+
+    // Numéros de pages
+    const maxPagesToShow = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+
+    if (endPage - startPage < maxPagesToShow - 1) {
+        startPage = Math.max(1, endPage - maxPagesToShow + 1);
+    }
+
+    // Page 1 si pas visible
+    if (startPage > 1) {
+        const firstButton = createPageButton(1);
+        paginationNumbers.appendChild(firstButton);
+        if (startPage > 2) {
+            const ellipsis = document.createElement('span');
+            ellipsis.className = 'relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700';
+            ellipsis.textContent = '...';
+            paginationNumbers.appendChild(ellipsis);
+        }
+    }
+
+    // Pages visibles
+    for (let i = startPage; i <= endPage; i++) {
+        const pageButton = createPageButton(i);
+        paginationNumbers.appendChild(pageButton);
+    }
+
+    // Dernière page si pas visible
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            const ellipsis = document.createElement('span');
+            ellipsis.className = 'relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700';
+            ellipsis.textContent = '...';
+            paginationNumbers.appendChild(ellipsis);
+        }
+        const lastButton = createPageButton(totalPages);
+        paginationNumbers.appendChild(lastButton);
+    }
+
+    // Bouton Suivant
+    const nextButton = document.createElement('button');
+    nextButton.onclick = () => changePage(currentPage + 1);
+    nextButton.disabled = currentPage === totalPages;
+    nextButton.className = `relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${
+        currentPage === totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-50'
+    }`;
+    nextButton.innerHTML = '<i class="fas fa-chevron-right"></i>';
+    paginationNumbers.appendChild(nextButton);
+
+    // Mettre à jour les boutons mobile
+    const prevPageMobile = document.getElementById('prevPageMobile');
+    const nextPageMobile = document.getElementById('nextPageMobile');
+    if (prevPageMobile) prevPageMobile.disabled = currentPage === 1;
+    if (nextPageMobile) nextPageMobile.disabled = currentPage === totalPages;
+}
+
+function createPageButton(pageNumber) {
+    const button = document.createElement('button');
+    button.onclick = () => changePage(pageNumber);
+    button.className = `relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+        pageNumber === currentPage
+            ? 'z-10 bg-green-50 border-green-500 text-green-600'
+            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+    }`;
+    button.textContent = pageNumber;
+    return button;
+}
+
+function changePage(newPage) {
+    if (newPage < 1 || newPage > totalPages || newPage === currentPage) return;
+
+    currentPage = newPage;
+    console.log(`Changement vers la page ${currentPage}`);
+
+    // Réafficher avec la nouvelle page
+    displayEmployees(employees);
+
+    // Scroll vers le haut du tableau
+    const tableContainer = document.querySelector('.overflow-x-auto');
+    if (tableContainer) {
+        tableContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
 // Fonctions de filtrage
 function filterEmployees() {
     if (!employees || employees.length === 0) {
         console.log('Aucun employé à filtrer');
         return;
     }
+
+    // Réinitialiser à la page 1 lors d'un nouveau filtrage
+    currentPage = 1;
 
     const searchTerm = getElementValue('searchInput').toLowerCase();
     const departementFilter = getElementValue('filterDepartement');
@@ -3228,20 +3470,56 @@ function resetFilters() {
 function openAddModal() {
     const modal = document.getElementById('employeeModal');
     if (!modal) return;
-    
-    document.getElementById('modalTitle').textContent = 'Ajouter un employé';
+
+    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-user-plus mr-2"></i>Ajouter un employé';
     document.getElementById('employeeForm').reset();
     document.getElementById('employeeId').value = '';
     document.getElementById('ajaxAction').value = 'add_employee';
     document.getElementById('photoPreview').src = 'uploads/photos/default-avatar.png';
-    
+
     modal.classList.remove('hidden');
+    // Animation d'ouverture
+    setTimeout(() => {
+        modal.classList.add('opacity-100');
+    }, 10);
 }
 
 function closeModal() {
     const modal = document.getElementById('employeeModal');
-    if (modal) modal.classList.add('hidden');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('opacity-100');
+    }
 }
+
+// Fermer le modal en cliquant sur le fond
+function closeModalOnBackdrop(event) {
+    if (event.target.id === 'employeeModal') {
+        closeModal();
+    }
+}
+
+// Prévisualiser la photo
+function previewPhoto(event) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('photoPreview').src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+// Fermer le modal avec la touche Escape
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        const modal = document.getElementById('employeeModal');
+        if (modal && !modal.classList.contains('hidden')) {
+            closeModal();
+        }
+    }
+});
 
 function editEmployee(id) {
     const employee = employees.find(e => e.id == id);
@@ -3253,7 +3531,7 @@ function editEmployee(id) {
     const modal = document.getElementById('employeeModal');
     if (!modal) return;
 
-    document.getElementById('modalTitle').textContent = 'Modifier l\'employé';
+    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-user-edit mr-2"></i>Modifier l\'employé';
     document.getElementById('employeeId').value = employee.id;
     document.getElementById('ajaxAction').value = 'update_employee';
     
@@ -3782,7 +4060,7 @@ function getStatusClass(statut) {
         'inactif': 'bg-gray-100 text-gray-800',
         'present': 'bg-green-100 text-green-800',
         'retard': 'bg-yellow-100 text-yellow-800',
-        'parti': 'bg-blue-100 text-blue-800'
+        'parti': 'bg-purple-100 text-purple-800'
     };
     return classes[statut] || 'bg-gray-100 text-gray-800';
 }
@@ -3823,7 +4101,7 @@ function showNotification(message, type = 'info') {
         'success': 'bg-green-500',
         'error': 'bg-red-500',
         'warning': 'bg-yellow-500',
-        'info': 'bg-blue-500'
+        'info': 'bg-purple-500'
     };
 
     const icons = {

@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../config.php';
+require_once 'includes/language.php';
 try {
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     // Requête pour récupérer les horaires d'ouverture/fermeture par jour
@@ -12,9 +13,57 @@ try {
     $stmt = $conn->prepare($query);
     $stmt->execute();
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Récupérer les plats pour le carrousel (limité à 15 plats avec images)
+    $queryPlatsCarrousel = "
+        SELECT p.id, p.nom, p.image, p.prix, p.description, c.nom as categorie_nom
+        FROM plats p
+        LEFT JOIN categories c ON p.categorie_id = c.id
+        WHERE p.disponible = 1 AND p.image IS NOT NULL
+        ORDER BY RAND()
+        LIMIT 15
+    ";
+    $stmtCarrousel = $conn->prepare($queryPlatsCarrousel);
+    $stmtCarrousel->execute();
+    $platsCarrousel = $stmtCarrousel->fetchAll(PDO::FETCH_ASSOC);
+
+    // Récupérer TOUS les plats disponibles pour le modal
+    $queryAllPlats = "
+        SELECT p.id, p.nom, p.image, p.prix, p.description, c.nom as categorie_nom
+        FROM plats p
+        LEFT JOIN categories c ON p.categorie_id = c.id
+        WHERE p.disponible = 1
+        ORDER BY c.nom, p.nom
+    ";
+    $stmtPlats = $conn->prepare($queryAllPlats);
+    $stmtPlats->execute();
+    $allPlats = $stmtPlats->fetchAll(PDO::FETCH_ASSOC);
+
+    // Récupérer les informations de la section À propos
+    $stmtAbout = $conn->prepare("SELECT * FROM about_section WHERE id = 1 LIMIT 1");
+    $stmtAbout->execute();
+    $aboutData = $stmtAbout->fetch(PDO::FETCH_ASSOC);
+
+    // Calculer les statistiques automatiques
+    $stmtTotalPlats = $conn->query("SELECT COUNT(*) as total FROM plats WHERE disponible = 1");
+    $totalPlats = $stmtTotalPlats->fetch(PDO::FETCH_ASSOC)['total'];
+
+    $stmtTotalReservations = $conn->query("SELECT COUNT(*) as total FROM reservations");
+    $totalReservations = $stmtTotalReservations->fetch(PDO::FETCH_ASSOC)['total'];
+
+    // Calculer les années d'existence
+    $anneeCreation = 2020; // À ajuster selon votre restaurant
+    $anneesExistence = date('Y') - $anneeCreation;
+
 } catch (PDOException $e) {
-    error_log("Erreur SQL horaires_ouverture : " . $e->getMessage());
-    $results = []; // Valeur de repli
+    error_log("Erreur SQL : " . $e->getMessage());
+    $results = [];
+    $platsCarrousel = [];
+    $allPlats = [];
+    $aboutData = ['titre' => 'À propos de Mulho', 'description' => '', 'sous_titre' => '', 'image' => null];
+    $totalPlats = 50;
+    $totalReservations = 100;
+    $anneesExistence = 5;
 }
 
 ?>
@@ -58,7 +107,9 @@ try {
         body {
             font-family: 'Inter', sans-serif;
             line-height: 1.6;
-            color: #333;
+            color: var(--text-main);
+            background: var(--bg-primary);
+            transition: background 0.3s ease, color 0.3s ease;
         }
 
         #preloader {
@@ -173,398 +224,267 @@ try {
             to { transform: rotate(360deg); }
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            line-height: 1.6;
-        }
-
         :root {
             --primary: #ff6b35;
             --secondary: #f7931e;
             --accent: #ffd23f;
-            --dark: #2d1810;
-            --light: #faf8f5;
-            --glass: rgba(255, 255, 255, 0.1);
-            --shadow: rgba(0, 0, 0, 0.2);
+
+            /* Theme Colors - Light Mode (par défaut) */
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-tertiary: #e2e8f0;
+            --text-main: #1a202c;
+            --text-secondary: #475569;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --card-bg: #ffffff;
+            --gradient-start: #f8fafc;
+            --gradient-end: #e2e8f0;
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        /* Dark Mode */
+        body.dark-mode {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-main: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+            --card-bg: #1e293b;
+            --gradient-start: #1e293b;
+            --gradient-end: #0f172a;
         }
 
-        body {
-            font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
-            color: white;
-            overflow-x: hidden;
-        }
-
-        /* Particles Background */
-        .particles {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -1;
-            pointer-events: none;
-        }
-
-        .particle {
-            position: absolute;
-            width: 2px;
-            height: 2px;
-            background: linear-gradient(45deg, var(--primary), var(--secondary));
-            border-radius: 50%;
-            animation: float-particle 20s infinite linear;
-            opacity: 0.6;
-        }
-
-        @keyframes float-particle {
-            0% {
-                transform: translateY(100vh) rotate(0deg);
-                opacity: 0;
-            }
-            10% {
-                opacity: 0.6;
-            }
-            90% {
-                opacity: 0.6;
-            }
-            100% {
-                transform: translateY(-100px) rotate(360deg);
-                opacity: 0;
-            }
-        }
-
-        /* Hero Section */
-        .hero-section {
-            min-height: 5vh;
-            display: flex;
-            align-items: center;
+        /* Section À propos */
+        .about-section {
+            background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
+            padding: 80px 0;
             position: relative;
             overflow: hidden;
         }
 
-        .hero-bg {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><defs><radialGradient id="grad1" cx="50%" cy="50%" r="50%"><stop offset="0%" style="stop-color:%23ff6b35;stop-opacity:0.1" /><stop offset="100%" style="stop-color:%23ff6b35;stop-opacity:0" /></radialGradient></defs><circle cx="200" cy="200" r="150" fill="url(%23grad1)" /><circle cx="800" cy="800" r="200" fill="url(%23grad1)" /></svg>');
-            opacity: 0.3;
-            animation: pulse-bg 8s ease-in-out infinite;
+        .about-hero {
+            text-align: center;
+            margin-bottom: 60px;
         }
 
-        @keyframes pulse-bg {
-            0%, 100% { transform: scale(1) rotate(0deg); }
-            50% { transform: scale(1.1) rotate(180deg); }
-        }
-
-        .hero-title {
+        .about-title {
             font-family: 'Playfair Display', serif;
-            font-size: clamp(2.5rem, 8vw, 6rem);
-            font-weight: 900;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 50%, var(--accent) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            text-align: center;
-            margin-bottom: 2rem;
-            position: relative;
-            z-index: 2;
-        }
-
-        .hero-subtitle {
-            font-size: 1.5rem;
-            text-align: center;
-            margin-bottom: 3rem;
-            opacity: 0.8;
-            font-weight: 300;
-        }
-
-        /* Glass Cards */
-        .glass-card {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 24px;
-            padding: 2rem;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .glass-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-            transition: left 0.8s;
-        }
-
-        .glass-card:hover::before {
-            left: 100%;
-        }
-
-        .glass-card:hover {
-            transform: translateY(-10px) scale(1.02);
-            box-shadow: 0 20px 40px rgba(255, 107, 53, 0.2);
-            border-color: rgba(255, 107, 53, 0.3);
-        }
-
-        /* Image Container with 3D Effect */
-        .image-3d {
-            position: relative;
-            border-radius: 20px;
-            overflow: hidden;
-            transform-style: preserve-3d;
-            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .image-3d:hover {
-            transform: rotateY(5deg) rotateX(5deg) translateZ(50px);
-        }
-
-        .image-3d img {
-            width: 100%;
-            height: 400px;
-            object-fit: cover;
-            transition: all 0.6s ease;
-        }
-
-        .image-3d:hover img {
-            transform: scale(1.1);
-            filter: brightness(1.1) contrast(1.1);
-        }
-
-        /* Floating Elements */
-        .floating-element {
-            position: absolute;
-            animation: float 6s ease-in-out infinite;
-        }
-
-        .floating-element:nth-child(odd) {
-            animation-delay: -3s;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translateY(0px) rotate(0deg); }
-            50% { transform: translateY(-20px) rotate(5deg); }
-        }
-
-        /* Stats with Neon Effect */
-        .neon-stat {
-            text-align: center;
-            padding: 1.5rem;
-            background: rgba(255, 107, 53, 0.1);
-            border: 2px solid rgba(255, 107, 53, 0.3);
-            border-radius: 16px;
-            position: relative;
-            overflow: hidden;
-            transition: all 0.4s ease;
-        }
-
-        .neon-stat:hover {
-            box-shadow: 0 0 30px rgba(255, 107, 53, 0.4);
-            border-color: var(--primary);
-        }
-
-        .neon-stat::before {
-            content: '';
-            position: absolute;
-            top: -2px;
-            left: -2px;
-            right: -2px;
-            bottom: -2px;
-            background: linear-gradient(45deg, var(--primary), var(--secondary), var(--accent));
-            border-radius: 16px;
-            z-index: -1;
-            opacity: 0;
-            transition: opacity 0.4s ease;
-        }
-
-        .neon-stat:hover::before {
-            opacity: 1;
-        }
-
-        .stat-number {
-            font-size: 3rem;
+            font-size: 3.5rem;
             font-weight: 800;
-            background: linear-gradient(135deg, var(--primary), var(--accent));
+            background: linear-gradient(135deg, #ff6b35, #f7931e);
             -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
             background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
         }
 
-        .stat-label {
-            font-size: 0.9rem;
-            opacity: 0.8;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            margin-top: 0.5rem;
+        .about-subtitle {
+            font-size: 1.3rem;
+            color: #64748b;
+            font-weight: 400;
         }
 
-        /* Modern Features List */
-        .feature-modern {
+        .about-content-wrapper {
+            display: flex;
+            gap: 40px;
+            align-items: center;
+            margin-bottom: 50px;
+        }
+
+        .about-image-container {
+            flex: 0 0 45%;
+            position: relative;
+        }
+
+        .about-image {
+            width: 100%;
+            height: 500px;
+            object-fit: cover;
+            border-radius: 24px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+            transition: transform 0.4s ease;
+        }
+
+        .about-image:hover {
+            transform: scale(1.02);
+        }
+
+        .about-text-container {
+            flex: 1;
+        }
+
+        .about-section-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 1.5rem;
+        }
+
+        .about-description {
+            font-size: 1.15rem;
+            line-height: 1.8;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+        }
+
+        .about-features {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin-bottom: 2rem;
+        }
+
+        .about-feature {
             display: flex;
             align-items: center;
-            margin: 1.5rem 0;
-            padding: 1.5rem;
-            background: rgba(255, 255, 255, 0.03);
+            gap: 15px;
+            padding: 20px;
+            background: var(--card-bg);
             border-radius: 16px;
-            border-left: 4px solid var(--primary);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
+            border-left: 4px solid #ff6b35;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
         }
 
-        .feature-modern::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 0;
-            height: 100%;
-            background: linear-gradient(90deg, var(--primary), var(--secondary));
-            transition: width 0.4s ease;
-            opacity: 0.1;
-        }
-
-        .feature-modern:hover::before {
-            width: 100%;
-        }
-
-        .feature-modern:hover {
+        .about-feature:hover {
             transform: translateX(10px);
-            background: rgba(255, 107, 53, 0.08);
-            border-left-color: var(--accent);
+            box-shadow: 0 8px 25px rgba(255, 107, 53, 0.15);
         }
 
-        .feature-icon-modern {
+        .about-feature-icon {
             font-size: 2rem;
-            margin-right: 1.5rem;
-            color: var(--primary);
-            transition: all 0.4s ease;
+            color: #ff6b35;
+            flex-shrink: 0;
         }
 
-        .feature-modern:hover .feature-icon-modern {
-            transform: scale(1.2) rotate(10deg);
-            color: var(--accent);
+        .about-feature-content h4 {
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 5px;
         }
 
-        /* CTA Button with Glow */
-        .cta-glow {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            border: none;
-            padding: 1rem 2rem;
-            border-radius: 50px;
-            color: white;
-            font-weight: 600;
+        .about-feature-content p {
+            color: var(--text-muted);
+            margin: 0;
+            font-size: 0.95rem;
+        }
+
+        .about-quote {
+            background: linear-gradient(135deg, #fff5f0, #ffffff);
+            border-left: 4px solid #ff6b35;
+            border-radius: 16px;
+            padding: 30px;
+            font-style: italic;
+            color: #475569;
             font-size: 1.1rem;
+            line-height: 1.7;
+            margin-top: 30px;
+            box-shadow: 0 4px 20px rgba(255, 107, 53, 0.1);
+        }
+
+        .about-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 30px;
+            margin-top: 50px;
+        }
+
+        .about-stat-card {
+            text-align: center;
+            padding: 30px;
+            background: var(--card-bg);
+            border-radius: 20px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .about-stat-card:hover {
+            transform: translateY(-5px);
+            border-color: #ff6b35;
+            box-shadow: 0 12px 35px rgba(255, 107, 53, 0.15);
+        }
+
+        .about-stat-number {
+            font-size: 3.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #ff6b35, #f7931e);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .about-stat-label {
+            color: #64748b;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.9rem;
+        }
+
+        .about-cta {
+            text-align: center;
+            margin-top: 50px;
+        }
+
+        .about-cta-btn {
+            background: linear-gradient(135deg, #ff6b35, #f7931e);
+            color: white;
+            padding: 18px 40px;
+            border-radius: 50px;
             text-decoration: none;
+            font-weight: 700;
+            font-size: 1.1rem;
             display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 8px 25px rgba(255, 107, 53, 0.3);
+            gap: 10px;
+            box-shadow: 0 10px 30px rgba(255, 107, 53, 0.3);
+            transition: all 0.3s ease;
         }
 
-        .cta-glow::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-            transition: left 0.6s;
-        }
-
-        .cta-glow:hover::before {
-            left: 100%;
-        }
-
-        .cta-glow:hover {
-            transform: translateY(-3px) scale(1.05);
-            box-shadow: 0 15px 35px rgba(255, 107, 53, 0.5);
+        .about-cta-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(255, 107, 53, 0.4);
             color: white;
         }
 
-        /* Morphing Shapes */
-        .morph-shape {
-            position: absolute;
-            width: 200px;
-            height: 200px;
-            background: linear-gradient(45deg, var(--primary), var(--secondary));
-            border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
-            opacity: 0.1;
-            animation: morph 8s ease-in-out infinite;
-        }
-
-        @keyframes morph {
-            0%, 100% {
-                border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
-                transform: rotate(0deg) scale(1);
-            }
-            25% {
-                border-radius: 58% 42% 75% 25% / 76% 46% 54% 24%;
-                transform: rotate(90deg) scale(1.1);
-            }
-            50% {
-                border-radius: 50% 50% 33% 67% / 55% 27% 73% 45%;
-                transform: rotate(180deg) scale(0.9);
-            }
-            75% {
-                border-radius: 33% 67% 58% 42% / 63% 68% 32% 37%;
-                transform: rotate(270deg) scale(1.05);
-            }
-        }
-
-        /* Responsive */
         @media (max-width: 768px) {
-            .hero-section {
-                padding: 2rem 0;
+            .about-title {
+                font-size: 2.5rem;
             }
-            
-            .glass-card {
-                padding: 1.5rem;
-                margin: 1rem 0;
+
+            .about-content-wrapper {
+                flex-direction: column;
             }
-            
-            .image-3d img {
-                height: 300px;
+
+            .about-image-container {
+                flex: 0 0 100%;
             }
-            
-            .stat-number {
+
+            .about-image {
+                height: 350px;
+            }
+
+            .about-section-title {
                 font-size: 2rem;
             }
-        }
 
-        /* Scroll Animations */
-        .fade-in {
-            opacity: 0;
-            transform: translateY(30px);
-            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-        }
+            .about-stats {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
 
-        .fade-in.visible {
-            opacity: 1;
-            transform: translateY(0);
+            .about-stat-number {
+                font-size: 2.5rem;
+            }
+
+            .about-feature {
+                padding: 15px;
+            }
         }
 
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -573,106 +493,59 @@ try {
             font-family: 'Inter', sans-serif;
         }
 
+        /* Section Contact */
         .contact-section {
-            padding: 60px 0;
-            background: #f8fafc;
-            position: relative;
-        }
-
-        .section-title {
-            text-align: center;
-            margin-bottom: 50px;
-            color: #2d3748;
-            font-weight: 800;
-            font-size: 3rem;
-            letter-spacing: -1px;
-            background: linear-gradient(135deg, #ff6b6b, #ee5a24, #feca57);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            padding: 40px 0;
+            background: var(--bg-secondary);
         }
 
         .info-card {
-            background: white;
-            border: 1px solid #e2e8f0;
-            padding: 35px;
-            border-radius: 20px;
-            margin-bottom: 25px;
+            background: var(--card-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 20px;
             display: flex;
             align-items: center;
-            gap: 25px;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-        }
-
-        .info-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-            transition: left 0.8s ease;
+            gap: 20px;
+            transition: all 0.3s ease;
         }
 
         .info-card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 15px 40px rgba(255, 107, 107, 0.15);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(255, 107, 107, 0.15);
             border-color: #ff6b6b;
         }
 
         .info-icon {
-            background: linear-gradient(135deg, #ff6b6b, #ee5a24, #feca57);
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
             color: white;
-            width: 80px;
-            height: 80px;
-            border-radius: 25px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 2rem;
+            font-size: 1.5rem;
             flex-shrink: 0;
-            box-shadow: 0 15px 35px rgba(255, 107, 107, 0.4);
-            position: relative;
-        }
-
-        .info-icon::after {
-            content: '';
-            position: absolute;
-            inset: -3px;
-            background: linear-gradient(135deg, #ff6b6b, #ee5a24, #feca57);
-            border-radius: 28px;
-            z-index: -1;
-            opacity: 0;
-            transition: opacity 0.4s ease;
-            filter: blur(8px);
-        }
-
-        .info-card:hover .info-icon::after {
-            opacity: 0.6;
         }
 
         .info-content h3 {
-            color: #2d3748;
+            color: var(--text-main);
             font-weight: 700;
-            margin-bottom: 8px;
-            font-size: 1.3rem;
-            letter-spacing: -0.5px;
+            margin-bottom: 5px;
+            font-size: 1.1rem;
         }
 
         .info-content p,
         .info-content a {
-            color: #4a5568;
+            color: var(--text-muted);
             margin: 0;
             text-decoration: none;
-            font-weight: 500;
-            transition: all 0.3s ease;
         }
 
         .info-content a:hover {
             color: #ff6b6b;
-            transform: translateX(3px);
         }
 
         .opening-hours {
@@ -684,10 +557,8 @@ try {
         .opening-hours li {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(0,0,0,0.08);
-            font-size: 0.95rem;
+            padding: 6px 0;
+            border-bottom: 1px solid #e2e8f0;
         }
 
         .opening-hours li:last-child {
@@ -695,250 +566,113 @@ try {
         }
 
         .day-name {
-            font-weight: 700;
-            color: #2d3748;
-            letter-spacing: -0.3px;
+            font-weight: 600;
+            color: var(--text-main);
         }
 
         .hours {
-            color: #4a5568;
-            font-weight: 500;
+            color: var(--text-muted);
         }
 
         .closed {
             color: #e53e3e;
-            font-weight: 700;
+            font-weight: 600;
         }
 
         .contact-form {
-            background: white;
-            border: 1px solid #e2e8f0;
-            padding: 50px;
-            border-radius: 25px;
-            margin-top: 40px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            position: relative;
-        }
-
-        .contact-form::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 5px;
-            background: linear-gradient(90deg, #ff6b6b, #ee5a24, #feca57, #5f27cd, #00d2d3);
-            background-size: 300% 100%;
-            animation: gradient 3s ease infinite;
-        }
-
-        @keyframes gradient {
-            0%, 100% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
+            background: var(--card-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 16px;
+            padding: 35px;
+            margin-top: 30px;
         }
 
         .form-title {
             text-align: center;
-            margin-bottom: 40px;
-            color: #2d3748;
-            font-weight: 800;
-            font-size: 2.5rem;
-            letter-spacing: -1px;
-            position: relative;
-        }
-
-        .form-title::after {
-            content: '';
-            position: absolute;
-            bottom: -10px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 60px;
-            height: 4px;
-            background: linear-gradient(90deg, #ff6b6b, #feca57);
-            border-radius: 2px;
-        }
-
-        .form-group {
-            position: relative;
-            margin-bottom: 25px;
+            margin-bottom: 30px;
+            color: var(--text-main);
+            font-weight: 700;
+            font-size: 2rem;
         }
 
         .form-control {
-            border: 2px solid #e2e8f0;
-            border-radius: 12px;
-            padding: 18px 20px;
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            padding: 12px 16px;
             font-size: 1rem;
-            font-weight: 500;
-            background: #f8fafc;
+            background: var(--bg-secondary);
+            color: var(--text-main);
             transition: all 0.3s ease;
+            width: 100%;
         }
 
         .form-control:focus {
             border-color: #ff6b6b;
-            box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.1);
-            background: white;
+            background: var(--card-bg);
             outline: none;
-        }
-
-        .form-control::placeholder {
-            color: #9ca3af;
-            font-weight: 400;
         }
 
         textarea.form-control {
             resize: vertical;
-            min-height: 140px;
+            min-height: 120px;
         }
 
         .submit-btn {
-            background: linear-gradient(135deg, #ff6b6b, #ee5a24, #feca57);
-            background-size: 200% 200%;
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
             color: white;
             border: none;
-            padding: 18px 50px;
+            padding: 15px 40px;
             border-radius: 50px;
-            font-weight: 700;
-            font-size: 1.1rem;
+            font-weight: 600;
+            font-size: 1rem;
             cursor: pointer;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.3s ease;
             width: 100%;
-            position: relative;
-            overflow: hidden;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            box-shadow: 0 15px 35px rgba(255, 107, 107, 0.4);
-        }
-
-        .submit-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-            transition: left 0.6s ease;
+            letter-spacing: 0.5px;
         }
 
         .submit-btn:hover {
-            transform: translateY(-3px) scale(1.02);
-            box-shadow: 0 20px 40px rgba(255, 107, 107, 0.6);
-            background-position: right center;
-        }
-
-        .submit-btn:hover::before {
-            left: 100%;
-        }
-
-        .submit-btn:active {
-            transform: translateY(-1px) scale(1.01);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(255, 107, 107, 0.3);
         }
 
         .message-status {
             text-align: center;
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 12px;
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 8px;
             font-weight: 600;
-            font-size: 1rem;
         }
 
-        .loading { 
-            color: #ff6b6b; 
+        .loading {
+            color: #ff6b6b;
             background: rgba(255, 107, 107, 0.1);
-            border: 2px solid rgba(255, 107, 107, 0.2);
         }
-        .error-message { 
-            color: #e53e3e; 
+        .error-message {
+            color: #e53e3e;
             background: rgba(229, 62, 62, 0.1);
-            border: 2px solid rgba(229, 62, 62, 0.2);
         }
-        .sent-message { 
-            color: #38a169; 
+        .sent-message {
+            color: #38a169;
             background: rgba(56, 161, 105, 0.1);
-            border: 2px solid rgba(56, 161, 105, 0.2);
         }
 
-        /* Responsive Design */
         @media (max-width: 768px) {
-            .contact-section {
-                padding: 40px 0;
-            }
-
-            .section-title {
-                font-size: 2rem;
-                margin-bottom: 40px;
-            }
-
             .info-card {
                 flex-direction: column;
                 text-align: center;
-                padding: 30px;
-                gap: 20px;
-            }
-
-            .info-icon {
-                width: 70px;
-                height: 70px;
-                font-size: 1.8rem;
             }
 
             .contact-form {
-                padding: 35px 25px;
-                margin-top: 30px;
-            }
-
-            .form-title {
-                font-size: 2rem;
-                margin-bottom: 30px;
+                padding: 25px 20px;
             }
 
             .opening-hours li {
                 flex-direction: column;
                 gap: 5px;
                 text-align: center;
-                padding: 12px 0;
             }
-        }
-
-        @media (max-width: 480px) {
-            .info-card {
-                padding: 25px 20px;
-            }
-
-            .contact-form {
-                padding: 30px 20px;
-            }
-
-            .form-control {
-                padding: 15px 16px;
-            }
-
-            .submit-btn {
-                padding: 16px 40px;
-                font-size: 1rem;
-            }
-        }
-
-        /* Animations d'entrée */
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(40px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .info-card {
-            animation: fadeInUp 0.8s ease forwards;
-        }
-
-        .contact-form {
-            animation: fadeInUp 1s ease forwards;
         }
     </style>
   <style>
@@ -991,6 +725,288 @@ try {
         color: #ffc107;
         font-size: 1.2rem;
     }
+
+    /* Section Nos Menus */
+    .menus-section {
+        padding: 60px 0;
+        background: #fff;
+    }
+
+    .menus-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 40px;
+        padding: 0 20px;
+    }
+
+    .menus-title {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #1a202c;
+        margin: 0;
+    }
+
+    .voir-tout-btn {
+        background: transparent;
+        border: none;
+        color: #1a202c;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.3s ease;
+    }
+
+    .voir-tout-btn:hover {
+        color: #ff6b35;
+        transform: translateX(5px);
+    }
+
+    .menus-container {
+        display: flex;
+        gap: 30px;
+        overflow-x: auto;
+        padding: 30px 20px;
+        scroll-behavior: smooth;
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+
+    .menus-container::-webkit-scrollbar {
+        display: none;
+    }
+
+    .menu-card {
+        flex: 0 0 auto;
+        text-align: center;
+        cursor: pointer;
+        transition: transform 0.3s ease;
+        width: 220px;
+        margin: 0 10px;
+    }
+
+    .menu-card:hover {
+        transform: translateY(-10px);
+    }
+
+    .menu-circle-wrapper {
+        width: 220px;
+        height: 220px;
+        border-radius: 50%;
+        overflow: hidden;
+        margin: 0 auto 20px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        transition: all 0.3s ease;
+        position: relative;
+        border: 3px solid #fff;
+    }
+
+    .menu-card:hover .menu-circle-wrapper {
+        transform: scale(1.08);
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25);
+    }
+
+    .menu-card-image {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .menu-name {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #1a202c;
+        text-align: center;
+        max-width: 220px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        line-height: 1.4;
+        padding: 0 10px;
+    }
+
+    /* Animation de défilement automatique */
+    @keyframes scroll {
+        0% {
+            transform: translateX(0);
+        }
+        100% {
+            transform: translateX(calc(-220px * 15));
+        }
+    }
+
+    .menus-container:hover {
+        animation-play-state: paused;
+    }
+
+    /* Modal pour tous les produits */
+    .modal-menus {
+        display: none;
+        position: fixed;
+        z-index: 9999;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        backdrop-filter: blur(5px);
+        overflow-y: auto;
+    }
+
+    .modal-menus.active {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-content-menus {
+        background: white;
+        border-radius: 24px;
+        width: 90%;
+        max-width: 1200px;
+        max-height: 85vh;
+        overflow-y: auto;
+        padding: 40px;
+        position: relative;
+        animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateY(-50px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .modal-close {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: #f3f4f6;
+        border: none;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        font-size: 1.5rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+    }
+
+    .modal-close:hover {
+        background: #ff6b35;
+        color: white;
+        transform: rotate(90deg);
+    }
+
+    .modal-title {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #1a202c;
+        margin-bottom: 30px;
+        text-align: center;
+    }
+
+    .products-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 25px;
+    }
+
+    .product-card {
+        background: #f8fafc;
+        border-radius: 16px;
+        padding: 20px;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        border: 2px solid transparent;
+    }
+
+    .product-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        border-color: #ff6b35;
+    }
+
+    .product-image {
+        width: 100%;
+        height: 180px;
+        object-fit: cover;
+        border-radius: 12px;
+        margin-bottom: 15px;
+    }
+
+    .product-name {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #1a202c;
+        margin-bottom: 8px;
+    }
+
+    .product-category {
+        font-size: 0.85rem;
+        color: #64748b;
+        margin-bottom: 8px;
+    }
+
+    .product-price {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #ff6b35;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .menus-header {
+            flex-direction: column;
+            gap: 15px;
+            align-items: flex-start;
+        }
+
+        .menus-title {
+            font-size: 1.5rem;
+        }
+
+        .menu-card {
+            width: 180px;
+            margin: 0 8px;
+        }
+
+        .menu-circle-wrapper {
+            width: 180px;
+            height: 180px;
+        }
+
+        .menu-name {
+            font-size: 0.95rem;
+            max-width: 180px;
+        }
+
+        .menus-container {
+            gap: 20px;
+            padding: 20px 15px;
+        }
+
+        .modal-content-menus {
+            padding: 25px;
+            width: 95%;
+        }
+
+        .products-grid {
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+        }
+    }
 </style>
 </head>
 
@@ -1001,123 +1017,182 @@ try {
 
     <?php include('includes/carrousel.php'); ?>
 
-    <!-- Particles Background -->
-    <div class="particles"></div>
-
-    <!-- Morphing Shapes -->
-    <div class="morph-shape" style="top: 10%; right: 10%;"></div>
-    <div class="morph-shape" style="bottom: 20%; left: 15%; animation-delay: -4s;"></div>
-
-    <!-- Hero Section -->
-    <section class="hero-section">
-        <div class="hero-bg"></div>
+    <!-- Section Nos Menus -->
+    <section class="menus-section">
         <div class="container">
-            <div class="text-center">
-                <h1 class="hero-title fade-in">À propos de Mulho</h1>
-                <p class="hero-subtitle fade-in">Où l'authenticité sénégalaise rencontre l'excellence culinaire</p>
+            <div class="menus-header">
+                <h2 class="menus-title"><?= t('menu.title') ?></h2>
+                <button class="voir-tout-btn" onclick="openModalMenus()">
+                    <?= t('menu.all_menus') ?>
+                    <i class="fas fa-arrow-right"></i>
+                </button>
+            </div>
+
+            <div class="menus-container" id="menusCarousel">
+                <?php foreach ($platsCarrousel as $plat): ?>
+                    <div class="menu-card">
+                        <div class="menu-circle-wrapper">
+                            <?php if (!empty($plat['image'])): ?>
+                                <img src="uploads/<?= htmlspecialchars($plat['image']) ?>"
+                                     alt="<?= htmlspecialchars($plat['nom']) ?>"
+                                     class="menu-card-image">
+                            <?php else: ?>
+                                <div class="menu-card-image" style="background: #e2e8f0; display: flex; align-items: center; justify-content: center;">
+                                    <i class="fas fa-utensils" style="font-size: 3rem; color: #94a3b8;"></i>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                        <div class="menu-name"><?= htmlspecialchars($plat['nom']) ?></div>
+                    </div>
+                <?php endforeach; ?>
+
+                <!-- Dupliquer les cartes pour un défilement infini -->
+                <?php foreach ($platsCarrousel as $plat): ?>
+                    <div class="menu-card">
+                        <div class="menu-circle-wrapper">
+                            <?php if (!empty($plat['image'])): ?>
+                                <img src="uploads/<?= htmlspecialchars($plat['image']) ?>"
+                                     alt="<?= htmlspecialchars($plat['nom']) ?>"
+                                     class="menu-card-image">
+                            <?php else: ?>
+                                <div class="menu-card-image" style="background: #e2e8f0; display: flex; align-items: center; justify-content: center;">
+                                    <i class="fas fa-utensils" style="font-size: 3rem; color: #94a3b8;"></i>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                        <div class="menu-name"><?= htmlspecialchars($plat['nom']) ?></div>
+                    </div>
+                <?php endforeach; ?>
             </div>
         </div>
     </section>
 
-    <!-- Main Content -->
-    <section class="py-5">
+    <!-- Modal Tous les Produits -->
+    <div id="modalMenus" class="modal-menus" onclick="closeModalIfOutside(event)">
+        <div class="modal-content-menus" onclick="event.stopPropagation()">
+            <button class="modal-close" onclick="closeModalMenus()">
+                <i class="fas fa-times"></i>
+            </button>
+
+            <h2 class="modal-title"><?= t('menu.all_menus') ?></h2>
+
+            <div class="products-grid">
+                <?php foreach ($allPlats as $plat): ?>
+                    <div class="product-card">
+                        <?php if (!empty($plat['image'])): ?>
+                            <img src="uploads/<?= htmlspecialchars($plat['image']) ?>"
+                                 alt="<?= htmlspecialchars($plat['nom']) ?>"
+                                 class="product-image">
+                        <?php else: ?>
+                            <div class="product-image" style="background: #e2e8f0; display: flex; align-items: center; justify-content: center;">
+                                <i class="fas fa-utensils" style="font-size: 3rem; color: #94a3b8;"></i>
+                            </div>
+                        <?php endif; ?>
+
+                        <div class="product-name"><?= htmlspecialchars($plat['nom']) ?></div>
+
+                        <?php if (!empty($plat['categorie_nom'])): ?>
+                            <div class="product-category"><?= htmlspecialchars($plat['categorie_nom']) ?></div>
+                        <?php endif; ?>
+
+                        <div class="product-price"><?= number_format($plat['prix'], 0, ',', ' ') ?> FCFA</div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section À propos -->
+    <section class="about-section" data-aos="fade-up">
         <div class="container">
-            <div class="row g-5 align-items-center">
-                <!-- Image Side -->
-                <div class="col-lg-6">
-                    <div class="glass-card fade-in">
-                        <div class="image-3d">
-                            <img src="assets/img/apropos.jpg" alt="Restaurant Mulho">
-                        </div>
-                    </div>
+            <!-- Hero Title -->
+            <div class="about-hero">
+                <h1 class="about-title"><?= htmlspecialchars($aboutData['titre'] ?? 'À propos de Mulho') ?></h1>
+                <p class="about-subtitle"><?= htmlspecialchars($aboutData['sous_titre'] ?? 'Où l\'authenticité sénégalaise rencontre l\'excellence culinaire') ?></p>
+            </div>
 
-                    <!-- Stats -->
-                    <div class="row g-3 mt-4 fade-in">
-                        <div class="col-4">
-                            <div class="neon-stat">
-                                <div class="stat-number" data-count="15">0</div>
-                                <div class="stat-label">Années</div>
-                            </div>
-                        </div>
-                        <div class="col-4">
-                            <div class="neon-stat">
-                                <div class="stat-number" data-count="50">0</div>
-                                <div class="stat-label">Plats</div>
-                            </div>
-                        </div>
-                        <div class="col-4">
-                            <div class="neon-stat">
-                                <div class="stat-number" data-count="1000">0</div>
-                                <div class="stat-label">Clients</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- CTA -->
-                    <div class="text-center mt-4 fade-in">
-                        <a href="tel:787308706" class="cta-glow">
-                            <i class="bi bi-telephone-fill"></i>
-                            Réserver : 78 730 87 06
-                        </a>
-                    </div>
+            <!-- Content Wrapper -->
+            <div class="about-content-wrapper" data-aos="fade-up" data-aos-delay="100">
+                <!-- Image -->
+                <div class="about-image-container">
+                    <?php if (!empty($aboutData['image'])): ?>
+                        <img src="uploads/<?= htmlspecialchars($aboutData['image']) ?>" alt="<?= htmlspecialchars($aboutData['titre'] ?? 'Restaurant Mulho') ?>" class="about-image">
+                    <?php else: ?>
+                        <img src="assets/img/apropos.jpg" alt="Restaurant Mulho" class="about-image">
+                    <?php endif; ?>
                 </div>
 
-                <!-- Content Side -->
-                <div class="col-lg-6">
-                    <div class="glass-card fade-in">
-                        <h2 class="mb-4" style="font-family: 'Playfair Display', serif; font-size: 2.5rem; background: linear-gradient(135deg, var(--primary), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
-                            Notre Histoire
-                        </h2>
-                        
-                        <p class="mb-4" style="font-size: 1.2rem; line-height: 1.8; opacity: 0.9;">
-                            Bienvenue au Restaurant Mulho, où chaque plat raconte l'histoire passionnée de la gastronomie sénégalaise. 
-                            Situé au cœur vibrant de Dakar, nous créons des expériences culinaires qui éveillent les sens et 
-                            célèbrent l'authenticité de notre terroir.
-                        </p>
+                <!-- Text Content -->
+                <div class="about-text-container">
+                    <h2 class="about-section-title"><?= t('about.subtitle') ?></h2>
 
-                        <!-- Features -->
-                        <div class="features-list">
-                            <div class="feature-modern fade-in">
-                                <i class="bi bi-gem feature-icon-modern"></i>
-                                <div>
-                                    <strong>Ingrédients Premium</strong><br>
-                                    <span style="opacity: 0.8;">Sélection rigoureuse de produits locaux d'exception</span>
-                                </div>
-                            </div>
+                    <p class="about-description">
+                        <?= nl2br(htmlspecialchars($aboutData['description'] ?? 'Bienvenue au Restaurant Mulho, où chaque plat raconte l\'histoire passionnée de la gastronomie sénégalaise. Situé au cœur vibrant de Dakar, nous créons des expériences culinaires qui éveillent les sens et célèbrent l\'authenticité de notre terroir.')) ?>
+                    </p>
 
-                            <div class="feature-modern fade-in">
-                                <i class="bi bi-fire feature-icon-modern"></i>
-                                <div>
-                                    <strong>Cuisine Authentique</strong><br>
-                                    <span style="opacity: 0.8;">Techniques traditionnelles sublimées par l'innovation</span>
-                                </div>
-                            </div>
-
-                            <div class="feature-modern fade-in">
-                                <i class="bi bi-hearts feature-icon-modern"></i>
-                                <div>
-                                    <strong>Expérience Unique</strong><br>
-                                    <span style="opacity: 0.8;">Service personnalisé dans une atmosphère chaleureuse</span>
-                                </div>
+                    <!-- Features -->
+                    <div class="about-features">
+                        <div class="about-feature">
+                            <i class="bi bi-gem about-feature-icon"></i>
+                            <div class="about-feature-content">
+                                <h4><?= t('about.feature_quality') ?></h4>
+                                <p><?= t('about.feature_quality_desc') ?></p>
                             </div>
                         </div>
 
-                        <div class="mt-4 p-4 fade-in" style="background: rgba(255, 107, 53, 0.1); border-radius: 16px; border-left: 4px solid var(--primary);">
-                            <p style="margin: 0; font-style: italic; opacity: 0.9;">
-                                "Notre passion transcende la simple restauration. Nous créons des moments magiques où chaque bouchée 
-                                transporte nos invités dans un voyage sensoriel au cœur de l'âme sénégalaise."
-                            </p>
+                        <div class="about-feature">
+                            <i class="bi bi-fire about-feature-icon"></i>
+                            <div class="about-feature-content">
+                                <h4><?= t('about.feature_chef') ?></h4>
+                                <p><?= t('about.feature_chef_desc') ?></p>
+                            </div>
+                        </div>
+
+                        <div class="about-feature">
+                            <i class="bi bi-hearts about-feature-icon"></i>
+                            <div class="about-feature-content">
+                                <h4><?= t('about.feature_ambiance') ?></h4>
+                                <p><?= t('about.feature_ambiance_desc') ?></p>
+                            </div>
                         </div>
                     </div>
+
+                    <!-- Quote -->
+                    <div class="about-quote">
+                        "Notre passion transcende la simple restauration. Nous créons des moments magiques où chaque bouchée transporte nos invités dans un voyage sensoriel au cœur de l'âme sénégalaise."
+                    </div>
                 </div>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="about-stats" data-aos="fade-up" data-aos-delay="200">
+                <div class="about-stat-card">
+                    <div class="about-stat-number" data-count="<?= $anneesExistence ?>">0</div>
+                    <div class="about-stat-label"><?= t('about.years_experience') ?></div>
+                </div>
+                <div class="about-stat-card">
+                    <div class="about-stat-number" data-count="<?= $totalPlats ?>">0</div>
+                    <div class="about-stat-label"><?= t('about.dishes') ?></div>
+                </div>
+                <div class="about-stat-card">
+                    <div class="about-stat-number" data-count="<?= $totalReservations ?>">0</div>
+                    <div class="about-stat-label"><?= t('about.happy_customers') ?></div>
+                </div>
+            </div>
+
+            <!-- CTA Button -->
+            <div class="about-cta" data-aos="fade-up" data-aos-delay="300">
+                <a href="tel:787308706" class="about-cta-btn">
+                    <i class="bi bi-telephone-fill"></i>
+<?= t('misc.book_now_call') ?> : 78 730 87 06
+                </a>
             </div>
         </div>
     </section>
     <!-- Section Réserver une table -->
     <section id="book-a-table" class="book-a-table section">
         <div class="container section-title" data-aos="fade-up">
-            <h2>Réserver une table</h2>
-            <p><span>Réservez votre</span> <span class="description-title">Table</span></p>
+            <h2><?= t('contact.form_title') ?></h2>
         </div>
         <div class="container">
             <div class="row g-0" data-aos="fade-up" data-aos-delay="100">
@@ -1126,32 +1201,32 @@ try {
                     <form action="forms/book-a-table.php" method="post" role="form" class="php-email-form" style="width: 100%;">
                         <div class="row gy-4">
                             <div class="col-lg-4 col-md-6">
-                                <input type="text" name="name" class="form-control" id="name" placeholder="Votre nom" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;">
+                                <input type="text" name="name" class="form-control" id="name" placeholder="<?= t('contact.name') ?>" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;">
                             </div>
                             <div class="col-lg-4 col-md-6">
-                                <input type="email" class="form-control" name="email" id="email" placeholder="Votre email" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;">
+                                <input type="email" class="form-control" name="email" id="email" placeholder="<?= t('contact.email') ?>" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;">
                             </div>
                             <div class="col-lg-4 col-md-6">
-                                <input type="text" class="form-control" name="phone" id="phone" placeholder="Votre téléphone" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;">
+                                <input type="text" class="form-control" name="phone" id="phone" placeholder="<?= t('contact.phone') ?>" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;">
                             </div>
                             <div class="col-lg-4 col-md-6">
-                                <input type="date" name="date" class="form-control" id="date" placeholder="Date" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;">
+                                <input type="date" name="date" class="form-control" id="date" placeholder="<?= t('contact.date') ?>" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;">
                             </div>
                             <div class="col-lg-4 col-md-6">
-                                <input type="time" class="form-control" name="time" id="time" placeholder="Heure" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;">
+                                <input type="time" class="form-control" name="time" id="time" placeholder="<?= t('contact.time') ?>" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;">
                             </div>
                             <div class="col-lg-4 col-md-6">
-                                <input type="number" class="form-control" name="people" id="people" placeholder="Nombre de personnes" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;">
+                                <input type="number" class="form-control" name="people" id="people" placeholder="<?= t('contact.guests') ?>" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;">
                             </div>
                         </div>
                         <div class="form-group mt-3">
-                            <textarea class="form-control" name="message" rows="5" placeholder="Message" style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px; width: 100%;"></textarea>
+                            <textarea class="form-control" name="message" rows="5" placeholder="<?= t('contact.message') ?>" style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px; width: 100%;"></textarea>
                         </div>
                         <div class="text-center mt-3">
-                            <div class="loading" style="display: none;">Chargement</div>
+                            <div class="loading" style="display: none;"><?= t('actions.loading') ?></div>
                             <div class="error-message" style="display: none; color: #e53e3e;"></div>
-                            <div class="sent-message" style="display: none; color: #38a169;">Votre demande de réservation a été envoyée. Nous vous rappellerons ou enverrons un email pour confirmer votre réservation. Merci !</div>
-                            <button type="submit" style="background: linear-gradient(135deg, #ec4899, #f97316); color: white; border: none; padding: 15px 40px; border-radius: 50px; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">Réserver une table</button>
+                            <div class="sent-message" style="display: none; color: #38a169;"><?= t('contact.success_message') ?></div>
+                            <button type="submit" style="background: linear-gradient(135deg, #ec4899, #f97316); color: white; border: none; padding: 15px 40px; border-radius: 50px; font-weight: 600; cursor: pointer; transition: all 0.3s ease;"><?= t('contact.form_title') ?></button>
                         </div>
                     </form>
                 </div>
@@ -1161,8 +1236,8 @@ try {
 <!-- ======= Avis Clients Section ======= -->
 <section id="avis" class="avis section">
     <div class="container section-title" data-aos="fade-up">
-        <h2>Avis Clients</h2>
-        <p><span>Ce que disent</span> <span class="description-title">nos clients</span></p>
+        <h2><?= t('misc.reviews') ?></h2>
+        <p><span><?= t('misc.what_clients_say') ?></span> <span class="description-title"><?= t('misc.our_clients') ?></span></p>
     </div>
     
     <div class="container" data-aos="fade-up" data-aos-delay="100">
@@ -1170,29 +1245,25 @@ try {
             <div class="col-lg-8">
                 <div class="glass-card p-4 mb-5">
                     <h3 class="text-center mb-4" style="font-family: 'Playfair Display', serif; background: linear-gradient(135deg, var(--primary), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
-                        Laissez votre avis
+                        <?= t('misc.leave_review') ?>
                     </h3>
                     
-                    <form id="avis-form" method="post" class="php-email-form">
+                    <form id="avis-form" method="post" action="traitement_avis.php">
                         <div class="row gy-4">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <input type="text" name="nom" class="form-control" placeholder="Votre nom" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;">
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <input type="email" class="form-control" name="email" placeholder="Votre email" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;">
+
+                            <div class="col-md-12">
+                                <div class="alert alert-info" style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 10px; padding: 12px;">
+                                    <i class="fas fa-info-circle"></i> <?= t('misc.anonymous_review') ?>
                                 </div>
                             </div>
                             <div class="col-md-12">
                                 <div class="form-group">
-                                    <textarea class="form-control" name="message" rows="5" placeholder="Votre avis" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px;"></textarea>
+                                    <textarea class="form-control" name="message" rows="5" placeholder="<?= t('misc.share_experience') ?>" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px; word-break: break-word; overflow-wrap: break-word;"></textarea>
                                 </div>
                             </div>
                             <div class="col-md-12">
                                 <div class="form-group text-center">
-                                    <label class="mb-2">Notez votre expérience</label>
+                                    <label class="mb-2"><?= t('misc.rate_experience') ?></label>
                                     <div class="rating-stars mb-3">
                                         <input type="radio" id="star5" name="note" value="5" />
                                         <label for="star5"><i class="fas fa-star"></i></label>
@@ -1209,10 +1280,10 @@ try {
                             </div>
                         </div>
                         <div class="text-center mt-3">
-                            <div class="loading" style="display: none;">Envoi en cours...</div>
+                            <div class="loading" style="display: none;"><?= t('actions.loading') ?></div>
                             <div class="error-message" style="display: none;"></div>
-                            <div class="sent-message" style="display: none;">Merci pour votre avis ! Il sera publié après modération.</div>
-                            <button type="submit" class="cta-glow">Soumettre l'avis</button>
+                            <div class="sent-message" style="display: none;"><?= t('misc.review_success') ?></div>
+                            <button type="submit" class="cta-glow"><?= t('misc.submit_review') ?></button>
                         </div>
                     </form>
                 </div>
@@ -1227,8 +1298,8 @@ try {
     <!-- Section Contact -->
     <section id="contact" class="contact section">
         <div class="container section-title" data-aos="fade-up">
-            <h2>Contact</h2>
-            <p><span>Besoin d'aide ?</span> <span class="description-title">Contactez-nous</span></p>
+            <h2><?= t('nav.contact') ?></h2>
+            <p><span><?= t('contact.subtitle') ?></span></p>
         </div>
         <div class="container" data-aos="fade-up" data-aos-delay="100">
             <div class="mb-5">
@@ -1239,7 +1310,7 @@ try {
             
             <div class="contact-section">
                 <div class="container">
-                    <h1 class="section-title">Contactez-nous</h1>
+                    <h1 class="section-title"><?= t('contact.title') ?></h1>
                     
                     <div class="row gy-4">
                         <div class="col-md-6">
@@ -1248,43 +1319,43 @@ try {
                                     <i class="bi bi-geo-alt"></i>
                                 </div>
                                 <div class="info-content">
-                                    <h3>Adresse</h3>
+                                    <h3><?= t('contact.address') ?></h3>
                                     <p>Dakar, Medina rue 27x24</p>
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="col-md-6">
                             <div class="info-card" data-aos="fade-up" data-aos-delay="300">
                                 <div class="info-icon">
                                     <i class="bi bi-telephone"></i>
                                 </div>
                                 <div class="info-content">
-                                    <h3>Appelez-nous</h3>
+                                    <h3><?= t('contact.phone') ?></h3>
                                     <p><a href="tel:787308706">78 730 87 06</a></p>
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="col-md-6">
                             <div class="info-card" data-aos="fade-up" data-aos-delay="400">
                                 <div class="info-icon">
                                     <i class="bi bi-envelope"></i>
                                 </div>
                                 <div class="info-content">
-                                    <h3>Envoyez-nous un email</h3>
+                                    <h3><?= t('contact.email') ?></h3>
                                     <p><a href="mailto:mulhomabiala29@gmail.com">mulhomabiala29@gmail.com</a></p>
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="col-md-6">
                             <div class="info-card" data-aos="fade-up" data-aos-delay="500">
                                 <div class="info-icon">
                                     <i class="bi bi-clock"></i>
                                 </div>
                                 <div class="info-content">
-                                    <h3>Heures d'ouverture</h3>
+                                    <h3><?= t('contact.opening_hours') ?></h3>
                                     <ul class="opening-hours">
                                         <?php if (!empty($results)): ?>
                                             <?php foreach ($results as $row): ?>
@@ -1292,7 +1363,7 @@ try {
                                                     <span class="day-name"><?= htmlspecialchars($row['jour']) ?></span>
                                                     <span class="hours">
                                                         <?php if ($row['ferme'] == 1): ?>
-                                                            <span class="closed">Fermé</span>
+                                                            <span class="closed"><?= t('contact.closed') ?></span>
                                                         <?php else: ?>
                                                             <?= htmlspecialchars(substr($row['heure_ouverture'], 0, 5)) ?> -
                                                             <?= htmlspecialchars(substr($row['heure_fermeture'], 0, 5)) ?>
@@ -1302,7 +1373,7 @@ try {
                                             <?php endforeach; ?>
                                         <?php else: ?>
                                             <li>
-                                                <span class="hours">Aucun horaire trouvé.</span>
+                                                <span class="hours"><?= t('misc.no_hours') ?></span>
                                             </li>
                                         <?php endif; ?>
                                     </ul>
@@ -1313,34 +1384,34 @@ try {
 
                     <!-- Formulaire de contact -->
                     <form action="forms/contact.php" method="post" class="php-email-form contact-form" data-aos="fade-up" data-aos-delay="600">
-                        <h2 class="form-title">Envoyez-nous un message</h2>
-                        
+                        <h2 class="form-title"><?= t('contact.title') ?></h2>
+
                         <div class="row gy-4">
                             <div class="col-md-6">
                                 <div class="form-group">
-                                    <input type="text" name="name" class="form-control" placeholder="Votre nom complet" required>
+                                    <input type="text" name="name" class="form-control" placeholder="<?= t('contact.name') ?>" required>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="form-group">
-                                    <input type="email" class="form-control" name="email" placeholder="Votre adresse email" required>
+                                    <input type="email" class="form-control" name="email" placeholder="<?= t('contact.email') ?>" required>
                                 </div>
                             </div>
                             <div class="col-md-12">
                                 <div class="form-group">
-                                    <input type="text" class="form-control" name="subject" placeholder="Sujet de votre message" required>
+                                    <input type="text" class="form-control" name="subject" placeholder="<?= t('contact.message') ?>" required>
                                 </div>
                             </div>
                             <div class="col-md-12">
                                 <div class="form-group">
-                                    <textarea class="form-control" name="message" rows="6" placeholder="Votre message détaillé..." required style="resize: vertical;"></textarea>
+                                    <textarea class="form-control" name="message" rows="6" placeholder="<?= t('contact.message') ?>" required style="resize: vertical;"></textarea>
                                 </div>
                             </div>
                             <div class="col-md-12 text-center">
-                                <div class="loading message-status" style="display: none;">Envoi en cours...</div>
+                                <div class="loading message-status" style="display: none;"><?= t('actions.loading') ?></div>
                                 <div class="error-message message-status" style="display: none;"></div>
-                                <div class="sent-message message-status" style="display: none;">Votre message a été envoyé avec succès ! Merci de nous avoir contactés.</div>
-                                <button type="submit" class="submit-btn">Envoyer le message</button>
+                                <div class="sent-message message-status" style="display: none;"><?= t('contact.success_message') ?></div>
+                                <button type="submit" class="submit-btn"><?= t('contact.send') ?></button>
                             </div>
                         </div>
                     </form>
@@ -1359,7 +1430,51 @@ try {
     <!-- Scripts -->
     <script src="cart.js"></script>
     <script>
+    // Fonction pour changer le thème
+    function toggleTheme() {
+        const body = document.body;
+        const themeIcon = document.getElementById('theme-icon');
+
+        if (body.classList.contains('dark-mode')) {
+            // Passer en mode clair
+            body.classList.remove('dark-mode');
+            themeIcon.classList.remove('fa-sun');
+            themeIcon.classList.add('fa-moon');
+            localStorage.setItem('theme', 'light');
+        } else {
+            // Passer en mode sombre
+            body.classList.add('dark-mode');
+            themeIcon.classList.remove('fa-moon');
+            themeIcon.classList.add('fa-sun');
+            localStorage.setItem('theme', 'dark');
+        }
+    }
+
+    // Fonction pour charger le thème sauvegardé
+    function loadTheme() {
+        const savedTheme = localStorage.getItem('theme');
+        const body = document.body;
+        const themeIcon = document.getElementById('theme-icon');
+
+        if (savedTheme === 'dark') {
+            body.classList.add('dark-mode');
+            if (themeIcon) {
+                themeIcon.classList.remove('fa-moon');
+                themeIcon.classList.add('fa-sun');
+            }
+        } else {
+            body.classList.remove('dark-mode');
+            if (themeIcon) {
+                themeIcon.classList.remove('fa-sun');
+                themeIcon.classList.add('fa-moon');
+            }
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
+        // Charger le thème sauvegardé
+        loadTheme();
+
         // === 🔁 Mise à jour du panier ===
         function updateCartCount() {
             const cartCount = document.getElementById('cart-count');
@@ -1471,7 +1586,7 @@ try {
     
     // Charger les avis validés
     function chargerAvis() {
-        fetch('get_avis.php')
+        fetch('../admin/get_avis.php')
             .then(response => response.json())
             .then(data => {
                 const container = document.getElementById('avis-container');
@@ -1490,22 +1605,7 @@ try {
     </script>
 
     <script>
-        // Create particles
-        function createParticles() {
-            const particlesContainer = document.querySelector('.particles');
-            const particleCount = 50;
-
-            for (let i = 0; i < particleCount; i++) {
-                const particle = document.createElement('div');
-                particle.className = 'particle';
-                particle.style.left = Math.random() * 100 + '%';
-                particle.style.animationDelay = Math.random() * 20 + 's';
-                particle.style.animationDuration = (Math.random() * 10 + 15) + 's';
-                particlesContainer.appendChild(particle);
-            }
-        }
-
-        // Animate stats
+        // Animate stats for About section
         function animateStats() {
             const stats = document.querySelectorAll('[data-count]');
             stats.forEach(stat => {
@@ -1523,54 +1623,86 @@ try {
             });
         }
 
-        // Scroll animations
-        function setupScrollAnimations() {
-            const observerOptions = {
-                threshold: 0.1,
-                rootMargin: '0px 0px -50px 0px'
-            };
-
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        entry.target.classList.add('visible');
-                        if (entry.target.querySelector('[data-count]')) {
-                            setTimeout(animateStats, 300);
+        // Observe About section for stats animation
+        document.addEventListener('DOMContentLoaded', () => {
+            const aboutSection = document.querySelector('.about-section');
+            if (aboutSection) {
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            animateStats();
+                            observer.unobserve(entry.target);
                         }
-                    }
-                });
-            }, observerOptions);
+                    });
+                }, { threshold: 0.3 });
 
-            document.querySelectorAll('.fade-in').forEach(el => {
-                observer.observe(el);
-            });
+                observer.observe(aboutSection);
+            }
+        });
+
+        // === 🍽️ Gestion du Modal des Menus ===
+        function openModalMenus() {
+            const modal = document.getElementById('modalMenus');
+            if (modal) {
+                modal.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
         }
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
-            createParticles();
-            setupScrollAnimations();
-            
-            // Add initial visible class to hero elements
-            setTimeout(() => {
-                document.querySelectorAll('.hero-section .fade-in').forEach(el => {
-                    el.classList.add('visible');
-                });
-            }, 100);
+        function closeModalMenus() {
+            const modal = document.getElementById('modalMenus');
+            if (modal) {
+                modal.classList.remove('active');
+                document.body.style.overflow = 'auto';
+            }
+        }
+
+        function closeModalIfOutside(event) {
+            if (event.target.id === 'modalMenus') {
+                closeModalMenus();
+            }
+        }
+
+        // Fermer le modal avec la touche Échap
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeModalMenus();
+            }
         });
 
-        // Mouse parallax effect
-        document.addEventListener('mousemove', (e) => {
-            const mouseX = e.clientX / window.innerWidth;
-            const mouseY = e.clientY / window.innerHeight;
-            
-            document.querySelectorAll('.morph-shape').forEach((shape, index) => {
-                const speed = (index + 1) * 0.02;
-                const x = (mouseX - 0.5) * speed * 100;
-                const y = (mouseY - 0.5) * speed * 100;
-                shape.style.transform += ` translate(${x}px, ${y}px)`;
+        // === 🎠 Défilement automatique du carrousel de menus ===
+        const menusCarousel = document.getElementById('menusCarousel');
+        if (menusCarousel) {
+            let scrollAmount = 0;
+            let scrollSpeed = 1.5; // pixels par frame (augmenté pour meilleure visibilité)
+            const cardWidth = 250; // 220px width + 30px gap
+
+            function autoScroll() {
+                scrollAmount += scrollSpeed;
+                menusCarousel.scrollLeft = scrollAmount;
+
+                // Réinitialiser quand on atteint la moitié (on a dupliqué les cartes)
+                if (scrollAmount >= menusCarousel.scrollWidth / 2) {
+                    scrollAmount = 0;
+                    menusCarousel.scrollLeft = 0;
+                }
+
+                requestAnimationFrame(autoScroll);
+            }
+
+            // Démarrer le défilement automatique
+            autoScroll();
+
+            // Arrêter le défilement au survol
+            menusCarousel.addEventListener('mouseenter', function() {
+                scrollSpeed = 0;
             });
-        });
+
+            // Reprendre le défilement après le survol
+            menusCarousel.addEventListener('mouseleave', function() {
+                scrollSpeed = 1.5;
+            });
+        }
     </script>
 
     <!-- Vendor JS Files -->

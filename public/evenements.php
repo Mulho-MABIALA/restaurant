@@ -1,859 +1,1137 @@
 <?php
+session_start();
 require_once '../config.php';
+require_once 'includes/language.php';
 
-// Récupérer uniquement les événements à venir, triés par date croissante
-$stmt = $conn->prepare("
-    SELECT * FROM evenements 
-    WHERE date_evenement >= CURDATE() 
-    ORDER BY date_evenement ASC, heure_evenement ASC
-");
-$stmt->execute();
-$evenements = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// Définir la locale française pour les dates
+setlocale(LC_TIME, 'fr_FR.UTF-8', 'fra');
+
+try {
+    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+    // Récupérer tous les événements
+    $queryEvenements = "SELECT * FROM evenements ORDER BY date_evenement DESC";
+    $stmtEvenements = $conn->prepare($queryEvenements);
+    $stmtEvenements->execute();
+    $evenements = $stmtEvenements->fetchAll(PDO::FETCH_ASSOC);
+
+    // Ajouter le nombre de photos pour chaque événement
+    foreach ($evenements as &$event) {
+        try {
+            $stmtPhotos = $conn->prepare("SELECT COUNT(*) as nb FROM evenements_galerie WHERE evenement_id = ?");
+            $stmtPhotos->execute([$event['id']]);
+            $event['nb_photos'] = $stmtPhotos->fetchColumn();
+        } catch (PDOException $e) {
+            // Si la table galerie n'existe pas, on met 0
+            $event['nb_photos'] = 0;
+        }
+    }
+
+} catch (PDOException $e) {
+    error_log("Erreur SQL : " . $e->getMessage());
+    echo "<!-- Erreur SQL: " . $e->getMessage() . " -->";
+    $evenements = [];
+}
 
 // Fonction pour formater la date en français
 function formatDateFr($date) {
-    $mois = [
-        1 => 'Jan', 2 => 'Fév', 3 => 'Mar', 4 => 'Avr',
-        5 => 'Mai', 6 => 'Juin', 7 => 'Juil', 8 => 'Août',
-        9 => 'Sep', 10 => 'Oct', 11 => 'Nov', 12 => 'Déc'
+    $moisFr = [
+        1 => 'janvier', 2 => 'février', 3 => 'mars', 4 => 'avril',
+        5 => 'mai', 6 => 'juin', 7 => 'juillet', 8 => 'août',
+        9 => 'septembre', 10 => 'octobre', 11 => 'novembre', 12 => 'décembre'
     ];
-    
+
     $timestamp = strtotime($date);
     $jour = date('d', $timestamp);
     $moisNum = (int)date('m', $timestamp);
     $annee = date('Y', $timestamp);
-    
-    return $jour . ' ' . $mois[$moisNum] . ' ' . $annee;
-}
 
-// Fonction pour déterminer si l'événement est bientôt (dans les 7 prochains jours)
-function estBientot($date) {
-    $aujourd_hui = new DateTime();
-    $date_evenement = new DateTime($date);
-    $diff = $aujourd_hui->diff($date_evenement);
-    
-    return $diff->days <= 7 && $diff->invert == 0;
+    return "$jour " . $moisFr[$moisNum] . " $annee";
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Événements à venir</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css" rel="stylesheet">
-    <style>
-        :root {
-            --events-primary: #667eea;
-            --events-primary-dark: #5a67d8;
-            --events-secondary: #f093fb;
-            --events-accent: #f6d365;
-            --events-danger: #ff6b6b;
-            --events-success: #4ecdc4;
-            --events-gray-50: #f8fafc;
-            --events-gray-100: #f1f5f9;
-            --events-gray-200: #e2e8f0;
-            --events-gray-300: #cbd5e0;
-            --events-gray-500: #64748b;
-            --events-gray-600: #475569;
-            --events-gray-700: #334155;
-            --events-gray-800: #1e293b;
-            --events-gray-900: #0f172a;
-            --events-white: #ffffff;
-        }
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>Événements - Restaurant Mulho</title>
+    <meta name="description" content="Découvrez nos événements et soirées spéciales">
+    <link rel="icon" type="image/x-icon" href="assets/img/logo.jpg">
 
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com" rel="preconnect">
+    <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- CSS Files -->
+    <link href="assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+    <link href="assets/vendor/aos/aos.css" rel="stylesheet">
+    <link href="assets/css/main.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@400;600;700;800&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
         body {
-            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            color: var(--events-gray-800);
-            line-height: 1.6;
+            font-family: 'Inter', sans-serif;
+            background: #000000;
+            color: #ffffff;
+            overflow-x: hidden;
         }
 
-        /* Header Section - Simplifié */
-        .events-header {
-            background: transparent;
-            color: var(--events-white);
-            padding: 2rem 0 1rem;
-            text-align: center;
-        }
-
-        .events-title {
-            font-size: 2.2rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-        }
-
-        .events-subtitle {
-            display: none; /* Caché car on va le mettre en bas */
-        }
-
-        /* Filters */
-        .events-filters {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(15px);
-            padding: 2rem 0;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-        }
-
-        .events-filter-tabs {
+        /* Hero Section */
+        .hero-section {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            min-height: 700px;
             display: flex;
+            align-items: center;
             justify-content: center;
-            gap: 1rem;
+            overflow: hidden;
+        }
+
+        .hero-background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0.4) 50%, rgba(0, 0, 0, 0.7) 100%);
+            z-index: 1;
+        }
+
+        .hero-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 50%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
+        }
+
+        /* Image de fond par défaut si pas d'image d'événement */
+        .hero-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 50%;
+            height: 100%;
+            background: url('https://images.unsplash.com/photo-1511578314322-379afb476865?ixlib=rb-4.0.3&auto=format&fit=crop&w=1469&q=80') center/cover;
+            z-index: 0;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            max-width: 1400px;
+            padding: 0 60px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 80px;
+            align-items: center;
+        }
+
+        .hero-left {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hero-right {
+            background: rgba(60, 60, 60, 0.85);
+            backdrop-filter: blur(20px);
+            padding: 80px 60px;
+            border-radius: 0;
+            color: white;
+        }
+
+        .event-pretitle {
+            font-family: 'Inter', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 300;
+            color: rgba(255, 255, 255, 0.9);
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+        }
+
+        .event-title {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(2.5rem, 6vw, 4rem);
+            font-weight: 300;
+            line-height: 1.1;
+            margin-bottom: 30px;
+            color: #D4AF37;
+        }
+
+        .event-date {
+            font-family: 'Inter', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 40px;
+            color: #ffffff;
+        }
+
+        .event-description {
+            font-family: 'Inter', sans-serif;
+            font-size: 1.15rem;
+            line-height: 1.8;
+            margin-bottom: 50px;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 300;
+        }
+
+        .event-cta-btn {
+            background: #D4AF37;
+            color: #000000;
+            padding: 18px 50px;
+            border: none;
+            font-family: 'Inter', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 700;
+            text-transform: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-block;
+            text-decoration: none;
+        }
+
+        .event-cta-btn:hover {
+            background: #F4D03F;
+            color: #000000;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(212, 175, 55, 0.4);
+        }
+
+        .scroll-indicator {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.7);
+            text-align: center;
+            animation: bounce 2s infinite;
+            cursor: pointer;
+            z-index: 2;
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% {
+                transform: translateX(-50%) translateY(0);
+            }
+            40% {
+                transform: translateX(-50%) translateY(-10px);
+            }
+            60% {
+                transform: translateX(-50%) translateY(-5px);
+            }
+        }
+
+        /* Events List Section */
+        .events-list-section {
+            background: #000000;
+            padding: 120px 0;
+            min-height: 100vh;
+        }
+
+        .section-title-container {
+            text-align: center;
+            margin-bottom: 100px;
+        }
+
+        .section-title {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(3rem, 8vw, 5rem);
+            font-weight: 700;
+            color: #D4AF37;
+            margin-bottom: 20px;
+            text-shadow: 0 4px 20px rgba(212, 175, 55, 0.3);
+        }
+
+        .section-subtitle {
+            font-family: 'Inter', sans-serif;
+            font-size: 1.2rem;
+            color: rgba(255, 255, 255, 0.7);
+            font-weight: 300;
+        }
+
+        /* Event Card */
+        .event-card {
+            background: rgba(30, 30, 30, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(212, 175, 55, 0.2);
+            margin-bottom: 60px;
+            transition: all 0.4s ease;
+            overflow: hidden;
+        }
+
+        .event-card:hover {
+            border-color: rgba(212, 175, 55, 0.5);
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(212, 175, 55, 0.2);
+        }
+
+        .event-card-inner {
+            display: grid;
+            grid-template-columns: 45% 55%;
+        }
+
+        .event-card-image {
+            position: relative;
+            height: 450px;
+            overflow: hidden;
+        }
+
+        .event-card-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.6s ease;
+        }
+
+        .event-card:hover .event-card-image img {
+            transform: scale(1.1);
+        }
+
+        .event-card-badge {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            background: rgba(212, 175, 55, 0.95);
+            color: #000000;
+            padding: 15px 25px;
+            font-family: 'Inter', sans-serif;
+            font-weight: 700;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .event-card-content {
+            padding: 60px 50px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .event-card-category {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #D4AF37;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 15px;
+        }
+
+        .event-card-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 20px;
+            line-height: 1.2;
+        }
+
+        .event-card-meta {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 25px;
             flex-wrap: wrap;
         }
 
-        .events-filter-tab {
-            padding: 0.75rem 1.5rem;
-            border: 2px solid var(--events-gray-200);
-            border-radius: 50px;
-            background: var(--events-white);
-            color: var(--events-gray-600);
-            text-decoration: none;
-            font-weight: 500;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-
-        .events-filter-tab:hover,
-        .events-filter-tab.events-active {
-            background: linear-gradient(135deg, var(--events-primary), var(--events-primary-dark));
-            border-color: var(--events-primary);
-            color: var(--events-white);
-            text-decoration: none;
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
-        }
-
-        /* Main Content */
-        .events-main {
-            padding: 3rem 0 2rem;
-        }
-
-        .events-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 3rem;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        /* Circular Event Cards */
-        .events-card {
-            position: relative;
-            width: 280px;
-            height: 350px; /* Augmenté pour les boutons */
-            margin: 0 auto;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .events-card:hover {
-            transform: scale(1.05);
-        }
-
-        .events-circle {
-            width: 280px;
-            height: 280px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--events-white) 0%, #f8fafc 100%);
-            box-shadow: 
-                0 20px 40px rgba(0, 0, 0, 0.1),
-                0 10px 20px rgba(0, 0, 0, 0.05),
-                inset 0 -2px 10px rgba(0, 0, 0, 0.05);
-            position: relative;
-            overflow: hidden;
+        .event-card-meta-item {
             display: flex;
-            flex-direction: column;
             align-items: center;
-            justify-content: center;
-            text-align: center;
-            padding: 2rem;
-            cursor: pointer;
+            gap: 10px;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 1rem;
         }
 
-        .events-circle::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: linear-gradient(45deg, 
-                transparent 30%, 
-                rgba(255, 255, 255, 0.1) 50%, 
-                transparent 70%);
-            transform: rotate(45deg);
-            transition: all 0.6s ease;
-            opacity: 0;
-        }
-
-        .events-card:hover .events-circle::before {
-            opacity: 1;
-            animation: shine 1.5s ease-in-out;
-        }
-
-        @keyframes shine {
-            0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
-            100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
-        }
-
-        /* Date Badge Circulaire */
-        .events-date-circle {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--events-primary), var(--events-primary-dark));
-            color: var(--events-white);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
-            z-index: 2;
-        }
-
-        .events-date-day {
+        .event-card-meta-item i {
+            color: #D4AF37;
             font-size: 1.1rem;
-            line-height: 1;
         }
 
-        .events-date-month {
-            font-size: 0.7rem;
-            opacity: 0.9;
+        .event-card-description {
+            font-family: 'Inter', sans-serif;
+            font-size: 1.05rem;
+            line-height: 1.8;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 30px;
+            font-weight: 300;
         }
 
-        /* Soon Badge */
-        .events-soon-badge {
-            position: absolute;
-            top: 15px;
-            left: 15px;
-            background: linear-gradient(135deg, var(--events-accent), #ffd89b);
-            color: var(--events-gray-800);
-            padding: 0.3rem 0.8rem;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            box-shadow: 0 4px 15px rgba(246, 211, 101, 0.4);
-            z-index: 2;
-        }
-
-        /* Event Content */
-        .events-content {
-            z-index: 1;
-            position: relative;
-            width: 100%;
-        }
-
-        .events-icon {
-            font-size: 2.5rem;
-            margin-bottom: 1rem;
-            background: linear-gradient(135deg, var(--events-primary), var(--events-secondary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
-        }
-
-        .events-card-title {
-            font-size: 1.1rem;
+        .event-card-price {
+            font-family: 'Inter', sans-serif;
+            font-size: 1.5rem;
             font-weight: 700;
-            margin-bottom: 0.8rem;
-            color: var(--events-gray-900);
-            line-height: 1.3;
-            max-height: 2.6rem;
-            overflow: hidden;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
+            color: #D4AF37;
+            margin-bottom: 30px;
         }
 
-        .events-meta-circle {
-            margin-bottom: 1rem;
+        .event-card-actions {
+            display: flex;
+            gap: 15px;
         }
 
-        .events-meta-item {
+        .btn-event-primary {
+            background: #D4AF37;
+            color: #000000;
+            padding: 15px 35px;
+            border: none;
+            font-family: 'Inter', sans-serif;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-event-primary:hover {
+            background: #F4D03F;
+            color: #000000;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(212, 175, 55, 0.4);
+        }
+
+        .btn-event-secondary {
+            background: transparent;
+            color: #D4AF37;
+            padding: 15px 35px;
+            border: 2px solid #D4AF37;
+            font-family: 'Inter', sans-serif;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-event-secondary:hover {
+            background: #D4AF37;
+            color: #000000;
+            transform: translateY(-2px);
+        }
+
+        /* Modal Galerie */
+        .modal-galerie {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.97);
+            overflow-y: auto;
+        }
+
+        .modal-galerie.active {
             display: flex;
             align-items: center;
             justify-content: center;
-            color: var(--events-gray-600);
-            font-size: 0.8rem;
-            margin-bottom: 0.3rem;
+            padding: 40px 20px;
         }
 
-        .events-meta-item i {
-            width: 14px;
-            margin-right: 0.4rem;
-            color: var(--events-primary);
+        .modal-content-galerie {
+            background: rgba(30, 30, 30, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            width: 90%;
+            max-width: 1200px;
+            padding: 50px;
+            position: relative;
+            max-height: 90vh;
+            overflow-y: auto;
         }
 
-        /* Action Buttons - En dehors du cercle */
-        .events-actions {
+        .modal-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: transparent;
+            border: none;
+            width: 45px;
+            height: 45px;
+            font-size: 2rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 10;
+            color: #D4AF37;
+        }
+
+        .modal-close:hover {
+            color: #F4D03F;
+            transform: rotate(90deg);
+        }
+
+        .modal-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #D4AF37;
+            margin-bottom: 40px;
+            text-align: center;
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 25px;
+        }
+
+        .gallery-item {
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            aspect-ratio: 1;
+            border: 1px solid rgba(212, 175, 55, 0.2);
+        }
+
+        .gallery-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.4s ease;
+        }
+
+        .gallery-item:hover img {
+            transform: scale(1.1);
+        }
+
+        .gallery-item-overlay {
             position: absolute;
             bottom: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 0.8rem;
-            justify-content: center;
-            width: 100%;
-            opacity: 0;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+            padding: 20px;
+            color: white;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
         }
 
-        .events-card:hover .events-actions {
-            opacity: 1;
-            transform: translateX(-50%) translateY(5px);
+        .gallery-item:hover .gallery-item-overlay {
+            transform: translateY(0);
         }
 
-        /* Supprimer l'ancien overlay */
-        .events-actions-overlay {
-            display: none;
-        }
-
-        .events-btn {
-            padding: 0.7rem 1.5rem;
-            border: none;
-            border-radius: 25px;
-            font-weight: 600;
-            text-decoration: none;
+        /* Empty State */
+        .empty-state {
             text-align: center;
-            transition: all 0.3s ease;
-            cursor: pointer;
-            font-size: 0.9rem;
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            padding: 120px 20px;
         }
 
-        .events-btn-primary {
-            background: linear-gradient(135deg, var(--events-primary), var(--events-primary-dark));
-            color: var(--events-white);
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        .empty-state i {
+            font-size: 5rem;
+            color: rgba(212, 175, 55, 0.3);
+            margin-bottom: 30px;
         }
 
-        .events-btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
-            color: var(--events-white);
+        .empty-state h3 {
+            font-family: 'Playfair Display', serif;
+            font-size: 2rem;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 15px;
         }
 
-        .events-btn-secondary {
-            background: linear-gradient(135deg, var(--events-success), #26d0ce);
-            color: var(--events-white);
-            box-shadow: 0 4px 15px rgba(78, 205, 196, 0.3);
+        .empty-state p {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 1.1rem;
         }
 
-        .events-btn-secondary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(78, 205, 196, 0.4);
-            color: var(--events-white);
+        /* Section Réservation */
+        .reservation-section {
+            background: #000000;
+            padding: 120px 0;
         }
 
-        /* Footer avec le texte déplacé */
-        .events-footer {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(15px);
-            color: var(--events-white);
-            padding: 3rem 0;
+        .reservation-title-container {
             text-align: center;
-            margin-top: 4rem;
+            margin-bottom: 80px;
         }
 
-        .events-footer-title {
-            font-size: 1.3rem;
-            font-weight: 600;
-            margin-bottom: 0.8rem;
+        .reservation-title {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(3rem, 8vw, 5rem);
+            font-weight: 700;
+            color: #D4AF37;
+            margin-bottom: 20px;
+            text-shadow: 0 4px 20px rgba(212, 175, 55, 0.3);
         }
 
-        .events-footer-text {
-            font-size: 1rem;
-            opacity: 0.9;
-            max-width: 600px;
-            margin: 0 auto;
-        }
-        .events-empty {
-            text-align: center;
-            padding: 4rem 2rem;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(15px);
-            border-radius: 30px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            max-width: 500px;
-            margin: 0 auto;
+        .reservation-subtitle {
+            font-family: 'Inter', sans-serif;
+            font-size: 1.2rem;
+            color: rgba(255, 255, 255, 0.7);
+            font-weight: 300;
         }
 
-        .events-empty i {
-            font-size: 4rem;
-            background: linear-gradient(135deg, var(--events-gray-300), var(--events-gray-400));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 2rem;
-        }
-
-        .events-empty h3 {
-            color: var(--events-gray-900);
-            margin-bottom: 0.5rem;
-        }
-
-        .events-empty p {
-            color: var(--events-gray-600);
-        }
-
-        /* Loading */
-        .events-loading {
-            display: none;
-            text-align: center;
-            padding: 2rem;
-        }
-
-        .events-spinner {
-            width: 3rem;
-            height: 3rem;
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-top: 4px solid var(--events-white);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 1rem;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        /* Modal */
-        .events-modal-header {
-            background: linear-gradient(135deg, var(--events-primary), var(--events-primary-dark));
-            color: var(--events-white);
-        }
-
-        .events-modal-content {
-            border: none;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        .reservation-grid {
+            display: grid;
+            grid-template-columns: 40% 60%;
+            background: rgba(30, 30, 30, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(212, 175, 55, 0.2);
             overflow: hidden;
         }
 
-        /* Responsive */
-        @media (max-width: 768px) {
-            .events-title {
-                font-size: 2rem;
-            }
-            
-            .events-grid {
-                grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-                gap: 2rem;
-                padding: 0 1rem;
-            }
-            
-            .events-card {
-                width: 240px;
-                height: 240px;
-            }
-            
-            .events-circle {
-                padding: 1.5rem;
-            }
-            
-            .events-icon {
-                font-size: 2rem;
-            }
-            
-            .events-card-title {
-                font-size: 1rem;
-            }
-            
-            .events-filter-tabs {
-                gap: 0.5rem;
-                padding: 0 1rem;
-            }
-            
-            .events-filter-tab {
-                padding: 0.5rem 1rem;
-                font-size: 0.9rem;
-            }
+        .reservation-image {
+            background: url('https://images.unsplash.com/photo-1414235077428-338989a2e8c0?ixlib=rb-4.0.3&auto=format&fit=crop&w=1470&q=80') center/cover;
+            min-height: 600px;
+            position: relative;
         }
 
-        .events-fade-in {
-            animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        @keyframes fadeInUp {
-            from { 
-                opacity: 0; 
-                transform: translateY(30px) scale(0.95); 
-            }
-            to { 
-                opacity: 1; 
-                transform: translateY(0) scale(1); 
-            }
-        }
-
-        .events-hidden {
-            display: none !important;
-        }
-
-        /* Gradient overlay for better text readability */
-        .events-circle::after {
+        .reservation-image::after {
             content: '';
             position: absolute;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background: radial-gradient(circle at center, transparent 60%, rgba(0, 0, 0, 0.02) 100%);
-            border-radius: 50%;
-            pointer-events: none;
+            background: linear-gradient(135deg, rgba(212, 175, 55, 0.2), rgba(0, 0, 0, 0.5));
+        }
+
+        .reservation-form-container {
+            padding: 60px 50px;
+        }
+
+        .reservation-form {
+            width: 100%;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            width: 100%;
+        }
+
+        .form-input,
+        .form-textarea {
+            width: 100%;
+            padding: 15px 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(212, 175, 55, 0.3);
+            border-radius: 8px;
+            color: #ffffff;
+            font-family: 'Inter', sans-serif;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-input::placeholder,
+        .form-textarea::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .form-input:focus,
+        .form-textarea:focus {
+            outline: none;
+            border-color: #D4AF37;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+
+        .form-messages {
+            margin: 20px 0;
+            min-height: 30px;
+        }
+
+        .reservation-submit-btn {
+            background: linear-gradient(135deg, #D4AF37, #F4D03F);
+            color: #000000;
+            border: none;
+            padding: 18px 50px;
+            border-radius: 8px;
+            font-family: 'Inter', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 10px 30px rgba(212, 175, 55, 0.3);
+        }
+
+        .reservation-submit-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(212, 175, 55, 0.5);
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .hero-content {
+                grid-template-columns: 1fr;
+                padding: 0 40px;
+            }
+
+            .hero-image {
+                width: 100%;
+                opacity: 0.3;
+            }
+
+            .hero-right {
+                padding: 60px 40px;
+            }
+
+            .event-card-inner {
+                grid-template-columns: 1fr;
+            }
+
+            .event-card-image {
+                height: 350px;
+            }
+
+            .event-card-content {
+                padding: 40px 30px;
+            }
+
+            .reservation-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .reservation-image {
+                min-height: 300px;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .hero-section {
+                min-height: 600px;
+            }
+
+            .hero-right {
+                padding: 40px 30px;
+            }
+
+            .event-title {
+                font-size: 2.5rem;
+            }
+
+            .event-card-title {
+                font-size: 2rem;
+            }
+
+            .event-card-actions {
+                flex-direction: column;
+            }
+
+            .btn-event-primary,
+            .btn-event-secondary {
+                justify-content: center;
+                width: 100%;
+            }
+
+            .modal-content-galerie {
+                padding: 30px;
+            }
+
+            .gallery-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                gap: 15px;
+            }
+
+            .reservation-form-container {
+                padding: 40px 25px;
+            }
+
+            .reservation-submit-btn {
+                width: 100%;
+                justify-content: center;
+            }
         }
     </style>
 </head>
+
 <body>
-       <?php include('includes/navbar.php'); ?>
-    <!-- Header -->
-    <header >
-           <sction class="events-footer">
-        <div class="container">
-            <div class="row justify-content-center">
-                <div class="col-lg-8" data-aos="fade-up">
-                    <h2 class="events-footer-title">Découvrez nos événements</h2>
-                    <p class="events-footer-text">
-                        Participez à nos prochains événements et vivez des moments inoubliables. 
-                        Réservez votre place dès maintenant !
+    <?php include('includes/navbar.php'); ?>
+
+    <?php if (!empty($evenements)): ?>
+        <?php $firstEvent = $evenements[0]; ?>
+        <!-- Hero Section -->
+        <section class="hero-section">
+            <?php if (!empty($firstEvent['image'])): ?>
+                <img src="../admin/uploads/evenements/<?= htmlspecialchars($firstEvent['image']) ?>"
+                     alt="<?= htmlspecialchars($firstEvent['titre']) ?>"
+                     class="hero-image"
+                     onerror="this.style.display='none'">
+            <?php endif; ?>
+
+            <div class="hero-background"></div>
+
+            <div class="hero-content">
+                <div class="hero-left"></div>
+
+                <div class="hero-right">
+                    <?php if (!empty($firstEvent['lieu'])): ?>
+                        <div class="event-pretitle"><?= strtoupper(htmlspecialchars($firstEvent['lieu'])) ?></div>
+                    <?php endif; ?>
+
+                    <h1 class="event-title"><?= htmlspecialchars($firstEvent['titre']) ?></h1>
+
+                    <div class="event-date">
+                        <?= formatDateFr($firstEvent['date_evenement']) ?>
+                    </div>
+
+                    <p class="event-description">
+                        <?php if (!empty($firstEvent['heure_evenement'])): ?>
+                            Nous vous attendons le <?= date('d', strtotime($firstEvent['date_evenement'])) ?>
+                            <?= date('F', strtotime($firstEvent['date_evenement'])) ?> à
+                            <?= substr($firstEvent['heure_evenement'], 0, 5) ?> !
+                        <?php else: ?>
+                            <?= nl2br(htmlspecialchars($firstEvent['description'])) ?>
+                        <?php endif; ?>
                     </p>
+
+                    <a href="tel:787308706" class="event-cta-btn">Je veux l'entendre</a>
                 </div>
             </div>
-        </div>
-    </section>
 
-    </header>
+            <div class="scroll-indicator" onclick="document.getElementById('all-events').scrollIntoView({behavior: 'smooth'})">
+                <p style="font-size: 0.9rem; margin-bottom: 10px; opacity: 0.8;">Voir tous les événements</p>
+                <i class="fas fa-chevron-down" style="font-size: 1.5rem;"></i>
+            </div>
+        </section>
+    <?php endif; ?>
 
-    
- 
-    <!-- Main Content -->
-    <section class="events-main">
+    <!-- All Events Section -->
+    <section class="events-list-section" id="all-events">
         <div class="container">
-            <!-- Loading -->
-            <div class="events-loading">
-                <div class="events-spinner"></div>
-                <p class="text-white">Chargement...</p>
+            <div class="section-title-container">
+                <h2 class="section-title">Tous nos événements</h2>
+                <p class="section-subtitle">Découvrez notre programmation complète</p>
             </div>
 
             <?php if (empty($evenements)): ?>
-                <!-- Empty State -->
-                <div class="events-empty events-fade-in" data-aos="fade-up">
+                <div class="empty-state">
                     <i class="fas fa-calendar-times"></i>
                     <h3>Aucun événement à venir</h3>
-                    <p>Il n'y a actuellement aucun événement programmé.<br>
-                    Revenez bientôt pour découvrir nos prochaines activités !</p>
+                    <p>Restez connectés pour découvrir nos prochains événements !</p>
                 </div>
             <?php else: ?>
-                <!-- Events Grid -->
-                <div class="events-grid" id="eventsContainer">
-                    <?php foreach ($evenements as $index => $evenement): ?>
-                        <?php 
-                        $estBientot = estBientot($evenement['date_evenement']);
-                        $dateObj = new DateTime($evenement['date_evenement']);
-                        $thisMonth = $dateObj->format('Y-m') === date('Y-m');
-                        
-                        // Déterminer l'icône basée sur le titre ou le type d'événement
-                        $icon = 'fa-calendar-alt';
-                        $titre_lower = strtolower($evenement['titre']);
-                        if (strpos($titre_lower, 'concert') !== false || strpos($titre_lower, 'musique') !== false) {
-                            $icon = 'fa-music';
-                        } elseif (strpos($titre_lower, 'formation') !== false || strpos($titre_lower, 'atelier') !== false) {
-                            $icon = 'fa-graduation-cap';
-                        } elseif (strpos($titre_lower, 'conférence') !== false) {
-                            $icon = 'fa-microphone';
-                        } elseif (strpos($titre_lower, 'sport') !== false) {
-                            $icon = 'fa-running';
-                        } elseif (strpos($titre_lower, 'exposition') !== false) {
-                            $icon = 'fa-palette';
-                        }
-                        ?>
-                        <div class="events-card-wrapper events-fade-in" 
-                             data-aos="zoom-in" 
-                             data-aos-delay="<?= 300 + ($index * 100) ?>"
-                             data-category="<?= $estBientot ? 'soon' : '' ?> <?= $thisMonth ? 'this-month' : '' ?>">
-                            <div class="events-card">
-                                <div class="events-circle" onclick="voirPlus(<?= $evenement['id'] ?>)">
-                                    
-                                    <div class="events-date-circle">
-                                        <div class="events-date-day">
-                                            <?= date('d', strtotime($evenement['date_evenement'])) ?>
-                                        </div>
-                                        <div class="events-date-month">
-                                            <?= date('M', strtotime($evenement['date_evenement'])) ?>
-                                        </div>
+                <?php foreach ($evenements as $index => $event): ?>
+                    <div class="event-card" data-aos="fade-up" data-aos-delay="<?= $index * 100 ?>">
+                        <div class="event-card-inner">
+                            <div class="event-card-image">
+                                <?php if (!empty($event['image'])): ?>
+                                    <img src="../admin/uploads/evenements/<?= htmlspecialchars($event['image']) ?>"
+                                         alt="<?= htmlspecialchars($event['titre']) ?>"
+                                         onerror="this.parentElement.innerHTML='<div style=\'height:100%;background:rgba(212,175,55,0.1);display:flex;align-items:center;justify-content:center;color:rgba(212,175,55,0.5);font-size:3rem;\'><i class=\'fas fa-image\'></i></div>'">
+                                <?php else: ?>
+                                    <div style="height:100%;background:rgba(212,175,55,0.1);display:flex;align-items:center;justify-content:center;color:rgba(212,175,55,0.5);font-size:3rem;">
+                                        <i class="fas fa-image"></i>
                                     </div>
-                                    
-                                    <?php if ($estBientot): ?>
-                                        <div class="events-soon-badge">
-                                            <i class="fas fa-bolt me-1"></i>Bientôt
+                                <?php endif; ?>
+                            </div>
+
+                            <div class="event-card-content">
+                                <?php if (!empty($event['lieu'])): ?>
+                                    <div class="event-card-category"><?= htmlspecialchars($event['lieu']) ?></div>
+                                <?php endif; ?>
+
+                                <h3 class="event-card-title"><?= htmlspecialchars($event['titre']) ?></h3>
+
+                                <div class="event-card-meta">
+                                    <div class="event-card-meta-item">
+                                        <i class="far fa-calendar"></i>
+                                        <span><?= date('d/m/Y', strtotime($event['date_evenement'])) ?></span>
+                                    </div>
+
+                                    <?php if (!empty($event['heure_evenement'])): ?>
+                                        <div class="event-card-meta-item">
+                                            <i class="far fa-clock"></i>
+                                            <span><?= substr($event['heure_evenement'], 0, 5) ?></span>
                                         </div>
                                     <?php endif; ?>
-                                    
-                                    <div class="events-content">
-                                        <div class="events-icon">
-                                            <i class="fas <?= $icon ?>"></i>
+
+                                    <?php if ($event['nb_photos'] > 0): ?>
+                                        <div class="event-card-meta-item">
+                                            <i class="fas fa-images"></i>
+                                            <span><?= $event['nb_photos'] ?> photo<?= $event['nb_photos'] > 1 ? 's' : '' ?></span>
                                         </div>
-                                        
-                                        <h3 class="events-card-title">
-                                            <?= htmlspecialchars($evenement['titre']) ?>
-                                        </h3>
-                                        
-                                        <div class="events-meta-circle">
-                                            <div class="events-meta-item">
-                                                <i class="fas fa-clock"></i>
-                                                <?= date('H:i', strtotime($evenement['heure_evenement'])) ?>
-                                            </div>
-                                            <div class="events-meta-item">
-                                                <i class="fas fa-map-marker-alt"></i>
-                                                <?= htmlspecialchars(substr($evenement['lieu'], 0, 20) . (strlen($evenement['lieu']) > 20 ? '...' : '')) ?>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <?php endif; ?>
                                 </div>
-                                
-                                <!-- Boutons à l'extérieur du cercle -->
-                                <div class="events-actions">
-                                    <button class="events-btn events-btn-primary" onclick="voirPlus(<?= $evenement['id'] ?>)">
-                                        <i class="fas fa-eye"></i>Voir plus
-                                    </button>
-                                    <button class="events-btn events-btn-secondary" onclick="reserver(<?= $evenement['id'] ?>)">
-                                        <i class="fas fa-ticket-alt"></i>Réserver
-                                    </button>
+
+                                <p class="event-card-description">
+                                    <?= nl2br(htmlspecialchars($event['description'])) ?>
+                                </p>
+
+                                <div class="event-card-actions">
+                                    <a href="tel:787308706" class="btn-event-primary">
+                                        <i class="fas fa-phone-alt"></i>
+                                        Réserver
+                                    </a>
+
+                                    <?php if ($event['nb_photos'] > 0): ?>
+                                        <button class="btn-event-secondary" onclick="openGallery(<?= $event['id'] ?>, '<?= htmlspecialchars(addslashes($event['titre'])) ?>')">
+                                            <i class="fas fa-images"></i>
+                                            Voir la galerie
+                                        </button>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
-                    <?php endforeach; ?>
-                </div>
+                    </div>
+                <?php endforeach; ?>
             <?php endif; ?>
         </div>
     </section>
 
-    <!-- Modal Detail -->
-    <div class="modal fade" id="eventDetailModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content events-modal-content">
-                <div class="modal-header events-modal-header">
-                    <h5 class="modal-title" id="modalEventTitle">
-                        <i class="fas fa-calendar-alt me-2"></i>Détails de l'événement
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+    <!-- Section Réservation -->
+    <section class="reservation-section" id="reservation">
+        <div class="container">
+            <div class="reservation-title-container" data-aos="fade-up">
+                <h2 class="reservation-title">Réserver une table</h2>
+                <p class="reservation-subtitle">Réservez votre table pour profiter de nos événements</p>
+            </div>
+
+            <div class="reservation-content" data-aos="fade-up" data-aos-delay="100">
+                <div class="reservation-grid">
+                    <!-- Image -->
+                    <div class="reservation-image"></div>
+
+                    <!-- Formulaire -->
+                    <div class="reservation-form-container">
+                        <form action="forms/book-a-table.php" method="post" role="form" class="reservation-form php-email-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <input type="text" name="name" class="form-input" placeholder="Votre nom" required>
+                                </div>
+                                <div class="form-group">
+                                    <input type="email" name="email" class="form-input" placeholder="Votre email" required>
+                                </div>
+                                <div class="form-group">
+                                    <input type="text" name="phone" class="form-input" placeholder="Votre téléphone" required>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <input type="date" name="date" class="form-input" required>
+                                </div>
+                                <div class="form-group">
+                                    <input type="time" name="time" class="form-input" required>
+                                </div>
+                                <div class="form-group">
+                                    <input type="number" name="people" class="form-input" placeholder="Nombre de personnes" required min="1">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <textarea name="message" class="form-textarea" rows="5" placeholder="Message (optionnel)"></textarea>
+                            </div>
+
+                            <div class="form-messages">
+                                <div class="loading" style="display: none; color: #D4AF37;">Envoi en cours...</div>
+                                <div class="error-message" style="display: none; color: #ef4444;"></div>
+                                <div class="sent-message" style="display: none; color: #10b981;">Votre demande de réservation a été envoyée. Nous vous rappellerons pour confirmer. Merci !</div>
+                            </div>
+
+                            <button type="submit" class="reservation-submit-btn">
+                                <i class="fas fa-calendar-check"></i>
+                                Réserver maintenant
+                            </button>
+                        </form>
+                    </div>
                 </div>
-                <div class="modal-body" id="modalEventContent">
-                    <!-- Contenu chargé dynamiquement -->
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
-                    <button type="button" class="events-btn events-btn-primary" onclick="reserver(currentEventId)">
-                        <i class="fas fa-ticket-alt me-2"></i>Réserver
-                    </button>
-                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Modal Galerie -->
+    <div id="modalGalerie" class="modal-galerie" onclick="closeGalleryIfOutside(event)">
+        <div class="modal-content-galerie" onclick="event.stopPropagation()">
+            <button class="modal-close" onclick="closeGallery()">×</button>
+
+            <h2 class="modal-title" id="galleryTitle"></h2>
+
+            <div class="gallery-grid" id="galleryGrid">
+                <!-- Les photos seront chargées ici -->
             </div>
         </div>
     </div>
 
-    <!-- Modal Reservation -->
-    <div class="modal fade" id="reservationModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content events-modal-content">
-                <div class="modal-header" style="background: linear-gradient(135deg, var(--events-success), #26d0ce);">
-                    <h5 class="modal-title text-white">
-                        <i class="fas fa-ticket-alt me-2"></i>Réservation
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle me-2"></i>
-                        <strong>Réservation en cours de développement</strong><br>
-                        Cette fonctionnalité sera bientôt disponible. 
-                        En attendant, vous pouvez nous contacter directement.
-                    </div>
-                    <div class="text-center">
-                        <h5 id="reservationEventTitle"></h5>
-                        <p class="text-muted" id="reservationEventDetails"></p>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
-                    <button type="button" class="events-btn events-btn-primary">
-                        <i class="fas fa-phone me-2"></i>Nous contacter
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
+    <?php include('includes/footer.php'); ?>
 
     <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
+    <script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="assets/vendor/aos/aos.js"></script>
+
     <script>
-        // Initialisation AOS
-        AOS.init({
-            duration: 800,
-            easing: 'ease-out-cubic',
-            once: true
-        });
-
-        let currentEventId = null;
-        const evenements = <?= json_encode($evenements) ?>;
-
-        // Gestion des filtres
-        document.querySelectorAll('.events-filter-tab').forEach(tab => {
-            tab.addEventListener('click', function(e) {
-                e.preventDefault();
-                
-                // Mise à jour de l'onglet actif
-                document.querySelectorAll('.events-filter-tab').forEach(t => t.classList.remove('events-active'));
-                this.classList.add('events-active');
-                
-                // Filtrage
-                const filter = this.getAttribute('data-filter');
-                filterEvents(filter);
+        // Initialize AOS
+        if (typeof AOS !== 'undefined') {
+            AOS.init({
+                duration: 800,
+                easing: 'ease-in-out',
+                once: true,
+                mirror: false
             });
-        });
-
-        function filterEvents(filter) {
-            const events = document.querySelectorAll('.events-card-wrapper');
-            const loading = document.querySelector('.events-loading');
-            
-            // Afficher le spinner
-            loading.style.display = 'block';
-            
-            // Masquer tous les événements
-            events.forEach(event => event.classList.add('events-hidden'));
-            
-            setTimeout(() => {
-                events.forEach(event => {
-                    let shouldShow = false;
-                    
-                    if (filter === 'all') {
-                        shouldShow = true;
-                    } else {
-                        const categories = event.getAttribute('data-category') || '';
-                        shouldShow = categories.includes(filter);
-                    }
-                    
-                    if (shouldShow) {
-                        event.classList.remove('events-hidden');
-                        event.classList.add('events-fade-in');
-                    }
-                });
-                
-                loading.style.display = 'none';
-            }, 300);
         }
 
-        function voirPlus(eventId) {
-            const evenement = evenements.find(e => e.id == eventId);
-            if (!evenement) return;
-            
-            currentEventId = eventId;
-            
-            const modalTitle = document.getElementById('modalEventTitle');
-            const modalContent = document.getElementById('modalEventContent');
-            
-            modalTitle.innerHTML = `<i class="fas fa-calendar-alt me-2"></i>${evenement.titre}`;
-            
-            const imageHtml = evenement.image 
-                ? `<img src="admin/uploads/evenements/${evenement.image}" class="img-fluid rounded mb-3" alt="${evenement.titre}">`
-                : `<div class="text-center mb-3 p-4 bg-light rounded">
-                     <i class="fas fa-calendar-alt text-muted" style="font-size: 3rem;"></i>
-                   </div>`;
-            
-            modalContent.innerHTML = `
-                ${imageHtml}
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <h6><i class="fas fa-calendar-alt text-primary me-2"></i>Date</h6>
-                        <p>${formatDateFr(evenement.date_evenement)}</p>
-                    </div>
-                    <div class="col-md-6">
-                        <h6><i class="fas fa-clock text-primary me-2"></i>Heure</h6>
-                        <p>${evenement.heure_evenement}</p>
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <h6><i class="fas fa-map-marker-alt text-primary me-2"></i>Lieu</h6>
-                    <p>${evenement.lieu}</p>
-                </div>
-                ${evenement.description ? `
-                    <div>
-                        <h6><i class="fas fa-info-circle text-primary me-2"></i>Description</h6>
-                        <p>${evenement.description}</p>
-                    </div>
-                ` : ''}
-            `;
-            
-            new bootstrap.Modal(document.getElementById('eventDetailModal')).show();
-        }
+        // Gallery functions
+        function openGallery(eventId, eventTitle) {
+            const modal = document.getElementById('modalGalerie');
+            const galleryTitle = document.getElementById('galleryTitle');
+            const galleryGrid = document.getElementById('galleryGrid');
 
-        function reserver(eventId) {
-            const evenement = evenements.find(e => e.id == eventId);
-            if (!evenement) return;
-            
-            // Fermer le modal de détails s'il est ouvert
-            const detailModal = bootstrap.Modal.getInstance(document.getElementById('eventDetailModal'));
-            if (detailModal) {
-                detailModal.hide();
-            }
-            
-            document.getElementById('reservationEventTitle').textContent = evenement.titre;
-            document.getElementById('reservationEventDetails').textContent = 
-                `${formatDateFr(evenement.date_evenement)} à ${evenement.heure_evenement} - ${evenement.lieu}`;
-            
-            new bootstrap.Modal(document.getElementById('reservationModal')).show();
-        }
+            galleryTitle.textContent = eventTitle;
+            galleryGrid.innerHTML = '<div style="text-align:center;padding:40px;"><i class="fas fa-spinner fa-spin" style="font-size:3rem;color:#D4AF37;"></i></div>';
 
-        function formatDateFr(dateString) {
-            const mois = [
-                'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
-                'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'
-            ];
-            
-            const date = new Date(dateString);
-            const jour = date.getDate().toString().padStart(2, '0');
-            const moisIndex = date.getMonth();
-            const annee = date.getFullYear();
-            
-            return `${jour} ${mois[moisIndex]} ${annee}`;
-        }
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
 
-        // Auto-refresh
-        setInterval(() => {
-            fetch('<?= $_SERVER['PHP_SELF'] ?>?ajax=1')
-                .then(response => response.text())
+            // Charger les photos via AJAX
+            fetch(`get_event_gallery.php?id=${eventId}`)
+                .then(response => response.json())
                 .then(data => {
-                    // Logique de mise à jour si nécessaire
+                    if (data.success && data.photos.length > 0) {
+                        galleryGrid.innerHTML = data.photos.map(photo => `
+                            <div class="gallery-item">
+                                <img src="../admin/uploads/evenements/${photo.image}" alt="${photo.legende || ''}" onerror="this.parentElement.style.display='none'">
+                                ${photo.legende ? `<div class="gallery-item-overlay">${photo.legende}</div>` : ''}
+                            </div>
+                        `).join('');
+                    } else {
+                        galleryGrid.innerHTML = '<p style="text-align:center;color:rgba(255,255,255,0.6);grid-column:1/-1;padding:60px 20px;">Aucune photo disponible</p>';
+                    }
                 })
-                .catch(error => console.log('Erreur:', error));
-        }, 300000);
+                .catch(error => {
+                    console.error('Erreur:', error);
+                    galleryGrid.innerHTML = '<p style="text-align:center;color:#D4AF37;grid-column:1/-1;padding:60px 20px;">Erreur de chargement</p>';
+                });
+        }
 
-        // Animation supplémentaire au survol des cercles
+        function closeGallery() {
+            const modal = document.getElementById('modalGalerie');
+            modal.classList.remove('active');
+            document.body.style.overflow = 'auto';
+        }
+
+        function closeGalleryIfOutside(event) {
+            if (event.target.id === 'modalGalerie') {
+                closeGallery();
+            }
+        }
+
+        // Close with ESC key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeGallery();
+            }
+        });
+
+        // Gestion du formulaire de réservation
         document.addEventListener('DOMContentLoaded', function() {
-            const circles = document.querySelectorAll('.events-circle');
-            
-            circles.forEach(circle => {
-                circle.addEventListener('mouseenter', function() {
-                    this.style.transform = 'scale(1.02)';
+            const reservationForm = document.querySelector('.php-email-form');
+
+            if (reservationForm) {
+                reservationForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+
+                    const loadingDiv = this.querySelector('.loading');
+                    const errorDiv = this.querySelector('.error-message');
+                    const successDiv = this.querySelector('.sent-message');
+                    const submitBtn = this.querySelector('.reservation-submit-btn');
+
+                    // Réinitialiser les messages
+                    loadingDiv.style.display = 'block';
+                    errorDiv.style.display = 'none';
+                    successDiv.style.display = 'none';
+                    submitBtn.disabled = true;
+
+                    // Récupérer les données du formulaire
+                    const formData = new FormData(this);
+
+                    // Envoyer la requête AJAX
+                    console.log('Form action:', this.action);
+                    console.log('FormData contents:');
+                    for (let pair of formData.entries()) {
+                        console.log(pair[0] + ': ' + pair[1]);
+                    }
+
+                    fetch(this.action, {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => {
+                        console.log('Response status:', response.status);
+                        console.log('Response ok:', response.ok);
+                        console.log('Response headers:', [...response.headers.entries()]);
+
+                        // Get response as text first to see what we're getting
+                        return response.text().then(text => {
+                            console.log('Raw response text:', text);
+                            try {
+                                const data = JSON.parse(text);
+                                console.log('Parsed JSON:', data);
+                                return data;
+                            } catch (e) {
+                                console.error('JSON parse error:', e);
+                                throw new Error('Invalid JSON response: ' + text.substring(0, 100));
+                            }
+                        });
+                    })
+                    .then(data => {
+                        loadingDiv.style.display = 'none';
+                        submitBtn.disabled = false;
+
+                        if (data.status === 'success') {
+                            successDiv.textContent = data.message;
+                            successDiv.style.display = 'block';
+                            this.reset();
+
+                            // Masquer le message après 5 secondes
+                            setTimeout(() => {
+                                successDiv.style.display = 'none';
+                            }, 5000);
+                        } else {
+                            errorDiv.textContent = data.message || 'Une erreur est survenue';
+                            errorDiv.style.display = 'block';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Full error object:', error);
+                        console.error('Error message:', error.message);
+                        console.error('Error stack:', error.stack);
+                        loadingDiv.style.display = 'none';
+                        submitBtn.disabled = false;
+                        errorDiv.textContent = 'Erreur de connexion. Veuillez réessayer. Consultez la console pour plus de détails.';
+                        errorDiv.style.display = 'block';
+                    });
                 });
-                
-                circle.addEventListener('mouseleave', function() {
-                    this.style.transform = 'scale(1)';
-                });
-            });
+            }
         });
     </script>
 </body>

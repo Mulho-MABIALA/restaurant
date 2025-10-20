@@ -1,5 +1,7 @@
 <?php
+session_start();
 require_once '../config.php';
+require_once 'includes/language.php';
 
 // Configuration des chemins
 define('UPLOAD_URL', 'http://localhost/restaurant/uploads/gallery/');

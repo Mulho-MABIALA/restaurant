@@ -98,11 +98,11 @@ if ($totalCommande == 0 && isset($_SESSION['panier']) && !empty($_SESSION['panie
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         @media print {
-            body { 
-                background: white !important; 
+            body {
+                background: white !important;
             }
-            .no-print { 
-                display: none !important; 
+            .no-print {
+                display: none !important;
             }
             .print-container {
                 max-width: none !important;
@@ -110,32 +110,66 @@ if ($totalCommande == 0 && isset($_SESSION['panier']) && !empty($_SESSION['panie
                 box-shadow: none !important;
             }
         }
-        
+
         /* Styles pour le reçu (identique à l'email) */
         .receipt-container {
-            max-width: 400px;
+            max-width: 450px;
             margin: 0 auto;
             background: white;
             border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
             overflow: hidden;
+            font-family: 'Courier New', monospace;
+        }
+        .receipt-header {
+            text-align: center;
+            padding: 25px 20px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border-bottom: 3px dashed #fff;
+        }
+        .restaurant-logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 15px;
+            background: white;
+            border-radius: 50%;
+            padding: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        .restaurant-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .restaurant-name {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        .restaurant-tagline {
+            font-size: 12px;
+            opacity: 0.9;
+            font-style: italic;
         }
         .header {
             text-align: center;
-            padding: 30px 20px 20px;
-            border-bottom: 1px solid #f0f0f0;
+            padding: 20px;
+            border-bottom: 2px dashed #e5e7eb;
         }
         .success-circle {
-            width: 60px;
-            height: 60px;
-            background-color: #c8f7c5;
+            width: 70px;
+            height: 70px;
+            background-color: #10b981;
             border-radius: 50%;
-            margin: 0 auto 20px;
+            margin: 0 auto 15px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 24px;
-            color: #22c55e;
+            font-size: 32px;
+            color: white;
+            box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
         }
         /* Nouveau style pour le statut impayé */
         .payment-status {
@@ -190,24 +224,52 @@ if ($totalCommande == 0 && isset($_SESSION['panier']) && !empty($_SESSION['panie
         }
         .detail-label {
             color: #666;
-            font-size: 14px;
+            font-size: 13px;
             flex: 1;
+            font-weight: 500;
         }
         .detail-value {
-            color: #333;
-            font-size: 14px;
-            font-weight: 500;
+            color: #1f2937;
+            font-size: 13px;
+            font-weight: 600;
             text-align: right;
             flex: 1;
         }
         .order-number {
             color: #3b82f6 !important;
-            font-weight: 600;
+            font-weight: 700;
+            font-size: 15px;
         }
         .total-value {
             color: #dc2626 !important;
+            font-weight: 700;
+            font-size: 18px;
+        }
+        .payment-method-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
             font-weight: 600;
-            font-size: 16px;
+            font-size: 12px;
+        }
+        .payment-especes {
+            background: #dcfce7;
+            color: #166534;
+            border: 1px solid #86efac;
+        }
+        .payment-wave {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
+        .payment-orange {
+            background: #fed7aa;
+            color: #9a3412;
+            border: 1px solid #fdba74;
+        }
+        .divider-dashed {
+            border-top: 2px dashed #e5e7eb;
+            margin: 15px 0;
         }
         .products-section {
             padding: 20px;
@@ -267,21 +329,35 @@ if ($totalCommande == 0 && isset($_SESSION['panier']) && !empty($_SESSION['panie
         }
         /* Footer avec informations de paiement */
         .payment-footer {
-            background-color: #f8f9fa;
+            background: linear-gradient(to bottom, #f9fafb 0%, #f3f4f6 100%);
             padding: 20px;
-            border-top: 1px solid #e9ecef;
+            border-top: 2px dashed #d1d5db;
             text-align: center;
         }
         .payment-footer h4 {
-            color: #495057;
+            color: #374151;
             font-size: 14px;
-            font-weight: 600;
-            margin-bottom: 8px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         .payment-footer p {
-            color: #6c757d;
-            font-size: 12px;
-            line-height: 1.4;
+            color: #6b7280;
+            font-size: 11px;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+        .receipt-footer {
+            background: #1f2937;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-size: 10px;
+        }
+        .receipt-footer p {
+            margin: 3px 0;
+            opacity: 0.9;
         }
         @media (max-width: 500px) {
             .receipt-container {
@@ -305,15 +381,28 @@ if ($totalCommande == 0 && isset($_SESSION['panier']) && !empty($_SESSION['panie
         <div class="print-container">
             <!-- Format reçu pour l'affichage et l'impression -->
             <div class="receipt-container">
+                <!-- Header du restaurant avec logo -->
+                <div class="receipt-header">
+                    <div class="restaurant-logo">
+                        <img src="assets/img/logo.jpg" alt="Restaurant Logo">
+                    </div>
+                    <div class="restaurant-name">RESTAURANT MULHO</div>
+                    <div class="restaurant-tagline">La saveur authentique du Sénégal</div>
+                    <div style="margin-top: 10px; font-size: 11px; opacity: 0.9;">
+                        <i class="fas fa-map-marker-alt"></i> Dakar, Sénégal<br>
+                        <i class="fas fa-phone"></i> +221 XX XXX XX XX
+                    </div>
+                </div>
+
                 <!-- Header avec cercle vert et titre -->
                 <div class="header">
                     <div class="success-circle">
                         <i class="fas fa-check"></i>
                     </div>
-                    <h1 style="font-size: 20px; font-weight: 600; color: #333; margin-bottom: 8px;">
-                        Commande confirmée !
+                    <h1 style="font-size: 22px; font-weight: 700; color: #10b981; margin-bottom: 8px; font-family: Arial, sans-serif;">
+                        COMMANDE CONFIRMÉE
                     </h1>
-                    <p style="color: #666; font-size: 14px;">
+                    <p style="color: #6b7280; font-size: 13px; font-family: Arial, sans-serif;">
                         <?= htmlspecialchars($message) ?>
                     </p>
                 </div>
@@ -374,9 +463,41 @@ if ($totalCommande == 0 && isset($_SESSION['panier']) && !empty($_SESSION['panie
                         <span class="detail-value"><?= htmlspecialchars($commande['num_table']) ?></span>
                     </div>
                     <?php endif; ?>
-                    
+
+                    <div class="divider-dashed"></div>
+
+                    <?php if (!empty($commande['mode_paiement'])):
+                        $paymentClass = '';
+                        $paymentIcon = '';
+                        switch($commande['mode_paiement']) {
+                            case 'Espèces':
+                                $paymentClass = 'payment-especes';
+                                $paymentIcon = '💵';
+                                break;
+                            case 'Wave':
+                                $paymentClass = 'payment-wave';
+                                $paymentIcon = '📱';
+                                break;
+                            case 'Orange Money':
+                                $paymentClass = 'payment-orange';
+                                $paymentIcon = '🍊';
+                                break;
+                        }
+                    ?>
                     <div class="detail-row">
-                        <span class="detail-label">Total à payer :</span>
+                        <span class="detail-label">Mode de paiement :</span>
+                        <span class="detail-value">
+                            <span class="payment-method-badge <?= $paymentClass ?>">
+                                <?= $paymentIcon ?> <?= htmlspecialchars($commande['mode_paiement']) ?>
+                            </span>
+                        </span>
+                    </div>
+                    <?php endif; ?>
+
+                    <div class="divider-dashed"></div>
+
+                    <div class="detail-row" style="background: #f9fafb; padding: 12px 8px; border-radius: 6px; margin-top: 10px;">
+                        <span class="detail-label" style="font-size: 15px; font-weight: 600; color: #374151;">Total à payer :</span>
                         <span class="detail-value total-value"><?= number_format($totalCommande, 2) ?> FCFA</span>
                     </div>
                 </div>
@@ -431,10 +552,22 @@ if ($totalCommande == 0 && isset($_SESSION['panier']) && !empty($_SESSION['panie
                 
                 <!-- Footer avec informations de paiement -->
                 <div class="payment-footer">
-                    <h4><i class="fas fa-exclamation-triangle"></i> Paiement requis</h4>
-                    <p>Cette commande sera traitée après réception du paiement.<br>
-                    Veuillez contacter notre équipe pour finaliser votre paiement.<br>
-                    <strong>Merci de conserver ce reçu jusqu'au paiement complet.</strong></p>
+                    <h4><i class="fas fa-info-circle"></i> Informations de paiement</h4>
+                    <p>Cette commande sera traitée après réception du paiement.</p>
+                    <p>Mode sélectionné : <strong><?= !empty($commande['mode_paiement']) ? htmlspecialchars($commande['mode_paiement']) : 'Non spécifié' ?></strong></p>
+                    <p>Veuillez contacter notre équipe pour finaliser votre paiement.</p>
+                    <p style="margin-top: 10px; font-weight: 600; color: #374151;">
+                        <i class="fas fa-receipt"></i> Merci de conserver ce reçu jusqu'au paiement complet
+                    </p>
+                </div>
+
+                <!-- Footer final -->
+                <div class="receipt-footer">
+                    <p><i class="fas fa-heart"></i> Merci de votre visite !</p>
+                    <p>Restaurant Mulho - Dakar, Sénégal</p>
+                    <p style="margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 8px;">
+                        Date d'impression : <?= date('d/m/Y à H:i') ?>
+                    </p>
                 </div>
             </div>
         </div>

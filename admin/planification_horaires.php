@@ -18,15 +18,15 @@ if (isset($_GET['action'])) {
                 $previous_week = date('Y-m-d', strtotime($current_week . ' -1 week'));
                 
                 $stmt = $conn->prepare("
-                    SELECT 
-                        lundi_debut, lundi_fin,
-                        mardi_debut, mardi_fin,
-                        mercredi_debut, mercredi_fin,
-                        jeudi_debut, jeudi_fin,
-                        vendredi_debut, vendredi_fin,
-                        samedi_debut, samedi_fin,
-                        dimanche_debut, dimanche_fin
-                    FROM horaires 
+                    SELECT
+                        lundi_debut, lundi_fin, lundi_pause_debut, lundi_pause_fin,
+                        mardi_debut, mardi_fin, mardi_pause_debut, mardi_pause_fin,
+                        mercredi_debut, mercredi_fin, mercredi_pause_debut, mercredi_pause_fin,
+                        jeudi_debut, jeudi_fin, jeudi_pause_debut, jeudi_pause_fin,
+                        vendredi_debut, vendredi_fin, vendredi_pause_debut, vendredi_pause_fin,
+                        samedi_debut, samedi_fin, samedi_pause_debut, samedi_pause_fin,
+                        dimanche_debut, dimanche_fin, dimanche_pause_debut, dimanche_pause_fin
+                    FROM horaires
                     WHERE employe_id = ? AND semaine_debut = ?
                 ");
                 
@@ -73,56 +73,70 @@ if (isset($_GET['action'])) {
                     if ($existing) {
                         // Mise à jour
                         $updateStmt = $conn->prepare("
-                            UPDATE horaires SET 
-                                lundi_debut = ?, lundi_fin = ?,
-                                mardi_debut = ?, mardi_fin = ?,
-                                mercredi_debut = ?, mercredi_fin = ?,
-                                jeudi_debut = ?, jeudi_fin = ?,
-                                vendredi_debut = ?, vendredi_fin = ?,
-                                samedi_debut = ?, samedi_fin = ?,
-                                dimanche_debut = ?, dimanche_fin = ?,
+                            UPDATE horaires SET
+                                lundi_debut = ?, lundi_fin = ?, lundi_pause_debut = ?, lundi_pause_fin = ?,
+                                mardi_debut = ?, mardi_fin = ?, mardi_pause_debut = ?, mardi_pause_fin = ?,
+                                mercredi_debut = ?, mercredi_fin = ?, mercredi_pause_debut = ?, mercredi_pause_fin = ?,
+                                jeudi_debut = ?, jeudi_fin = ?, jeudi_pause_debut = ?, jeudi_pause_fin = ?,
+                                vendredi_debut = ?, vendredi_fin = ?, vendredi_pause_debut = ?, vendredi_pause_fin = ?,
+                                samedi_debut = ?, samedi_fin = ?, samedi_pause_debut = ?, samedi_pause_fin = ?,
+                                dimanche_debut = ?, dimanche_fin = ?, dimanche_pause_debut = ?, dimanche_pause_fin = ?,
                                 date_modification = NOW()
                             WHERE employe_id = ? AND semaine_debut = ?
                         ");
-                        
+
                         $updateStmt->execute([
                             $schedule['lundi_debut'], $schedule['lundi_fin'],
+                            $schedule['lundi_pause_debut'], $schedule['lundi_pause_fin'],
                             $schedule['mardi_debut'], $schedule['mardi_fin'],
+                            $schedule['mardi_pause_debut'], $schedule['mardi_pause_fin'],
                             $schedule['mercredi_debut'], $schedule['mercredi_fin'],
+                            $schedule['mercredi_pause_debut'], $schedule['mercredi_pause_fin'],
                             $schedule['jeudi_debut'], $schedule['jeudi_fin'],
+                            $schedule['jeudi_pause_debut'], $schedule['jeudi_pause_fin'],
                             $schedule['vendredi_debut'], $schedule['vendredi_fin'],
+                            $schedule['vendredi_pause_debut'], $schedule['vendredi_pause_fin'],
                             $schedule['samedi_debut'], $schedule['samedi_fin'],
+                            $schedule['samedi_pause_debut'], $schedule['samedi_pause_fin'],
                             $schedule['dimanche_debut'], $schedule['dimanche_fin'],
+                            $schedule['dimanche_pause_debut'], $schedule['dimanche_pause_fin'],
                             $schedule['employe_id'], $current_week
                         ]);
                     } else {
                         // Insertion
-                      $insertStmt = $conn->prepare("
-    INSERT INTO horaires (
-        employe_id, semaine_debut,
-        lundi_debut, lundi_fin,
-        mardi_debut, mardi_fin,
-        mercredi_debut, mercredi_fin,
-        jeudi_debut, jeudi_fin,
-        vendredi_debut, vendredi_fin,
-        samedi_debut, samedi_fin,
-        dimanche_debut, dimanche_fin,
-        date_creation, date_modification
-    ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW()
-    )
-");
-                        
-$insertStmt->execute([
-    $schedule['employe_id'], $current_week,
-    $schedule['lundi_debut'], $schedule['lundi_fin'],
-    $schedule['mardi_debut'], $schedule['mardi_fin'],
-    $schedule['mercredi_debut'], $schedule['mercredi_fin'],
-    $schedule['jeudi_debut'], $schedule['jeudi_fin'],
-    $schedule['vendredi_debut'], $schedule['vendredi_fin'],
-    $schedule['samedi_debut'], $schedule['samedi_fin'],
-    $schedule['dimanche_debut'], $schedule['dimanche_fin']
-]);
+                        $insertStmt = $conn->prepare("
+                            INSERT INTO horaires (
+                                employe_id, semaine_debut,
+                                lundi_debut, lundi_fin, lundi_pause_debut, lundi_pause_fin,
+                                mardi_debut, mardi_fin, mardi_pause_debut, mardi_pause_fin,
+                                mercredi_debut, mercredi_fin, mercredi_pause_debut, mercredi_pause_fin,
+                                jeudi_debut, jeudi_fin, jeudi_pause_debut, jeudi_pause_fin,
+                                vendredi_debut, vendredi_fin, vendredi_pause_debut, vendredi_pause_fin,
+                                samedi_debut, samedi_fin, samedi_pause_debut, samedi_pause_fin,
+                                dimanche_debut, dimanche_fin, dimanche_pause_debut, dimanche_pause_fin,
+                                date_creation, date_modification
+                            ) VALUES (
+                                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW()
+                            )
+                        ");
+
+                        $insertStmt->execute([
+                            $schedule['employe_id'], $current_week,
+                            $schedule['lundi_debut'], $schedule['lundi_fin'],
+                            $schedule['lundi_pause_debut'], $schedule['lundi_pause_fin'],
+                            $schedule['mardi_debut'], $schedule['mardi_fin'],
+                            $schedule['mardi_pause_debut'], $schedule['mardi_pause_fin'],
+                            $schedule['mercredi_debut'], $schedule['mercredi_fin'],
+                            $schedule['mercredi_pause_debut'], $schedule['mercredi_pause_fin'],
+                            $schedule['jeudi_debut'], $schedule['jeudi_fin'],
+                            $schedule['jeudi_pause_debut'], $schedule['jeudi_pause_fin'],
+                            $schedule['vendredi_debut'], $schedule['vendredi_fin'],
+                            $schedule['vendredi_pause_debut'], $schedule['vendredi_pause_fin'],
+                            $schedule['samedi_debut'], $schedule['samedi_fin'],
+                            $schedule['samedi_pause_debut'], $schedule['samedi_pause_fin'],
+                            $schedule['dimanche_debut'], $schedule['dimanche_fin'],
+                            $schedule['dimanche_pause_debut'], $schedule['dimanche_pause_fin']
+                        ]);
                     }
                     
                     $copied_count++;
@@ -184,26 +198,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($existing) {
                 // Mise à jour
                 $updateStmt = $conn->prepare("
-                    UPDATE horaires SET 
-                        lundi_debut = ?, lundi_fin = ?,
-                        mardi_debut = ?, mardi_fin = ?,
-                        mercredi_debut = ?, mercredi_fin = ?,
-                        jeudi_debut = ?, jeudi_fin = ?,
-                        vendredi_debut = ?, vendredi_fin = ?,
-                        samedi_debut = ?, samedi_fin = ?,
-                        dimanche_debut = ?, dimanche_fin = ?,
+                    UPDATE horaires SET
+                        lundi_debut = ?, lundi_fin = ?, lundi_pause_debut = ?, lundi_pause_fin = ?,
+                        mardi_debut = ?, mardi_fin = ?, mardi_pause_debut = ?, mardi_pause_fin = ?,
+                        mercredi_debut = ?, mercredi_fin = ?, mercredi_pause_debut = ?, mercredi_pause_fin = ?,
+                        jeudi_debut = ?, jeudi_fin = ?, jeudi_pause_debut = ?, jeudi_pause_fin = ?,
+                        vendredi_debut = ?, vendredi_fin = ?, vendredi_pause_debut = ?, vendredi_pause_fin = ?,
+                        samedi_debut = ?, samedi_fin = ?, samedi_pause_debut = ?, samedi_pause_fin = ?,
+                        dimanche_debut = ?, dimanche_fin = ?, dimanche_pause_debut = ?, dimanche_pause_fin = ?,
                         date_modification = NOW()
                     WHERE employe_id = ? AND semaine_debut = ?
                 ");
-                
+
                 $updateStmt->execute([
                     $schedule['lundi_debut'] ?: null, $schedule['lundi_fin'] ?: null,
+                    $schedule['lundi_pause_debut'] ?: null, $schedule['lundi_pause_fin'] ?: null,
                     $schedule['mardi_debut'] ?: null, $schedule['mardi_fin'] ?: null,
+                    $schedule['mardi_pause_debut'] ?: null, $schedule['mardi_pause_fin'] ?: null,
                     $schedule['mercredi_debut'] ?: null, $schedule['mercredi_fin'] ?: null,
+                    $schedule['mercredi_pause_debut'] ?: null, $schedule['mercredi_pause_fin'] ?: null,
                     $schedule['jeudi_debut'] ?: null, $schedule['jeudi_fin'] ?: null,
+                    $schedule['jeudi_pause_debut'] ?: null, $schedule['jeudi_pause_fin'] ?: null,
                     $schedule['vendredi_debut'] ?: null, $schedule['vendredi_fin'] ?: null,
+                    $schedule['vendredi_pause_debut'] ?: null, $schedule['vendredi_pause_fin'] ?: null,
                     $schedule['samedi_debut'] ?: null, $schedule['samedi_fin'] ?: null,
+                    $schedule['samedi_pause_debut'] ?: null, $schedule['samedi_pause_fin'] ?: null,
                     $schedule['dimanche_debut'] ?: null, $schedule['dimanche_fin'] ?: null,
+                    $schedule['dimanche_pause_debut'] ?: null, $schedule['dimanche_pause_fin'] ?: null,
                     $employe_id, $semaine_debut
                 ]);
             } else {
@@ -211,28 +232,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $insertStmt = $conn->prepare("
                     INSERT INTO horaires (
                         employe_id, semaine_debut,
-                        lundi_debut, lundi_fin,
-                        mardi_debut, mardi_fin,
-                        mercredi_debut, mercredi_fin,
-                        jeudi_debut, jeudi_fin,
-                        vendredi_debut, vendredi_fin,
-                        samedi_debut, samedi_fin,
-                        dimanche_debut, dimanche_fin,
+                        lundi_debut, lundi_fin, lundi_pause_debut, lundi_pause_fin,
+                        mardi_debut, mardi_fin, mardi_pause_debut, mardi_pause_fin,
+                        mercredi_debut, mercredi_fin, mercredi_pause_debut, mercredi_pause_fin,
+                        jeudi_debut, jeudi_fin, jeudi_pause_debut, jeudi_pause_fin,
+                        vendredi_debut, vendredi_fin, vendredi_pause_debut, vendredi_pause_fin,
+                        samedi_debut, samedi_fin, samedi_pause_debut, samedi_pause_fin,
+                        dimanche_debut, dimanche_fin, dimanche_pause_debut, dimanche_pause_fin,
                         date_creation, date_modification
                     ) VALUES (
-                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW()
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW()
                     )
                 ");
-                
+
                 $insertStmt->execute([
                     $employe_id, $semaine_debut,
                     $schedule['lundi_debut'] ?: null, $schedule['lundi_fin'] ?: null,
+                    $schedule['lundi_pause_debut'] ?: null, $schedule['lundi_pause_fin'] ?: null,
                     $schedule['mardi_debut'] ?: null, $schedule['mardi_fin'] ?: null,
+                    $schedule['mardi_pause_debut'] ?: null, $schedule['mardi_pause_fin'] ?: null,
                     $schedule['mercredi_debut'] ?: null, $schedule['mercredi_fin'] ?: null,
+                    $schedule['mercredi_pause_debut'] ?: null, $schedule['mercredi_pause_fin'] ?: null,
                     $schedule['jeudi_debut'] ?: null, $schedule['jeudi_fin'] ?: null,
+                    $schedule['jeudi_pause_debut'] ?: null, $schedule['jeudi_pause_fin'] ?: null,
                     $schedule['vendredi_debut'] ?: null, $schedule['vendredi_fin'] ?: null,
+                    $schedule['vendredi_pause_debut'] ?: null, $schedule['vendredi_pause_fin'] ?: null,
                     $schedule['samedi_debut'] ?: null, $schedule['samedi_fin'] ?: null,
-                    $schedule['dimanche_debut'] ?: null, $schedule['dimanche_fin'] ?: null
+                    $schedule['samedi_pause_debut'] ?: null, $schedule['samedi_pause_fin'] ?: null,
+                    $schedule['dimanche_debut'] ?: null, $schedule['dimanche_fin'] ?: null,
+                    $schedule['dimanche_pause_debut'] ?: null, $schedule['dimanche_pause_fin'] ?: null
                 ]);
             }
         }
@@ -418,23 +446,48 @@ try {
                                 foreach ($jours_db as $jour):
                                     $debut = $employee_schedule ? $employee_schedule[$jour . '_debut'] : null;
                                     $fin = $employee_schedule ? $employee_schedule[$jour . '_fin'] : null;
+                                    $pause_debut = $employee_schedule ? $employee_schedule[$jour . '_pause_debut'] : null;
+                                    $pause_fin = $employee_schedule ? $employee_schedule[$jour . '_pause_fin'] : null;
                                 ?>
                                     <td class="px-2 py-2 text-center time-slot">
                                         <div class="space-y-1">
-                                            <input type="time" 
-                                                   class="text-xs border rounded px-1 py-1 w-full schedule-input"
-                                                   data-day="<?php echo $jour; ?>"
-                                                   data-type="debut"
-                                                   data-original="<?php echo $debut ?: ''; ?>"
-                                                   value="<?php echo $debut ?: ''; ?>"
-                                                   placeholder="Début">
-                                            <input type="time" 
-                                                   class="text-xs border rounded px-1 py-1 w-full schedule-input"
-                                                   data-day="<?php echo $jour; ?>"
-                                                   data-type="fin"
-                                                   data-original="<?php echo $fin ?: ''; ?>"
-                                                   value="<?php echo $fin ?: ''; ?>"
-                                                   placeholder="Fin">
+                                            <!-- Horaires de travail -->
+                                            <div class="bg-blue-50 border border-blue-200 rounded p-1">
+                                                <div class="text-xs text-blue-700 font-semibold mb-1">Travail</div>
+                                                <input type="time"
+                                                       class="text-xs border rounded px-1 py-1 w-full schedule-input mb-1"
+                                                       data-day="<?php echo $jour; ?>"
+                                                       data-type="debut"
+                                                       data-original="<?php echo $debut ?: ''; ?>"
+                                                       value="<?php echo $debut ?: ''; ?>"
+                                                       placeholder="Début">
+                                                <input type="time"
+                                                       class="text-xs border rounded px-1 py-1 w-full schedule-input"
+                                                       data-day="<?php echo $jour; ?>"
+                                                       data-type="fin"
+                                                       data-original="<?php echo $fin ?: ''; ?>"
+                                                       value="<?php echo $fin ?: ''; ?>"
+                                                       placeholder="Fin">
+                                            </div>
+
+                                            <!-- Horaires de pause -->
+                                            <div class="bg-orange-50 border border-orange-200 rounded p-1">
+                                                <div class="text-xs text-orange-700 font-semibold mb-1">Pause</div>
+                                                <input type="time"
+                                                       class="text-xs border rounded px-1 py-1 w-full schedule-input mb-1"
+                                                       data-day="<?php echo $jour; ?>"
+                                                       data-type="pause_debut"
+                                                       data-original="<?php echo $pause_debut ?: ''; ?>"
+                                                       value="<?php echo $pause_debut ?: ''; ?>"
+                                                       placeholder="Début">
+                                                <input type="time"
+                                                       class="text-xs border rounded px-1 py-1 w-full schedule-input"
+                                                       data-day="<?php echo $jour; ?>"
+                                                       data-type="pause_fin"
+                                                       data-original="<?php echo $pause_fin ?: ''; ?>"
+                                                       value="<?php echo $pause_fin ?: ''; ?>"
+                                                       placeholder="Fin">
+                                            </div>
                                         </div>
                                     </td>
                                 <?php endforeach; ?>
@@ -615,12 +668,21 @@ try {
                         jours.forEach(jour => {
                             const debutInput = row.querySelector(`input[data-day="${jour}"][data-type="debut"]`);
                             const finInput = row.querySelector(`input[data-day="${jour}"][data-type="fin"]`);
-                            
+                            const pauseDebutInput = row.querySelector(`input[data-day="${jour}"][data-type="pause_debut"]`);
+                            const pauseFinInput = row.querySelector(`input[data-day="${jour}"][data-type="pause_fin"]`);
+
                             if (debutInput && finInput) {
                                 debutInput.value = data.schedule[jour + '_debut'] || '';
                                 finInput.value = data.schedule[jour + '_fin'] || '';
                                 markAsChanged(debutInput);
                                 markAsChanged(finInput);
+                            }
+
+                            if (pauseDebutInput && pauseFinInput) {
+                                pauseDebutInput.value = data.schedule[jour + '_pause_debut'] || '';
+                                pauseFinInput.value = data.schedule[jour + '_pause_fin'] || '';
+                                markAsChanged(pauseDebutInput);
+                                markAsChanged(pauseFinInput);
                             }
                         });
                         
@@ -685,9 +747,13 @@ try {
                 jours.forEach(jour => {
                     const debutInput = row.querySelector(`input[data-day="${jour}"][data-type="debut"]`);
                     const finInput = row.querySelector(`input[data-day="${jour}"][data-type="fin"]`);
-                    
+                    const pauseDebutInput = row.querySelector(`input[data-day="${jour}"][data-type="pause_debut"]`);
+                    const pauseFinInput = row.querySelector(`input[data-day="${jour}"][data-type="pause_fin"]`);
+
                     schedule[jour + '_debut'] = debutInput.value || null;
                     schedule[jour + '_fin'] = finInput.value || null;
+                    schedule[jour + '_pause_debut'] = pauseDebutInput.value || null;
+                    schedule[jour + '_pause_fin'] = pauseFinInput.value || null;
                 });
                 
                 schedules.push(schedule);

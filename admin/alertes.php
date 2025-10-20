@@ -1,10 +1,10 @@
 <?php
 session_start();
-require_once '../../config.php';
-require_once '../permissions.php';
+require_once '../config.php';
+require_once 'permissions.php';
 
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
-    header('Location: ../login.php');
+    header('Location: login.php');
     exit;
 }
 
@@ -43,12 +43,12 @@ $nb_traitees = $stmt->fetchColumn();
     <title>Alertes Financières - Restaurant</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="../assets/css/cards-design.css">
+    <link rel="stylesheet" href="assets/css/cards-design.css">
 </head>
 <body class="bg-gray-50">
 
     <div class="flex h-screen overflow-hidden">
-        <?php include '../sidebar.php'; ?>
+        <?php include 'sidebar.php'; ?>
 
         <div class="flex-1 overflow-y-auto">
             <nav class="bg-white shadow-sm border-b sticky top-0 z-10">

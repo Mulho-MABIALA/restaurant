@@ -379,67 +379,135 @@ try {
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        .fade-in { animation: fadeIn 0.3s ease-in; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
-        .contract-badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; }
-        .contract-cdi { background-color: #dcfce7; color: #166534; }
-        .contract-cdd { background-color: #fef3c7; color: #92400e; }
-        .contract-stage { background-color: #dbeafe; color: #1e40af; }
-        .contract-apprentissage { background-color: #fce7f3; color: #be185d; }
-        .contract-freelance { background-color: #f3e8ff; color: #7c3aed; }
-        .contract-temps_partiel { background-color: #e0f2fe; color: #0277bd; }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+        }
+        .card:hover {
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+            transform: translateY(-4px);
+        }
+        .contract-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        .contract-cdi { background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); color: #166534; }
+        .contract-cdd { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); color: #92400e; }
+        .contract-stage { background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); color: #1e40af; }
+        .contract-apprentissage { background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%); color: #be185d; }
+        .contract-freelance { background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%); color: #7c3aed; }
+        .contract-temps_partiel { background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%); color: #0277bd; }
+
+        .stat-item {
+            transition: all 0.2s ease;
+        }
+        .stat-item:hover {
+            background-color: #f9fafb;
+            transform: scale(1.02);
+        }
+
+        .action-btn {
+            transition: all 0.2s ease;
+        }
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
         @media print {
             .no-print { display: none !important; }
             .badge-container { page-break-after: always; }
         }
+
+        .gradient-header {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+
+        .info-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #6b7280;
+        }
+
+        .info-value {
+            font-size: 0.95rem;
+            color: #111827;
+            font-weight: 500;
+        }
     </style>
 </head>
-<body class="bg-gray-50">
-    <div class="max-w-7xl mx-auto p-6">
+<body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
+    <div class="max-w-7xl mx-auto p-4 sm:p-6">
         <!-- Header -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6 card-shadow">
-            <div class="flex items-center justify-between mb-4">
-                <button onclick="window.close()" class="text-gray-600 hover:text-gray-800 transition duration-200">
-                    <i class="fas fa-arrow-left mr-2"></i>Retour
+        <div class="card p-6 mb-6 fade-in gradient-header">
+            <div class="flex items-center justify-between mb-6">
+                <button onclick="window.history.back()" class="flex items-center text-white hover:text-gray-100 transition duration-200 bg-white/20 px-4 py-2 rounded-lg backdrop-blur-sm">
+                    <i class="fas fa-arrow-left mr-2"></i>
+                    <span class="font-medium">Retour</span>
                 </button>
-               <div class="flex space-x-2">
-    <button onclick="generateBadge()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition duration-200">
-        <i class="fas fa-qrcode mr-2"></i>Badge
-    </button>
-</div>
+               <div class="flex space-x-3">
+                    <button onclick="generateBadge()" class="action-btn bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white px-4 py-2 rounded-lg transition duration-200 flex items-center">
+                        <i class="fas fa-qrcode mr-2"></i>
+                        <span class="hidden sm:inline">Badge</span>
+                    </button>
+                </div>
             </div>
-            
-            <div class="flex items-center">
-                <img src="uploads/photos/<?php echo htmlspecialchars($employee['photo'] ?? 'default-avatar.png'); ?>" 
-                     class="w-24 h-24 rounded-full border-4 border-gray-200 object-cover">
-                <div class="ml-6">
-                    <h1 class="text-3xl font-bold text-gray-900">
-                        <?php echo htmlspecialchars($employee['prenom'] . ' ' . $employee['nom']); ?>
+
+            <div class="flex flex-col sm:flex-row items-center sm:items-start">
+                <div class="relative mb-4 sm:mb-0">
+                    <img src="uploads/photos/<?php echo htmlspecialchars($employee['photo'] ?? 'default-avatar.png'); ?>"
+                         class="w-28 h-28 rounded-full border-4 border-white object-cover shadow-xl">
+                    <div class="absolute -bottom-2 -right-2 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg">
                         <?php if ($employee['is_admin']): ?>
-                            <i class="fas fa-crown text-yellow-500 ml-2" title="Administrateur"></i>
+                            <i class="fas fa-crown text-yellow-500 text-lg"></i>
+                        <?php else: ?>
+                            <i class="fas fa-user text-green-600 text-lg"></i>
                         <?php endif; ?>
+                    </div>
+                </div>
+                <div class="sm:ml-6 text-center sm:text-left flex-1">
+                    <h1 class="text-3xl sm:text-4xl font-bold text-white mb-3">
+                        <?php echo htmlspecialchars($employee['prenom'] . ' ' . $employee['nom']); ?>
                     </h1>
-                    <div class="flex items-center mt-2 flex-wrap gap-2">
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
-                              style="background-color: <?php echo $employee['poste_couleur'] ?? '#6B7280'; ?>20; color: <?php echo $employee['poste_couleur'] ?? '#6B7280'; ?>;">
+                    <div class="flex items-center justify-center sm:justify-start mt-3 flex-wrap gap-2">
+                        <span class="inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold bg-white/90 backdrop-blur-sm shadow-md"
+                              style="color: <?php echo $employee['poste_couleur'] ?? '#059669'; ?>;">
+                            <i class="fas fa-briefcase mr-2"></i>
                             <?php echo htmlspecialchars($employee['poste_nom'] ?? 'Non défini'); ?>
                         </span>
-                        <span class="contract-badge contract-<?php echo strtolower(str_replace(' ', '_', $employee['type_contrat'] ?? '')); ?>">
+                        <span class="contract-badge shadow-md">
+                            <i class="fas fa-file-contract mr-1"></i>
                             <?php echo htmlspecialchars($employee['type_contrat'] ?? 'Non défini'); ?>
                         </span>
-                        <span class="px-3 py-1 rounded-full text-sm font-medium <?php 
-                            echo $employee['statut'] === 'actif' ? 'bg-green-100 text-green-800' : 
-                                ($employee['statut'] === 'en_conge' ? 'bg-yellow-100 text-yellow-800' : 
-                                ($employee['statut'] === 'absent' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800')); 
+                        <span class="px-4 py-2 rounded-full text-sm font-semibold shadow-md <?php
+                            echo $employee['statut'] === 'actif' ? 'bg-green-100 text-green-800' :
+                                ($employee['statut'] === 'en_conge' ? 'bg-yellow-100 text-yellow-800' :
+                                ($employee['statut'] === 'absent' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'));
                         ?>">
+                            <i class="fas fa-circle text-xs mr-2"></i>
                             <?php echo ucfirst(str_replace('_', ' ', $employee['statut'])); ?>
                         </span>
                     </div>
                     <?php if ($employee['code_numerique']): ?>
-                        <div class="mt-2">
-                            <span class="text-sm text-gray-600">Code numérique: </span>
-                            <span class="font-mono font-bold text-blue-600"><?php echo $employee['code_numerique']; ?></span>
+                        <div class="mt-4 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-lg inline-block">
+                            <span class="text-sm text-white/90 font-medium">Code: </span>
+                            <span class="font-mono font-bold text-white text-lg"><?php echo $employee['code_numerique']; ?></span>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -450,56 +518,80 @@ try {
             <!-- Informations détaillées -->
             <div class="lg:col-span-2 space-y-6">
                 <!-- Informations personnelles -->
-                <div class="bg-white rounded-lg shadow-md p-6 card-shadow fade-in">
-                    <h2 class="text-xl font-semibold text-gray-900 mb-4">
-                        <i class="fas fa-user mr-2 text-blue-600"></i>Informations personnelles
-                    </h2>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Email</label>
-                            <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['email']); ?></p>
+                <div class="card p-6 fade-in">
+                    <div class="flex items-center mb-6">
+                        <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+                            <i class="fas fa-user text-white text-xl"></i>
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Téléphone</label>
-                            <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['telephone'] ?? 'Non renseigné'); ?></p>
+                        <h2 class="text-2xl font-bold text-gray-900 ml-4">Informations personnelles</h2>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <label class="info-label flex items-center">
+                                <i class="fas fa-envelope text-blue-500 mr-2"></i>
+                                Email
+                            </label>
+                            <p class="info-value mt-2"><?php echo htmlspecialchars($employee['email']); ?></p>
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Date d'embauche</label>
-                            <p class="mt-1 text-sm text-gray-900"><?php echo date('d/m/Y', strtotime($employee['date_embauche'])); ?></p>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <label class="info-label flex items-center">
+                                <i class="fas fa-phone text-green-500 mr-2"></i>
+                                Téléphone
+                            </label>
+                            <p class="info-value mt-2"><?php echo htmlspecialchars($employee['telephone'] ?? 'Non renseigné'); ?></p>
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Salaire</label>
-                            <p class="mt-1 text-sm text-gray-900">
-                                <?php 
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <label class="info-label flex items-center">
+                                <i class="fas fa-calendar-alt text-purple-500 mr-2"></i>
+                                Date d'embauche
+                            </label>
+                            <p class="info-value mt-2"><?php echo date('d/m/Y', strtotime($employee['date_embauche'])); ?></p>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <label class="info-label flex items-center">
+                                <i class="fas fa-money-bill-wave text-green-500 mr-2"></i>
+                                Salaire
+                            </label>
+                            <p class="info-value mt-2">
+                                <?php
                                 if ($employee['salaire_individuel']) {
-                                    echo number_format($employee['salaire_individuel'], 0, ',', ' ') . ' FCFA (individuel)';
+                                    echo number_format($employee['salaire_individuel'], 0, ',', ' ') . ' FCFA';
                                 } elseif ($employee['salaire']) {
                                     echo number_format($employee['salaire'], 0, ',', ' ') . ' FCFA';
                                 } elseif ($employee['poste_salaire']) {
-                                    echo number_format($employee['poste_salaire'], 0, ',', ' ') . ' FCFA (salaire du poste)';
+                                    echo number_format($employee['poste_salaire'], 0, ',', ' ') . ' FCFA';
                                 } else {
                                     echo 'Non défini';
                                 }
                                 ?>
                             </p>
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Horaires habituels</label>
-                            <p class="mt-1 text-sm text-gray-900"><?php echo $employee['heure_debut'] . ' - ' . $employee['heure_fin']; ?></p>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <label class="info-label flex items-center">
+                                <i class="fas fa-clock text-orange-500 mr-2"></i>
+                                Horaires habituels
+                            </label>
+                            <p class="info-value mt-2"><?php echo $employee['heure_debut'] . ' - ' . $employee['heure_fin']; ?></p>
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Matricule</label>
-                            <p class="mt-1 text-sm text-gray-900 font-mono"><?php echo htmlspecialchars($employee['matricule'] ?? 'Non défini'); ?></p>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <label class="info-label flex items-center">
+                                <i class="fas fa-id-badge text-indigo-500 mr-2"></i>
+                                Matricule
+                            </label>
+                            <p class="info-value mt-2 font-mono"><?php echo htmlspecialchars($employee['matricule'] ?? 'Non défini'); ?></p>
                         </div>
                     </div>
                 </div>
 
                 <!-- Informations administratives -->
-                <div class="bg-white rounded-lg shadow-md p-6 card-shadow fade-in">
-                    <h2 class="text-xl font-semibold text-gray-900 mb-4">
-                        <i class="fas fa-id-card mr-2 text-blue-600"></i>Informations administratives
-                    </h2>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="card p-6 fade-in">
+                    <div class="flex items-center mb-6">
+                        <div class="w-12 h-12 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                            <i class="fas fa-id-card text-white text-xl"></i>
+                        </div>
+                        <h2 class="text-2xl font-bold text-gray-900 ml-4">Informations administratives</h2>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Numéro de sécurité sociale</label>
                             <p class="mt-1 text-sm text-gray-900"><?php echo htmlspecialchars($employee['num_secu'] ?? 'Non renseigné'); ?></p>
@@ -681,41 +773,66 @@ try {
                 <?php endif; ?>
 
                 <!-- Horaires de la semaine -->
-                <div class="bg-white rounded-lg shadow-md p-6 card-shadow fade-in">
-                    <h2 class="text-xl font-semibold text-gray-900 mb-4">
-                        <i class="fas fa-calendar-week mr-2 text-green-600"></i>Horaires de la semaine
-                    </h2>
+                <div class="card p-6 fade-in">
+                    <div class="flex items-center mb-6">
+                        <div class="w-12 h-12 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-xl flex items-center justify-center shadow-lg">
+                            <i class="fas fa-calendar-week text-white text-xl"></i>
+                        </div>
+                        <h2 class="text-2xl font-bold text-gray-900 ml-4">Horaires de la semaine</h2>
+                    </div>
                     <?php if ($horaires): ?>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <?php 
+                        <div class="space-y-3">
+                            <?php
                             $jours = [
-                                'lundi' => 'Lundi',
-                                'mardi' => 'Mardi', 
-                                'mercredi' => 'Mercredi',
-                                'jeudi' => 'Jeudi',
-                                'vendredi' => 'Vendredi',
-                                'samedi' => 'Samedi',
-                                'dimanche' => 'Dimanche'
+                                'lundi' => ['label' => 'Lundi', 'color' => 'blue'],
+                                'mardi' => ['label' => 'Mardi', 'color' => 'indigo'],
+                                'mercredi' => ['label' => 'Mercredi', 'color' => 'purple'],
+                                'jeudi' => ['label' => 'Jeudi', 'color' => 'pink'],
+                                'vendredi' => ['label' => 'Vendredi', 'color' => 'rose'],
+                                'samedi' => ['label' => 'Samedi', 'color' => 'orange'],
+                                'dimanche' => ['label' => 'Dimanche', 'color' => 'red']
                             ];
-                            
-                            foreach ($jours as $jour => $label): 
+
+                            foreach ($jours as $jour => $info):
                                 $debut = $horaires[$jour . '_debut'];
                                 $fin = $horaires[$jour . '_fin'];
+                                $hasHoraire = ($debut && $fin);
                             ?>
-                                <div class="flex justify-between items-center py-2 border-b border-gray-100">
-                                    <span class="font-medium text-gray-700"><?php echo $label; ?></span>
-                                    <span class="text-gray-600">
-                                        <?php echo ($debut && $fin) ? $debut . ' - ' . $fin : '<span class="text-red-500">Repos</span>'; ?>
-                                    </span>
+                                <div class="flex items-center justify-between p-4 rounded-lg <?php echo $hasHoraire ? 'bg-gradient-to-r from-gray-50 to-white border-l-4 border-' . $info['color'] . '-500' : 'bg-gray-50'; ?>">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-10 h-10 bg-<?php echo $info['color']; ?>-100 rounded-lg flex items-center justify-center">
+                                            <i class="fas fa-calendar-day text-<?php echo $info['color']; ?>-600"></i>
+                                        </div>
+                                        <span class="font-semibold text-gray-800"><?php echo $info['label']; ?></span>
+                                    </div>
+                                    <?php if ($hasHoraire): ?>
+                                        <div class="flex items-center space-x-2">
+                                            <span class="px-3 py-1 bg-white rounded-lg shadow-sm text-sm font-medium text-gray-700">
+                                                <i class="fas fa-sign-in-alt text-green-600 mr-1"></i>
+                                                <?php echo $debut; ?>
+                                            </span>
+                                            <i class="fas fa-arrow-right text-gray-400"></i>
+                                            <span class="px-3 py-1 bg-white rounded-lg shadow-sm text-sm font-medium text-gray-700">
+                                                <i class="fas fa-sign-out-alt text-red-600 mr-1"></i>
+                                                <?php echo $fin; ?>
+                                            </span>
+                                        </div>
+                                    <?php else: ?>
+                                        <span class="px-4 py-1 bg-red-100 text-red-700 rounded-full text-sm font-semibold">
+                                            <i class="fas fa-bed mr-1"></i>Repos
+                                        </span>
+                                    <?php endif; ?>
                                 </div>
                             <?php endforeach; ?>
                         </div>
                     <?php else: ?>
-                        <div class="text-center py-8">
-                            <i class="fas fa-calendar-times text-4xl text-gray-300 mb-2"></i>
-                            <p class="text-gray-500">Aucun horaire planifié pour cette semaine</p>
-                            <button onclick="planifierHoraires()" class="mt-2 text-blue-600 hover:text-blue-800 text-sm">
-                                <i class="fas fa-plus mr-1"></i>Planifier des horaires
+                        <div class="text-center py-12 bg-gray-50 rounded-xl">
+                            <div class="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <i class="fas fa-calendar-times text-4xl text-gray-400"></i>
+                            </div>
+                            <p class="text-gray-600 font-medium mb-4">Aucun horaire planifié pour cette semaine</p>
+                            <button onclick="planifierHoraires()" class="bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white px-6 py-3 rounded-lg font-semibold shadow-md transition duration-200">
+                                <i class="fas fa-plus mr-2"></i>Planifier des horaires
                             </button>
                         </div>
                     <?php endif; ?>
@@ -853,81 +970,101 @@ try {
                 </div>
 
                 <!-- Actions rapides -->
-                <div class="bg-white rounded-lg shadow-md p-6 card-shadow fade-in">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Actions rapides</h3>
-                    <div class="space-y-2">
-                        <button onclick="marquerPresence('entree')" class="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
+                <div class="card p-6 fade-in">
+                    <div class="flex items-center mb-6">
+                        <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg">
+                            <i class="fas fa-bolt text-white"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-gray-900 ml-3">Actions rapides</h3>
+                    </div>
+                    <div class="space-y-3">
+                        <button onclick="marquerPresence('entree')" class="action-btn w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-4 py-3 rounded-xl text-sm font-semibold shadow-md">
                             <i class="fas fa-sign-in-alt mr-2"></i>Marquer entrée
                         </button>
-                        <button onclick="marquerPresence('sortie')" class="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
+                        <button onclick="marquerPresence('sortie')" class="action-btn w-full bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white px-4 py-3 rounded-xl text-sm font-semibold shadow-md">
                             <i class="fas fa-sign-out-alt mr-2"></i>Marquer sortie
                         </button>
-                        <button onclick="envoyerEmail()" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
+                        <button onclick="envoyerEmail()" class="action-btn w-full bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white px-4 py-3 rounded-xl text-sm font-semibold shadow-md">
                             <i class="fas fa-envelope mr-2"></i>Envoyer email
                         </button>
-                        <button onclick="voirPointages()" class="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
+                        <button onclick="voirPointages()" class="action-btn w-full bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white px-4 py-3 rounded-xl text-sm font-semibold shadow-md">
                             <i class="fas fa-chart-line mr-2"></i>Voir dashboard
                         </button>
                     </div>
                 </div>
 
                 <!-- Statistiques -->
-                <div class="bg-white rounded-lg shadow-md p-6 card-shadow fade-in">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Statistiques du mois</h3>
-                    <div class="space-y-4" id="statisticsContainer">
-                        <div class="flex justify-between items-center">
-                            <div class="flex items-center">
-                                <i class="fas fa-calendar-check text-green-600 mr-2"></i>
-                                <span class="text-sm text-gray-600">Ancienneté</span>
-                            </div>
-                            <span class="text-sm font-medium text-gray-900"><?php echo $statistics['anciennete']; ?></span>
+                <div class="card p-6 fade-in">
+                    <div class="flex items-center mb-6">
+                        <div class="w-10 h-10 bg-gradient-to-br from-emerald-500 to-green-600 rounded-lg flex items-center justify-center shadow-lg">
+                            <i class="fas fa-chart-bar text-white"></i>
                         </div>
-                        
-                        <div class="flex justify-between items-center">
+                        <h3 class="text-xl font-bold text-gray-900 ml-3">Statistiques du mois</h3>
+                    </div>
+                    <div class="space-y-3" id="statisticsContainer">
+                        <div class="stat-item flex justify-between items-center p-3 rounded-lg">
                             <div class="flex items-center">
-                                <i class="fas fa-user-check text-green-600 mr-2"></i>
-                                <span class="text-sm text-gray-600">Présences</span>
-                            </div>
-                            <span class="text-sm font-medium text-green-700"><?php echo $statistics['presences_ce_mois']; ?></span>
-                        </div>
-                        
-                        <div class="flex justify-between items-center">
-                            <div class="flex items-center">
-                                <i class="fas fa-clock text-yellow-600 mr-2"></i>
-                                <span class="text-sm text-gray-600">Retards</span>
-                            </div>
-                            <span class="text-sm font-medium text-yellow-700"><?php echo $statistics['retards_ce_mois']; ?></span>
-                        </div>
-                        
-                        <div class="flex justify-between items-center">
-                            <div class="flex items-center">
-                                <i class="fas fa-user-times text-red-600 mr-2"></i>
-                                <span class="text-sm text-gray-600">Absences</span>
-                            </div>
-                            <span class="text-sm font-medium text-red-700"><?php echo $statistics['absences_ce_mois']; ?></span>
-                        </div>
-                        
-                        <div class="flex justify-between items-center">
-                            <div class="flex items-center">
-                                <i class="fas fa-hourglass-half text-blue-600 mr-2"></i>
-                                <span class="text-sm text-gray-600">Heures travaillées</span>
-                            </div>
-                            <span class="text-sm font-medium text-blue-700"><?php echo $statistics['heures_ce_mois']; ?></span>
-                        </div>
-                        
-                        <div class="border-t pt-3 mt-3">
-                            <div class="flex justify-between items-center">
-                                <div class="flex items-center">
-                                    <i class="fas fa-chart-line text-purple-600 mr-2"></i>
-                                    <span class="text-sm text-gray-600">Taux de présence</span>
+                                <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+                                    <i class="fas fa-calendar-check text-green-600"></i>
                                 </div>
-                                <span class="text-sm font-bold text-purple-700"><?php echo $statistics['taux_presence']; ?></span>
+                                <span class="text-sm font-medium text-gray-700">Ancienneté</span>
                             </div>
+                            <span class="text-sm font-bold text-gray-900"><?php echo $statistics['anciennete']; ?></span>
+                        </div>
+
+                        <div class="stat-item flex justify-between items-center p-3 rounded-lg">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+                                    <i class="fas fa-user-check text-green-600"></i>
+                                </div>
+                                <span class="text-sm font-medium text-gray-700">Présences</span>
+                            </div>
+                            <span class="text-sm font-bold text-green-700"><?php echo $statistics['presences_ce_mois']; ?></span>
+                        </div>
+
+                        <div class="stat-item flex justify-between items-center p-3 rounded-lg">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center mr-3">
+                                    <i class="fas fa-clock text-yellow-600"></i>
+                                </div>
+                                <span class="text-sm font-medium text-gray-700">Retards</span>
+                            </div>
+                            <span class="text-sm font-bold text-yellow-700"><?php echo $statistics['retards_ce_mois']; ?></span>
+                        </div>
+
+                        <div class="stat-item flex justify-between items-center p-3 rounded-lg">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center mr-3">
+                                    <i class="fas fa-user-times text-red-600"></i>
+                                </div>
+                                <span class="text-sm font-medium text-gray-700">Absences</span>
+                            </div>
+                            <span class="text-sm font-bold text-red-700"><?php echo $statistics['absences_ce_mois']; ?></span>
+                        </div>
+
+                        <div class="stat-item flex justify-between items-center p-3 rounded-lg">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                                    <i class="fas fa-hourglass-half text-blue-600"></i>
+                                </div>
+                                <span class="text-sm font-medium text-gray-700">Heures travaillées</span>
+                            </div>
+                            <span class="text-sm font-bold text-blue-700"><?php echo $statistics['heures_ce_mois']; ?></span>
+                        </div>
+
+                        <div class="stat-item flex justify-between items-center p-3 rounded-lg bg-gradient-to-r from-purple-50 to-indigo-50 border-2 border-purple-200">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
+                                    <i class="fas fa-chart-line text-purple-600"></i>
+                                </div>
+                                <span class="text-sm font-bold text-gray-800">Taux de présence</span>
+                            </div>
+                            <span class="text-lg font-bold text-purple-700"><?php echo $statistics['taux_presence']; ?></span>
                         </div>
                     </div>
-                    
-                    <button onclick="refreshStatistics()" class="w-full mt-4 text-sm text-gray-600 hover:text-gray-800 transition duration-200">
-                        <i class="fas fa-sync-alt mr-1"></i>Actualiser
+
+                    <button onclick="refreshStatistics()" class="w-full mt-6 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 rounded-lg transition duration-200">
+                        <i class="fas fa-sync-alt mr-2"></i>Actualiser
                     </button>
                 </div>
 

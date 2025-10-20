@@ -1,7 +1,8 @@
 <?php
-require_once '../config.php';
-require 'vendor/autoload.php';
 session_start();
+require_once '../config.php';
+require_once 'includes/language.php';
+require '../vendor/autoload.php';
 
 // Ajouter ce code après session_start() dans commander.php
 
@@ -51,8 +52,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
         
         // Coordonnées exactes de votre restaurant
             
-        $restaurant_lat = 14.726939436267559;
-        $restaurant_lng = -17.466387761380286;
+        $restaurant_lat = 14.6806968; 
+        $restaurant_lng =  -17.4480072;
         $allowed_radius = 150; 
         
         // Calculer la distance
@@ -167,9 +168,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !isset($_POST['newsletter_choice']) 
     $adresse = trim($_POST['adresse']);
     $mode_retrait = $_POST['mode_retrait'] ?? '';
     $num_table = trim($_POST['num_table'] ?? '');
-    
-    if (empty($nom) || empty($adresse)) {
-        $erreur = "Veuillez remplir tous les champs obligatoires.";
+    $mode_paiement = $_POST['mode_paiement'] ?? '';
+
+    if (empty($nom) || empty($adresse) || empty($telephone) || empty($num_table) || empty($mode_paiement)) {
+        $erreur = "Veuillez remplir tous les champs obligatoires (Nom, Téléphone, Numéro de table, Adresse, Mode de paiement).";
     } else {
         // CORRECTION 1: Récupérer les produits AVANT de commencer la transaction
         $produits = [];
@@ -220,11 +222,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !isset($_POST['newsletter_choice']) 
                 $conn->beginTransaction();
                 $transactionActive = true;
 
-                // CORRECTION 4: Insertion de la commande avec le bon total
-                $stmt = $conn->prepare("INSERT INTO commandes 
-    (nom_client, email, telephone, adresse, mode_retrait, num_table, total, statut_paiement, date_commande, statut, vu_admin, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'impaye', NOW(), 'En cours', 0, NOW())");
-                $stmt->execute([$nom, $email, $telephone, $adresse, $mode_retrait, $num_table, $total]);
+                // CORRECTION 4: Insertion de la commande avec le bon total et mode de paiement
+                $stmt = $conn->prepare("INSERT INTO commandes
+    (nom_client, email, telephone, adresse, mode_retrait, num_table, mode_paiement, total, statut_paiement, date_commande, statut, vu_admin, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'impaye', NOW(), 'En cours', 0, NOW())");
+                $stmt->execute([$nom, $email, $telephone, $adresse, $mode_retrait, $num_table, $mode_paiement, $total]);
                 $commande_id = $conn->lastInsertId();
 
                 // CORRECTION 5: Insertion des détails avec vérification
@@ -515,6 +517,11 @@ if (!empty($num_table)) {
 
 $emailTemplate .= "
         <div class='detail-row'>
+            <span class='detail-label'>Mode de paiement:</span>
+            <span class='detail-value' style='font-weight: 600;'>" . htmlspecialchars($mode_paiement) . "</span>
+        </div>
+
+        <div class='detail-row'>
             <span class='detail-label'>Total à payer:</span>
             <span class='detail-value total-value'>" . number_format($total, 2) . " FCFA</span>
         </div>
@@ -747,18 +754,22 @@ $emailTemplate .= "
                             
                             <div>
                                 <label for="telephone" class="block text-sm font-semibold text-gray-700 mb-2">
-                                    Numéro de téléphone
+                                    Numéro de téléphone <span class="text-red-500">*</span>
                                 </label>
                                 <div class="relative">
-                                    <input type="tel" 
-                                           id="telephone" 
+                                    <input type="tel"
+                                           id="telephone"
                                            name="telephone"
+                                           required
+                                           pattern="[0-9]{9,15}"
+                                           placeholder="Ex: 771234567"
                                            value="<?= isset($_POST['telephone']) ? htmlspecialchars($_POST['telephone']) : '' ?>"
                                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors pl-10 bg-gray-50 focus:bg-white">
                                     <svg class="w-5 h-5 text-gray-400 absolute left-3 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
                                     </svg>
                                 </div>
+                                <p class="text-xs text-gray-500 mt-1">📱 Nécessaire pour vous contacter</p>
                             </div>
                         </div>
                         
@@ -781,13 +792,15 @@ $emailTemplate .= "
                         </div>
                         <div>
                             <label for="num_table" class="block text-sm font-semibold text-gray-700 mb-2">
-                                Numéro de table
+                                Numéro de table <span class="text-red-500">*</span>
                             </label>
                             <div class="relative">
-                                <input type="number" 
-                                       id="num_table" 
-                                       name="num_table" 
+                                <input type="number"
+                                       id="num_table"
+                                       name="num_table"
                                        min="1"
+                                       max="100"
+                                       required
                                        value="<?= isset($_POST['num_table']) ? htmlspecialchars($_POST['num_table']) : '' ?>"
                                        placeholder="Entrez votre numéro de table"
                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors pl-10 bg-gray-50 focus:bg-white">
@@ -795,6 +808,63 @@ $emailTemplate .= "
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
                                 </svg>
                             </div>
+                            <p class="text-xs text-gray-500 mt-1">🪑 Le numéro est affiché sur votre table</p>
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label for="mode_paiement" class="block text-sm font-semibold text-gray-700 mb-2">
+                                Mode de paiement <span class="text-red-500">*</span>
+                            </label>
+                            <div class="grid grid-cols-3 gap-3">
+                                <!-- Option Espèces -->
+                                <label class="relative cursor-pointer">
+                                    <input type="radio"
+                                           name="mode_paiement"
+                                           value="Espèces"
+                                           required
+                                           class="peer sr-only"
+                                           <?= (isset($_POST['mode_paiement']) && $_POST['mode_paiement'] == 'Espèces') ? 'checked' : '' ?>>
+                                    <div class="w-full px-4 py-4 border-2 border-gray-300 rounded-lg text-center transition-all
+                                                peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:shadow-md
+                                                hover:border-primary/50 hover:shadow-sm">
+                                        <div class="text-3xl mb-2">💵</div>
+                                        <div class="font-semibold text-sm text-gray-700">Espèces</div>
+                                    </div>
+                                </label>
+
+                                <!-- Option Wave -->
+                                <label class="relative cursor-pointer">
+                                    <input type="radio"
+                                           name="mode_paiement"
+                                           value="Wave"
+                                           required
+                                           class="peer sr-only"
+                                           <?= (isset($_POST['mode_paiement']) && $_POST['mode_paiement'] == 'Wave') ? 'checked' : '' ?>>
+                                    <div class="w-full px-4 py-4 border-2 border-gray-300 rounded-lg text-center transition-all
+                                                peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:shadow-md
+                                                hover:border-blue-400 hover:shadow-sm">
+                                        <div class="text-3xl mb-2">📱</div>
+                                        <div class="font-semibold text-sm text-gray-700">Wave</div>
+                                    </div>
+                                </label>
+
+                                <!-- Option Orange Money -->
+                                <label class="relative cursor-pointer">
+                                    <input type="radio"
+                                           name="mode_paiement"
+                                           value="Orange Money"
+                                           required
+                                           class="peer sr-only"
+                                           <?= (isset($_POST['mode_paiement']) && $_POST['mode_paiement'] == 'Orange Money') ? 'checked' : '' ?>>
+                                    <div class="w-full px-4 py-4 border-2 border-gray-300 rounded-lg text-center transition-all
+                                                peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:shadow-md
+                                                hover:border-orange-400 hover:shadow-sm">
+                                        <div class="text-3xl mb-2">🍊</div>
+                                        <div class="font-semibold text-sm text-gray-700">Orange Money</div>
+                                    </div>
+                                </label>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-2">💳 Sélectionnez votre mode de paiement préféré</p>
                         </div>
                         <button type="submit" 
                                 class="w-full bg-gradient-to-r from-primary to-primary-dark text-white font-bold py-4 px-6 rounded-lg hover:from-primary-dark hover:to-primary transform hover:scale-[1.02] transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center space-x-2">
@@ -901,8 +971,8 @@ $emailTemplate .= "
 // CONFIGURATION RESTAURANT AVEC VOS COORDONNÉES
 // ==========================================
 const RESTAURANT_CONFIG = {
-    latitude: 14.726939436267559,
-    longitude: -17.466387761380286,
+    latitude: 14.6806968,
+    longitude: -17.4480072,
     allowedRadius: 150,
     name: "Muhlo Restaurant"
 };

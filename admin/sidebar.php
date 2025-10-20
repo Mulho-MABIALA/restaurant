@@ -1,12 +1,12 @@
 <?php
 // Vérifier si config.php a déjà été chargé
 if (!isset($conn)) {
-    require_once '../config.php';
+    require_once __DIR__ . '/../config.php';
 }
 
 // Vérifier si permissions.php a déjà été chargé
 if (!function_exists('canAccess')) {
-    require_once './permissions.php';
+    require_once __DIR__ . '/permissions.php';
 }
 
 $adminId = $_SESSION['admin_id'] ?? null;
@@ -415,9 +415,17 @@ $currentPage = basename($_SERVER['PHP_SELF']);
         #sidebar.sidebar-collapsed .toggle-icon {
             transform: rotate(180deg);
         }
+
+        /* Fix pour le scroll avec sidebar sticky */
+        @media (min-width: 1024px) {
+            .content-wrapper {
+                height: 100vh;
+                overflow-y: auto;
+            }
+        }
     </style>
 </head>
-<body class="bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200 min-h-screen">
+<body class="bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200">
 
 <!-- Mobile overlay -->
 <div id="mobile-overlay" class="fixed inset-0 z-40 mobile-overlay opacity-0 pointer-events-none lg:hidden transition-opacity duration-300"></div>
@@ -428,7 +436,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
 </button>
 
 <!-- Sidebar -->
-<aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-80 sidebar-gradient shadow-2xl sidebar-mobile lg:relative lg:translate-x-0 transition-all duration-300">
+<aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-80 sidebar-gradient shadow-2xl sidebar-mobile lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 transition-all duration-300">
 
     <!-- Floating decorative elements -->
     <div class="floating-elements sidebar-expanded-only">
@@ -490,7 +498,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
         <?php endif; ?>
         
         <!-- Restaurant Management -->
-        <?php if (anyVisible($conn, $adminId, ['reservations', 'commandes', 'gestion_plats', 'categories_plats', 'gallery', 'admin_evenements', 'horaires', 'admin_newsletter', 'avis_admin'])): ?>
+        <?php if (anyVisible($conn, $adminId, ['reservations', 'commandes', 'gestion_plats', 'categories_plats', 'gallery', 'gestion_about', 'admin_evenements', 'horaires', 'admin_newsletter', 'avis_admin'])): ?>
         <div class="space-y-3 animate-fade-in" style="animation-delay: 0.1s">
             <h2 class="section-title text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 flex items-center pb-2">
                 <div class="w-2 h-2 bg-purple-500 rounded-full mr-3 animate-pulse-soft shadow-lg shadow-purple-500/50" style="animation-delay: 0.5s"></div>
@@ -570,6 +578,19 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                     <div class="flex-1">
                         <span class="font-medium text-base">Galerie</span>
                         <p class="nav-description text-sm text-gray-400 opacity-80">Gestion de la galerie</p>
+                    </div>
+                    <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
+                </a>
+                <?php endif; ?>
+
+                <?php if (canAccess($conn, $adminId, 'gestion_about')): ?>
+                <a href="gestion_about.php" class="nav-item <?php echo ($currentPage === 'gestion_about.php') ? 'active-nav' : ''; ?> flex items-center px-4 py-4 <?php echo ($currentPage === 'gestion_about.php') ? 'text-white' : 'text-gray-300 hover:bg-surface-lighter/50 hover:text-white'; ?> rounded-2xl transition-all duration-300 group hover:shadow-xl">
+                    <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
+                        <i class="fas fa-info-circle nav-icon text-lg"></i>
+                    </div>
+                    <div class="flex-1">
+                        <span class="font-medium text-base">À Propos</span>
+                        <p class="nav-description text-sm text-gray-400 opacity-80">Gestion de la section À propos</p>
                     </div>
                     <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
                 </a>
@@ -734,56 +755,60 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                  style="display: none;"
             >
                 <?php if (canAccess($conn, $adminId, 'dashboard_finances')): ?>
-                <a href="./finances/dashboard.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                <a href="./finances_dashboard.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                     <i class="fas fa-tachometer-alt mr-3 w-5 text-sm"></i>
                     <span class="font-medium">Dashboard</span>
                 </a>
                 <?php endif; ?>
                 
                 <?php if (canAccess($conn, $adminId, 'facturation')): ?>
-                <a href="./finances/facturation.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                <a href="./facturation.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                     <i class="fas fa-file-invoice-dollar mr-3 w-5 text-sm"></i>
                     <span class="font-medium">Facturation</span>
                 </a>
                 <?php endif; ?>
                 
                 <?php if (canAccess($conn, $adminId, 'rapports')): ?>
-                <a href="./finances/rapports.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                <a href="./rapports.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                     <i class="fas fa-chart-pie mr-3 w-5 text-sm"></i>
                     <span class="font-medium">Rapports</span>
                 </a>
                 <?php endif; ?>
                 
                 <?php if (canAccess($conn, $adminId, 'tresorerie')): ?>
-                <a href="./finances/tresorerie.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                <a href="./tresorerie_globale.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                    <i class="fas fa-chart-line mr-3 w-5 text-sm"></i>
+                    <span class="font-medium">Trésorerie Globale</span>
+                </a>
+                <a href="./tresorerie.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                     <i class="fas fa-piggy-bank mr-3 w-5 text-sm"></i>
-                    <span class="font-medium">Trésorerie</span>
+                    <span class="font-medium">Trésorerie Détaillée</span>
                 </a>
                 <?php endif; ?>
 
                 <?php if (canAccess($conn, $adminId, 'fournisseurs')): ?>
-                <a href="./finances/fournisseurs.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                <a href="./fournisseurs.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                     <i class="fas fa-truck mr-3 w-5 text-sm"></i>
                     <span class="font-medium">Fournisseurs</span>
                 </a>
                 <?php endif; ?>
 
                 <?php if (canAccess($conn, $adminId, 'factures_fournisseur')): ?>
-                <a href="./finances/factures_fournisseur.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                <a href="./factures_fournisseur.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                     <i class="fas fa-file-invoice mr-3 w-5 text-sm"></i>
                     <span class="font-medium">Factures Fournisseurs</span>
                 </a>
                 <?php endif; ?>
 
                 <?php if (canAccess($conn, $adminId, 'marges')): ?>
-                <a href="./finances/marges.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                <a href="./marges.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                     <i class="fas fa-chart-line mr-3 w-5 text-sm"></i>
                     <span class="font-medium">Analyse Marges</span>
                 </a>
                 <?php endif; ?>
 
                 <?php if (canAccess($conn, $adminId, 'alertes')): ?>
-                <a href="./finances/alertes.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                <a href="./alertes.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                     <i class="fas fa-bell mr-3 w-5 text-sm"></i>
                     <span class="font-medium">Alertes Financières</span>
                 </a>

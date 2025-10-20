@@ -115,7 +115,7 @@ $taux_confirmation = $total_reservations > 0 ? round(($confirmées / $total_rese
 
 // ⭐ Derniers avis
 $avis = $conn->query("
-    SELECT nom, note, message, date_creation
+    SELECT note, message, date_creation
     FROM avis
     ORDER BY date_creation DESC
     LIMIT 5
@@ -270,32 +270,125 @@ if ($admin_id > 0) {
         }
     </script>
 
-    <!-- Styles Professionnels -->
+    <!-- Styles Professionnels avec Dark/Light Mode -->
     <style>
         [x-cloak] { display: none !important; }
-        
-        .glass-morphism {
-            background: rgba(255, 255, 255, 0.08);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.12);
+
+        /* Variables CSS pour le thème */
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --glass-bg: rgba(255, 255, 255, 0.08);
+            --glass-border: rgba(255, 255, 255, 0.12);
+            --card-bg: rgba(255, 255, 255, 0.06);
+            --shadow-color: rgba(0, 0, 0, 0.3);
         }
-        
+
+        /* Light Mode Variables */
+        .light-mode {
+            --bg-primary: #f8fafc;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #f1f5f9;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --border-color: rgba(0, 0, 0, 0.1);
+            --glass-bg: rgba(255, 255, 255, 0.95);
+            --glass-border: rgba(0, 0, 0, 0.08);
+            --card-bg: rgba(255, 255, 255, 0.98);
+            --shadow-color: rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .glass-morphism {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            transition: all 0.3s ease;
+        }
+
         .glass-card {
-            background: rgba(255, 255, 255, 0.06);
+            background: var(--card-bg);
             backdrop-filter: blur(25px);
-            border: 1px solid rgba(255, 255, 255, 0.10);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 8px 32px var(--shadow-color);
+            transition: all 0.3s ease;
         }
         
         .gradient-corporate {
-            background: linear-gradient(135deg, 
-                #1e293b 0%, 
-                #334155 25%, 
-                #475569 50%, 
-                #64748b 75%, 
+            background: linear-gradient(135deg,
+                #1e293b 0%,
+                #334155 25%,
+                #475569 50%,
+                #64748b 75%,
                 #94a3b8 100%);
             background-size: 400% 400%;
             animation: gradientShift 20s ease infinite;
+        }
+
+        .light-mode .gradient-corporate {
+            background: linear-gradient(135deg,
+                #f1f5f9 0%,
+                #e2e8f0 25%,
+                #cbd5e1 50%,
+                #94a3b8 75%,
+                #64748b 100%);
+        }
+
+        /* Light mode blob animations */
+        .light-mode .blob {
+            background: linear-gradient(45deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+        }
+
+        /* Light mode text */
+        .light-mode .text-corporate {
+            background: linear-gradient(135deg, #0f172a, #334155);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Theme Toggle Button */
+        .theme-toggle {
+            position: relative;
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(251, 191, 36, 0.3);
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.05) rotate(5deg);
+            box-shadow: 0 6px 20px rgba(251, 191, 36, 0.4);
+        }
+
+        .light-mode .theme-toggle {
+            background: linear-gradient(135deg, #1e293b, #334155);
+            box-shadow: 0 4px 12px rgba(30, 41, 59, 0.3);
+        }
+
+        .theme-icon {
+            font-size: 1.5rem;
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .theme-toggle:hover .theme-icon {
+            transform: rotate(15deg) scale(1.1);
         }
         
         @keyframes gradientShift {
@@ -449,6 +542,11 @@ if ($admin_id > 0) {
                         
                         <!-- Contrôles Professionnels -->
                         <div class="flex items-center space-x-4" x-data="{ profileOpen: false, notificationsOpen: false }">
+                            <!-- Theme Toggle Button -->
+                            <button onclick="toggleTheme()" class="theme-toggle" title="Changer le thème" type="button">
+                                <i class="theme-icon fas fa-sun" id="theme-icon"></i>
+                            </button>
+
                             <!-- Widget Stats Temps Réel -->
                             <div class="hidden sm:flex items-center space-x-6 glass-card rounded-2xl px-6 py-4 shadow-xl">
                                 <div class="flex items-center space-x-3 text-text-primary">
@@ -1057,15 +1155,14 @@ if ($admin_id > 0) {
                 <p class="text-text-secondary">Retours et évaluations</p>
             </div>
         </div>
-        <a href="avis.php" class="text-corporate-amber hover:text-amber-300 font-semibold flex items-center group">
+        <a href="avis_admin.php" class="text-corporate-amber hover:text-amber-300 font-semibold flex items-center group">
             Voir tout <i class="fas fa-arrow-right ml-2 group-hover:translate-x-1 transition-transform"></i>
         </a>
     </div>
     
     <div class="space-y-6">
-        <?php foreach($avis as $avis_item): 
+        <?php foreach($avis as $avis_item):
             // Vérification et valeurs par défaut pour éviter les erreurs
-            $client_nom = $avis_item['nom'] ?? 'Client inconnu';
             $date_envoi = $avis_item['date_creation'] ?? date('Y-m-d H:i:s');
             $commentaire = $avis_item['message'] ?? 'Aucun commentaire';
             $note = $avis_item['note'] ?? 0;
@@ -1075,21 +1172,21 @@ if ($admin_id > 0) {
                 <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center space-x-4">
                         <div class="w-12 h-12 bg-warning-gradient rounded-2xl flex items-center justify-center shadow-lg">
-                            <span class="text-white font-bold"><?= strtoupper(substr($client_nom, 0, 1)) ?></span>
+                            <i class="fas fa-user-circle text-white text-2xl"></i>
                         </div>
                         <div>
-                            <p class="font-bold text-text-primary"><?= htmlspecialchars($client_nom) ?></p>
+                            <p class="font-bold text-text-primary">Client anonyme</p>
                             <p class="text-text-secondary text-sm"><?= date('d/m/Y', strtotime($date_envoi)) ?></p>
                         </div>
                     </div>
-                    
+
                     <div class="flex items-center space-x-1 bg-corporate-amber/20 px-3 py-1 rounded-xl">
                         <?php for($i = 1; $i <= 5; $i++): ?>
                             <i class="fas fa-star text-sm <?= $i <= $note ? 'text-corporate-amber' : 'text-white/30' ?>"></i>
                         <?php endfor; ?>
                     </div>
                 </div>
-                
+
                 <blockquote class="text-text-secondary leading-relaxed italic font-medium">
                     "<?= htmlspecialchars(substr($commentaire, 0, 150)) ?><?= strlen($commentaire) > 150 ? '...' : '' ?>"
                 </blockquote>
@@ -1764,6 +1861,64 @@ function uploadProfilePhoto(input) {
             100% { box-shadow: 0 0 20px rgba(3, 105, 161, 0.6), 0 0 30px rgba(15, 118, 110, 0.4); }
         }
     </style>
-   
+
+    <!-- Theme Toggle Script -->
+    <script>
+        // Fonction pour basculer entre les thèmes
+        function toggleTheme() {
+            const body = document.body;
+            const themeIcon = document.getElementById('theme-icon');
+            const isDark = body.classList.contains('light-mode');
+
+            if (isDark) {
+                // Passer en mode sombre
+                body.classList.remove('light-mode');
+                themeIcon.classList.remove('fa-moon');
+                themeIcon.classList.add('fa-sun');
+                localStorage.setItem('theme', 'dark');
+            } else {
+                // Passer en mode clair
+                body.classList.add('light-mode');
+                themeIcon.classList.remove('fa-sun');
+                themeIcon.classList.add('fa-moon');
+                localStorage.setItem('theme', 'light');
+            }
+
+            // Animation du toggle
+            themeIcon.style.transform = 'rotate(360deg) scale(0)';
+            setTimeout(() => {
+                themeIcon.style.transform = 'rotate(0deg) scale(1)';
+            }, 150);
+        }
+
+        // Charger le thème sauvegardé au chargement de la page
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedTheme = localStorage.getItem('theme');
+            const themeIcon = document.getElementById('theme-icon');
+
+            if (savedTheme === 'light') {
+                document.body.classList.add('light-mode');
+                themeIcon.classList.remove('fa-sun');
+                themeIcon.classList.add('fa-moon');
+            }
+        });
+
+        // Horloge en temps réel
+        function updateClock() {
+            const clockElement = document.getElementById('live-clock');
+            if (clockElement) {
+                const now = new Date();
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+                clockElement.textContent = `${hours}:${minutes}:${seconds}`;
+            }
+        }
+
+        // Mettre à jour l'horloge toutes les secondes
+        setInterval(updateClock, 1000);
+        updateClock(); // Appel initial
+    </script>
+
 </body>
 </html>

@@ -1,16 +1,16 @@
 <?php
 session_start();
-require_once '../../config.php';
-require_once '../permissions.php';
+require_once '../config.php';
+require_once 'permissions.php';
 
 // Vérifier authentification
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
-    header('Location: ../login.php');
+    header('Location: login.php');
     exit;
 }
 
 if (!isset($_SESSION['admin_id'])) {
-    header('Location: ../login.php');
+    header('Location: login.php');
     exit;
 }
 
@@ -78,7 +78,7 @@ $progression = $ventes_jour['ca_total'] > 0 ? round(($ventes_jour['ca_total'] / 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="../assets/css/cards-design.css">
+    <link rel="stylesheet" href="assets/css/cards-design.css">
     <style>
         /* Scrollbar pour light theme */
         ::-webkit-scrollbar {
@@ -122,7 +122,7 @@ $progression = $ventes_jour['ca_total'] > 0 ? round(($ventes_jour['ca_total'] / 
 <body class="bg-gray-50">
 
     <div class="flex h-screen overflow-hidden">
-        <?php include '../sidebar.php'; ?>
+        <?php include 'sidebar.php'; ?>
 
         <div class="flex-1 overflow-y-auto">
             <!-- Navigation Finances -->
@@ -135,7 +135,7 @@ $progression = $ventes_jour['ca_total'] > 0 ? round(($ventes_jour['ca_total'] / 
                                 Dashboard Financier
                             </h1>
                             <div class="hidden md:flex space-x-2">
-                                <a href="dashboard.php" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                                <a href="finances_dashboard.php" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
                                     <i class="fas fa-dashboard mr-1"></i>Tableau de bord
                                 </a>
                                 <a href="facturation.php" class="text-gray-600 hover:bg-gray-100 px-4 py-2 rounded-lg text-sm font-medium">

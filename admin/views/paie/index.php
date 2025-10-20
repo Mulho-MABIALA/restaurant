@@ -557,111 +557,301 @@
         <?php include __DIR__ . '/../../sidebar.php'; ?>
 
         <!-- Contenu principal -->
-        <div class="flex-1 overflow-y-auto">
+        <div class="flex-1 overflow-y-auto bg-gradient-to-br from-gray-50 to-gray-100">
             <div class="container mx-auto px-4 py-6">
-        <!-- Header principal -->
+        <!-- Header principal - Version moderne et épurée -->
         <div class="mb-8">
-            <div class="gradient-bg text-white rounded-lg p-6 mb-6">
-                <div class="flex flex-col md:flex-row md:items-center md:justify-between">
-                    <div class="flex items-center space-x-4 mb-4 md:mb-0">
-                        <i class="fas fa-utensils text-3xl"></i>
-                        <div>
-                            <h1 class="text-3xl font-bold">Restaurant Le Savoureux</h1>
-                            <p class="text-sm opacity-90">Système de Gestion RH Intégré avec Présences</p>
-                            <p class="text-sm opacity-75">
-                                Période: <span class="font-semibold"><?php echo date('F Y'); ?></span>
-                            </p>
+            <div class="bg-white rounded-2xl shadow-lg overflow-hidden mb-6 border border-gray-100">
+                <div class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 px-8 py-6">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+                        <div class="flex items-center space-x-4 mb-4 md:mb-0">
+                            <div class="bg-white bg-opacity-20 backdrop-blur-sm rounded-xl p-4">
+                                <i class="fas fa-utensils text-white text-3xl"></i>
+                            </div>
+                            <div>
+                                <h1 class="text-3xl font-bold text-white tracking-tight">Restaurant Le Savoureux</h1>
+                                <p class="text-white text-opacity-90 text-sm mt-1 font-medium">Système de Gestion RH Intégré</p>
+                                <div class="flex items-center mt-2 space-x-4">
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white bg-opacity-20 text-white backdrop-blur-sm">
+                                        <i class="fas fa-calendar mr-2"></i><?php
+                                        $mois_fr = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+                                        echo $mois_fr[date('n') - 1] . ' ' . date('Y');
+                                        ?>
+                                    </span>
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white bg-opacity-20 text-white backdrop-blur-sm">
+                                        <i class="fas fa-clock mr-2"></i><?php echo date('H:i'); ?>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <div class="text-right">
+                                <p class="text-white font-semibold text-lg">Admin RH</p>
+                                <div class="flex items-center justify-end mt-1 space-x-2">
+                                    <i class="fas fa-map-marker-alt text-white text-opacity-75 text-xs"></i>
+                                    <p class="text-white text-opacity-90 text-sm">Dakar, Sénégal</p>
+                                </div>
+                                <p class="text-white text-opacity-75 text-xs mt-1">
+                                    <i class="fas fa-user-check mr-1"></i>Connecté: <?php echo date('d/m/Y à H:i'); ?>
+                                </p>
+                            </div>
+                            <div class="hidden md:block bg-white bg-opacity-20 backdrop-blur-sm rounded-full p-1">
+                                <i class="fas fa-user-circle text-white text-4xl"></i>
+                            </div>
                         </div>
                     </div>
-                    <div class="flex items-center space-x-4">
-                        <div class="text-right">
-                            <p class="font-semibold">Admin RH</p>
-                            <p class="text-sm opacity-90">Dakar, Sénégal</p>
-                            <p class="text-xs opacity-75">Dernière connexion: <?php echo date('d/m/Y H:i'); ?></p>
+                </div>
+
+                <!-- Barre d'actions rapides -->
+                <div class="bg-gray-50 border-t border-gray-100 px-8 py-3">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-2 text-sm text-gray-600">
+                            <i class="fas fa-info-circle text-indigo-500"></i>
+                            <span>Accès rapide aux fonctionnalités principales</span>
                         </div>
-                        <i class="fas fa-user-circle text-3xl"></i>
+                        <div class="flex items-center space-x-2">
+                            <button onclick="window.location.reload()" class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                                <i class="fas fa-sync-alt mr-2"></i>Actualiser
+                            </button>
+                            <button onclick="window.print()" class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                                <i class="fas fa-print mr-2"></i>Imprimer
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Statistiques enrichies avec présences -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-6" id="stats-container">
-                <div class="bg-white rounded-lg shadow p-4 card-hover">
-                    <div class="flex items-center">
-                        <div class="p-3 rounded-full bg-blue-100">
-                            <i class="fas fa-users text-blue-600 text-lg"></i>
+            <!-- Section Tableau de Bord RH Avancé -->
+            <div class="card p-6 mb-6 bg-white rounded-xl shadow-md">
+                <h2 class="text-2xl font-semibold mb-6 text-gray-800">Tableau de Bord RH Avancé</h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        <div class="flex items-center">
+                            <div class="p-2 rounded-lg bg-purple-100 text-purple-600 mr-3">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">Effectif Total</p>
+                                <p class="text-2xl font-bold text-gray-800" id="totalEmployes">0</p>
+                            </div>
                         </div>
-                        <div class="ml-3">
-                            <p class="text-xs font-medium text-gray-500">Employés actifs</p>
-                            <p class="text-xl font-bold text-gray-900" id="stat-employes"><?php echo h($stats['employes_actifs']); ?></p>
+                    </div>
+
+                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        <div class="flex items-center">
+                            <div class="p-2 rounded-lg bg-green-100 text-green-600 mr-3">
+                                <i class="fas fa-user-check"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">Taux de Présence</p>
+                                <p class="text-2xl font-bold text-gray-800" id="tauxPresence">0%</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        <div class="flex items-center">
+                            <div class="p-2 rounded-lg bg-pink-100 text-pink-600 mr-3">
+                                <i class="fas fa-money-bill-wave"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">Masse Salariale</p>
+                                <p class="text-2xl font-bold text-gray-800" id="masseSalariale">0 FCFA</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        <div class="flex items-center">
+                            <div class="p-2 rounded-lg bg-orange-100 text-orange-600 mr-3">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">Retard Moyen</p>
+                                <p class="text-2xl font-bold text-gray-800" id="retardMoyen">0 min</p>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-lg shadow p-4 card-hover">
-                    <div class="flex items-center">
-                        <div class="p-3 rounded-full bg-green-100">
-                            <i class="fas fa-file-invoice text-green-600 text-lg"></i>
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 mt-4">
+                    <h3 class="text-lg font-semibold mb-4 text-gray-800">Générer un Rapport Personnalisé</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Type de Rapport</label>
+                            <select id="reportType" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-800 focus:border-green-500 focus:ring-2 focus:ring-green-200">
+                                <option value="presences">Présences et Retards</option>
+                                <option value="salaires">Salaires et Coûts</option>
+                                <option value="effectifs">Effectifs et Démographie</option>
+                                <option value="turnover">Turnover et Rotation</option>
+                            </select>
                         </div>
-                        <div class="ml-3">
-                            <p class="text-xs font-medium text-gray-500">Bulletins ce mois</p>
-                            <p class="text-xl font-bold text-gray-900" id="stat-bulletins"><?php echo h($stats['bulletins_mois']); ?></p>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Date Début</label>
+                            <input type="date" id="reportStartDate" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-800 focus:border-green-500 focus:ring-2 focus:ring-green-200">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Date Fin</label>
+                            <input type="date" id="reportEndDate" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-800 focus:border-green-500 focus:ring-2 focus:ring-green-200">
+                        </div>
+                    </div>
+                    <button onclick="generateCustomReport()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-all duration-200 shadow-sm">
+                        <i class="fas fa-file-export mr-2"></i>Générer le Rapport
+                    </button>
+
+                    <!-- Indicateur de chargement -->
+                    <div id="reportLoading" class="hidden mt-4 text-center">
+                        <i class="fas fa-spinner fa-spin text-green-600 text-2xl"></i>
+                        <p class="text-gray-600">Génération du rapport en cours...</p>
+                    </div>
+                </div>
+
+                <!-- Modal pour afficher les rapports -->
+                <div id="reportModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden z-50">
+                    <div class="flex items-center justify-center min-h-screen p-4">
+                        <div class="bg-white rounded-xl max-w-6xl w-full max-h-screen overflow-y-auto shadow-2xl">
+                            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                                <h3 id="reportModalTitle" class="text-lg font-semibold text-gray-800">Rapport Personnalisé</h3>
+                                <button onclick="closeReportModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                                    <i class="fas fa-times text-xl"></i>
+                                </button>
+                            </div>
+                            <div class="p-6">
+                                <div id="reportContent" class="mb-6 text-gray-800">
+                                    <!-- Le contenu du rapport sera chargé ici -->
+                                </div>
+                                <div class="flex justify-end space-x-3">
+                                    <button onclick="exportReportToPDF()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-all duration-200 shadow-sm">
+                                        <i class="fas fa-file-pdf mr-2"></i>Exporter en PDF
+                                    </button>
+                                    <button onclick="exportReportToExcel()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all duration-200 shadow-sm">
+                                        <i class="fas fa-file-excel mr-2"></i>Exporter en Excel
+                                    </button>
+                                    <button onclick="closeReportModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-all duration-200">
+                                        Fermer
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistiques enrichies avec présences - Version moderne -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6" id="stats-container">
+                <!-- Carte Employés -->
+                <div class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-5 border border-gray-100 hover:border-blue-200 transform hover:-translate-y-1">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center mb-2">
+                                <div class="p-2.5 rounded-lg bg-gradient-to-br from-blue-100 to-blue-50">
+                                    <i class="fas fa-users text-blue-600 text-xl"></i>
+                                </div>
+                            </div>
+                            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Employés</p>
+                            <p class="text-2xl font-bold text-gray-900" id="stat-employes"><?php echo h($stats['employes_actifs']); ?></p>
+                        </div>
+                        <div class="text-blue-600 opacity-20">
+                            <i class="fas fa-users text-4xl"></i>
                         </div>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-lg shadow p-4 card-hover">
-                    <div class="flex items-center">
-                        <div class="p-3 rounded-full bg-purple-100">
-                            <i class="fas fa-clock text-purple-600 text-lg"></i>
+                <!-- Carte Bulletins -->
+                <div class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-5 border border-gray-100 hover:border-green-200 transform hover:-translate-y-1">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center mb-2">
+                                <div class="p-2.5 rounded-lg bg-gradient-to-br from-green-100 to-green-50">
+                                    <i class="fas fa-file-invoice text-green-600 text-xl"></i>
+                                </div>
+                            </div>
+                            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Bulletins</p>
+                            <p class="text-2xl font-bold text-gray-900" id="stat-bulletins"><?php echo h($stats['bulletins_mois']); ?></p>
                         </div>
-                        <div class="ml-3">
-                            <p class="text-xs font-medium text-gray-500">Présents aujourd'hui</p>
-                            <p class="text-xl font-bold text-gray-900" id="stat-presences">-</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-lg shadow p-4 card-hover">
-                    <div class="flex items-center">
-                        <div class="p-3 rounded-full bg-yellow-100">
-                            <i class="fas fa-calendar-check text-yellow-600 text-lg"></i>
-                        </div>
-                        <div class="ml-3">
-                            <p class="text-xs font-medium text-gray-500">Congés en attente</p>
-                            <p class="text-xl font-bold text-gray-900" id="stat-conges"><?php echo h($stats['conges_attente'] ?? 0); ?></p>
+                        <div class="text-green-600 opacity-20">
+                            <i class="fas fa-file-invoice text-4xl"></i>
                         </div>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-lg shadow p-4 card-hover">
-                    <div class="flex items-center">
-                        <div class="p-3 rounded-full bg-orange-100">
-                            <i class="fas fa-hand-holding-usd text-orange-600 text-lg"></i>
+                <!-- Carte Présences -->
+                <div class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-5 border border-gray-100 hover:border-purple-200 transform hover:-translate-y-1">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center mb-2">
+                                <div class="p-2.5 rounded-lg bg-gradient-to-br from-purple-100 to-purple-50">
+                                    <i class="fas fa-clock text-purple-600 text-xl"></i>
+                                </div>
+                            </div>
+                            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Présents</p>
+                            <p class="text-2xl font-bold text-gray-900" id="stat-presences">-</p>
                         </div>
-                        <div class="ml-3">
-                            <p class="text-xs font-medium text-gray-500">Avances en attente</p>
-                            <p class="text-xl font-bold text-gray-900" id="stat-avances"><?php echo h($stats['avances_attente'] ?? 0); ?></p>
+                        <div class="text-purple-600 opacity-20">
+                            <i class="fas fa-clock text-4xl"></i>
                         </div>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-lg shadow p-4 card-hover">
-                    <div class="flex items-center">
-                        <div class="p-3 rounded-full bg-red-100">
-                            <i class="fas fa-chart-line text-red-600 text-lg"></i>
+                <!-- Carte Congés -->
+                <div class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-5 border border-gray-100 hover:border-yellow-200 transform hover:-translate-y-1">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center mb-2">
+                                <div class="p-2.5 rounded-lg bg-gradient-to-br from-yellow-100 to-yellow-50">
+                                    <i class="fas fa-calendar-check text-yellow-600 text-xl"></i>
+                                </div>
+                            </div>
+                            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Congés</p>
+                            <p class="text-2xl font-bold text-gray-900" id="stat-conges"><?php echo h($stats['conges_attente'] ?? 0); ?></p>
                         </div>
-                        <div class="ml-3">
-                            <p class="text-xs font-medium text-gray-500">Masse salariale</p>
-                            <p class="text-sm font-bold text-gray-900" id="stat-masse"><?php echo formaterMontant($stats['masse_salariale']); ?></p>
+                        <div class="text-yellow-600 opacity-20">
+                            <i class="fas fa-calendar-check text-4xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Carte Avances -->
+                <div class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-5 border border-gray-100 hover:border-orange-200 transform hover:-translate-y-1">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center mb-2">
+                                <div class="p-2.5 rounded-lg bg-gradient-to-br from-orange-100 to-orange-50">
+                                    <i class="fas fa-hand-holding-usd text-orange-600 text-xl"></i>
+                                </div>
+                            </div>
+                            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Avances</p>
+                            <p class="text-2xl font-bold text-gray-900" id="stat-avances"><?php echo h($stats['avances_attente'] ?? 0); ?></p>
+                        </div>
+                        <div class="text-orange-600 opacity-20">
+                            <i class="fas fa-hand-holding-usd text-4xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Carte Masse salariale -->
+                <div class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-5 border border-gray-100 hover:border-red-200 transform hover:-translate-y-1">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center mb-2">
+                                <div class="p-2.5 rounded-lg bg-gradient-to-br from-red-100 to-red-50">
+                                    <i class="fas fa-chart-line text-red-600 text-xl"></i>
+                                </div>
+                            </div>
+                            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Masse</p>
+                            <p class="text-lg font-bold text-gray-900 leading-tight" id="stat-masse"><?php echo formaterMontant($stats['masse_salariale']); ?></p>
+                        </div>
+                        <div class="text-red-600 opacity-20">
+                            <i class="fas fa-chart-line text-4xl"></i>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Navigation par onglets -->
-        <nav class="bg-white rounded-lg shadow-md mb-6">
+        <!-- Navigation par onglets - Version moderne -->
+        <nav class="bg-white rounded-2xl shadow-lg mb-6 border border-gray-100 overflow-hidden">
             <div class="px-6">
                 <div class="flex space-x-8 overflow-x-auto">
                     <button onclick="showTab('paie')" class="tab-btn tab-active px-6 py-4 font-semibold transition-all whitespace-nowrap">
@@ -959,51 +1149,170 @@
 
         <!-- Onglet Dashboard -->
         <div id="dashboard-tab" class="tab-content">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <div class="bg-white rounded-lg shadow p-6">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">Résumé mensuel avec présences</h3>
-                    <div id="resume-mensuel" class="space-y-4">
-                        <!-- Sera rempli par JavaScript avec stats avancées -->
+            <!-- Section supérieure - Stats principales -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                <!-- Carte Employés -->
+                <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-transform duration-200">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-blue-100 text-sm font-medium mb-1">Employés Actifs</p>
+                            <p class="text-3xl font-bold" id="dashboard-total-employes">0</p>
+                            <p class="text-blue-100 text-xs mt-2">Total dans le système</p>
+                        </div>
+                        <div class="bg-white bg-opacity-20 rounded-full p-4">
+                            <i class="fas fa-users text-3xl"></i>
+                        </div>
                     </div>
                 </div>
-                
-                <div class="bg-white rounded-lg shadow p-6">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">Actions en attente</h3>
-                    <div id="actions-attente" class="space-y-4">
-                        <!-- Sera rempli par JavaScript -->
+
+                <!-- Carte Bulletins -->
+                <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-transform duration-200">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-green-100 text-sm font-medium mb-1">Bulletins Ce Mois</p>
+                            <p class="text-3xl font-bold" id="dashboard-total-bulletins">0</p>
+                            <p class="text-green-100 text-xs mt-2">Générés en <?php echo date('F Y'); ?></p>
+                        </div>
+                        <div class="bg-white bg-opacity-20 rounded-full p-4">
+                            <i class="fas fa-file-invoice text-3xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Carte Masse Salariale -->
+                <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-transform duration-200">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-purple-100 text-sm font-medium mb-1">Masse Salariale</p>
+                            <p class="text-2xl font-bold" id="dashboard-masse-salariale">0 FCFA</p>
+                            <p class="text-purple-100 text-xs mt-2">Ce mois</p>
+                        </div>
+                        <div class="bg-white bg-opacity-20 rounded-full p-4">
+                            <i class="fas fa-money-bill-wave text-3xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Carte Taux de Présence -->
+                <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-transform duration-200">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-orange-100 text-sm font-medium mb-1">Taux de Présence</p>
+                            <p class="text-3xl font-bold" id="dashboard-taux-presence">0%</p>
+                            <p class="text-orange-100 text-xs mt-2">Moyenne mensuelle</p>
+                        </div>
+                        <div class="bg-white bg-opacity-20 rounded-full p-4">
+                            <i class="fas fa-clock text-3xl"></i>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Graphiques et statistiques avancées -->
+            <!-- Section Actions en attente -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div class="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow duration-200 overflow-hidden border-l-4 border-yellow-500">
+                    <div class="p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-800">Congés en Attente</h3>
+                            <div class="bg-yellow-100 rounded-full p-3">
+                                <i class="fas fa-calendar-alt text-yellow-600 text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="text-4xl font-bold text-yellow-600" id="dashboard-conges-attente">0</div>
+                        <p class="text-gray-500 text-sm mt-2">Demandes à valider</p>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow duration-200 overflow-hidden border-l-4 border-orange-500">
+                    <div class="p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-800">Avances en Attente</h3>
+                            <div class="bg-orange-100 rounded-full p-3">
+                                <i class="fas fa-hand-holding-usd text-orange-600 text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="text-4xl font-bold text-orange-600" id="dashboard-avances-attente">0</div>
+                        <p class="text-gray-500 text-sm mt-2">Demandes à approuver</p>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow duration-200 overflow-hidden border-l-4 border-red-500">
+                    <div class="p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-800">Primes à Valider</h3>
+                            <div class="bg-red-100 rounded-full p-3">
+                                <i class="fas fa-award text-red-600 text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="text-4xl font-bold text-red-600" id="dashboard-primes-attente">0</div>
+                        <p class="text-gray-500 text-sm mt-2">En attente de validation</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section Graphiques et statistiques -->
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                <div class="bg-white rounded-lg shadow p-6">
-                    <h4 class="text-lg font-medium text-gray-900 mb-4">Répartition par département</h4>
-                    <div id="repartition-departements" class="space-y-3">
-                        <!-- Sera rempli par JavaScript -->
+                <!-- Répartition par département -->
+                <div class="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow duration-200 overflow-hidden">
+                    <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4">
+                        <h4 class="text-lg font-semibold text-white flex items-center">
+                            <i class="fas fa-building mr-3"></i>
+                            Répartition par département
+                        </h4>
+                    </div>
+                    <div class="p-6">
+                        <div id="repartition-departements" class="space-y-3">
+                            <!-- Sera rempli par JavaScript -->
+                        </div>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-lg shadow p-6">
-                    <h4 class="text-lg font-medium text-gray-900 mb-4">Types de contrats</h4>
-                    <div id="types-contrats" class="space-y-3">
-                        <!-- Sera rempli par JavaScript -->
+                <!-- Types de contrats -->
+                <div class="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow duration-200 overflow-hidden">
+                    <div class="bg-gradient-to-r from-green-500 to-green-600 px-6 py-4">
+                        <h4 class="text-lg font-semibold text-white flex items-center">
+                            <i class="fas fa-file-contract mr-3"></i>
+                            Types de contrats
+                        </h4>
+                    </div>
+                    <div class="p-6">
+                        <div id="types-contrats" class="space-y-3">
+                            <!-- Sera rempli par JavaScript -->
+                        </div>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-lg shadow p-6">
-                    <h4 class="text-lg font-medium text-gray-900 mb-4">Indicateurs clés</h4>
-                    <div id="indicateurs-cles" class="space-y-3">
-                        <!-- Sera rempli par JavaScript -->
+                <!-- Indicateurs clés -->
+                <div class="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow duration-200 overflow-hidden">
+                    <div class="bg-gradient-to-r from-purple-500 to-purple-600 px-6 py-4">
+                        <h4 class="text-lg font-semibold text-white flex items-center">
+                            <i class="fas fa-chart-line mr-3"></i>
+                            Indicateurs clés
+                        </h4>
+                    </div>
+                    <div class="p-6">
+                        <div id="indicateurs-cles" class="space-y-4">
+                            <!-- Sera rempli par JavaScript -->
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Graphique des présences sur 7 jours -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h4 class="text-lg font-medium text-gray-900 mb-4">Évolution des présences (7 derniers jours)</h4>
-                <div id="graphique-presences" class="h-64 flex items-center justify-center bg-gray-50 rounded">
-                    <p class="text-gray-500">Graphique des présences</p>
+            <div class="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow duration-200 overflow-hidden">
+                <div class="bg-gradient-to-r from-indigo-500 to-indigo-600 px-6 py-4">
+                    <h4 class="text-lg font-semibold text-white flex items-center">
+                        <i class="fas fa-chart-area mr-3"></i>
+                        Évolution des présences (7 derniers jours)
+                    </h4>
+                </div>
+                <div class="p-6">
+                    <div id="graphique-presences" class="h-64 flex items-center justify-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                        <div class="text-center">
+                            <i class="fas fa-chart-line text-gray-400 text-4xl mb-3"></i>
+                            <p class="text-gray-500">Graphique des présences à venir</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -3045,10 +3354,11 @@ async function chargerPresences() {
         const result = await Utils.apiCall('get_presences_jour', {
             date: new Date().toISOString().split('T')[0]
         });
-        
+
         if (result.success) {
             const presencesJour = result.presences.map(presence => ({
                 id: presence.employe_id,
+                employe_id: presence.employe_id, // Conserver aussi employe_id pour compatibilité
                 nom: presence.nom,
                 prenom: presence.prenom,
                 poste_nom: presence.poste_nom,
@@ -3080,10 +3390,11 @@ async function chargerPresences() {
 async function changerDatePresences(date) {
     try {
         const result = await Utils.apiCall('get_presences_jour', { date: date });
-        
+
         if (result.success) {
             const presencesJour = result.presences.map(presence => ({
                 id: presence.employe_id,
+                employe_id: presence.employe_id, // Conserver aussi employe_id pour compatibilité
                 nom: presence.nom,
                 prenom: presence.prenom,
                 poste_nom: presence.poste_nom,
@@ -3114,6 +3425,11 @@ function afficherPresencesJour(presences) {
     }
 
     container.innerHTML = presences.map(presence => {
+        // Debug: vérifier que l'ID existe
+        if (!presence.id && !presence.employe_id) {
+            console.error('Présence sans ID:', presence);
+        }
+
         const statusConfig = {
             'present': { class: 'presence-present', icon: 'fa-check-circle', text: 'Présent', color: 'text-green-600' },
             'absent': { class: 'presence-absent', icon: 'fa-times-circle', text: 'Absent', color: 'text-red-600' },
@@ -3149,8 +3465,8 @@ function afficherPresencesJour(presences) {
         }
         
         return `
-            <div class="bg-white border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer" 
-                 onclick="voirDetailsPresenceEmploye(${presence.employe_id})">
+            <div class="bg-white border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                 onclick="voirDetailsPresenceEmploye(${presence.id || presence.employe_id || 0})">
                 <div class="flex items-center justify-between mb-2">
                     <h4 class="font-medium text-gray-900">${presence.prenom} ${presence.nom}</h4>
                     <span class="presence-indicator ${config.class}"></span>
@@ -5520,11 +5836,14 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Chargement initial des données pour l'onglet actif
     chargerBulletins();
-    
+
     // Mise à jour des statistiques si nécessaire
     if (window.initialData && window.initialData.stats) {
         updateStatsDisplay();
     }
+
+    // Charger le Tableau de Bord RH Avancé
+    chargerTableauBordRH();
 });
 
 // ================== FONCTIONS UTILITAIRES ==================
@@ -5544,6 +5863,105 @@ function updateStatsDisplay() {
         }
     });
 }
+
+// ================== FONCTIONS TABLEAU DE BORD RH AVANCÉ ==================
+function chargerTableauBordRH() {
+    // Charger les statistiques avancées
+    fetch('gestion_paie.php?action=get_stats_avancees')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Effectif Total
+                document.getElementById('totalEmployes').textContent = data.stats.effectif_total || employes.length;
+
+                // Taux de Présence
+                document.getElementById('tauxPresence').textContent = (data.stats.taux_presence || 0) + '%';
+
+                // Masse Salariale
+                const masseSalariale = data.stats.masse_salariale || 0;
+                document.getElementById('masseSalariale').textContent = new Intl.NumberFormat('fr-FR').format(masseSalariale) + ' FCFA';
+
+                // Retard Moyen
+                document.getElementById('retardMoyen').textContent = (data.stats.retard_moyen || 0) + ' min';
+            } else {
+                // Valeurs par défaut si l'API n'est pas disponible
+                document.getElementById('totalEmployes').textContent = employes.length;
+                document.getElementById('tauxPresence').textContent = '0%';
+                document.getElementById('masseSalariale').textContent = '0 FCFA';
+                document.getElementById('retardMoyen').textContent = '0 min';
+            }
+        })
+        .catch(error => {
+            console.error('Erreur lors du chargement des statistiques:', error);
+            // Valeurs par défaut en cas d'erreur
+            document.getElementById('totalEmployes').textContent = employes.length;
+            document.getElementById('tauxPresence').textContent = 'N/A';
+            document.getElementById('masseSalariale').textContent = 'N/A';
+            document.getElementById('retardMoyen').textContent = 'N/A';
+        });
+}
+
+function generateCustomReport() {
+    const reportType = document.getElementById('reportType').value;
+    const startDate = document.getElementById('reportStartDate').value;
+    const endDate = document.getElementById('reportEndDate').value;
+
+    if (!startDate || !endDate) {
+        showNotification('Veuillez sélectionner une période', 'error');
+        return;
+    }
+
+    // Afficher le loader
+    document.getElementById('reportLoading').classList.remove('hidden');
+
+    // Générer le rapport
+    fetch('gestion_paie.php?action=generate_custom_report', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            type: reportType,
+            date_debut: startDate,
+            date_fin: endDate
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('reportLoading').classList.add('hidden');
+
+        if (data.success) {
+            // Afficher le rapport dans la modal
+            document.getElementById('reportModalTitle').textContent = data.title || 'Rapport Personnalisé';
+            document.getElementById('reportContent').innerHTML = data.content || '<p class="text-gray-600">Aucune donnée disponible pour cette période.</p>';
+            openReportModal();
+        } else {
+            showNotification(data.message || 'Erreur lors de la génération du rapport', 'error');
+        }
+    })
+    .catch(error => {
+        document.getElementById('reportLoading').classList.add('hidden');
+        console.error('Erreur:', error);
+        showNotification('Erreur lors de la génération du rapport', 'error');
+    });
+}
+
+function openReportModal() {
+    document.getElementById('reportModal').classList.remove('hidden');
+}
+
+function closeReportModal() {
+    document.getElementById('reportModal').classList.add('hidden');
+}
+
+function exportReportToPDF() {
+    showNotification('Export PDF en cours de développement', 'info');
+}
+
+function exportReportToExcel() {
+    showNotification('Export Excel en cours de développement', 'info');
+}
+
 async function voirDetailsAvance(id) {
     try {
         const result = await Utils.apiCall('get_avance_details', { avance_id: id });

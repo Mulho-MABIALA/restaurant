@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html lang="fr">
-<meta name="google" content="notranslate">   
+<meta name="google" content="notranslate">
+<?php
+if (!function_exists('t')) {
+    require_once __DIR__ . '/language.php';
+}
+?>
 <head>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -565,20 +570,51 @@
                 <!-- Menu Horizontal (Desktop) -->
                 <div class="horizontal-menu-container" id="horizontal-menu">
                     <nav class="horizontal-nav">
-                        <a href="#hero" class="horizontal-nav-item">Accueil</a>
-                        <a href="#about" class="horizontal-nav-item">A propos</a>
-                        <a href="cartes.php" class="horizontal-nav-item la-carte-text">La Carte</a>
-                        <a href="evenements.php" class="horizontal-nav-item">Evénements</a>
-                        <a href="gallery_public.php" class="horizontal-nav-item">Galerie!</a>
-                        <a href="#contact" class="horizontal-nav-item">Contact</a>
+                        <a href="#hero" class="horizontal-nav-item"><?= t('nav.home') ?></a>
+                        <a href="#about" class="horizontal-nav-item"><?= t('nav.about') ?></a>
+                        <a href="cartes.php" class="horizontal-nav-item la-carte-text"><?= t('nav.carte') ?></a>
+                        <a href="evenements.php" class="horizontal-nav-item"><?= t('nav.events') ?></a>
+                        <a href="gallery_public.php" class="horizontal-nav-item"><?= t('nav.gallery') ?></a>
+                        <a href="#contact" class="horizontal-nav-item"><?= t('nav.contact') ?></a>
                     </nav>
                 </div>
                 
                 <!-- Actions Desktop -->
                 <div class="flex items-center space-x-3 z-10">
+                    <!-- Language Selector -->
+                    <div class="relative" id="lang-selector">
+                        <button onclick="toggleLangMenu(event)" class="p-2 rounded-lg hover:bg-gray-200 transition-colors duration-200 flex items-center gap-1" title="Changer la langue" style="border: 1px solid rgba(212, 165, 116, 0.3);">
+                            <span id="current-flag" style="font-size: 1.1rem;">🇫🇷</span>
+                            <i class="fas fa-chevron-down text-xs" style="color: #d4a574;"></i>
+                        </button>
+                        <div id="lang-menu" class="absolute right-0 mt-2 w-44 bg-white rounded-lg shadow-lg border border-gray-200 hidden overflow-hidden" style="z-index: 1001;">
+                            <a href="?lang=fr" class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-100 transition-colors border-b border-gray-100" onclick="changeLang(event, 'fr', '🇫🇷')">
+                                <span style="font-size: 1.1rem;">🇫🇷</span>
+                                <span style="color: #2c3e50; font-weight: 500;">Français</span>
+                            </a>
+                            <a href="?lang=en" class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-100 transition-colors border-b border-gray-100" onclick="changeLang(event, 'en', '🇬🇧')">
+                                <span style="font-size: 1.1rem;">🇬🇧</span>
+                                <span style="color: #2c3e50; font-weight: 500;">English</span>
+                            </a>
+                            <a href="?lang=es" class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-100 transition-colors border-b border-gray-100" onclick="changeLang(event, 'es', '🇪🇸')">
+                                <span style="font-size: 1.1rem;">🇪🇸</span>
+                                <span style="color: #2c3e50; font-weight: 500;">Español</span>
+                            </a>
+                            <a href="?lang=wo" class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-100 transition-colors" onclick="changeLang(event, 'wo', '🇸🇳')">
+                                <span style="font-size: 1.1rem;">🇸🇳</span>
+                                <span style="color: #2c3e50; font-weight: 500;">Wolof</span>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Theme Toggle Button -->
+                    <button id="theme-toggle" onclick="toggleTheme()" class="p-2 rounded-lg hover:bg-gray-200 transition-colors duration-200" title="Changer le thème">
+                        <i class="fas fa-moon text-xl" id="theme-icon" style="color: #d4a574;"></i>
+                    </button>
+
                     <!-- Bouton Réserver -->
                     <a href="#book-a-table" class="btn-primary bg-gradient-to-r from-pink-500 via-pink-600 to-orange-500 text-white px-4 py-2 rounded-xl font-semibold hover:from-pink-600 hover:via-pink-700 hover:to-orange-600 transition-all duration-300 text-sm whitespace-nowrap shadow-lg hover:shadow-xl">
-                        <span>Réserver</span>
+                        <span><?= t('nav.reserve') ?></span>
                     </a>
 
                     <!-- Menu Toggle Button -->
@@ -594,13 +630,13 @@
         <!-- Mobile Dropdown Menu -->
         <div id="mobile-dropdown" class="mobile-dropdown-menu lg:hidden">
             <nav class="mobile-nav-items">
-                <a href="#hero" class="mobile-nav-link">Accueil</a>
-                <a href="#about" class="mobile-nav-link">A propos</a>
-                <a href="menu.php" class="mobile-nav-link">Menu</a>
-                <a href="carte.php" class="mobile-nav-link la-carte-text">La Carte</a>
-                <a href="evenements.php" class="mobile-nav-link">Evénements</a>
-                <a href="gallery_public.php" class="mobile-nav-link">Galerie!</a>
-                <a href="#contact" class="mobile-nav-link">Contact</a>
+                <a href="#hero" class="mobile-nav-link"><?= t('nav.home') ?></a>
+                <a href="#about" class="mobile-nav-link"><?= t('nav.about') ?></a>
+                <a href="menu.php" class="mobile-nav-link"><?= t('nav.menu') ?></a>
+                <a href="cartes.php" class="mobile-nav-link la-carte-text"><?= t('nav.carte') ?></a>
+                <a href="evenements.php" class="mobile-nav-link"><?= t('nav.events') ?></a>
+                <a href="gallery_public.php" class="mobile-nav-link"><?= t('nav.gallery') ?></a>
+                <a href="#contact" class="mobile-nav-link"><?= t('nav.contact') ?></a>
             </nav>
         </div>
     </header>
@@ -733,6 +769,57 @@
                 timeout = setTimeout(later, wait);
             };
         }
+
+        // === 🌐 Gestion du sélecteur de langue ===
+        function toggleLangMenu(event) {
+            event.stopPropagation();
+            const langMenu = document.getElementById('lang-menu');
+            langMenu.classList.toggle('hidden');
+        }
+
+        function changeLang(event, lang, flag) {
+            event.preventDefault();
+            document.getElementById('current-flag').textContent = flag;
+            localStorage.setItem('selectedLang', lang);
+            localStorage.setItem('selectedFlag', flag);
+            window.location.href = '?lang=' + lang;
+        }
+
+        // Charger la langue sauvegardée
+        document.addEventListener('DOMContentLoaded', function() {
+            // Mapper les langues aux drapeaux
+            const langFlags = {
+                'fr': '🇫🇷',
+                'en': '🇬🇧',
+                'es': '🇪🇸',
+                'wo': '🇸🇳'
+            };
+
+            // Obtenir la langue depuis l'URL ou localStorage
+            const urlParams = new URLSearchParams(window.location.search);
+            const langFromUrl = urlParams.get('lang');
+            const savedLang = langFromUrl || localStorage.getItem('selectedLang') || 'fr';
+            const currentFlag = document.getElementById('current-flag');
+
+            if (currentFlag) {
+                currentFlag.textContent = langFlags[savedLang] || '🇫🇷';
+            }
+
+            // Sauvegarder dans localStorage
+            if (langFromUrl) {
+                localStorage.setItem('selectedLang', langFromUrl);
+                localStorage.setItem('selectedFlag', langFlags[langFromUrl]);
+            }
+
+            // Fermer le menu de langue en cliquant à l'extérieur
+            document.addEventListener('click', function(e) {
+                const langSelector = document.getElementById('lang-selector');
+                const langMenu = document.getElementById('lang-menu');
+                if (langSelector && langMenu && !langSelector.contains(e.target)) {
+                    langMenu.classList.add('hidden');
+                }
+            });
+        });
     </script>
 
 </body>

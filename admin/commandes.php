@@ -95,15 +95,21 @@ if (isset($_POST['action']) && $_POST['action'] === 'creer_commande_manuelle') {
         $email = $_POST['email'] ?? '';
         $telephone = $_POST['telephone'] ?? '';
         $num_table = $_POST['num_table'] ?? '';
+        $mode_paiement = $_POST['mode_paiement'] ?? 'Non spécifié';
         $produits = json_decode($_POST['produits'] ?? '[]', true);
         $remise_type = $_POST['remise_type'] ?? 'aucune'; // 'pourcentage', 'montant', 'aucune'
         $remise_valeur = floatval($_POST['remise_valeur'] ?? 0);
         $total_original = floatval($_POST['total_original'] ?? 0);
         $total_final = floatval($_POST['total_final'] ?? 0);
-        
-        // Validation des données - simplifiée
+
+        // Validation des données améliorée
         if (empty($num_table) || empty($produits)) {
             echo json_encode(['success' => false, 'message' => 'Veuillez renseigner le numéro de table et sélectionner des produits']);
+            exit;
+        }
+
+        if (empty($mode_paiement) || $mode_paiement === 'Non spécifié') {
+            echo json_encode(['success' => false, 'message' => 'Veuillez sélectionner un mode de paiement']);
             exit;
         }
         
@@ -129,23 +135,24 @@ if (isset($_POST['action']) && $_POST['action'] === 'creer_commande_manuelle') {
         // Insérer la commande
         $stmt = $conn->prepare("
             INSERT INTO commandes (
-                nom_client, email, telephone, num_table, 
-                total, statut, statut_paiement, vu_admin, 
+                nom_client, email, telephone, num_table, mode_paiement,
+                total, statut, statut_paiement, vu_admin,
                 type_commande, remise_type, remise_valeur, remise_montant,
                 created_at, date_commande
             ) VALUES (
-                :nom_client, :email, :telephone, :num_table,
+                :nom_client, :email, :telephone, :num_table, :mode_paiement,
                 :total, 'En cours', 'Impayé', 0,
                 'manuelle', :remise_type, :remise_valeur, :remise_montant,
                 NOW(), NOW()
             )
         ");
-        
+
         $result = $stmt->execute([
             'nom_client' => $nom_client,
             'email' => $email,
             'telephone' => $telephone,
             'num_table' => $num_table,
+            'mode_paiement' => $mode_paiement,
             'total' => $total_final,
             'remise_type' => $remise_type,
             'remise_valeur' => $remise_valeur,
@@ -260,12 +267,14 @@ $categories_disponibles = getAllCategories($conn);
             $id              = $_POST['id'];
             $statut          = $_POST['statut'] ?? '';
             $statut_paiement = $_POST['statut_paiement'] ?? 'Impayé';
+            $mode_paiement   = $_POST['mode_paiement'] ?? 'Non spécifié';
             $vu_admin        = isset($_POST['vu_admin']) && $_POST['vu_admin'] === '1' ? 1 : 0;
 
-            $stmt   = $conn->prepare("UPDATE commandes SET statut = :statut, statut_paiement = :statut_paiement, vu_admin = :vu_admin WHERE id = :id");
+            $stmt   = $conn->prepare("UPDATE commandes SET statut = :statut, statut_paiement = :statut_paiement, mode_paiement = :mode_paiement, vu_admin = :vu_admin WHERE id = :id");
             $result = $stmt->execute([
                 'statut'          => $statut,
                 'statut_paiement' => $statut_paiement,
+                'mode_paiement'   => $mode_paiement,
                 'vu_admin'        => $vu_admin,
                 'id'              => $id,
             ]);
@@ -358,12 +367,42 @@ $categories_disponibles = getAllCategories($conn);
     $filtre_statut   = $_GET['statut'] ?? '';
     $filtre_paiement = $_GET['paiement'] ?? '';
 
+    // Pagination
+    $items_per_page = 10;
+    $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+    $offset = ($page - 1) * $items_per_page;
+
     try {
-        $sql = "SELECT *, 
-        CASE 
+        // Requête pour compter le total
+        $sqlCount = "SELECT COUNT(*) as total FROM commandes WHERE 1";
+        $paramsCount = [];
+
+        if (! empty($search)) {
+            $sqlCount .= " AND (nom_client LIKE :search OR email LIKE :search OR telephone LIKE :search)";
+            $paramsCount['search'] = "%$search%";
+        }
+
+        if (! empty($filtre_statut)) {
+            $sqlCount .= " AND statut = :statut";
+            $paramsCount['statut'] = $filtre_statut;
+        }
+
+        if (! empty($filtre_paiement)) {
+            $sqlCount .= " AND statut_paiement = :paiement";
+            $paramsCount['paiement'] = $filtre_paiement;
+        }
+
+        $stmtCount = $conn->prepare($sqlCount);
+        $stmtCount->execute($paramsCount);
+        $total_items = $stmtCount->fetch()['total'];
+        $total_pages = ceil($total_items / $items_per_page);
+
+        // Requête pour récupérer les commandes avec pagination
+        $sql = "SELECT *,
+        CASE
             WHEN type_commande = 'manuelle' THEN CONCAT('[MANUELLE] ', nom_client)
-            ELSE nom_client 
-        END as nom_client_display 
+            ELSE nom_client
+        END as nom_client_display
         FROM commandes WHERE 1";
         $params = [];
 
@@ -383,26 +422,43 @@ $categories_disponibles = getAllCategories($conn);
         }
 
         // Ordre par date/id pour garder la cohérence
-        $sql .= " ORDER BY id DESC";
+        $sql .= " ORDER BY id DESC LIMIT :limit OFFSET :offset";
         $stmt = $conn->prepare($sql);
-        $stmt->execute($params);
+
+        // Bind des paramètres de pagination
+        $stmt->bindValue(':limit', $items_per_page, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+
+        // Bind des autres paramètres
+        foreach ($params as $key => $value) {
+            $stmt->bindValue(':' . $key, $value);
+        }
+
+        $stmt->execute();
         $commandes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Pour les statistiques, il faut récupérer toutes les données (sans pagination)
+        $sqlStats = "SELECT * FROM commandes WHERE 1";
+        $stmtStats = $conn->prepare($sqlStats);
+        $stmtStats->execute();
+        $toutes_commandes = $stmtStats->fetchAll(PDO::FETCH_ASSOC);
+
     } catch (PDOException $e) {
         die("Erreur : " . $e->getMessage());
     }
 
-    // Statistiques améliorées
-    $total_cmd      = count($commandes);
-    $nouvelles_cmd  = count(array_filter($commandes, fn($c) => ! $c['vu_admin']));
-    $cmd_aujourdhui = count(array_filter($commandes, fn($c) => date('Y-m-d', strtotime($c['created_at'] ?? $c['date_commande'] ?? 'now')) === date('Y-m-d')));
+    // Statistiques améliorées (utiliser toutes_commandes pour les stats globales)
+    $total_cmd      = count($toutes_commandes);
+    $nouvelles_cmd  = count(array_filter($toutes_commandes, fn($c) => ! $c['vu_admin']));
+    $cmd_aujourdhui = count(array_filter($toutes_commandes, fn($c) => date('Y-m-d', strtotime($c['created_at'] ?? $c['date_commande'] ?? 'now')) === date('Y-m-d')));
     // Ne compter que les commandes payées dans le total des ventes
     $total_ventes = array_sum(array_map(function ($cmd) {
         return ($cmd['statut_paiement'] ?? 'Impayé') === 'Payé' ? $cmd['total'] : 0;
-    }, $commandes));
+    }, $toutes_commandes));
     $moyenne_cmd = $total_cmd > 0 ? intval($total_ventes / $total_cmd) : 0;
 
     // Statistiques de paiement
-    $commandes_payees   = count(array_filter($commandes, fn($c) => ($c['statut_paiement'] ?? 'Impayé') === 'Payé'));
+    $commandes_payees   = count(array_filter($toutes_commandes, fn($c) => ($c['statut_paiement'] ?? 'Impayé') === 'Payé'));
     $commandes_impayees = $total_cmd - $commandes_payees;
 
     // Liste des statuts possibles
@@ -587,18 +643,21 @@ $categories_disponibles = getAllCategories($conn);
 
         /* Styles pour le modal de commande manuelle */
 .category-btn {
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
 }
 
-.category-btn.active {
-    background-color: #dc2626 !important;
+.category-btn.active:not([data-category="all"]) {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
     color: white !important;
-    border-color: #dc2626 !important;
+    border-color: #10b981 !important;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    transform: scale(1.05);
 }
 
 .category-btn:not(.active):hover {
-    background-color: #f3f4f6;
-    border-color: #d1d5db;
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .produit-card {
@@ -730,47 +789,57 @@ $categories_disponibles = getAllCategories($conn);
 
 /* Styles pour le modal de commande manuelle */
 .category-btn {
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
 }
 
-.category-btn.active {
-    background-color: #dc2626 !important;
+.category-btn.active:not([data-category="all"]) {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
     color: white !important;
-    border-color: #dc2626 !important;
+    border-color: #10b981 !important;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    transform: scale(1.05);
 }
 
 .category-btn:not(.active):hover {
-    background-color: #f3f4f6;
-    border-color: #d1d5db;
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .produit-card {
-    transition: all 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     border-radius: 16px;
     overflow: hidden;
     position: relative;
-    border: 2px solid transparent;
+    border: 2px solid #f3f4f6;
+    cursor: pointer;
+    background: white;
 }
 
 .produit-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.08);
-    border-color: #e5e7eb;
+    transform: translateY(-6px) scale(1.02);
+    box-shadow: 0 25px 35px -8px rgba(16, 185, 129, 0.15), 0 12px 14px -6px rgba(16, 185, 129, 0.08);
+    border-color: #10b981;
 }
 
 .produit-image {
     width: 100%;
-    height: 140px;
+    height: 150px;
     object-fit: cover;
-    border-radius: 12px;
+    border-radius: 12px 12px 0 0;
     position: relative;
+    transition: transform 0.3s ease;
+}
+
+.produit-card:hover .produit-image {
+    transform: scale(1.05);
 }
 
 .produit-placeholder {
     width: 100%;
-    height: 70px;
-    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-    border-radius: 0;
+    height: 150px;
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    border-radius: 12px 12px 0 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -779,44 +848,59 @@ $categories_disponibles = getAllCategories($conn);
 
 .produit-badge {
     position: absolute;
-    top: 8px;
-    right: 8px;
-    background: rgba(0, 0, 0, 0.8);
+    top: 10px;
+    right: 10px;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.95) 0%, rgba(5, 150, 105, 0.95) 100%);
     color: white;
-    padding: 4px 10px;
-    border-radius: 12px;
-    font-size: 11px;
-    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
     backdrop-filter: blur(10px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
 }
 
 .produit-quantity-badge {
     position: absolute;
-    top: 8px;
-    left: 8px;
-    background: #dc2626;
+    top: 10px;
+    left: 10px;
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
     color: white;
-    padding: 4px 8px;
+    padding: 6px 10px;
     border-radius: 20px;
-    font-size: 12px;
-    font-weight: bold;
-    min-width: 24px;
+    font-size: 13px;
+    font-weight: 800;
+    min-width: 32px;
     text-align: center;
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.5);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 4px 12px rgba(220, 38, 38, 0.5);
+    }
+    50% {
+        box-shadow: 0 4px 20px rgba(220, 38, 38, 0.7);
+    }
 }
 
 .btn-ajouter {
-    transition: all 0.2s ease;
-    border-radius: 8px;
-    font-weight: 600;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 10px;
+    font-weight: 700;
     font-size: 13px;
-    padding: 8px 16px;
+    padding: 10px 16px;
     width: 100%;
     border: 2px solid transparent;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
 }
 
 .btn-ajouter:hover {
-    transform: scale(1.02);
-    border-color: #059669;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.5);
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
 }
 
 .btn-ajouter.added {
@@ -826,28 +910,42 @@ $categories_disponibles = getAllCategories($conn);
 
 /* Amélioration des cartes produits */
 .produit-info {
-    padding: 12px;
-    background: white;
+    padding: 16px;
+    background: linear-gradient(to bottom, white 0%, #fafafa 100%);
 }
 
 .produit-nom {
-    font-weight: 600;
-    font-size: 10px;
-    color: #1f2937;
-    margin-bottom: 2px;
-    line-height: 1.2;
+    font-weight: 700;
+    font-size: 14px;
+    color: #111827;
+    margin-bottom: 8px;
+    line-height: 1.4;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    min-height: 24px;
+    min-height: 40px;
+    transition: color 0.3s ease;
+}
+
+.produit-card:hover .produit-nom {
+    color: #10b981;
 }
 
 .produit-prix {
-    font-weight: 700;
-    font-size: 16px;
+    font-weight: 800;
+    font-size: 18px;
     color: #059669;
+    letter-spacing: -0.5px;
+}
+
+.line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .panier-item {
@@ -1047,6 +1145,22 @@ $categories_disponibles = getAllCategories($conn);
         50% {
             transform: scale(1.3);
         }
+    }
+
+    /* Styles pour les boutons mode de paiement */
+    .mode-paiement-btn.selected {
+        border-color: #1f2937 !important;
+        background-color: #1f2937 !important;
+        color: white !important;
+        transform: scale(1.05);
+    }
+
+    .mode-paiement-btn.selected i {
+        color: white !important;
+    }
+
+    .mode-paiement-btn {
+        transition: all 0.3s ease;
     }
 
     /* Styles pour l'impression */
@@ -1481,60 +1595,120 @@ $categories_disponibles = getAllCategories($conn);
                     </div>
                 </div>
 
-                <!-- Tableau des Commandes avec bordures visibles -->
-                <div class="bg-white/80 backdrop-blur-md shadow-md table-wrapper">
-                    <div class="px-6 py-4 bg-gray-50/80 border-b-2 border-gray-300">
+                <!-- Tableau des Commandes Actives - Design Amélioré -->
+                <div class="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+                    <!-- En-tête moderne avec gradient -->
+                    <div class="px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600">
                         <div class="flex items-center justify-between">
-                            <h3 class="text-lg font-bold text-gray-800">Commandes</h3>
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                                    <i class="fas fa-clipboard-list text-white text-lg"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-xl font-bold text-white">Commandes Actives</h3>
+                                    <p class="text-xs text-blue-100 mt-0.5"><?= count($commandes) ?> commande(s) en cours</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="px-3 py-1.5 bg-white/20 backdrop-blur-sm rounded-lg text-xs font-medium text-white border border-white/30">
+                                    <i class="fas fa-sync-alt mr-1.5 animate-spin" style="animation-duration: 3s;"></i>
+                                    Mise à jour en temps réel
+                                </span>
+                            </div>
                         </div>
                     </div>
 
+                    <!-- Tableau responsive -->
                     <div class="overflow-x-auto">
-                        <table class="min-w-full">
-                            <thead class="bg-gray-50/80">
-                                <tr class="table-header">
-                                    <th class="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300" style="width: 80px; min-width: 80px;">
-                                        <i class="fas fa-hashtag mr-1"></i>N°
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gradient-to-r from-gray-50 to-gray-100">
+                                <tr>
+                                    <th scope="col" class="px-4 py-4 text-left border-r border-gray-200" style="width: 70px;">
+                                        <div class="flex items-center gap-2">
+                                            <i class="fas fa-hashtag text-indigo-500 text-sm"></i>
+                                            <span class="text-xs font-bold text-gray-700 uppercase tracking-wider">N°</span>
+                                        </div>
                                     </th>
-                                    <th class="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300" style="width: 200px; min-width: 200px;">
-                                        <i class="fas fa-user mr-1"></i>Client
+                                    <th scope="col" class="px-4 py-4 text-left border-r border-gray-200" style="width: 220px;">
+                                        <div class="flex items-center gap-2">
+                                            <i class="fas fa-user text-emerald-500 text-sm"></i>
+                                            <span class="text-xs font-bold text-gray-700 uppercase tracking-wider">Client</span>
+                                        </div>
                                     </th>
-                                    <th class="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300" style="width: 250px; min-width: 250px;">
-                                        <i class="fas fa-phone mr-1"></i>Contact
+                                    <th scope="col" class="px-4 py-4 text-left border-r border-gray-200" style="width: 240px;">
+                                        <div class="flex items-center gap-2">
+                                            <i class="fas fa-address-book text-blue-500 text-sm"></i>
+                                            <span class="text-xs font-bold text-gray-700 uppercase tracking-wider">Contact</span>
+                                        </div>
                                     </th>
-                                    <th class="px-3 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300" style="width: 80px; min-width: 80px;">
-                                    <i class="fas fa-table mr-1"></i>Table
+                                    <th scope="col" class="px-4 py-4 text-center border-r border-gray-200" style="width: 90px;">
+                                        <div class="flex items-center justify-center gap-2">
+                                            <i class="fas fa-chair text-cyan-500 text-sm"></i>
+                                            <span class="text-xs font-bold text-gray-700 uppercase tracking-wider">Table</span>
+                                        </div>
                                     </th>
-                                    <th class="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300" style="width: 120px;">
-                                        <i class="fas fa-coins mr-1"></i>Total
+                                    <th scope="col" class="px-4 py-4 text-left border-r border-gray-200" style="width: 130px;">
+                                        <div class="flex items-center gap-2">
+                                            <i class="fas fa-coins text-amber-500 text-sm"></i>
+                                            <span class="text-xs font-bold text-gray-700 uppercase tracking-wider">Total</span>
+                                        </div>
                                     </th>
-                                    <th class="px-3 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300" style="width: 110px;">
-                                        <i class="fas fa-tasks mr-1"></i>Statut
+                                    <th scope="col" class="px-4 py-4 text-center border-r border-gray-200" style="width: 140px;">
+                                        <div class="flex items-center justify-center gap-2">
+                                            <i class="fas fa-tasks text-purple-500 text-sm"></i>
+                                            <span class="text-xs font-bold text-gray-700 uppercase tracking-wider">Statut</span>
+                                        </div>
                                     </th>
-                                    <th class="px-3 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300" style="width: 100px;">
-                                        <i class="fas fa-credit-card mr-1"></i>Paiement
+                                    <th scope="col" class="px-4 py-4 text-center border-r border-gray-200" style="width: 120px;">
+                                        <div class="flex items-center justify-center gap-2">
+                                            <i class="fas fa-credit-card text-green-500 text-sm"></i>
+                                            <span class="text-xs font-bold text-gray-700 uppercase tracking-wider">Paiement</span>
+                                        </div>
                                     </th>
-                                    <th class="px-3 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300" style="width: 90px;">
-                                        <i class="fas fa-eye mr-1"></i>Vu
+                                    <th scope="col" class="px-4 py-4 text-center border-r border-gray-200" style="width: 140px;">
+                                        <div class="flex items-center justify-center gap-2">
+                                            <i class="fas fa-wallet text-indigo-500 text-sm"></i>
+                                            <span class="text-xs font-bold text-gray-700 uppercase tracking-wider">Mode Paiement</span>
+                                        </div>
                                     </th>
-                                    <th class="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300" style="width: 130px;">
-                                        <i class="fas fa-calendar mr-1"></i>Date
+                                    <th scope="col" class="px-4 py-4 text-center border-r border-gray-200" style="width: 100px;">
+                                        <div class="flex items-center justify-center gap-2">
+                                            <i class="fas fa-eye text-orange-500 text-sm"></i>
+                                            <span class="text-xs font-bold text-gray-700 uppercase tracking-wider">Statut</span>
+                                        </div>
                                     </th>
-                                    <th class="px-3 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider" style="width: 140px;">
-                                        <i class="fas fa-cogs mr-1"></i>Actions
+                                    <th scope="col" class="px-4 py-4 text-left border-r border-gray-200" style="width: 140px;">
+                                        <div class="flex items-center gap-2">
+                                            <i class="fas fa-clock text-pink-500 text-sm"></i>
+                                            <span class="text-xs font-bold text-gray-700 uppercase tracking-wider">Date/Heure</span>
+                                        </div>
+                                    </th>
+                                    <th scope="col" class="px-4 py-4 text-center" style="width: 160px;">
+                                        <div class="flex items-center justify-center gap-2">
+                                            <i class="fas fa-cogs text-gray-500 text-sm"></i>
+                                            <span class="text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</span>
+                                        </div>
                                     </th>
                                 </tr>
                             </thead>
-                            <tbody class="bg-white/50" id="commandesTableBody">
+                            <tbody class="bg-white divide-y divide-gray-100" id="commandesTableBody">
                               <?php if (empty($commandes)): ?>
     <tr>
-        <td colspan="10" class="px-6 py-20 text-center">
-            <div class="flex flex-col items-center">
-                <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                    <i class="fas fa-search-minus text-gray-400 text-2xl"></i>
+        <td colspan="11" class="px-6 py-24 text-center bg-gradient-to-b from-gray-50 to-white">
+            <div class="flex flex-col items-center max-w-md mx-auto">
+                <div class="w-20 h-20 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
+                    <i class="fas fa-inbox text-blue-500 text-3xl"></i>
                 </div>
-                <h3 class="text-lg font-bold text-gray-700 mb-2">Aucune commande trouvée</h3>
-                <p class="text-gray-500">Essayez de modifier vos critères de recherche</p>
+                <h3 class="text-xl font-bold text-gray-800 mb-2">Aucune commande active</h3>
+                <p class="text-gray-500 text-sm leading-relaxed">
+                    Il n'y a actuellement aucune commande en cours. Les nouvelles commandes apparaîtront automatiquement ici.
+                </p>
+                <div class="mt-4 px-4 py-2 bg-blue-50 rounded-lg border border-blue-200">
+                    <p class="text-xs text-blue-700">
+                        <i class="fas fa-info-circle mr-1.5"></i>
+                        Essayez de modifier vos filtres de recherche
+                    </p>
+                </div>
             </div>
         </td>
     </tr>
@@ -1545,147 +1719,192 @@ $categories_disponibles = getAllCategories($conn);
     $numero_affichage = $total_commandes;
     foreach ($commandes as $cmd):
 ?>
-    <tr class="table-row cursor-pointer hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200"
+    <tr class="group cursor-pointer hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-indigo-50/50 transition-all duration-300 border-b border-gray-100"
         id="commande-<?php echo $cmd['id']?>"
         data-commande-id="<?php echo $cmd['id']?>"
         onclick="ouvrirModalDepuisLigne(event, <?php echo $cmd['id']?>)"
-        title="Cliquez pour voir les détails">
-        <td class="px-3 py-3 whitespace-nowrap border-r border-gray-200">
+        title="Cliquez pour voir les détails de la commande">
+        <td class="px-4 py-4 whitespace-nowrap border-r border-gray-100">
             <div class="flex items-center justify-center">
                 <div class="w-7 h-7 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
                     <span class="text-white text-xs font-bold"><?php echo $numero_affichage?></span>
                 </div>
             </div>
         </td>
-        <td class="px-3 py-3 border-r border-gray-200">
-            <div class="flex items-center">
-                <div class="w-8 h-8 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center mr-2 flex-shrink-0">
-                    <span class="text-white font-bold text-xs"><?php echo strtoupper(substr(e($cmd['nom_client']), 0, 1))?></span>
+        <td class="px-4 py-4 border-r border-gray-100">
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm group-hover:shadow-md transition-shadow">
+                    <span class="text-white font-bold text-sm"><?php echo strtoupper(substr(e($cmd['nom_client']), 0, 1))?></span>
                 </div>
-                <div class="truncate">
-                    <?php if (($cmd['type_commande'] ?? 'en_ligne') === 'manuelle'): ?>
-                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                            <i class="fas fa-user-edit text-xs"></i>
-                        </span>
-                    <?php endif; ?>
-                    <span class="text-sm font-semibold text-gray-900"><?php echo e($cmd['nom_client'])?></span>
-                </div>
-            </div>
-        </td>
-        <td class="px-3 py-3 border-r border-gray-200">
-            <div class="space-y-0.5">
-                <div class="text-xs text-gray-900 font-medium truncate flex items-center">
-                    <i class="fas fa-envelope text-gray-400 mr-1 text-xs"></i>
-                    <?php echo e($cmd['email'])?>
-                </div>
-                <div class="text-xs text-gray-500 flex items-center">
-                    <i class="fas fa-phone text-gray-400 mr-1 text-xs"></i>
-                    <?php echo e($cmd['telephone'])?>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                        <?php if (($cmd['type_commande'] ?? 'en_ligne') === 'manuelle'): ?>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-gradient-to-r from-blue-100 to-blue-200 text-blue-800 flex-shrink-0 border border-blue-300" title="Commande manuelle">
+                                <i class="fas fa-user-edit text-xs mr-1"></i>Manuel
+                            </span>
+                        <?php endif; ?>
+                        <span class="text-sm font-semibold text-gray-900 truncate"><?php echo e($cmd['nom_client'])?></span>
+                    </div>
                 </div>
             </div>
         </td>
-        <td class="px-3 py-3 whitespace-nowrap border-r border-gray-200 text-center">
+        <td class="px-4 py-4 border-r border-gray-100">
+            <div class="space-y-2">
+                <div class="flex items-center gap-2">
+                    <div class="w-6 h-6 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-envelope text-blue-600 text-xs"></i>
+                    </div>
+                    <span class="text-xs text-gray-900 font-medium truncate"><?php echo e($cmd['email']) ?: 'Non renseigné'?></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-6 h-6 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-phone text-emerald-600 text-xs"></i>
+                    </div>
+                    <span class="text-xs text-gray-700 font-medium truncate"><?php echo e($cmd['telephone']) ?: 'Non renseigné'?></span>
+                </div>
+            </div>
+        </td>
+        <td class="px-4 py-4 whitespace-nowrap border-r border-gray-100 text-center">
             <div class="flex items-center justify-center">
-                <span class="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center text-sm font-bold text-gray-800">
-                    <?php echo e($cmd['num_table'] ?? 'N/A')?>
+                <span class="inline-flex items-center justify-center w-10 h-10 bg-gradient-to-br from-cyan-100 to-blue-200 rounded-xl text-base font-bold text-cyan-800 border-2 border-cyan-300 shadow-sm group-hover:shadow-md transition-all">
+                    <?php echo e($cmd['num_table'] ?? '-')?>
                 </span>
             </div>
         </td>
-        <td class="px-3 py-3 whitespace-nowrap border-r border-gray-200">
-            <div class="flex items-center">
-                <i class="fas fa-coins text-emerald-500 mr-1.5 text-xs"></i>
-                <span class="text-sm font-bold text-gray-800"><?php echo number_format($cmd['total'], 0)?> FCFA</span>
+        <td class="px-4 py-4 whitespace-nowrap border-r border-gray-100">
+            <div class="flex items-center gap-2">
+                <div class="w-7 h-7 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-coins text-amber-600 text-sm"></i>
+                </div>
+                <div class="flex flex-col">
+                    <span class="text-sm font-bold text-gray-900"><?php echo number_format($cmd['total'], 0, ',', ' ')?></span>
+                    <span class="text-xs text-gray-500 font-medium">FCFA</span>
+                </div>
             </div>
         </td>
-        <td class="px-3 py-3 whitespace-nowrap border-r border-gray-200 text-center">
+        <td class="px-4 py-4 whitespace-nowrap border-r border-gray-100 text-center">
             <?php
                 $statutClass = '';
                 $statutIcon  = '';
+                $statutBg = '';
                 switch ($cmd['statut']) {
                     case 'En cours':
-                        $statutClass = 'bg-yellow-100 text-yellow-800';
+                        $statutClass = 'bg-gradient-to-r from-yellow-100 to-amber-100 text-yellow-800 border-yellow-300';
                         $statutIcon  = 'fas fa-clock';
                         break;
                     case 'Livré':
                     case 'Terminée':
-                        $statutClass = 'bg-green-100 text-green-800';
+                        $statutClass = 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 border-green-300';
                         $statutIcon  = 'fas fa-check-circle';
                         break;
                     case 'Annulé':
-                        $statutClass = 'bg-red-100 text-red-800';
+                        $statutClass = 'bg-gradient-to-r from-red-100 to-pink-100 text-red-800 border-red-300';
                         $statutIcon  = 'fas fa-times-circle';
                         break;
                     case 'Préparation en cours':
-                        $statutClass = 'bg-blue-100 text-blue-800';
+                        $statutClass = 'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 border-blue-300';
                         $statutIcon  = 'fas fa-utensils';
                         break;
                     default:
-                        $statutClass = 'bg-gray-100 text-gray-800';
+                        $statutClass = 'bg-gradient-to-r from-gray-100 to-slate-100 text-gray-800 border-gray-300';
                         $statutIcon  = 'fas fa-question-circle';
                 }
             ?>
-            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold <?php echo $statutClass?> border" id="statut-<?php echo $cmd['id']?>">
-                <i class="<?php echo $statutIcon?> mr-1 text-xs"></i>
+            <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold <?php echo $statutClass?> border-2 shadow-sm" id="statut-<?php echo $cmd['id']?>">
+                <i class="<?php echo $statutIcon?> mr-1.5"></i>
                 <?php echo e($cmd['statut'])?>
             </span>
         </td>
-        <td class="px-3 py-3 whitespace-nowrap border-r border-gray-200 text-center">
+        <td class="px-4 py-4 whitespace-nowrap border-r border-gray-100 text-center">
             <?php
                 $statutPaiement = $cmd['statut_paiement'] ?? 'Impayé';
-                $paiementClass  = $statutPaiement === 'Payé' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-orange-100 text-orange-800 border-orange-200';
+                $paiementClass  = $statutPaiement === 'Payé'
+                    ? 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 border-green-300'
+                    : 'bg-gradient-to-r from-orange-100 to-amber-100 text-orange-800 border-orange-300';
                 $paiementIcon   = $statutPaiement === 'Payé' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle';
             ?>
-            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold <?php echo $paiementClass?> border" id="paiement-<?php echo $cmd['id']?>">
-                <i class="<?php echo $paiementIcon?> mr-1 text-xs"></i>
+            <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold <?php echo $paiementClass?> border-2 shadow-sm" id="paiement-<?php echo $cmd['id']?>">
+                <i class="<?php echo $paiementIcon?> mr-1.5"></i>
                 <?php echo e($statutPaiement)?>
             </span>
         </td>
-        <td class="px-3 py-3 whitespace-nowrap border-r border-gray-200 text-center">
+        <td class="px-4 py-4 whitespace-nowrap border-r border-gray-100 text-center">
+            <?php
+                $modePaiement = $cmd['mode_paiement'] ?? 'Non spécifié';
+                $modeIcon = '';
+                $modeClass = '';
+
+                switch($modePaiement) {
+                    case 'Espèces':
+                        $modeIcon = 'fas fa-money-bill-wave';
+                        $modeClass = 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 border-green-300';
+                        break;
+                    case 'Wave':
+                        $modeIcon = 'fas fa-mobile-alt';
+                        $modeClass = 'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 border-blue-300';
+                        break;
+                    case 'Orange Money':
+                        $modeIcon = 'fas fa-mobile-alt';
+                        $modeClass = 'bg-gradient-to-r from-orange-100 to-amber-100 text-orange-800 border-orange-300';
+                        break;
+                    default:
+                        $modeIcon = 'fas fa-question-circle';
+                        $modeClass = 'bg-gradient-to-r from-gray-100 to-slate-100 text-gray-800 border-gray-300';
+                }
+            ?>
+            <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold <?php echo $modeClass?> border-2 shadow-sm" id="mode-paiement-<?php echo $cmd['id']?>">
+                <i class="<?php echo $modeIcon?> mr-1.5"></i>
+                <?php echo e($modePaiement)?>
+            </span>
+        </td>
+        <td class="px-4 py-4 whitespace-nowrap border-r border-gray-100 text-center">
             <?php if ($cmd['vu_admin']): ?>
-                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200" id="vu-<?php echo $cmd['id']?>">
-                    <i class="fas fa-check-circle text-xs mr-1"></i>
+                <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-800 border-2 border-emerald-300 shadow-sm" id="vu-<?php echo $cmd['id']?>">
+                    <i class="fas fa-check-circle mr-1.5"></i>
                     Lu
                 </span>
             <?php else: ?>
-                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200" id="vu-<?php echo $cmd['id']?>">
-                    <i class="fas fa-circle text-xs mr-1 animate-pulse"></i>
+                <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-100 to-orange-100 text-amber-800 border-2 border-amber-300 shadow-sm animate-pulse" id="vu-<?php echo $cmd['id']?>">
+                    <i class="fas fa-bell mr-1.5"></i>
                     Nouveau
                 </span>
             <?php endif; ?>
         </td>
-        <td class="px-3 py-3 border-r border-gray-200">
-            <div class="flex items-center text-xs text-gray-500">
-                <i class="fas fa-calendar text-gray-400 mr-1.5 text-xs"></i>
-                <div>
+        <td class="px-4 py-4 border-r border-gray-100">
+            <div class="flex items-start gap-2">
+                <div class="w-7 h-7 bg-pink-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <i class="fas fa-clock text-pink-600 text-xs"></i>
+                </div>
+                <div class="flex flex-col">
                     <?php
                         $date = $cmd['date_commande'] ?? $cmd['created_at'] ?? 'Non défini';
                         if ($date !== 'Non défini') {
-                            echo date('d/m/Y', strtotime($date));
-                            echo '<br><span class="text-xs text-gray-400">' . date('H:i', strtotime($date)) . '</span>';
+                            echo '<span class="text-xs font-semibold text-gray-900">' . date('d/m/Y', strtotime($date)) . '</span>';
+                            echo '<span class="text-xs text-gray-500 font-medium">' . date('H:i', strtotime($date)) . '</span>';
                         } else {
-                            echo $date;
+                            echo '<span class="text-xs text-gray-500">' . $date . '</span>';
                         }
                     ?>
                 </div>
             </div>
         </td>
-        <td class="px-3 py-3 text-center">
-            <div class="flex items-center justify-center gap-1">
+        <td class="px-4 py-4 text-center" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-center gap-2">
                 <a href="recu.php?id=<?php echo $cmd['id']?>"
                    target="_blank"
                    class="inline-flex items-center px-2 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-all duration-200 border border-green-200"
                    title="Voir le reçu">
-                    <i class="fas fa-eye text-sm"></i>
+                    <i class="fas fa-eye text-sm pointer-events-none"></i>
                 </a>
-                <button onclick="openEditModal(<?php echo $cmd['id']?>, '<?php echo $numero_affichage?>')"
+                <button type="button" onclick="handleEditClick(event, <?php echo $cmd['id']?>, '<?php echo $numero_affichage?>')"
                    class="inline-flex items-center px-2 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all duration-200 border border-blue-200"
                    title="Modifier">
-                    <i class="fas fa-edit text-sm"></i>
+                    <i class="fas fa-edit text-sm pointer-events-none"></i>
                 </button>
-                <button onclick="confirmDelete(<?php echo $cmd['id']?>, '<?php echo e($cmd['nom_client'])?>', '<?php echo $numero_affichage?>')"
+                <button type="button" onclick="handleDeleteClick(event, <?php echo $cmd['id']?>, '<?php echo e($cmd['nom_client'])?>', '<?php echo $numero_affichage?>')"
                    class="inline-flex items-center px-2 py-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-all duration-200 border border-red-200"
                    title="Supprimer">
-                    <i class="fas fa-trash text-sm"></i>
+                    <i class="fas fa-trash text-sm pointer-events-none"></i>
                 </button>
             </div>
         </td>
@@ -1697,6 +1916,77 @@ endforeach; ?>
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- Pagination -->
+                    <?php if ($total_pages > 1): ?>
+                    <div class="px-6 py-4 border-t-2 border-gray-200 bg-gray-50">
+                        <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+                            <!-- Info pagination -->
+                            <div class="text-sm text-gray-600">
+                                Affichage de <span class="font-semibold"><?= min($offset + 1, $total_items) ?></span> à
+                                <span class="font-semibold"><?= min($offset + $items_per_page, $total_items) ?></span> sur
+                                <span class="font-semibold"><?= $total_items ?></span> commandes
+                            </div>
+
+                            <!-- Boutons pagination -->
+                            <div class="flex items-center gap-2">
+                                <?php
+                                // Construire les paramètres GET pour conserver les filtres
+                                $query_params = [];
+                                if (!empty($search)) $query_params[] = 'search=' . urlencode($search);
+                                if (!empty($filtre_statut)) $query_params[] = 'statut=' . urlencode($filtre_statut);
+                                if (!empty($filtre_paiement)) $query_params[] = 'paiement=' . urlencode($filtre_paiement);
+                                $query_string = !empty($query_params) ? '&' . implode('&', $query_params) : '';
+                                ?>
+
+                                <!-- Première page -->
+                                <?php if ($page > 1): ?>
+                                    <a href="?page=1<?= $query_string ?>"
+                                       class="px-3 py-2 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
+                                        <i class="fas fa-angle-double-left"></i>
+                                    </a>
+                                <?php endif; ?>
+
+                                <!-- Page précédente -->
+                                <?php if ($page > 1): ?>
+                                    <a href="?page=<?= $page - 1 ?><?= $query_string ?>"
+                                       class="px-3 py-2 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
+                                        <i class="fas fa-angle-left"></i>
+                                    </a>
+                                <?php endif; ?>
+
+                                <!-- Numéros de pages -->
+                                <?php
+                                $start_page = max(1, $page - 2);
+                                $end_page = min($total_pages, $page + 2);
+
+                                for ($i = $start_page; $i <= $end_page; $i++):
+                                ?>
+                                    <a href="?page=<?= $i ?><?= $query_string ?>"
+                                       class="px-4 py-2 <?= $i === $page ? 'bg-blue-600 text-white border-2 border-blue-600' : 'bg-white text-gray-700 border-2 border-gray-300 hover:bg-gray-100' ?> rounded-lg font-semibold transition-colors">
+                                        <?= $i ?>
+                                    </a>
+                                <?php endfor; ?>
+
+                                <!-- Page suivante -->
+                                <?php if ($page < $total_pages): ?>
+                                    <a href="?page=<?= $page + 1 ?><?= $query_string ?>"
+                                       class="px-3 py-2 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
+                                        <i class="fas fa-angle-right"></i>
+                                    </a>
+                                <?php endif; ?>
+
+                                <!-- Dernière page -->
+                                <?php if ($page < $total_pages): ?>
+                                    <a href="?page=<?= $total_pages ?><?= $query_string ?>"
+                                       class="px-3 py-2 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
+                                        <i class="fas fa-angle-double-right"></i>
+                                    </a>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                 </div>
 
                 </div>
@@ -1920,6 +2210,16 @@ endforeach; ?>
                     </select>
                 </div>
 
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-3">Mode de paiement</label>
+                    <select id="editModePaiement" name="mode_paiement" class="form-input block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-base">
+                        <option value="Non spécifié">Non spécifié</option>
+                        <option value="Espèces">💵 Espèces</option>
+                        <option value="Wave">📱 Wave</option>
+                        <option value="Orange Money">🍊 Orange Money</option>
+                    </select>
+                </div>
+
                 <div class="flex items-center p-4 bg-gray-50 rounded-lg border border-gray-200">
                     <input type="checkbox" id="editVuAdmin" name="vu_admin" value="1" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 transition-colors">
                     <label for="editVuAdmin" class="ml-3 text-sm font-medium text-gray-700">
@@ -1999,33 +2299,42 @@ endforeach; ?>
   </div>
 
   <!-- ===== MODAL DE COMMANDE MANUELLE (à ajouter avant </body>) ===== -->
-<div id="commandeManuelleModal" class="fixed inset-0 bg-black/50 modal-overlay flex items-center justify-center z-50 hidden">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-7xl h-full max-h-[95vh] m-4 flex flex-col overflow-hidden">
-        <!-- Header du modal -->
-        <div class="bg-gradient-to-r from-green-600 to-emerald-700 text-white p-6 flex items-center justify-between">
-            <div class="flex items-center">
-                <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mr-4">
-                    <i class="fas fa-shopping-cart text-xl"></i>
-                </div>
-                <div>
-                    <h2 class="text-2xl font-bold">Nouvelle commande manuelle</h2>
-                    <p class="text-green-100">Sélectionnez les produits pour créer une commande</p>
-                </div>
-            </div>
+<div id="commandeManuelleModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm modal-overlay flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-7xl h-full max-h-[95vh] m-4 flex flex-col overflow-hidden border-4 border-green-100">
+        <!-- Header du modal avec gradient amélioré -->
+        <div class="bg-gradient-to-br from-green-600 via-emerald-600 to-teal-700 text-white p-8 relative overflow-hidden">
+            <!-- Effet de cercles décoratifs -->
+            <div class="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32"></div>
+            <div class="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full -ml-24 -mb-24"></div>
 
-            <!-- Boutons d'action du header -->
-            <div class="flex items-center space-x-4">
-                <!-- Bouton Panier -->
-                <button onclick="openPanierModal()" class="relative bg-white/20 hover:bg-white/30 px-6 py-3 rounded-lg transition-all duration-300 flex items-center space-x-3">
-                    <i class="fas fa-shopping-cart text-xl"></i>
-                    <span class="font-semibold">Panier</span>
-                    <span id="headerItemCount" class="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full min-w-[24px] text-center">0</span>
-                </button>
+            <div class="relative flex items-center justify-between">
+                <div class="flex items-center">
+                    <div class="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mr-5 shadow-lg transform hover:scale-110 transition-transform duration-300">
+                        <i class="fas fa-shopping-cart text-2xl"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-3xl font-bold tracking-tight mb-1">Nouvelle commande manuelle</h2>
+                        <p class="text-green-50 text-sm flex items-center">
+                            <i class="fas fa-info-circle mr-2 text-xs"></i>
+                            Sélectionnez les produits pour créer une commande
+                        </p>
+                    </div>
+                </div>
 
-                <!-- Bouton Fermer -->
-                <button onclick="closeCommandeManuelleModal()" class="text-white/80 hover:text-white transition-colors">
-                    <i class="fas fa-times text-2xl"></i>
-                </button>
+                <!-- Boutons d'action du header -->
+                <div class="flex items-center space-x-3">
+                    <!-- Bouton Panier amélioré -->
+                    <button onclick="openPanierModal()" class="relative group bg-white/20 backdrop-blur-sm hover:bg-white/30 px-6 py-3.5 rounded-xl transition-all duration-300 flex items-center space-x-3 shadow-lg hover:shadow-xl transform hover:scale-105">
+                        <i class="fas fa-shopping-basket text-xl group-hover:rotate-12 transition-transform"></i>
+                        <span class="font-bold">Mon Panier</span>
+                        <span id="headerItemCount" class="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-pink-600 text-white text-xs font-bold px-2.5 py-1 rounded-full min-w-[28px] text-center shadow-lg animate-pulse">0</span>
+                    </button>
+
+                    <!-- Bouton Fermer amélioré -->
+                    <button onclick="closeCommandeManuelleModal()" class="w-11 h-11 bg-white/10 hover:bg-white/20 rounded-xl flex items-center justify-center transition-all hover:rotate-90 transform duration-300">
+                        <i class="fas fa-times text-2xl"></i>
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -2033,36 +2342,54 @@ endforeach; ?>
         <div class="flex-1 flex overflow-hidden">
             <!-- Panel produits (pleine largeur maintenant) -->
             <div class="flex-1 flex flex-col">
-                <!-- Barre de recherche et navigation -->
-                <div class="p-6 border-b border-gray-200 bg-gray-50">
+                <!-- Barre de recherche et navigation améliorée -->
+                <div class="p-6 border-b-2 border-gray-200 bg-gradient-to-br from-gray-50 to-white">
 
-                    <!-- Barre de recherche -->
-                    <div class="relative mb-6">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <i class="fas fa-search text-gray-400"></i>
+                    <!-- Barre de recherche avec effet glassmorphism -->
+                    <div class="relative mb-6 group">
+                        <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                            <i class="fas fa-search text-gray-400 text-lg group-focus-within:text-green-500 transition-colors"></i>
                         </div>
-                        <input type="text" 
-                               id="searchProduits" 
-                               placeholder="Recherche" 
-                               class="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-base">
-                        <button class="absolute inset-y-0 right-0 pr-3 flex items-center">
-                            <i class="fas fa-times text-gray-400 hover:text-gray-600 cursor-pointer hidden" id="clearSearch"></i>
+                        <input type="text"
+                               id="searchProduits"
+                               placeholder="Rechercher un produit..."
+                               class="block w-full pl-14 pr-12 py-4 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-green-200 focus:border-green-500 text-base font-medium shadow-sm hover:shadow-md transition-all placeholder-gray-400">
+                        <button class="absolute inset-y-0 right-0 pr-4 flex items-center">
+                            <i class="fas fa-times text-gray-400 hover:text-red-500 cursor-pointer hidden transition-colors transform hover:scale-125" id="clearSearch"></i>
                         </button>
                     </div>
 
-                    <!-- Navigation par catégories -->
-                    <div class="flex flex-wrap gap-3" id="categoriesNav">
-                        <button class="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-blue-100 text-blue-800 border border-blue-200 category-btn active" data-category="all">
-                            <i class="fas fa-th-large mr-2"></i>
-                            Tous
-                        </button>
-                        <!-- Les catégories seront ajoutées dynamiquement -->
+                    <!-- Navigation par catégories améliorée -->
+                    <div>
+                        <div class="flex items-center mb-4">
+                            <i class="fas fa-filter text-gray-600 mr-2"></i>
+                            <h3 class="text-sm font-bold text-gray-700 uppercase tracking-wider">Catégories</h3>
+                        </div>
+                        <div class="flex flex-wrap gap-3" id="categoriesNav">
+                            <button onclick="filterByCategory('all')" class="inline-flex items-center px-5 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md hover:shadow-lg border-2 border-green-600 category-btn active transform hover:scale-105 transition-all" data-category="all">
+                                <i class="fas fa-th-large mr-2"></i>
+                                Tous les produits
+                            </button>
+                            <!-- Les catégories seront ajoutées dynamiquement -->
+                        </div>
                     </div>
                 </div>
 
-                <!-- Grille des produits -->
-                <div class="flex-1 overflow-auto p-4">
-                    <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2" id="produitsGrid">
+                <!-- Grille des produits avec meilleur espacement -->
+                <div class="flex-1 overflow-auto p-6 bg-gray-50">
+                    <!-- En-tête de la grille -->
+                    <div class="mb-4 flex items-center justify-between">
+                        <h3 class="text-sm font-bold text-gray-700 uppercase tracking-wider flex items-center">
+                            <i class="fas fa-utensils text-green-600 mr-2"></i>
+                            Produits disponibles
+                        </h3>
+                        <span class="text-xs text-gray-500 bg-white px-3 py-1 rounded-full border border-gray-200">
+                            <i class="fas fa-box mr-1"></i>
+                            <span id="produitsCount">0</span> articles
+                        </span>
+                    </div>
+
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-4" id="produitsGrid">
                         <!-- Les produits seront chargés dynamiquement -->
                     </div>
                 </div>
@@ -2073,120 +2400,148 @@ endforeach; ?>
 
 <!-- ===== MODAL PANIER ===== -->
 <div id="panierModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm modal-overlay flex items-center justify-center z-[60] hidden">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[95vh] m-4 flex flex-col overflow-hidden">
-        <!-- Header du panier -->
-        <div class="bg-gradient-to-r from-green-600 via-green-500 to-emerald-600 text-white p-6 flex items-center justify-between">
-            <div class="flex items-center">
-                <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center mr-4 animate-float">
-                    <i class="fas fa-shopping-basket text-2xl"></i>
+    <div class="bg-white rounded-lg shadow-2xl w-full max-w-4xl max-h-[95vh] m-4 flex flex-col overflow-hidden border-4 border-gray-200">
+        <!-- Header style feuille de commande -->
+        <div class="bg-white border-b-2 border-gray-800 px-6 py-3">
+            <div class="flex items-center justify-between">
+                <div class="flex-1">
+                    <h3 class="text-2xl font-black text-gray-900 uppercase tracking-tight">Bon de Commande</h3>
+                    <p class="text-xs text-gray-600 font-medium">Restaurant - Commande Manuelle</p>
                 </div>
-                <div>
-                    <h3 class="text-3xl font-bold">Récapitulatif de commande</h3>
-                    <p class="text-green-50 text-sm mt-1">Vérifiez et validez votre commande</p>
+                <div class="flex items-center gap-6">
+                    <div class="text-right">
+                        <div class="text-xs text-gray-500">Date: <span class="font-bold text-gray-900" id="commandeDate"></span></div>
+                        <div class="text-xs text-gray-500">N°: <span class="font-bold text-gray-900" id="commandeNumber"></span></div>
+                    </div>
+                    <button onclick="closePanierModal()" class="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-all text-gray-600 hover:text-gray-900">
+                        <i class="fas fa-times text-lg"></i>
+                    </button>
                 </div>
             </div>
-            <button onclick="closePanierModal()" class="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-lg flex items-center justify-center transition-all">
-                <i class="fas fa-times text-xl"></i>
-            </button>
         </div>
 
-        <!-- Contenu du panier -->
-        <div class="flex-1 overflow-auto bg-gray-50">
-            <!-- Informations table -->
-            <div class="p-6 border-b-2 border-gray-300 bg-white">
-                <label class="block text-sm font-bold text-gray-700 mb-3 flex items-center">
-                    <i class="fas fa-table text-green-600 mr-2"></i>
-                    Numéro de table <span class="text-red-500 ml-1">*</span>
-                </label>
-                <div class="relative">
-                    <input type="number" id="numTable" placeholder="Entrez le N° de table" min="1"
-                           class="w-full px-5 py-4 pl-14 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-green-200 focus:border-green-500 text-center font-bold text-2xl transition-all">
-                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <i class="fas fa-hashtag text-gray-400 text-xl"></i>
+        <!-- Contenu du panier style feuille -->
+        <div class="flex-1 overflow-auto bg-white">
+            <!-- Informations client et table -->
+            <div class="px-6 py-3 bg-gray-50 border-b border-gray-300">
+                <div class="grid grid-cols-2 gap-4">
+                    <!-- Numéro de table -->
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
+                            Table N°
+                        </label>
+                        <input type="number" id="numTable" placeholder="00" min="1"
+                               class="w-full px-3 py-2 border-2 border-gray-400 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-gray-900 text-center font-black text-2xl transition-all bg-white">
+                    </div>
+
+                    <!-- Mode de paiement -->
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
+                            Mode de paiement
+                        </label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button type="button" onclick="selectModePaiement('Espèces')" id="btnModePaiementEspeces"
+                                    class="mode-paiement-btn px-2 py-1.5 border-2 border-gray-400 rounded-lg hover:border-gray-900 hover:bg-gray-100 transition-all text-xs font-bold flex flex-col items-center gap-0.5 bg-white">
+                                <i class="fas fa-money-bill-wave text-base text-green-600"></i>
+                                <span class="text-[10px]">Espèces</span>
+                            </button>
+                            <button type="button" onclick="selectModePaiement('Wave')" id="btnModePaiementWave"
+                                    class="mode-paiement-btn px-2 py-1.5 border-2 border-gray-400 rounded-lg hover:border-gray-900 hover:bg-gray-100 transition-all text-xs font-bold flex flex-col items-center gap-0.5 bg-white">
+                                <i class="fas fa-mobile-alt text-base text-blue-600"></i>
+                                <span class="text-[10px]">Wave</span>
+                            </button>
+                            <button type="button" onclick="selectModePaiement('Orange Money')" id="btnModePaiementOrange"
+                                    class="mode-paiement-btn px-2 py-1.5 border-2 border-gray-400 rounded-lg hover:border-gray-900 hover:bg-gray-100 transition-all text-xs font-bold flex flex-col items-center gap-0.5 bg-white">
+                                <i class="fas fa-mobile-alt text-base text-orange-600"></i>
+                                <span class="text-[10px]">OM</span>
+                            </button>
+                        </div>
+                        <input type="hidden" id="modePaiementSelected" value="">
                     </div>
                 </div>
             </div>
 
-            <!-- Liste des articles -->
-            <div class="p-6">
-                <h4 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
-                    <i class="fas fa-list text-green-600 mr-2"></i>
-                    Articles commandés
-                </h4>
-                <div id="panierItems" class="space-y-4">
+            <!-- Liste des articles style tableau -->
+            <div class="px-6 py-3">
+                <div class="mb-2 pb-2 border-b border-gray-900">
+                    <h4 class="text-xs font-black text-gray-900 uppercase tracking-wide">Articles commandés</h4>
+                </div>
+
+                <!-- En-tête du tableau -->
+                <div class="grid grid-cols-12 gap-4 px-2 py-1.5 bg-gray-100 border-y border-gray-400 text-[10px] font-black text-gray-700 uppercase tracking-wide">
+                    <div class="col-span-5">Désignation</div>
+                    <div class="col-span-2 text-center">Prix Unit.</div>
+                    <div class="col-span-2 text-center">Qté</div>
+                    <div class="col-span-2 text-right">Total</div>
+                    <div class="col-span-1"></div>
+                </div>
+
+                <div id="panierItems">
                     <!-- Message panier vide -->
-                    <div id="panierVide" class="text-center py-16 bg-white rounded-xl border-2 border-dashed border-gray-300">
-                        <div class="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <i class="fas fa-shopping-cart text-gray-400 text-3xl"></i>
-                        </div>
-                        <p class="text-gray-500 text-lg font-medium">Aucun article sélectionné</p>
-                        <p class="text-gray-400 text-sm mt-2">Ajoutez des produits pour commencer</p>
+                    <div id="panierVide" class="text-center py-8">
+                        <i class="fas fa-receipt text-gray-300 text-3xl mb-2"></i>
+                        <p class="text-gray-500 text-xs font-medium">Aucun article</p>
+                        <p class="text-gray-400 text-[10px] mt-0.5">Sélectionnez des produits</p>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Footer avec totaux et actions -->
-        <div class="border-t-4 border-gray-300 p-6 bg-white space-y-5">
+        <div class="border-t-2 border-gray-900 bg-white">
             <!-- Options de remise -->
-            <div class="space-y-3">
-                <label class="block text-base font-bold text-gray-700 flex items-center">
-                    <i class="fas fa-percent-circle text-green-600 mr-2"></i>
-                    Remise (Optionnel)
-                </label>
-                <div class="grid grid-cols-2 gap-3">
-                    <button onclick="toggleRemiseType('pourcentage')" id="btnRemisePourcentage"
-                            class="px-4 py-3 border-2 border-gray-300 rounded-xl text-sm font-semibold hover:bg-green-50 hover:border-green-400 transition-all">
-                        <i class="fas fa-percent mr-2"></i>Pourcentage
-                    </button>
-                    <button onclick="toggleRemiseType('montant')" id="btnRemiseMontant"
-                            class="px-4 py-3 border-2 border-gray-300 rounded-xl text-sm font-semibold hover:bg-green-50 hover:border-green-400 transition-all">
-                        <i class="fas fa-coins mr-2"></i>Montant fixe
-                    </button>
+            <div class="px-6 py-2 bg-gray-50 border-b border-gray-300">
+                <div class="flex items-center gap-3">
+                    <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                        Remise
+                    </label>
+                    <div class="flex gap-1.5">
+                        <button onclick="toggleRemiseType('pourcentage')" id="btnRemisePourcentage"
+                                class="px-2 py-1 border-2 border-gray-400 rounded text-[10px] font-bold hover:bg-gray-100 hover:border-gray-900 transition-all bg-white">
+                            <i class="fas fa-percent mr-0.5"></i>%
+                        </button>
+                        <button onclick="toggleRemiseType('montant')" id="btnRemiseMontant"
+                                class="px-2 py-1 border-2 border-gray-400 rounded text-[10px] font-bold hover:bg-gray-100 hover:border-gray-900 transition-all bg-white">
+                            <i class="fas fa-coins mr-0.5"></i>FCFA
+                        </button>
+                    </div>
+                    <input type="number" id="remiseValeur" placeholder="0" min="0" step="0.01"
+                           class="flex-1 px-2 py-1 border-2 border-gray-400 rounded focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-all bg-white text-xs font-bold text-right hidden">
                 </div>
-                <input type="number" id="remiseValeur" placeholder="Entrez la valeur de la remise" min="0" step="0.01"
-                       class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-green-200 focus:border-green-500 transition-all hidden">
             </div>
 
-            <!-- Totaux -->
-            <div class="space-y-4 bg-gradient-to-br from-gray-50 to-gray-100 p-5 rounded-2xl border-2 border-gray-200 shadow-inner">
-                <div class="flex justify-between items-center text-base">
-                    <span class="text-gray-600 font-semibold flex items-center">
-                        <i class="fas fa-calculator text-gray-400 mr-2"></i>Sous-total
-                    </span>
-                    <span id="sousTotal" class="font-bold text-gray-800 text-lg">0 FCFA</span>
+            <!-- Totaux style facture -->
+            <div class="px-6 py-3 space-y-2">
+                <div class="flex justify-between items-center text-xs border-b border-gray-300 pb-1">
+                    <span class="text-gray-600 font-medium uppercase tracking-wide">Sous-total</span>
+                    <span id="sousTotal" class="font-bold text-gray-900">0 FCFA</span>
                 </div>
-                <div class="flex justify-between items-center text-base text-green-600" id="ligneRemise" style="display: none;">
-                    <span class="font-semibold flex items-center">
-                        <i class="fas fa-tag text-green-500 mr-2"></i>Remise
-                    </span>
-                    <span id="montantRemise" class="font-bold text-lg">-0 FCFA</span>
+                <div class="flex justify-between items-center text-xs border-b border-gray-300 pb-1" id="ligneRemise" style="display: none;">
+                    <span class="text-gray-600 font-medium uppercase tracking-wide">Remise</span>
+                    <span id="montantRemise" class="font-bold text-red-600">-0 FCFA</span>
                 </div>
-                <div class="flex justify-between items-center text-2xl font-bold border-t-2 border-gray-300 pt-4 mt-2">
-                    <span class="flex items-center text-gray-800">
-                        <i class="fas fa-receipt text-green-600 mr-2 text-xl"></i>Total
-                    </span>
-                    <span id="totalFinal" class="text-green-600">0 FCFA</span>
+                <div class="flex justify-between items-center pt-2 border-t-2 border-gray-900">
+                    <span class="text-base font-black text-gray-900 uppercase tracking-tight">Total à payer</span>
+                    <span id="totalFinal" class="text-2xl font-black text-gray-900">0 FCFA</span>
                 </div>
             </div>
 
             <!-- Boutons d'action -->
-            <div class="grid grid-cols-3 gap-3 pt-3">
-                <button onclick="viderPanier()"
-                        class="px-4 py-4 bg-red-50 border-2 border-red-300 text-red-600 rounded-xl hover:bg-red-100 hover:border-red-400 transition-all font-semibold shadow-sm">
-                    <i class="fas fa-trash mb-1"></i>
-                    <div class="text-xs">Vider</div>
-                </button>
-                <button onclick="imprimerRecu()"
-                        class="px-4 py-4 bg-blue-50 border-2 border-blue-300 text-blue-600 rounded-xl hover:bg-blue-100 hover:border-blue-400 transition-all font-semibold shadow-sm">
-                    <i class="fas fa-print mb-1"></i>
-                    <div class="text-xs">Imprimer</div>
-                </button>
-                <button onclick="effectuerPaiement()" id="btnPayer"
-                        class="px-4 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all font-bold shadow-lg hover:shadow-xl transform hover:scale-105">
-                    <i class="fas fa-check-circle mb-1"></i>
-                    <div class="text-sm">Valider</div>
-                </button>
+            <div class="px-6 pb-3">
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="viderPanier()"
+                            class="px-3 py-2 bg-white border-2 border-gray-400 text-gray-700 rounded-lg hover:bg-gray-100 hover:border-gray-900 transition-all font-bold text-xs uppercase tracking-wide">
+                        <i class="fas fa-trash mr-1"></i>Vider
+                    </button>
+                    <button onclick="imprimerRecu()"
+                            class="px-3 py-2 bg-white border-2 border-gray-400 text-gray-700 rounded-lg hover:bg-gray-100 hover:border-gray-900 transition-all font-bold text-xs uppercase tracking-wide">
+                        <i class="fas fa-print mr-1"></i>Imprimer
+                    </button>
+                    <button onclick="effectuerPaiement()" id="btnPayer"
+                            class="px-3 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-all font-black text-xs uppercase tracking-wide shadow-lg hover:shadow-xl">
+                        <i class="fas fa-check-circle mr-1"></i>Valider
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -2204,13 +2559,59 @@ endforeach; ?>
     let commandeToDelete = null;
     let commandeToEdit = null;
     let currentClientName = null;
+
+    // Protection contre les double-clics
+    let deleteInProgress = false;
+    let editInProgress = false;
     
     // Variables globales pour la commande manuelle - INITIALISATION CORRECTE
     let produits = [];
     let categories = [];
-    let panier = [];
+    let panier = []; // Panier simple - tableau d'objets {id, nom, prix, quantite, image}
     let remiseType = 'aucune';
     let remiseValeur = 0;
+    let modePaiementSelected = '';
+
+    // Sauvegarder le panier dans localStorage pour persistance
+    function savePanierToStorage() {
+        try {
+            localStorage.setItem('admin_panier_temp', JSON.stringify(panier));
+            console.log("💾 Panier sauvegardé dans localStorage");
+        } catch(e) {
+            console.error("Erreur sauvegarde localStorage:", e);
+        }
+    }
+
+    // Charger le panier depuis localStorage
+    function loadPanierFromStorage() {
+        try {
+            const saved = localStorage.getItem('admin_panier_temp');
+            if (saved) {
+                panier = JSON.parse(saved);
+                console.log("📂 Panier chargé depuis localStorage:", panier);
+                return true;
+            }
+        } catch(e) {
+            console.error("Erreur chargement localStorage:", e);
+        }
+        return false;
+    }
+
+    // Vider le panier du localStorage
+    function clearPanierStorage() {
+        try {
+            localStorage.removeItem('admin_panier_temp');
+            console.log("🗑️ Panier localStorage vidé");
+        } catch(e) {
+            console.error("Erreur vidage localStorage:", e);
+        }
+    }
+
+    // Constantes pour éviter les magic numbers
+    const TOAST_DURATION = 4000;
+    const NOTIFICATION_INTERVAL = 30000;
+    const DEBOUNCE_DELAY = 300;
+    const DEBUG_MODE = true; // Mettre à false en production - TEMPORAIREMENT ACTIVÉ POUR DEBUG
 
     // Fonction pour ouvrir le modal de modification
     function openEditModal(id, numeroAffichage) {
@@ -2246,6 +2647,7 @@ endforeach; ?>
                 document.getElementById('editCommandeInfo').textContent = `N°${numeroCommande} - ${commande.nom_client}`;
                 document.getElementById('editStatut').value = commande.statut;
                 document.getElementById('editStatutPaiement').value = commande.statut_paiement || 'Impayé';
+                document.getElementById('editModePaiement').value = commande.mode_paiement || 'Non spécifié';
                 document.getElementById('editVuAdmin').checked = commande.vu_admin == 1;
 
                 // Afficher le modal
@@ -2271,8 +2673,9 @@ endforeach; ?>
     document.getElementById('editForm').addEventListener('submit', function(e) {
         e.preventDefault();
 
-        if (!commandeToEdit) return;
+        if (!commandeToEdit || editInProgress) return;
 
+        editInProgress = true;
         const saveBtn = document.getElementById('saveEditBtn');
         const originalText = saveBtn.innerHTML;
 
@@ -2311,19 +2714,22 @@ endforeach; ?>
 
             saveBtn.innerHTML = originalText;
             saveBtn.disabled = false;
+            editInProgress = false;
         })
         .catch(error => {
             console.error('Erreur:', error);
             showToast('Erreur de connexion', 'error');
             saveBtn.innerHTML = originalText;
             saveBtn.disabled = false;
+            editInProgress = false;
         });
     });
 
     // Fonction pour supprimer la commande via AJAX
     function deleteCommande() {
-        if (!commandeToDelete) return;
+        if (!commandeToDelete || deleteInProgress) return;
 
+        deleteInProgress = true;
         const confirmBtn = document.getElementById('confirmDeleteBtn');
         const originalText = confirmBtn.innerHTML;
 
@@ -2372,12 +2778,14 @@ endforeach; ?>
             // Restaurer le bouton dans tous les cas
             confirmBtn.innerHTML = originalText;
             confirmBtn.disabled = false;
+            deleteInProgress = false;
         })
         .catch(error => {
             console.error('Erreur:', error);
             showToast('Erreur de connexion', 'error');
             confirmBtn.innerHTML = originalText;
             confirmBtn.disabled = false;
+            deleteInProgress = false;
         });
     }
 
@@ -2428,6 +2836,33 @@ endforeach; ?>
         paiementElement.className = 'status-badge flex items-center ' + paiementClass;
         paiementElement.innerHTML = `<i class="${paiementIcon} mr-1 text-xs"></i>${newPaiement}`;
 
+        // Mettre à jour le mode de paiement
+        const modePaiementElement = document.getElementById('mode-paiement-' + commandeId);
+        const newModePaiement = formData.get('mode_paiement') || 'Non spécifié';
+        let modeClass = '';
+        let modeIcon = '';
+
+        switch(newModePaiement) {
+            case 'Espèces':
+                modeIcon = 'fas fa-money-bill-wave';
+                modeClass = 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 border-green-300';
+                break;
+            case 'Wave':
+                modeIcon = 'fas fa-mobile-alt';
+                modeClass = 'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 border-blue-300';
+                break;
+            case 'Orange Money':
+                modeIcon = 'fas fa-mobile-alt';
+                modeClass = 'bg-gradient-to-r from-orange-100 to-amber-100 text-orange-800 border-orange-300';
+                break;
+            default:
+                modeIcon = 'fas fa-question-circle';
+                modeClass = 'bg-gradient-to-r from-gray-100 to-slate-100 text-gray-800 border-gray-300';
+        }
+
+        modePaiementElement.className = 'inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold border-2 shadow-sm ' + modeClass;
+        modePaiementElement.innerHTML = `<i class="${modeIcon} mr-1.5"></i>${newModePaiement}`;
+
         // Mettre à jour le statut "vu"
         const vuElement = document.getElementById('vu-' + commandeId);
         const vuAdmin = formData.get('vu_admin') === '1';
@@ -2446,33 +2881,100 @@ endforeach; ?>
         }, 1000);
     }
 
+    // Fonction helper pour debug
+    function debugLog(...args) {
+        if (DEBUG_MODE) {
+            console.log(...args);
+        }
+    }
+
+    // Fonction debounce pour limiter les appels
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    // Fonctions wrapper pour gérer stopPropagation
+    function handleEditClick(event, id, numeroAffichage) {
+        if (event) {
+            event.stopPropagation();
+            event.preventDefault();
+        }
+        debugLog('handleEditClick appelée pour commande', id);
+        openEditModal(id, numeroAffichage);
+        return false;
+    }
+
+    function handleDeleteClick(event, id, nomClient, numeroAffichage) {
+        if (event) {
+            event.stopPropagation();
+            event.preventDefault();
+        }
+        debugLog('handleDeleteClick appelée pour commande', id);
+        confirmDelete(id, nomClient, numeroAffichage);
+        return false;
+    }
+
+    // Fonction pour sélectionner le mode de paiement
+    function selectModePaiement(mode) {
+        modePaiementSelected = mode;
+        document.getElementById('modePaiementSelected').value = mode;
+
+        // Retirer la classe selected de tous les boutons
+        document.querySelectorAll('.mode-paiement-btn').forEach(btn => {
+            btn.classList.remove('selected');
+        });
+
+        // Ajouter la classe selected au bouton cliqué
+        const btnId = 'btnModePaiement' + mode.replace(/ /g, '').replace('Espèces', 'Especes');
+        const selectedBtn = document.getElementById(btnId);
+        if (selectedBtn) {
+            selectedBtn.classList.add('selected');
+        }
+    }
+
     // Fonction pour ouvrir le modal de commande manuelle - CORRIGÉE
     function openCommandeManuelleModal() {
         const modal = document.getElementById('commandeManuelleModal');
         modal.classList.remove('hidden');
-        
-        // Reset du panier
+
+        // Reset du panier ET du localStorage
         panier = [];
+        clearPanierStorage();
         remiseType = 'aucune';
         remiseValeur = 0;
-        
+        modePaiementSelected = '';
+
         // Charger les produits et initialiser l'interface seulement après le chargement
         chargerProduits().then((success) => {
             if (success) {
                 updatePanierDisplay();
                 updateTotaux();
-                
+
                 // Clear form
                 document.getElementById('numTable').value = '';
+                document.getElementById('modePaiementSelected').value = '';
                 document.getElementById('searchProduits').value = '';
                 document.getElementById('remiseValeur').value = '';
                 document.getElementById('remiseValeur').classList.add('hidden');
-                
-                // Reset remise buttons
-                document.getElementById('btnRemisePourcentage').classList.remove('bg-green-600', 'text-white');
-                document.getElementById('btnRemisePourcentage').classList.add('border-gray-300');
-                document.getElementById('btnRemiseMontant').classList.remove('bg-green-600', 'text-white');
-                document.getElementById('btnRemiseMontant').classList.add('border-gray-300');
+
+                // Reset mode paiement buttons
+                document.querySelectorAll('.mode-paiement-btn').forEach(btn => {
+                    btn.classList.remove('selected');
+                });
+
+                // Reset remise buttons - style feuille
+                document.getElementById('btnRemisePourcentage').classList.remove('bg-gray-900', 'text-white', 'border-gray-900');
+                document.getElementById('btnRemisePourcentage').classList.add('bg-white', 'border-gray-400');
+                document.getElementById('btnRemiseMontant').classList.remove('bg-gray-900', 'text-white', 'border-gray-900');
+                document.getElementById('btnRemiseMontant').classList.add('bg-white', 'border-gray-400');
             }
         });
     }
@@ -2683,8 +3185,8 @@ endforeach; ?>
 
     // Fonction pour charger les produits - CORRIGÉE
     function chargerProduits() {
-        console.log("Tentative de chargement des produits...");
-        
+        debugLog("Tentative de chargement des produits...");
+
         return fetch('commandes.php', {
             method: 'POST',
             headers: {
@@ -2693,19 +3195,19 @@ endforeach; ?>
             body: 'action=get_produits'
         })
         .then(response => {
-            console.log("Réponse reçue, status:", response.status);
+            debugLog("Réponse reçue, status:", response.status);
             if (!response.ok) {
                 throw new Error('Erreur réseau: ' + response.status);
             }
             return response.json();
         })
         .then(data => {
-            console.log("Données reçues:", data);
+            debugLog("Données reçues:", data);
             if (data.success) {
                 produits = data.produits || [];
                 categories = data.categories || [];
-                console.log(`${produits.length} produits chargés, ${categories.length} catégories`);
-                
+                debugLog(`${produits.length} produits chargés, ${categories.length} catégories`);
+
                 initializeCategories();
                 afficherProduits(produits);
                 return true;
@@ -2714,7 +3216,7 @@ endforeach; ?>
             }
         })
         .catch(error => {
-            console.error('Erreur détaillée:', error);
+            console.error('Erreur détaillée:', error); // Garder console.error pour les vraies erreurs
             showToast('Erreur de chargement: ' + error.message, 'error');
             // Afficher des produits vides pour éviter les erreurs
             produits = [];
@@ -2728,156 +3230,174 @@ endforeach; ?>
     // Fonction pour initialiser les catégories
     function initializeCategories() {
         const categoriesNav = document.getElementById('categoriesNav');
-        
-        // Garder le bouton "Tous"
-        const btnTous = categoriesNav.querySelector('[data-category="all"]');
+
+        // Vider et recréer tous les boutons
         categoriesNav.innerHTML = '';
+
+        // Créer le bouton "Tous"
+        const btnTous = document.createElement('button');
+        btnTous.className = 'inline-flex items-center px-5 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md hover:shadow-lg border-2 border-green-600 category-btn active transform hover:scale-105 transition-all';
+        btnTous.dataset.category = 'all';
+        btnTous.innerHTML = '<i class="fas fa-th-large mr-2"></i>Tous les produits';
+        btnTous.onclick = () => filterByCategory('all');
         categoriesNav.appendChild(btnTous);
-        
+
         // Ajouter les catégories
         categories.forEach(cat => {
             const categoryColors = {
-                'Burgers': { bg: 'bg-blue-100', text: 'text-blue-800', icon: 'fas fa-hamburger' },
-                'Asiatique': { bg: 'bg-red-100', text: 'text-red-800', icon: 'fas fa-utensils' },
-                'Italien': { bg: 'bg-green-100', text: 'text-green-800', icon: 'fas fa-pizza-slice' },
-                'Plats Froid': { bg: 'bg-cyan-100', text: 'text-cyan-800', icon: 'fas fa-snowflake' },
-                'Plats chauds': { bg: 'bg-purple-100', text: 'text-purple-800', icon: 'fas fa-fire' },
-                'Boissons': { bg: 'bg-orange-100', text: 'text-orange-800', icon: 'fas fa-glass-water' }
+                'Burgers': { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300', icon: 'fas fa-hamburger' },
+                'Asiatique': { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-300', icon: 'fas fa-utensils' },
+                'Italien': { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300', icon: 'fas fa-pizza-slice' },
+                'Plats Froid': { bg: 'bg-cyan-100', text: 'text-cyan-800', border: 'border-cyan-300', icon: 'fas fa-snowflake' },
+                'Plats chauds': { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-300', icon: 'fas fa-fire' },
+                'Boissons': { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300', icon: 'fas fa-glass-water' },
+                'Desserts': { bg: 'bg-pink-100', text: 'text-pink-800', border: 'border-pink-300', icon: 'fas fa-ice-cream' },
+                'Entrées': { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300', icon: 'fas fa-leaf' }
             };
-            
-            const colorData = categoryColors[cat.nom] || { bg: 'bg-gray-100', text: 'text-gray-800', icon: 'fas fa-tag' };
-            
+
+            const colorData = categoryColors[cat.nom] || { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-300', icon: 'fas fa-tag' };
+
             const button = document.createElement('button');
-            button.className = `inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${colorData.bg} ${colorData.text} border border-current category-btn`;
+            button.className = `inline-flex items-center px-5 py-2.5 rounded-xl text-sm font-bold ${colorData.bg} ${colorData.text} border-2 ${colorData.border} category-btn transform hover:scale-105 transition-all hover:shadow-md`;
             button.dataset.category = cat.id;
             button.innerHTML = `<i class="${colorData.icon} mr-2"></i>${cat.nom}`;
             button.onclick = () => filterByCategory(cat.id);
-            
+
             categoriesNav.appendChild(button);
         });
     }
 
     // Fonction pour filtrer par catégorie
     function filterByCategory(categoryId) {
+        debugLog("Filtrage par catégorie:", categoryId);
+
         // Mettre à jour les boutons actifs
         document.querySelectorAll('.category-btn').forEach(btn => {
             btn.classList.remove('active');
+            // Retirer les styles du bouton "Tous"
+            if (btn.dataset.category === 'all') {
+                btn.className = 'inline-flex items-center px-5 py-2.5 rounded-xl text-sm font-bold border-2 category-btn transform hover:scale-105 transition-all hover:shadow-md';
+            }
         });
-        
+
         if (categoryId === 'all') {
-            document.querySelector('[data-category="all"]').classList.add('active');
+            const btnAll = document.querySelector('[data-category="all"]');
+            if (btnAll) {
+                btnAll.classList.add('active');
+                // Remettre le style vert pour le bouton actif
+                btnAll.className = 'inline-flex items-center px-5 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md hover:shadow-lg border-2 border-green-600 category-btn active transform hover:scale-105 transition-all';
+            }
+            debugLog("Affichage de tous les produits:", produits.length);
             afficherProduits(produits);
         } else {
-            document.querySelector(`[data-category="${categoryId}"]`).classList.add('active');
+            const btnCategory = document.querySelector(`[data-category="${categoryId}"]`);
+            if (btnCategory) {
+                btnCategory.classList.add('active');
+            }
             const produitsFiltres = produits.filter(p => p.categorie_id == categoryId);
+            debugLog("Produits filtrés:", produitsFiltres.length);
             afficherProduits(produitsFiltres);
         }
     }
 
-    // Fonction pour afficher les produits
-   function afficherProduits(produitsToShow) {
+    // Fonction pour afficher les produits - VERSION SIMPLIFIÉE ET FONCTIONNELLE
+    function afficherProduits(produitsToShow) {
+        console.log(">>> afficherProduits appelé, nombre:", produitsToShow?.length);
+
         const grid = document.getElementById('produitsGrid');
-        
-        // Vérifier que produitsToShow est un tableau
+        const produitsCount = document.getElementById('produitsCount');
+
         if (!Array.isArray(produitsToShow)) {
             produitsToShow = [];
         }
-        
+
+        if (produitsCount) {
+            produitsCount.textContent = produitsToShow.length;
+        }
+
         if (produitsToShow.length === 0) {
             grid.innerHTML = `
                 <div class="col-span-full text-center py-12">
-                    <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <i class="fas fa-search text-gray-400 text-xl"></i>
+                    <div class="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-search text-gray-400 text-3xl"></i>
                     </div>
-                    <p class="text-gray-500">Aucun produit disponible</p>
+                    <p class="text-gray-600 font-semibold text-lg">Aucun produit trouvé</p>
                 </div>
             `;
             return;
         }
-        
-        grid.innerHTML = '';
-        produitsToShow.forEach(produit => {
-            // Debug: afficher les infos du produit
-            if (produit.image) {
-                console.log('Produit:', produit.nom, 'Image:', produit.image);
-            }
 
-            // Vérifier si le produit est dans le panier
+        grid.innerHTML = '';
+
+        produitsToShow.forEach(produit => {
             const itemInPanier = panier.find(item => item.id == produit.id);
             const quantiteInPanier = itemInPanier ? itemInPanier.quantite : 0;
 
             const card = document.createElement('div');
             card.className = 'produit-card bg-white shadow-sm border border-gray-100';
+            card.dataset.productId = produit.id;
 
-            // Gérer les différents formats d'image (image, image_url, ou chemin complet)
             const imagePath = produit.image || produit.image_url || '';
-
-            // Construire le bon chemin d'image
             let imageSrc = '';
             if (imagePath) {
-                // Si le chemin commence par uploads/, ajouter ../
                 if (imagePath.startsWith('uploads/')) {
+                    imageSrc = '../public/' + imagePath;
+                } else if (imagePath.startsWith('public/uploads/')) {
                     imageSrc = '../' + imagePath;
-                }
-                // Si c'est juste un nom de fichier, ajouter ../uploads/
-                else if (!imagePath.includes('/')) {
-                    imageSrc = '../uploads/' + imagePath;
-                }
-                // Sinon utiliser tel quel
-                else {
+                } else if (!imagePath.includes('/')) {
+                    imageSrc = '../public/uploads/' + imagePath;
+                } else {
                     imageSrc = imagePath;
                 }
             }
 
-            const imageHtml = imageSrc ?
-                `<img src="${imageSrc}"
-                      alt="${produit.nom}"
-                      class="produit-image"
-                      onerror="console.log('Erreur image:', this.src); this.style.display='none'; this.nextElementSibling.style.display='flex';">`
-                : '';
-
             card.innerHTML = `
-                <div class="relative">
-                    ${imageHtml}
+                <div class="relative overflow-hidden">
+                    ${imageSrc ? `<img src="${imageSrc}" alt="${produit.nom}" class="produit-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">` : ''}
                     <div class="produit-placeholder" style="${imagePath ? 'display: none;' : 'display: flex;'}">
-                        <i class="fas fa-utensils text-gray-300 text-xl"></i>
+                        <i class="fas fa-utensils text-green-400 text-4xl"></i>
                     </div>
-
-                    <div class="produit-badge text-[10px] px-2 py-0.5">${parseInt(produit.prix)}</div>
-
-                    ${quantiteInPanier > 0 ? `<div class="produit-quantity-badge text-xs">${quantiteInPanier}</div>` : ''}
+                    <div class="produit-badge">${parseInt(produit.prix)} FCFA</div>
+                    ${quantiteInPanier > 0 ? `<div class="produit-quantity-badge">${quantiteInPanier}</div>` : ''}
                 </div>
-
-                <div class="produit-info p-1.5">
-                    <h3 class="produit-nom font-semibold text-gray-800 mb-1 text-[11px] leading-tight">${produit.nom}</h3>
-                    <div class="flex items-center justify-between gap-1">
-                        <span class="produit-prix font-bold text-green-600 text-xs">${parseInt(produit.prix)}</span>
-                        <button onclick="ajouterAuPanier(${produit.id})"
-                                class="btn-ajouter px-1.5 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition-colors ${quantiteInPanier > 0 ? 'bg-green-700' : ''}">
-                            <i class="fas fa-plus text-[10px]"></i>
+                <div class="produit-info p-4">
+                    <h3 class="produit-nom font-bold text-gray-900 mb-2 text-sm leading-tight">${produit.nom}</h3>
+                    <div class="flex items-center justify-between gap-2 mt-3">
+                        <div class="flex flex-col">
+                            <span class="text-xs text-gray-500 font-medium">Prix</span>
+                            <span class="produit-prix font-extrabold text-green-600 text-base">${parseInt(produit.prix)} <span class="text-xs">FCFA</span></span>
+                        </div>
+                        <button class="btn-ajouter flex items-center gap-2 px-4 py-2 text-white ${quantiteInPanier > 0 ? 'added' : ''}">
+                            <i class="fas fa-${quantiteInPanier > 0 ? 'check' : 'plus'} text-sm"></i>
+                            <span class="text-xs font-bold">${quantiteInPanier > 0 ? 'Ajouté' : 'Ajouter'}</span>
                         </button>
                     </div>
                 </div>
             `;
+
+            // L'événement est géré par le gestionnaire global, pas besoin de l'attacher ici
+
             grid.appendChild(card);
         });
     }
 
-    // Fonction pour ajouter un produit au panier - CORRIGÉE
+    // Fonction pour ajouter un produit au panier - VERSION SIMPLIFIÉE
     function ajouterAuPanier(produitId) {
+        console.log("🛒 ajouterAuPanier appelé avec ID:", produitId);
+        console.log("📦 Panier AVANT:", panier.length, "items");
+
         const produit = produits.find(p => p.id == produitId);
         if (!produit) {
-            console.error("Produit non trouvé:", produitId);
+            console.error("❌ Produit non trouvé:", produitId);
             return;
         }
 
-        const existingItemIndex = panier.findIndex(item => item.id == produitId);
+        const existingItem = panier.find(item => item.id == produitId);
 
-        if (existingItemIndex >= 0) {
-            // Produit déjà dans le panier, augmenter la quantité
-            panier[existingItemIndex].quantite++;
+        if (existingItem) {
+            existingItem.quantite++;
+            console.log("➕ Quantité augmentée:", existingItem.nom, "x", existingItem.quantite);
         } else {
-            // Nouveau produit, l'ajouter au panier
             panier.push({
                 id: produit.id,
                 nom: produit.nom,
@@ -2885,196 +3405,242 @@ endforeach; ?>
                 quantite: 1,
                 image: produit.image || produit.image_url || null
             });
+            console.log("✅ Nouveau produit ajouté:", produit.nom);
         }
 
+        console.log("📦 Panier APRES:", panier.length, "items");
+
+        // Sauvegarder dans localStorage
+        savePanierToStorage();
+
+        // Mettre à jour l'affichage
         updatePanierDisplay();
         updateTotaux();
-        updateProductBadges(); // Mettre à jour les badges sur les produits
 
-        // Animer le badge du panier
+        // Mettre à jour uniquement les badges des produits sans tout réafficher
+        updateProductBadgesOnly();
+
+        // Animation
         const headerBadge = document.getElementById('headerItemCount');
         if (headerBadge) {
             headerBadge.classList.add('pulse-badge');
-            setTimeout(() => {
-                headerBadge.classList.remove('pulse-badge');
-            }, 500);
+            setTimeout(() => headerBadge.classList.remove('pulse-badge'), 500);
         }
 
-        // Animation de feedback
         showToast(`${produit.nom} ajouté au panier`, 'success');
     }
 
-    // Nouvelle fonction pour mettre à jour les badges des produits
-    function updateProductBadges() {
+    // Fonction pour mettre à jour uniquement les badges sans réafficher tous les produits
+    function updateProductBadgesOnly() {
         const productCards = document.querySelectorAll('.produit-card');
         productCards.forEach(card => {
-            const productId = card.querySelector('button').onclick.toString().match(/ajouterAuPanier\((\d+)\)/)[1];
+            const productId = parseInt(card.dataset.productId);
+            if (!productId) return;
+
             const itemInPanier = panier.find(item => item.id == productId);
             const quantiteInPanier = itemInPanier ? itemInPanier.quantite : 0;
-            
+
             // Mettre à jour le badge de quantité
-            const badge = card.querySelector('.produit-quantity-badge');
+            const badgeContainer = card.querySelector('.relative.overflow-hidden');
+            let badge = card.querySelector('.produit-quantity-badge');
+
             if (quantiteInPanier > 0) {
-                if (!badge) {
+                if (!badge && badgeContainer) {
                     const newBadge = document.createElement('div');
                     newBadge.className = 'produit-quantity-badge';
                     newBadge.textContent = quantiteInPanier;
-                    card.querySelector('.relative').appendChild(newBadge);
-                } else {
+                    badgeContainer.appendChild(newBadge);
+                } else if (badge) {
                     badge.textContent = quantiteInPanier;
                 }
-                
-                // Changer l'apparence du bouton
+
+                // Mettre à jour le bouton
                 const button = card.querySelector('.btn-ajouter');
-                button.classList.add('bg-green-700');
-                button.innerHTML = '<i class="fas fa-check mr-1"></i>Ajouté';
-            } else {
-                if (badge) {
-                    badge.remove();
+                if (button) {
+                    button.classList.add('added');
+                    const icon = button.querySelector('i');
+                    const text = button.querySelector('span');
+                    if (icon) icon.className = 'fas fa-check text-sm';
+                    if (text) text.textContent = 'Ajouté';
                 }
-                
-                // Remettre le bouton à son état initial
+            } else {
+                if (badge) badge.remove();
+
+                // Remettre le bouton à l'état initial
                 const button = card.querySelector('.btn-ajouter');
-                button.classList.remove('bg-green-700');
-                button.innerHTML = '<i class="fas fa-plus mr-1"></i>Ajouter';
+                if (button) {
+                    button.classList.remove('added');
+                    const icon = button.querySelector('i');
+                    const text = button.querySelector('span');
+                    if (icon) icon.className = 'fas fa-plus text-sm';
+                    if (text) text.textContent = 'Ajouter';
+                }
             }
         });
     }
 
-    // Fonction pour mettre à jour l'affichage du panier - AMÉLIORÉE
-    function updatePanierDisplay() {
-        const panierItems = document.getElementById('panierItems');
-        const panierVide = document.getElementById('panierVide');
-        const headerItemCount = document.getElementById('headerItemCount');
+ function updatePanierDisplay() {
+    const panierItems = document.getElementById('panierItems');
+    const headerItemCount = document.getElementById('headerItemCount');
 
-        if (panier.length === 0) {
-            panierVide.style.display = 'block';
-            panierItems.innerHTML = '';
-            panierItems.appendChild(panierVide);
-            if (headerItemCount) headerItemCount.textContent = '0';
-            return;
-        }
+    // Mettre à jour la date et le numéro de commande
+    const commandeDate = document.getElementById('commandeDate');
+    const commandeNumber = document.getElementById('commandeNumber');
+    if (commandeDate) {
+        const now = new Date();
+        commandeDate.textContent = now.toLocaleDateString('fr-FR');
+    }
+    if (commandeNumber) {
+        commandeNumber.textContent = '#' + Date.now().toString().slice(-6);
+    }
 
-        panierVide.style.display = 'none';
-        const totalItems = panier.reduce((sum, item) => sum + item.quantite, 0);
-        if (headerItemCount) headerItemCount.textContent = totalItems;
+    // Vider le contenu
+    panierItems.innerHTML = '';
 
-        panierItems.innerHTML = '';
+    if (panier.length === 0) {
+        // ✅ Recréer l'élément panierVide dynamiquement
+        const panierVide = document.createElement('div');
+        panierVide.id = 'panierVide';
+        panierVide.className = 'text-center py-8';
+        panierVide.innerHTML = `
+            <i class="fas fa-receipt text-gray-300 text-3xl mb-2"></i>
+            <p class="text-gray-500 text-xs font-medium">Aucun article</p>
+            <p class="text-gray-400 text-[10px] mt-0.5">Sélectionnez des produits</p>
+        `;
+        panierItems.appendChild(panierVide);
         
-        panier.forEach((item, index) => {
-            const itemDiv = document.createElement('div');
-            itemDiv.className = 'panier-item bg-white rounded-xl p-5 border-2 border-gray-200 shadow-sm hover:shadow-md transition-all';
+        if (headerItemCount) headerItemCount.textContent = '0';
+        return;
+    }
 
-            const imageHtml = item.image ?
-                `<img src="${item.image.startsWith('uploads/') ? '../' + item.image : (item.image.includes('/') ? item.image : '../uploads/' + item.image)}"
-                      alt="${item.nom}"
-                      class="w-16 h-16 object-cover rounded-lg"
-                      onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg flex items-center justify-center\\'><i class=\\'fas fa-utensils text-gray-400 text-xl\\'></i></div>';")>`
-                :
-                `<div class="w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg flex items-center justify-center">
-                    <i class="fas fa-utensils text-gray-400 text-xl"></i>
-                </div>`;
+    const totalItems = panier.reduce((sum, item) => sum + item.quantite, 0);
+    if (headerItemCount) headerItemCount.textContent = totalItems;
 
-            itemDiv.innerHTML = `
-                <!-- Ligne 1: Image + Infos + Supprimer -->
-                <div class="flex items-center justify-between mb-4">
-                    <div class="flex items-center flex-1">
-                        ${imageHtml}
-                        <div class="ml-4 flex-1">
-                            <h4 class="font-bold text-gray-900 text-base mb-1">${item.nom}</h4>
-                            <div class="flex items-center gap-2">
-                                <span class="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                                    <i class="fas fa-tag text-green-600 mr-1"></i>${parseInt(item.prix)} FCFA
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                    <button onclick="retirerDuPanier(${index})"
-                            class="ml-3 w-8 h-8 bg-red-100 text-red-600 hover:bg-red-200 rounded-lg flex items-center justify-center transition-all">
-                        <i class="fas fa-trash text-sm"></i>
+    panier.forEach((item, index) => {
+        const itemRow = document.createElement('div');
+        itemRow.className = 'grid grid-cols-12 gap-4 px-2 py-2 border-b border-gray-200 hover:bg-gray-50 transition-all items-center';
+
+        const prixUnitaire = parseInt(item.prix);
+        const prixTotal = prixUnitaire * item.quantite;
+
+        itemRow.innerHTML = `
+            <!-- Désignation -->
+            <div class="col-span-5">
+                <div class="font-bold text-gray-900 text-xs">${item.nom}</div>
+            </div>
+
+            <!-- Prix unitaire -->
+            <div class="col-span-2 text-center">
+                <span class="text-xs font-medium text-gray-700">${prixUnitaire}</span>
+            </div>
+
+            <!-- Quantité avec contrôles -->
+            <div class="col-span-2">
+                <div class="flex items-center justify-center gap-1">
+                    <button onclick="modifierQuantite(${index}, -1)" type="button"
+                            class="w-5 h-5 bg-gray-200 hover:bg-red-500 hover:text-white text-gray-700 rounded flex items-center justify-center transition-all text-[10px] font-bold">
+                        <i class="fas fa-minus"></i>
+                    </button>
+                    <span class="text-sm font-black text-gray-900 min-w-[30px] text-center">${item.quantite}</span>
+                    <button onclick="modifierQuantite(${index}, 1)" type="button"
+                            class="w-5 h-5 bg-gray-200 hover:bg-green-500 hover:text-white text-gray-700 rounded flex items-center justify-center transition-all text-[10px] font-bold">
+                        <i class="fas fa-plus"></i>
                     </button>
                 </div>
+            </div>
 
-                <!-- Ligne 2: Contrôles quantité + Prix total -->
-                <div class="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-                    <div class="flex items-center">
-                        <span class="text-sm font-medium text-gray-600 mr-3">Quantité:</span>
-                        <div class="flex items-center gap-2 bg-white rounded-lg border-2 border-gray-200 px-2">
-                            <button onclick="modifierQuantite(${index}, -1)"
-                                    class="w-8 h-8 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded transition-all flex items-center justify-center">
-                                <i class="fas fa-minus"></i>
-                            </button>
-                            <span class="text-lg font-bold text-gray-900 min-w-[30px] text-center">${item.quantite}</span>
-                            <button onclick="modifierQuantite(${index}, 1)"
-                                    class="w-8 h-8 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded transition-all flex items-center justify-center">
-                                <i class="fas fa-plus"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="text-right">
-                        <div class="text-xs text-gray-500 mb-0.5">Total</div>
-                        <div class="text-xl font-bold text-green-600">${parseInt(item.prix * item.quantite)} <span class="text-sm">FCFA</span></div>
-                    </div>
-                </div>
-            `;
-            panierItems.appendChild(itemDiv);
-        });
+            <!-- Total -->
+            <div class="col-span-2 text-right">
+                <span class="text-xs font-bold text-gray-900">${prixTotal}</span>
+            </div>
+
+            <!-- Action supprimer -->
+            <div class="col-span-1 text-center">
+                <button onclick="retirerDuPanier(${index})" type="button"
+                        class="w-6 h-6 bg-red-100 text-red-600 hover:bg-red-600 hover:text-white rounded flex items-center justify-center transition-all mx-auto">
+                    <i class="fas fa-trash text-[10px]"></i>
+                </button>
+            </div>
+        `;
+        panierItems.appendChild(itemRow);
+    });
+}
+ // ✅ Définir en DEHORS de DOMContentLoaded
+function modifierQuantite(index, delta) {
+    console.log(`🔄 modifierQuantite - index: ${index}, delta: ${delta}, panier:`, panier);
+
+    if (!panier[index]) {
+        console.error("❌ Produit non trouvé à l'index:", index);
+        return;
     }
 
-    // Fonction pour modifier la quantité - CORRIGÉE
-    function modifierQuantite(index, delta) {
-        if (panier[index]) {
-            panier[index].quantite += delta;
-            
-            if (panier[index].quantite <= 0) {
-                // Supprimer l'article si la quantité devient 0
-                panier.splice(index, 1);
-            }
-            
-            updatePanierDisplay();
-            updateTotaux();
-            updateProductBadges(); // Mettre à jour les badges sur les produits
-        }
+    const produitNom = panier[index].nom;
+    panier[index].quantite += delta;
+
+    if (panier[index].quantite <= 0) {
+        console.log(`🗑️ Quantité = 0, suppression de ${produitNom}`);
+        panier.splice(index, 1);
+    } else {
+        console.log(`✅ Nouvelle quantité de ${produitNom}: ${panier[index].quantite}`);
     }
 
-    // Fonction pour retirer un item du panier - CORRIGÉE
-    function retirerDuPanier(index) {
-        if (panier[index]) {
-            const itemName = panier[index].nom;
-            panier.splice(index, 1);
-            
-            updatePanierDisplay();
-            updateTotaux();
-            updateProductBadges(); // Mettre à jour les badges sur les produits
-            
-            showToast(`${itemName} retiré du panier`, 'success');
-        }
+    savePanierToStorage();
+    updatePanierDisplay();
+    updateTotaux();
+    updateProductBadgesOnly();
+}
+
+  function retirerDuPanier(index) {
+    console.log(`🗑️ retirerDuPanier - index: ${index}`);
+
+    if (!panier[index]) {
+        console.error("❌ Produit non trouvé à l'index:", index);
+        return;
     }
 
-    // Fonction pour vider le panier
-    function viderPanier() {
-        if (panier.length === 0) return;
-        
-        if (confirm('Êtes-vous sûr de vouloir vider le panier ?')) {
-            panier = [];
-            updatePanierDisplay();
-            updateTotaux();
-            showToast('Panier vidé', 'success');
-        }
+    const itemName = panier[index].nom;
+    panier.splice(index, 1);
+
+    console.log(`✅ ${itemName} retiré du panier`);
+
+    savePanierToStorage();
+    updatePanierDisplay(); // ✅ Ceci recrée tout le HTML
+    updateTotaux();
+    updateProductBadgesOnly();
+
+    showToast(`${itemName} retiré du panier`, 'success');
+}
+ function viderPanier() {
+    if (panier.length === 0) {
+        console.log("ℹ️ Le panier est déjà vide");
+        return;
     }
+
+    if (confirm('Êtes-vous sûr de vouloir vider le panier ?')) {
+        console.log(`🗑️ Vidage du panier (${panier.length} items)`);
+
+        panier = [];
+        clearPanierStorage();
+        updatePanierDisplay(); // ✅ Recrée l'affichage avec panierVide
+        updateTotaux();
+        updateProductBadgesOnly();
+
+        showToast('Panier vidé', 'success');
+    }
+}
 
     // Fonction pour gérer les types de remise
     function toggleRemiseType(type) {
         const btnPourcentage = document.getElementById('btnRemisePourcentage');
         const btnMontant = document.getElementById('btnRemiseMontant');
         const inputRemise = document.getElementById('remiseValeur');
-        
-        // Reset buttons
+
+        // Reset buttons - style feuille
         [btnPourcentage, btnMontant].forEach(btn => {
-            btn.classList.remove('bg-green-600', 'text-white');
-            btn.classList.add('border-gray-300');
+            btn.classList.remove('bg-gray-900', 'text-white', 'border-gray-900');
+            btn.classList.add('bg-white', 'border-gray-400');
         });
-        
+
         if (remiseType === type) {
             // Désactiver la remise
             remiseType = 'aucune';
@@ -3086,20 +3652,20 @@ endforeach; ?>
             remiseType = type;
             inputRemise.classList.remove('hidden');
             inputRemise.focus();
-            
+
             if (type === 'pourcentage') {
-                btnPourcentage.classList.add('bg-green-600', 'text-white');
-                btnPourcentage.classList.remove('border-gray-300');
-                inputRemise.placeholder = 'Pourcentage (%)';
+                btnPourcentage.classList.add('bg-gray-900', 'text-white', 'border-gray-900');
+                btnPourcentage.classList.remove('bg-white', 'border-gray-400');
+                inputRemise.placeholder = '0';
                 inputRemise.max = '100';
             } else {
-                btnMontant.classList.add('bg-green-600', 'text-white');
-                btnMontant.classList.remove('border-gray-300');
-                inputRemise.placeholder = 'Montant (FCFA)';
+                btnMontant.classList.add('bg-gray-900', 'text-white', 'border-gray-900');
+                btnMontant.classList.remove('bg-white', 'border-gray-400');
+                inputRemise.placeholder = '0';
                 inputRemise.removeAttribute('max');
             }
         }
-        
+
         updateTotaux();
     }
 
@@ -3149,31 +3715,35 @@ endforeach; ?>
             remiseInput.addEventListener('input', updateTotaux);
         }
         
-        // Event listener pour la recherche
+        // Event listener pour la recherche avec debounce
         const searchInput = document.getElementById('searchProduits');
         const clearSearch = document.getElementById('clearSearch');
-        
+
+        // Fonction de recherche avec debounce
+        const performSearch = debounce(function(query) {
+            if (query) {
+                clearSearch.classList.remove('hidden');
+                const produitsFiltres = produits.filter(p =>
+                    p.nom.toLowerCase().includes(query) ||
+                    (p.description && p.description.toLowerCase().includes(query))
+                );
+                afficherProduits(produitsFiltres);
+
+                // Désactiver les filtres de catégorie pendant la recherche
+                document.querySelectorAll('.category-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+            } else {
+                clearSearch.classList.add('hidden');
+                afficherProduits(produits);
+                document.querySelector('[data-category="all"]').classList.add('active');
+            }
+        }, DEBOUNCE_DELAY);
+
         if (searchInput) {
             searchInput.addEventListener('input', function() {
                 const query = this.value.toLowerCase().trim();
-                
-                if (query) {
-                    clearSearch.classList.remove('hidden');
-                    const produitsFiltres = produits.filter(p => 
-                        p.nom.toLowerCase().includes(query) || 
-                        (p.description && p.description.toLowerCase().includes(query))
-                    );
-                    afficherProduits(produitsFiltres);
-                    
-                    // Désactiver les filtres de catégorie pendant la recherche
-                    document.querySelectorAll('.category-btn').forEach(btn => {
-                        btn.classList.remove('active');
-                    });
-                } else {
-                    clearSearch.classList.add('hidden');
-                    afficherProduits(produits);
-                    document.querySelector('[data-category="all"]').classList.add('active');
-                }
+                performSearch(query);
             });
         }
         
@@ -3185,20 +3755,52 @@ endforeach; ?>
                 document.querySelector('[data-category="all"]').classList.add('active');
             });
         }
+
+        // GESTIONNAIRE GLOBAL pour les boutons d'ajout au panier
+        // Utiliser la délégation d'événements sur le document entier
+        document.addEventListener('click', function(e) {
+            // Vérifier si le clic est sur un bouton d'ajout ou à l'intérieur
+            const button = e.target.closest('.btn-ajouter');
+            if (button) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                // Trouver la carte produit parente
+                const card = button.closest('.produit-card');
+                if (card && card.dataset.productId) {
+                    const productId = parseInt(card.dataset.productId);
+                    console.log("🎯 CLICK GLOBAL détecté sur produit ID:", productId);
+                    ajouterAuPanier(productId);
+                }
+            }
+        });
     });
 
     // Fonction pour effectuer le paiement (enregistrer la commande)
     function effectuerPaiement() {
         const numTable = document.getElementById('numTable').value.trim();
-        
-        // Validation simplifiée - seulement le numéro de table
+
+        // Validation améliorée
         if (!numTable) {
             showToast('Veuillez renseigner le numéro de table', 'error');
+            document.getElementById('numTable').focus();
             return;
         }
-        
+
+        // Validation que c'est bien un nombre
+        if (isNaN(numTable) || parseInt(numTable) < 1) {
+            showToast('Le numéro de table doit être un nombre valide', 'error');
+            document.getElementById('numTable').focus();
+            return;
+        }
+
         if (panier.length === 0) {
             showToast('Le panier est vide', 'error');
+            return;
+        }
+
+        if (!modePaiementSelected || modePaiementSelected === '') {
+            showToast('Veuillez sélectionner un mode de paiement', 'error');
             return;
         }
         
@@ -3226,6 +3828,7 @@ endforeach; ?>
         formData.append('email', '');
         formData.append('telephone', '0000000000');
         formData.append('num_table', numTable);
+        formData.append('mode_paiement', modePaiementSelected);
         formData.append('produits', JSON.stringify(panier));
         formData.append('remise_type', remiseType);
         formData.append('remise_valeur', remiseValeur);
@@ -3241,8 +3844,13 @@ endforeach; ?>
         .then(data => {
             if (data.success) {
                 showToast('Commande créée avec succès !', 'success');
+
+                // Vider le panier et le localStorage
+                panier = [];
+                clearPanierStorage();
+
                 closeCommandeManuelleModal();
-                
+
                 // Recharger la page pour voir la nouvelle commande
                 setTimeout(() => {
                     location.reload();
@@ -3251,7 +3859,7 @@ endforeach; ?>
                 showToast('Erreur: ' + data.message, 'error');
                 console.error('Erreur serveur:', data);
             }
-            
+
             btnPayer.innerHTML = originalText;
             btnPayer.disabled = false;
         })
@@ -3375,7 +3983,7 @@ endforeach; ?>
                 toast.style.transform = 'translateX(100%)';
                 setTimeout(() => toast.remove(), 300);
             }
-        }, 4000);
+        }, TOAST_DURATION);
     }
 
     // Fonction pour mettre à jour les statistiques
@@ -3868,13 +4476,25 @@ function updateTrendIndicator(card, current, total) {
             return new Intl.NumberFormat('fr-FR').format(montant) + ' FCFA';
         }
 
+        // Variable pour éviter les appels multiples simultanés
+        let notificationUpdateInProgress = false;
+
         // Mettre à jour les notifications
-        function updateNotificationsCommandes() {
-            fetch('get_nouvelles_commandes.php')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        const nombreNouvelles = data.nombre_nouvelles;
+        async function updateNotificationsCommandes() {
+            // Éviter les appels simultanés
+            if (notificationUpdateInProgress) {
+                debugLog('Mise à jour des notifications déjà en cours, abandon');
+                return;
+            }
+
+            notificationUpdateInProgress = true;
+
+            try {
+                const response = await fetch('get_nouvelles_commandes.php');
+                const data = await response.json();
+
+                if (data.success) {
+                    const nombreNouvelles = data.nombre_nouvelles;
                         const commandesAujourdhui = data.commandes_aujourdhui;
                         const dernieresCommandes = data.dernieres_commandes;
 
@@ -3963,10 +4583,23 @@ function updateTrendIndicator(card, current, total) {
                             notificationSoundPlayed = true;
                         }
                     }
-                })
-                .catch(error => {
-                    console.error('Erreur lors de la récupération des notifications:', error);
+            } catch (error) {
+                console.error('Erreur lors de la récupération des notifications:', error);
+            } finally {
+                notificationUpdateInProgress = false;
+            }
+        }
+
+        // Fonction récursive pour planifier la prochaine mise à jour
+        function scheduleNextNotificationUpdate() {
+            setTimeout(() => {
+                updateNotificationsCommandes().then(() => {
+                    scheduleNextNotificationUpdate();
+                }).catch(() => {
+                    // En cas d'erreur, replanifier quand même
+                    scheduleNextNotificationUpdate();
                 });
+            }, NOTIFICATION_INTERVAL);
         }
 
         // Afficher un toast de notification
@@ -4012,8 +4645,8 @@ function updateTrendIndicator(card, current, total) {
         // Initialiser les notifications au chargement
         document.addEventListener('DOMContentLoaded', function() {
             updateNotificationsCommandes();
-            // Mettre à jour toutes les 30 secondes
-            setInterval(updateNotificationsCommandes, 30000);
+            // Démarrer la mise à jour récursive
+            scheduleNextNotificationUpdate();
         });
 
     </script>
