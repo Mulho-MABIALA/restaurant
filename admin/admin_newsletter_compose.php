@@ -214,7 +214,7 @@ try {
 
     <div class="flex h-screen overflow-hidden">
 
-        <?php include 'sidebar.php'; ?>
+        <?php include 'includes/sidebar.php'; ?>
 
         <div class="flex-1 overflow-y-auto">
 

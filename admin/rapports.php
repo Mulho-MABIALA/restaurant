@@ -1,7 +1,7 @@
 <?php
 session_start();
 require_once '../config.php';
-require_once 'permissions.php';
+require_once 'includes/permissions.php';
 
 // Vérifier authentification
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
@@ -137,7 +137,7 @@ $ca_quotidien_moyen = $stats['ca_total'] / $nb_jours;
 <body class="bg-gray-50">
 
     <div class="flex h-screen overflow-hidden">
-        <?php include 'sidebar.php'; ?>
+        <?php include 'includes/sidebar.php'; ?>
 
         <div class="flex-1 overflow-y-auto">
             <!-- Navigation Finances -->

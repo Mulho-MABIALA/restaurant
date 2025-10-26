@@ -1,7 +1,7 @@
 <?php
 session_start();
 require_once '../config.php';
-require_once './permissions.php';
+require_once 'includes/permissions.php';
 
 if (!isset($_SESSION['admin_logged_in'])) {
     header('Location: login.php');
@@ -614,7 +614,7 @@ try {
 </head>
 <body class="bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen transition-all duration-300" id="body">
     <div class="flex h-screen">
-        <?php include 'sidebar.php'; ?>
+        <?php include 'includes/sidebar.php'; ?>
         
         <div class="flex-1 overflow-auto">
             <!-- Header avec mode sombre -->
@@ -2150,6 +2150,6 @@ try {
     </script>
 
     <!-- Footer -->
-    <?php include 'footer.php'; ?>
+    <?php include 'includes/footer.php'; ?>
 </body>
 </html>

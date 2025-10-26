@@ -1,7 +1,7 @@
 <?php
 session_start();
 require_once '../config.php';
-require_once 'permissions.php';
+require_once 'includes/permissions.php';
 
 if (!isset($_SESSION['admin_id'])) {
     header('Location: login.php');
@@ -107,7 +107,7 @@ $anneesExistence = date('Y') - $anneeCreation;
 <body class="bg-gray-50">
 
     <div class="flex h-screen overflow-hidden">
-        <?php include 'sidebar.php'; ?>
+        <?php include 'includes/sidebar.php'; ?>
 
         <div class="flex-1 overflow-y-auto">
             <div class="p-8">

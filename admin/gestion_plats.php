@@ -1,7 +1,7 @@
 <?php
 session_start();
 require_once '../config.php';
-require_once './permissions.php';
+require_once 'includes/permissions.php';
 
 // Vérifier si l'admin est connecté
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
@@ -55,8 +55,10 @@ try {
     $total_items = $stmtCount->fetch()['total'];
     $total_pages = ceil($total_items / $items_per_page);
 
-    // Requête pour récupérer les plats avec pagination
-    $query = "SELECT p.id, p.nom, p.description, p.prix, p.image, p.disponible, c.nom AS categorie_nom
+    // Requête pour récupérer les plats avec pagination et horaires
+    $query = "SELECT p.id, p.nom, p.description, p.prix, p.image, p.disponible,
+                     p.disponibilite_active, p.heure_debut, p.heure_fin,
+                     c.nom AS categorie_nom
               FROM plats p
               LEFT JOIN categories c ON p.categorie_id = c.id";
     if ($hasFilter) {
@@ -165,7 +167,7 @@ try {
 
 <body class="bg-gray-50 font-inter">
     <div class="flex h-screen overflow-hidden">
-        <?php include 'sidebar.php'; ?>
+        <?php include 'includes/sidebar.php'; ?>
         
         <div class="flex-1 overflow-x-hidden overflow-y-auto">
             <div class="p-6">
@@ -450,6 +452,9 @@ try {
                                     <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden md:table-cell">
                                         <i class="fas fa-info-circle mr-2"></i>Statut
                                     </th>
+                                    <th class="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider hidden lg:table-cell">
+                                        <i class="fas fa-clock mr-2"></i>Disponibilité
+                                    </th>
                                     <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden lg:table-cell">
                                         <i class="fas fa-image mr-2"></i>Image
                                     </th>
@@ -517,7 +522,24 @@ try {
                                                 </span>
                                             <?php endif; ?>
                                         </td>
-                                        
+
+                                        <!-- Colonne Disponibilité Horaire -->
+                                        <td class="px-6 py-4 whitespace-nowrap hidden lg:table-cell">
+                                            <div class="flex flex-col items-center">
+                                                <?php if (!empty($plat['disponibilite_active']) && $plat['disponibilite_active'] == 1): ?>
+                                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                        <i class="fas fa-clock mr-1"></i>
+                                                        <?= htmlspecialchars(substr($plat['heure_debut'], 0, 5)) ?> - <?= htmlspecialchars(substr($plat['heure_fin'], 0, 5)) ?>
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                        <i class="fas fa-infinity mr-1"></i>
+                                                        24h/24
+                                                    </span>
+                                                <?php endif; ?>
+                                            </div>
+                                        </td>
+
                                         <td class="px-6 py-4 whitespace-nowrap hidden lg:table-cell">
                                             <?php if (!empty($plat['image']) && file_exists('../public/uploads/' . $plat['image'])): ?>
                                                 <img src="../public/uploads/<?= htmlspecialchars($plat['image']) ?>"
@@ -1077,6 +1099,6 @@ try {
     </script>
 
     <!-- Footer -->
-    <?php include 'footer.php'; ?>
+    <?php include 'includes/footer.php'; ?>
 </body>
 </html>

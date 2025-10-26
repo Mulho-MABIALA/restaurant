@@ -1,7 +1,7 @@
 <?php
 session_start();
 require_once '../config.php'; 
-require_once './permissions.php';
+require_once 'includes/permissions.php';
   // Vérifie l'accès admin
     if (! isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
         header('Location: login.php');
@@ -31,6 +31,9 @@ $message = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajouter_categorie'])) {
     $nom = trim($_POST['nom'] ?? '');
     $description = trim($_POST['description'] ?? '');
+    $disponibilite_active = isset($_POST['disponibilite_active']) ? 1 : 0;
+    $heure_debut = !empty($_POST['heure_debut']) ? $_POST['heure_debut'] : null;
+    $heure_fin = !empty($_POST['heure_fin']) ? $_POST['heure_fin'] : null;
 
     if (!empty($nom)) {
         try {
@@ -39,8 +42,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajouter_categorie']))
             $stmt->execute([$nom]);
 
             if ($stmt->rowCount() === 0) {
-                $insert = $conn->prepare("INSERT INTO categories (nom, description) VALUES (?, ?)");
-                $insert->execute([$nom, $description]);
+                $insert = $conn->prepare("INSERT INTO categories (nom, description, disponibilite_active, heure_debut, heure_fin) VALUES (?, ?, ?, ?, ?)");
+                $insert->execute([$nom, $description, $disponibilite_active, $heure_debut, $heure_fin]);
                 $message = ['type' => 'success', 'text' => 'Catégorie ajoutée avec succès'];
             } else {
                 $message = ['type' => 'error', 'text' => 'Cette catégorie existe déjà'];
@@ -178,7 +181,7 @@ if (isset($_GET['message']) && !$message) {
 </head>
 <body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 min-h-screen">
     <div class="flex h-screen overflow-hidden">
-        <?php include 'sidebar.php'; ?>
+        <?php include 'includes/sidebar.php'; ?>
 
         <div class="flex-1 overflow-auto">
             <main class="p-4 md:p-6 lg:p-8">
@@ -243,14 +246,63 @@ if (isset($_GET['message']) && !$message) {
                                             class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:bg-white"
                                             placeholder="Ex: Entrées, Plats principaux...">
                                     </div>
-                                    
+
                                     <div class="space-y-2">
                                         <label for="description" class="block text-sm font-semibold text-gray-700">Description (optionnelle)</label>
                                         <textarea id="description" name="description" rows="3"
                                             class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:bg-white resize-none"
                                             placeholder="Décrivez cette catégorie..."></textarea>
                                     </div>
-                                    
+
+                                    <!-- Horaires de disponibilité -->
+                                    <div class="border-t pt-4">
+                                        <div class="flex items-center mb-3">
+                                            <input type="checkbox" id="disponibilite_active" name="disponibilite_active"
+                                                class="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                                                onchange="toggleHoraires(this)">
+                                            <label for="disponibilite_active" class="ml-2 text-sm font-semibold text-gray-700">
+                                                <i class="fas fa-clock mr-1 text-blue-500"></i>
+                                                Limiter la disponibilité par horaires
+                                            </label>
+                                        </div>
+
+                                        <div id="horaires_fields" class="space-y-3 hidden">
+                                            <div class="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-r-lg">
+                                                <p class="text-xs text-blue-700">
+                                                    <i class="fas fa-info-circle mr-1"></i>
+                                                    Cette catégorie sera disponible uniquement pendant ces horaires
+                                                </p>
+                                            </div>
+
+                                            <div class="grid grid-cols-2 gap-3">
+                                                <div class="space-y-2">
+                                                    <label for="heure_debut" class="block text-sm font-medium text-gray-700">
+                                                        <i class="fas fa-play text-green-500 mr-1"></i>
+                                                        Heure début
+                                                    </label>
+                                                    <input type="time" id="heure_debut" name="heure_debut"
+                                                        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                                </div>
+
+                                                <div class="space-y-2">
+                                                    <label for="heure_fin" class="block text-sm font-medium text-gray-700">
+                                                        <i class="fas fa-stop text-red-500 mr-1"></i>
+                                                        Heure fin
+                                                    </label>
+                                                    <input type="time" id="heure_fin" name="heure_fin"
+                                                        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                                </div>
+                                            </div>
+
+                                            <div class="bg-amber-50 border-l-4 border-amber-500 p-2 rounded-r-lg">
+                                                <p class="text-xs text-amber-700">
+                                                    <i class="fas fa-lightbulb mr-1"></i>
+                                                    Exemple: Brunch 10:00 - 15:00
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <button type="submit" name="ajouter_categorie"
                                         class="w-full btn-gradient text-white px-6 py-3 rounded-xl font-semibold flex items-center justify-center space-x-2">
                                         <i class="fas fa-save"></i>
@@ -324,6 +376,9 @@ if (isset($_GET['message']) && !$message) {
                                                 <tr>
                                                     <th class="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Catégorie</th>
                                                     <th class="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Description</th>
+                                                    <th class="px-6 py-4 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">
+                                                        <i class="fas fa-clock mr-1"></i>Disponibilité
+                                                    </th>
                                                     <th class="px-6 py-4 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">Actions</th>
                                                 </tr>
                                             </thead>
@@ -345,6 +400,23 @@ if (isset($_GET['message']) && !$message) {
                                                             <p class="text-gray-700 truncate">
                                                                 <?= !empty($categorie['description']) ? htmlspecialchars($categorie['description']) : '<span class="text-gray-400 italic">Aucune description</span>' ?>
                                                             </p>
+                                                        </td>
+                                                        <td class="px-6 py-4">
+                                                            <?php if (!empty($categorie['disponibilite_active']) && $categorie['disponibilite_active'] == 1): ?>
+                                                                <div class="flex flex-col items-center">
+                                                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                                        <i class="fas fa-clock mr-1"></i>
+                                                                        <?= htmlspecialchars(substr($categorie['heure_debut'], 0, 5)) ?> - <?= htmlspecialchars(substr($categorie['heure_fin'], 0, 5)) ?>
+                                                                    </span>
+                                                                </div>
+                                                            <?php else: ?>
+                                                                <div class="text-center">
+                                                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                                        <i class="fas fa-check-circle mr-1"></i>
+                                                                        24h/24
+                                                                    </span>
+                                                                </div>
+                                                            <?php endif; ?>
                                                         </td>
                                                         <td class="px-6 py-4 text-center">
                                                             <div class="flex justify-center space-x-3">
@@ -396,9 +468,23 @@ if (isset($_GET['message']) && !$message) {
                 });
             });
         });
+
+        // Fonction pour afficher/masquer les champs d'horaires
+        function toggleHoraires(checkbox) {
+            const horairesFields = document.getElementById('horaires_fields');
+            if (checkbox.checked) {
+                horairesFields.classList.remove('hidden');
+                horairesFields.classList.add('animate-fade-in');
+            } else {
+                horairesFields.classList.add('hidden');
+                // Réinitialiser les champs
+                document.getElementById('heure_debut').value = '';
+                document.getElementById('heure_fin').value = '';
+            }
+        }
     </script>
 
     <!-- Footer -->
-    <?php include 'footer.php'; ?>
+    <?php include 'includes/footer.php'; ?>
 </body>
 </html>

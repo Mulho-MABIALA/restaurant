@@ -2,7 +2,7 @@
     session_start();
     require_once __DIR__ . '/../vendor/autoload.php';
     require_once '../config.php';
-    require_once './permissions.php';
+    require_once 'includes/permissions.php';
     error_reporting(E_ALL);
     ini_set('display_errors', 1);
 
@@ -84,11 +84,10 @@
 
     // Filtre selon l'onglet actif
     if ($active_tab === 'actives') {
-        // Réservations actives : réservations non annulées (futures ou en attente de traitement)
-        // On inclut aussi les réservations passées non traitées pour ne rien perdre
-        $query .= " AND (statut = 'non_lu' OR (statut != 'annule' AND date_reservation >= CURDATE()))";
+        // Réservations actives : toutes les réservations non annulées
+        $query .= " AND statut != 'annule'";
     }
-    // Pour 'historique', on affiche tout
+    // Pour 'historique', on affiche tout (y compris les annulées)
 
     // Recherche
     if (! empty($search)) {
@@ -147,10 +146,10 @@
     $stmt->execute();
     $reservations = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // DEBUG: Afficher le nombre total
-    echo "<!-- DEBUG: Total items = $total_items, Total pages = $total_pages, Onglet = $active_tab -->";
-    echo "<!-- DEBUG: Query = " . htmlspecialchars($queryWithLimit) . " -->";
-    echo "<!-- DEBUG: Nombre de résultats = " . count($reservations) . " -->";
+    // DEBUG: Afficher le nombre total (commenté pour la production)
+    // echo "<!-- DEBUG: Total items = $total_items, Total pages = $total_pages, Onglet = $active_tab -->";
+    // echo "<!-- DEBUG: Query = " . htmlspecialchars($queryWithLimit) . " -->";
+    // echo "<!-- DEBUG: Nombre de résultats = " . count($reservations) . " -->";
 
     // Pour les statistiques de l'historique, récupérer toutes les réservations (sans pagination)
     if ($active_tab === 'historique') {
@@ -339,7 +338,7 @@ button[title]:hover::after {
 
   <div class="flex h-screen overflow-hidden">
 
-    <?php include 'sidebar.php'; ?>
+    <?php include 'includes/sidebar.php'; ?>
 
 
     <div class="flex-1 overflow-y-auto">
@@ -2567,6 +2566,6 @@ document.head.appendChild(style);
   </script>
 
   <!-- Footer -->
-  <?php include 'footer.php'; ?>
+  <?php include 'includes/footer.php'; ?>
 </body>
 </html>

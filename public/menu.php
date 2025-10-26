@@ -2,20 +2,63 @@
 include('../config.php');
 require_once '../admin/communication/fonctions_annonces.php';
 require_once 'includes/language.php';
+require_once '../includes/category_availability.php';
 if ($_POST['action'] ?? '' === 'add_to_cart') {
     if (!isset($_SESSION['panier'])) {
         $_SESSION['panier'] = [];
     }
-    
+
     $plat_id = (int)$_POST['plat_id'];
     $quantite = (int)$_POST['quantite'];
-    
+
+    // Vérifier la disponibilité du plat ET de sa catégorie
+    try {
+        $stmt_check = $conn->prepare("
+            SELECT p.id as plat_id, p.nom as plat_nom, p.disponibilite_active as plat_dispo,
+                   p.heure_debut as plat_debut, p.heure_fin as plat_fin,
+                   c.id as cat_id, c.nom as cat_nom, c.disponibilite_active as cat_dispo,
+                   c.heure_debut as cat_debut, c.heure_fin as cat_fin
+            FROM plats p
+            JOIN categories c ON p.categorie_id = c.id
+            WHERE p.id = ?
+        ");
+        $stmt_check->execute([$plat_id]);
+        $info = $stmt_check->fetch(PDO::FETCH_ASSOC);
+
+        if ($info) {
+            // Préparer les données plat et catégorie
+            $plat_data = [
+                'disponibilite_active' => $info['plat_dispo'],
+                'heure_debut' => $info['plat_debut'],
+                'heure_fin' => $info['plat_fin']
+            ];
+
+            $cat_data = [
+                'disponibilite_active' => $info['cat_dispo'],
+                'heure_debut' => $info['cat_debut'],
+                'heure_fin' => $info['cat_fin']
+            ];
+
+            // Vérifier disponibilité
+            if (!isPlatAvailable($plat_data, $cat_data)) {
+                $message = getPlatAvailabilityMessage($plat_data, $cat_data);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Ce plat n\'est pas disponible actuellement. ' . $message
+                ]);
+                exit;
+            }
+        }
+    } catch (PDOException $e) {
+        // En cas d'erreur, on continue (fallback)
+    }
+
     if (isset($_SESSION['panier'][$plat_id])) {
         $_SESSION['panier'][$plat_id] += $quantite;
     } else {
         $_SESSION['panier'][$plat_id] = $quantite;
     }
-    
+
     echo json_encode(['success' => true]);
     exit;
 }
@@ -42,13 +85,16 @@ if ($_POST['action'] ?? '' === 'update_cart') {
 try {
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // Récupérer les catégories disponibles (id et nom)
-    $stmt_cat = $conn->query("SELECT id, nom FROM categories ORDER BY nom ASC");
+    // Récupérer les catégories disponibles avec leurs horaires
+    $stmt_cat = $conn->query("SELECT id, nom, description, disponibilite_active, heure_debut, heure_fin FROM categories ORDER BY nom ASC");
     $categories_db = $stmt_cat->fetchAll(PDO::FETCH_ASSOC);
 
     if (empty($categories_db)) {
         die("Aucune catégorie disponible.");
     }
+
+    // Ajouter les informations de disponibilité à chaque catégorie
+    $categories_db = filterCategoriesByAvailability($categories_db, false);
 
     // Vérifier si categorie_id est défini dans l'URL et valide, sinon prendre la première catégorie
     $categorie_id = isset($_GET['categorie_id']) 
@@ -111,7 +157,10 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mulho - Restaurant</title>
+    <title><?php echo htmlspecialchars(getSetting('restaurant_name', 'Restaurant Mulho')); ?> - Menu</title>
+
+    <?php include 'includes/pwa-meta.php'; ?>
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
@@ -232,14 +281,15 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
         .header-btn {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-            padding: 0.625rem 1rem;
+            justify-content: center;
+            width: 3rem;
+            height: 3rem;
+            padding: 0;
             background: transparent;
             color: var(--text-muted);
             border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
-            font-size: 0.875rem;
-            font-weight: 500;
+            border-radius: 50%;
+            font-size: 1.125rem;
             cursor: pointer;
             transition: all 0.3s ease;
             position: relative;
@@ -249,7 +299,7 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
             background: var(--gold);
             color: #000000;
             border-color: var(--gold);
-            transform: translateY(-1px);
+            transform: translateY(-2px) scale(1.05);
             box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4);
         }
 
@@ -277,13 +327,14 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
 
         .cart-badge {
             position: absolute;
-            top: -0.5rem;
-            right: -0.5rem;
+            top: -0.375rem;
+            right: -0.375rem;
             background: var(--accent);
             color: var(--white);
             border-radius: 9999px;
-            width: 1.25rem;
-            height: 1.25rem;
+            min-width: 1.375rem;
+            height: 1.375rem;
+            padding: 0 0.35rem;
             font-size: 0.75rem;
             font-weight: 700;
             display: flex;
@@ -291,6 +342,8 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
             justify-content: center;
             transform: scale(0);
             transition: transform 0.2s ease;
+            box-shadow: 0 2px 8px rgba(245, 158, 11, 0.4);
+            border: 2px solid var(--white);
         }
 
         .cart-badge.show {
@@ -1211,298 +1264,330 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
         }
 
         /* Modal de commande */
+        /* Modal Styles */
         .order-modal {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
             display: none;
             align-items: center;
             justify-content: center;
-            z-index: 50;
+            z-index: 1000;
             animation: fadeIn 0.3s ease;
+            padding: 1rem;
+        }
+
+        .order-modal.show {
+            display: flex;
         }
 
         .order-content {
             background: var(--white);
-            border-radius: var(--radius-xl);
-            max-width: 28rem;
-            width: 90%;
+            border-radius: 20px;
+            max-width: 1000px;
+            width: 100%;
             position: relative;
-            box-shadow: var(--shadow-xl);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            max-height: 95vh;
             overflow: hidden;
-            animation: slideUp 0.3s ease;
-            max-height: 85vh;
             display: flex;
             flex-direction: column;
         }
 
-        @keyframes slideUp {
-            from { transform: translateY(2rem); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-
-        .order-modal-header {
-            position: relative;
-            height: 9rem;
-            background: linear-gradient(135deg, var(--accent), var(--accent-dark));
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            flex-shrink: 0;
-        }
-
-        .order-item-image {
-            width: 5.5rem;
-            height: 5.5rem;
-            border-radius: var(--radius-lg);
-            object-fit: cover;
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            position: relative;
-            z-index: 2;
-            box-shadow: var(--shadow-lg);
-        }
-
-        .order-item-placeholder {
-            width: 5.5rem;
-            height: 5.5rem;
-            border-radius: var(--radius-lg);
-            background: rgba(255, 255, 255, 0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--white);
-            font-size: 2rem;
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            position: relative;
-            z-index: 2;
-        }
-
         .close-modal {
             position: absolute;
-            top: 1rem;
-            right: 1rem;
-            background: rgba(255, 255, 255, 0.2);
-            color: var(--white);
+            top: 1.5rem;
+            right: 1.5rem;
+            background: #fff;
+            color: #111;
             border: none;
-            font-size: 1.125rem;
+            font-size: 1.5rem;
             cursor: pointer;
-            width: 2.25rem;
-            height: 2.25rem;
+            width: 2.5rem;
+            height: 2.5rem;
             display: flex;
             align-items: center;
             justify-content: center;
             border-radius: 50%;
-            transition: all 0.2s ease;
-            z-index: 3;
+            transition: all 0.3s ease;
+            z-index: 10;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         .close-modal:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: scale(1.05);
+            background: #f3f4f6;
+            transform: rotate(90deg);
         }
 
-        .order-body {
-            padding: 2rem;
+        /* Modal Grid */
+        .modal-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            min-height: 600px;
+            height: auto;
             flex: 1;
-            overflow-y: auto;
+            overflow: hidden;
         }
 
-        .order-header {
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-
-        .order-title {
-            font-family: 'Playfair Display', serif;
-            font-size: 1.375rem;
-            font-weight: 600;
-            color: var(--primary);
-            margin-bottom: 0.5rem;
-        }
-
-        .order-item-name {
-            font-size: 1.125rem;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: 0.25rem;
-        }
-
-        .order-item-price {
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: var(--accent);
-        }
-
-        /* Instructions spéciales */
-        .special-instructions {
-            margin-bottom: 1.5rem;
-        }
-
-        .special-instructions-label {
-            display: block;
-            margin-bottom: 0.75rem;
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: var(--primary);
-        }
-
-        .special-instructions-input {
-            width: 100%;
-            padding: 1rem;
-            border: 2px solid var(--border);
-            border-radius: var(--radius-md);
-            font-size: 0.875rem;
-            font-family: inherit;
-            transition: all 0.3s ease;
-            background: var(--white);
-            resize: vertical;
-            min-height: 5rem;
-        }
-
-        .special-instructions-input:focus {
-            outline: none;
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
-        }
-
-        .special-instructions-input::placeholder {
-            color: var(--text-light);
-            font-style: italic;
-        }
-
-        /* Section quantité */
-        .quantity-section {
-            margin-bottom: 2rem;
-        }
-
-        .quantity-label {
-            display: block;
-            margin-bottom: 1rem;
-            font-size: 1rem;
-            font-weight: 600;
-            color: var(--primary);
-        }
-
-        .quantity-control {
+        /* Left: Image Section */
+        .modal-image-section {
+            background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: 2.5rem;
+            border-right: 1px solid #e5e7eb;
+        }
+
+        .product-image-wrapper {
+            width: 100%;
+            max-width: 450px;
+            aspect-ratio: 1;
+            border-radius: 16px;
+            overflow: hidden;
+            background: #fff;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15), 0 4px 10px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .product-image-wrapper:hover {
+            transform: scale(1.02);
+        }
+
+        .product-image-wrapper img,
+        .product-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .product-image-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+            color: #9ca3af;
+            font-size: 4rem;
+        }
+
+        /* Right: Details Section */
+        .modal-details-section {
+            padding: 2rem 2.5rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
             gap: 1.25rem;
-            margin-bottom: 1rem;
+            max-height: 100%;
+        }
+
+        /* Scrollbar styling */
+        .modal-details-section::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .modal-details-section::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        .modal-details-section::-webkit-scrollbar-thumb {
+            background: #d1b07c;
+            border-radius: 10px;
+        }
+
+        .modal-details-section::-webkit-scrollbar-thumb:hover {
+            background: #b8965a;
+        }
+
+        /* Product Header */
+        .product-header {
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .product-name {
+            font-size: 1.625rem;
+            font-weight: 700;
+            color: #111;
+            margin: 0 0 0.5rem 0;
+            line-height: 1.2;
+        }
+
+        .product-price-container {
+            display: flex;
+            align-items: baseline;
+            gap: 0.5rem;
+        }
+
+        .product-price-label {
+            font-size: 0.875rem;
+            color: #6b7280;
+            font-weight: 500;
+        }
+
+        .product-price {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #22c55e;
+        }
+
+        /* Description Section */
+        .product-description-section {
+            padding: 0.75rem 0;
+        }
+
+        .section-title {
+            font-size: 0.9375rem;
+            font-weight: 600;
+            color: #374151;
+            margin: 0 0 0.4rem 0;
+        }
+
+        .product-description {
+            font-size: 0.875rem;
+            line-height: 1.5;
+            color: #6b7280;
+            margin: 0;
+        }
+
+        /* Category Section */
+        .product-category-section {
+            padding: 0.5rem 0;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .category-label {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .category-value {
+            font-size: 0.875rem;
+            color: #6b7280;
+            padding: 0.25rem 0.75rem;
+            background: #f3f4f6;
+            border-radius: 6px;
+            margin-left: 0.5rem;
+        }
+
+        /* Customization Section */
+        .product-customization-section {
+            padding: 0.75rem 0;
+        }
+
+        .customization-textarea {
+            width: 100%;
+            padding: 0.875rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-family: inherit;
+            transition: all 0.3s ease;
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .customization-textarea:focus {
+            outline: none;
+            border-color: #22c55e;
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+        }
+
+        .customization-textarea::placeholder {
+            color: #9ca3af;
+        }
+
+        /* Quantity Section */
+        .product-quantity-section {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem 0;
+        }
+
+        .quantity-label {
+            font-size: 0.9375rem;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .quantity-selector {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
         }
 
         .quantity-btn {
-            width: 3rem;
-            height: 3rem;
-            border: 2px solid var(--border);
-            background: var(--white);
-            border-radius: var(--radius-md);
+            width: 2.5rem;
+            height: 2.5rem;
+            border: 2px solid #e5e7eb;
+            background: #fff;
+            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 1.125rem;
-            font-weight: bold;
-            color: var(--text-secondary);
-            box-shadow: var(--shadow-sm);
+            transition: all 0.2s ease;
+            color: #374151;
         }
 
         .quantity-btn:hover {
-            border-color: var(--accent);
-            background: var(--accent);
-            color: var(--white);
-            transform: scale(1.05);
-            box-shadow: var(--shadow-md);
+            border-color: #22c55e;
+            background: #f0fdf4;
+            color: #22c55e;
         }
 
         .quantity-btn:active {
             transform: scale(0.95);
         }
 
-        .quantity-display {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--primary);
-            min-width: 3.75rem;
+        .quantity-input {
+            width: 3.5rem;
+            height: 2.5rem;
             text-align: center;
-            background: var(--gray-50);
-            padding: 0.75rem 1.25rem;
-            border-radius: var(--radius-md);
-            border: 2px solid var(--border);
-        }
-
-        /* Résumé de commande */
-        .order-summary {
-            background: var(--gray-50);
-            border-radius: var(--radius-lg);
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            border: 1px solid var(--border);
-        }
-
-        .order-summary-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.75rem;
-        }
-
-        .order-summary-row:last-child {
-            margin-bottom: 0;
-            padding-top: 0.75rem;
-            border-top: 2px solid var(--border);
-            font-weight: 700;
-        }
-
-        .order-summary-label {
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-        }
-
-        .order-summary-value {
-            color: var(--primary);
-            font-weight: 600;
-            font-size: 0.875rem;
-        }
-
-        .order-summary-total {
-            font-size: 1.125rem;
-            color: var(--accent);
-        }
-
-        /* Bouton d'ajout au panier */
-        .add-to-cart-btn {
-            width: 100%;
-            background: linear-gradient(135deg, var(--accent), var(--accent-dark));
-            color: var(--white);
-            border: none;
-            padding: 1.125rem;
-            border-radius: var(--radius-lg);
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
             font-size: 1rem;
-            font-weight: 700;
+            font-weight: 600;
+            color: #111;
+            background: #f9fafb;
+        }
+
+        /* Add to Cart Button */
+        .add-to-cart-modal-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            color: #fff;
+            border: none;
+            padding: 1rem;
+            border-radius: 10px;
+            font-size: 1.0625rem;
+            font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 0.75rem;
-            position: relative;
-            overflow: hidden;
-            box-shadow: var(--shadow-md);
+            gap: 0.625rem;
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+            margin-top: auto;
         }
 
-        .add-to-cart-btn:hover {
-            transform: translateY(-1px);
-            box-shadow: var(--shadow-lg);
+        .add-to-cart-modal-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(34, 197, 94, 0.4);
         }
 
-        .add-to-cart-btn:active {
+        .add-to-cart-modal-btn:active {
             transform: translateY(0);
         }
 
@@ -1603,8 +1688,9 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
             }
             
             .header-btn {
-                padding: 0.5rem 0.75rem;
-                font-size: 0.8125rem;
+                width: 2.75rem;
+                height: 2.75rem;
+                font-size: 1rem;
             }
             
             .container {
@@ -1673,18 +1759,36 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
                 max-height: 90vh;
             }
 
-            .order-body {
+            .modal-grid {
+                grid-template-columns: 1fr;
+                min-height: auto;
+            }
+
+            .modal-image-section {
+                padding: 1.5rem;
+                min-height: 250px;
+            }
+
+            .modal-details-section {
                 padding: 1.5rem;
             }
 
-            .order-modal-header {
-                height: 7.5rem;
+            .product-name {
+                font-size: 1.5rem;
             }
 
-            .order-item-image,
-            .order-item-placeholder {
-                width: 4.5rem;
-                height: 4.5rem;
+            .product-description {
+                font-size: 0.875rem;
+            }
+
+            .quantity-selector button {
+                width: 2.5rem;
+                height: 2.5rem;
+            }
+
+            .add-to-cart-modal-btn {
+                padding: 0.875rem;
+                font-size: 0.9375rem;
             }
             
             .hero {
@@ -1733,11 +1837,8 @@ if (isset($_SESSION['panier']) && !empty($_SESSION['panier'])) {
             }
             
             .header-btn {
-                padding: 0.5rem;
-                font-size: 0;
-            }
-            
-            .header-btn i {
+                width: 2.5rem;
+                height: 2.5rem;
                 font-size: 1rem;
             }
             
@@ -1784,17 +1885,16 @@ if (compterAnnoncesActives('menu') > 0) {
     <div class="header-content">
 
         <div class="logo">
-            <img src="assets/img/logo.jpg" alt="Logo Mulho">
-            <span>Mulho</span>
+            <img src="assets/img/logo.jpg" alt="Logo <?php echo htmlspecialchars(getSetting('restaurant_name', 'Restaurant Mulho')); ?>">
+            <span><?php echo htmlspecialchars(getSetting('restaurant_name', 'Restaurant Mulho')); ?></span>
         </div>
 
         <div class="header-actions">
             <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle" title="Changer le thème">
                 <i class="fas fa-moon" id="themeIcon"></i>
             </button>
-            <button class="header-btn" onclick="openCartModal()" id="cartBtn">
+            <button class="header-btn" onclick="openCartModal()" id="cartBtn" title="Voir le panier">
                 <i class="fas fa-shopping-bag"></i>
-                <span>Panier</span>
                 <span class="cart-badge" id="cartBadge">0</span>
             </button>
         </div>
@@ -1886,11 +1986,26 @@ if (compterAnnoncesActives('menu') > 0) {
                     </a>
                     <?php
                     $index = 1;
-                    foreach ($categories_db as $cat): ?>
-                        <a href="?categorie_id=<?= (int)$cat['id'] ?>"
-                           class="category-btn <?= (!isset($_GET['show_all']) && $categorie_id === (int)$cat['id']) ? 'active' : '' ?>"
-                           data-index="<?= $index ?>">
+                    foreach ($categories_db as $cat):
+                        $isAvailable = $cat['is_available'] ?? true;
+                        $availabilityMsg = $cat['availability_message'] ?? '';
+                    ?>
+                        <a href="<?= $isAvailable ? '?categorie_id=' . (int)$cat['id'] : '#' ?>"
+                           class="category-btn <?= (!isset($_GET['show_all']) && $categorie_id === (int)$cat['id']) ? 'active' : '' ?> <?= !$isAvailable ? 'category-unavailable' : '' ?>"
+                           data-index="<?= $index ?>"
+                           <?= !$isAvailable ? 'onclick="return false;" style="opacity: 0.5; cursor: not-allowed;"' : '' ?>
+                           title="<?= htmlspecialchars($availabilityMsg) ?>">
                             <?= htmlspecialchars($cat['nom']) ?>
+                            <?php if (!$isAvailable): ?>
+                                <span style="display: block; font-size: 10px; margin-top: 2px;">
+                                    <i class="fas fa-lock" style="font-size: 10px;"></i> Fermé
+                                </span>
+                            <?php elseif (!empty($cat['disponibilite_active']) && $cat['disponibilite_active'] == 1): ?>
+                                <span style="display: block; font-size: 9px; margin-top: 2px; opacity: 0.7;">
+                                    <i class="fas fa-clock" style="font-size: 9px;"></i>
+                                    <?= substr($cat['heure_debut'], 0, 5) ?>-<?= substr($cat['heure_fin'], 0, 5) ?>
+                                </span>
+                            <?php endif; ?>
                         </a>
                     <?php
                     $index++;
@@ -1928,11 +2043,11 @@ if (compterAnnoncesActives('menu') > 0) {
                         <?php foreach ($plats_categorie as $plat): ?>
     <?php $isAvailable = isset($plat['disponible']) && $plat['disponible'] == 1; ?>
     
-    <div class="menu-item <?= !$isAvailable ? 'opacity-50' : '' ?>" 
-         <?= $isAvailable ? "onclick=\"openOrderModal('" . htmlspecialchars($plat['nom']) . "', " . $plat['prix'] . ", '" . htmlspecialchars($plat['image'] ?? '') . "', '" . htmlspecialchars($plat['description'] ?? '') . "')\"" : '' ?>>
-        
+    <div class="menu-item <?= !$isAvailable ? 'opacity-50' : '' ?>"
+         <?= $isAvailable ? "onclick=\"openOrderModal(" . htmlspecialchars(json_encode($plat['nom'])) . ", " . $plat['prix'] . ", " . htmlspecialchars(json_encode($plat['image'] ?? '')) . ", " . htmlspecialchars(json_encode($plat['description'] ?? '')) . ", " . htmlspecialchars(json_encode($plat['categorie_nom'] ?? '')) . ")\"" : '' ?>>
+
         <?php if ($isAvailable): ?>
-            <button class="quick-add-btn" onclick="event.stopPropagation(); quickAddToCart('<?= htmlspecialchars($plat['nom']) ?>', <?= $plat['prix'] ?>, '<?= htmlspecialchars($plat['image'] ?? '') ?>', '<?= htmlspecialchars($plat['description'] ?? '') ?>')">
+            <button class="quick-add-btn" onclick="event.stopPropagation(); openOrderModal(<?= htmlspecialchars(json_encode($plat['nom'])) ?>, <?= $plat['prix'] ?>, <?= htmlspecialchars(json_encode($plat['image'] ?? '')) ?>, <?= htmlspecialchars(json_encode($plat['description'] ?? '')) ?>, <?= htmlspecialchars(json_encode($plat['categorie_nom'] ?? '')) ?>)">
                 <i class="fas fa-plus"></i>
             </button>
         <?php else: ?>
@@ -1962,9 +2077,6 @@ if (compterAnnoncesActives('menu') > 0) {
                 </div>
                 <div class="menu-item-price"><?= number_format($plat['prix'] ?? 0, 0, ',', ' ') ?> F</div>
             </div>
-            <?php if (!empty($plat['description'])): ?>
-                <div class="menu-item-description"><?= htmlspecialchars($plat['description']) ?></div>
-            <?php endif; ?>
         </div>
     </div>
 <?php endforeach; ?>
@@ -1995,17 +2107,17 @@ if (compterAnnoncesActives('menu') > 0) {
             
             <div class="category-section">
                 <h2 class="category-title"><?= htmlspecialchars($categorie_nom) ?></h2>
-                
+
                 <?php if (!empty($plats)): ?>
                     <div class="menu-grid list-view">
                     <?php foreach ($plats as $plat): ?>
     <?php $isAvailable = isset($plat['disponible']) && $plat['disponible'] == 1; ?>
-    
-    <div class="menu-item <?= !$isAvailable ? 'opacity-50' : '' ?>" 
-        <?= $isAvailable ? "onclick=\"openOrderModal('" . htmlspecialchars($plat['nom']) . "', " . $plat['prix'] . ", '" . htmlspecialchars($plat['image'] ?? '') . "', '" . htmlspecialchars($plat['description'] ?? '') . "')\"" : '' ?>>
-        
+
+    <div class="menu-item <?= !$isAvailable ? 'opacity-50' : '' ?>"
+        <?= $isAvailable ? "onclick=\"openOrderModal(" . htmlspecialchars(json_encode($plat['nom'])) . ", " . $plat['prix'] . ", " . htmlspecialchars(json_encode($plat['image'] ?? '')) . ", " . htmlspecialchars(json_encode($plat['description'] ?? '')) . ", " . htmlspecialchars(json_encode($categorie_nom)) . ")\"" : '' ?>>
+
         <?php if ($isAvailable): ?>
-            <button class="quick-add-btn" onclick="event.stopPropagation(); quickAddToCart('<?= htmlspecialchars($plat['nom']) ?>', <?= $plat['prix'] ?>, '<?= htmlspecialchars($plat['image'] ?? '') ?>', '<?= htmlspecialchars($plat['description'] ?? '') ?>')">
+            <button class="quick-add-btn" onclick="event.stopPropagation(); openOrderModal(<?= htmlspecialchars(json_encode($plat['nom'])) ?>, <?= $plat['prix'] ?>, <?= htmlspecialchars(json_encode($plat['image'] ?? '')) ?>, <?= htmlspecialchars(json_encode($plat['description'] ?? '')) ?>, <?= htmlspecialchars(json_encode($categorie_nom)) ?>)">
                 <i class="fas fa-plus"></i>
             </button>
         <?php else: ?>
@@ -2035,9 +2147,6 @@ if (compterAnnoncesActives('menu') > 0) {
                 </div>
                 <div class="menu-item-price"><?= number_format($plat['prix'] ?? 0, 0, ',', ' ') ?> F</div>
             </div>
-            <?php if (!empty($plat['description'])): ?>
-                <div class="menu-item-description"><?= htmlspecialchars($plat['description']) ?></div>
-            <?php endif; ?>
         </div>
     </div>
 <?php endforeach; ?>
@@ -2058,75 +2167,82 @@ if (compterAnnoncesActives('menu') > 0) {
         </div>
     </div>
 
-    <!-- Enhanced Order Modal -->
-    <div class="order-modal" id="orderModal">
+    <!-- Enhanced Product Detail Modal -->
+    <div class="order-modal" id="orderModal" onclick="if(event.target === this) closeOrderModal()">
         <div class="order-content">
-            <div class="order-modal-header">
-                <button class="close-modal" onclick="closeOrderModal()">&times;</button>
-                <div id="orderItemImageContainer">
-                    <!-- Image will be inserted here -->
-                </div>
-            </div>
-            
-            <div class="order-body">
-                <div class="order-header">
-                    <h3 class="order-title">Personnaliser</h3>
-                    <div class="order-item-name" id="orderItemName">Nom du plat</div>
-                    <div class="order-item-price" id="orderItemPrice">Prix</div>
-                </div>
+            <!-- Close Button -->
+            <button class="close-modal" onclick="closeOrderModal()">
+                <i class="fas fa-times"></i>
+            </button>
 
-                <!-- Special Instructions -->
-                <div class="special-instructions">
-                    <label class="special-instructions-label">Instructions spéciales</label>
-                    <textarea 
-                        id="specialInstructions" 
-                        class="special-instructions-input" 
-                        placeholder="Pas de poivre, moins de sel..."
-                        rows="3"></textarea>
-                </div>
-
-                <!-- Quantity Section -->
-                <div class="quantity-section">
-                    <label class="quantity-label">Quantité</label>
-                    <div class="quantity-control">
-                        <button class="quantity-btn" type="button" onclick="changeQuantity(-1)">
-                            <i class="fas fa-minus"></i>
-                        </button>
-                        <div class="quantity-display" id="quantityDisplay">1</div>
-                        <button class="quantity-btn" type="button" onclick="changeQuantity(1)">
-                            <i class="fas fa-plus"></i>
-                        </button>
+            <div class="modal-grid">
+                <!-- Left: Product Image -->
+                <div class="modal-image-section">
+                    <div id="orderItemImageContainer" class="product-image-wrapper">
+                        <!-- Image will be inserted here -->
                     </div>
                 </div>
 
-                <!-- Order Summary -->
-                <div class="order-summary">
-                    <div class="order-summary-row">
-                        <span class="order-summary-label">Prix unitaire</span>
-                        <span class="order-summary-value" id="unitPrice">0 F</span>
+                <!-- Right: Product Details -->
+                <div class="modal-details-section">
+                    <!-- Product Name & Price -->
+                    <div class="product-header">
+                        <h2 class="product-name" id="orderItemName">Nom du plat</h2>
+                        <div class="product-price-container">
+                            <span class="product-price-label">Prix :</span>
+                            <span class="product-price" id="orderItemPrice">0 FCFA</span>
+                        </div>
                     </div>
-                    <div class="order-summary-row">
-                        <span class="order-summary-label">Quantité</span>
-                        <span class="order-summary-value" id="summaryQuantity">1</span>
-                    </div>
-                    <div class="order-summary-row">
-                        <span class="order-summary-label">Total</span>
-                        <span class="order-summary-value order-summary-total" id="totalPrice">0 F</span>
-                    </div>
-                </div>
 
-                <!-- Add to Cart Button -->
-                <button class="add-to-cart-btn" onclick="addToCart()">
-                    <i class="fas fa-shopping-bag"></i>
-                    <span id="addToCartText">Ajouter au panier</span>
-                </button>
+                    <!-- Product Description -->
+                    <div class="product-description-section">
+                        <h3 class="section-title">Description :</h3>
+                        <p class="product-description" id="orderItemDescription">Description du produit...</p>
+                    </div>
+
+                    <!-- Category -->
+                    <div class="product-category-section">
+                        <span class="category-label">Catégorie :</span>
+                        <span class="category-value" id="orderItemCategory">autres</span>
+                    </div>
+
+                    <!-- Special Instructions -->
+                    <div class="product-customization-section">
+                        <h3 class="section-title">Personnalisation (optionnel) :</h3>
+                        <textarea
+                            id="specialInstructions"
+                            class="customization-textarea"
+                            placeholder="Ajoutez vos instructions spéciales (ex: sans piment, bien cuit...)"
+                            rows="3"></textarea>
+                    </div>
+
+                    <!-- Quantity Selection -->
+                    <div class="product-quantity-section">
+                        <label class="quantity-label">Quantité :</label>
+                        <div class="quantity-selector">
+                            <button class="quantity-btn minus" type="button" onclick="changeQuantity(-1)">
+                                <i class="fas fa-minus"></i>
+                            </button>
+                            <input type="number" class="quantity-input" id="quantityDisplay" value="1" min="1" readonly>
+                            <button class="quantity-btn plus" type="button" onclick="changeQuantity(1)">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Add to Cart Button -->
+                    <button class="add-to-cart-modal-btn" onclick="addToCart()">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span>Ajouter au panier</span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Hero Section -->
     <div class="hero" id="heroSection">
-        <h1>Bienvenue chez Mulho</h1>
+        <h1>Bienvenue chez <?php echo htmlspecialchars(getSetting('restaurant_name', 'Restaurant Mulho')); ?></h1>
         <p>Découvrez nos spécialités culinaires authentiques</p>
     </div>
     
@@ -2419,43 +2535,72 @@ function proceedToCheckoutWithAjax() {
             document.getElementById('orderModal').style.display = 'flex';
         }
 
-        function openOrderModal(name, price, image, description) {
-    fetch('verifier_disponibilite.php?id=' + encodeURIComponent(name))
-    .then(response => response.json())
-    .then(data => {
-        if (!data.disponible) {
-            showToast('Ce plat n\'est plus disponible');
-            return;
+        function openOrderModal(name, price, image, description, category) {
+            console.log('openOrderModal called with:', {name, price, image, description, category});
+
+            // Debug: check if elements exist
+            const nameElement = document.getElementById('orderItemName');
+            const priceElement = document.getElementById('orderItemPrice');
+            const modal = document.getElementById('orderModal');
+
+            console.log('Element check:', {
+                nameElement: nameElement,
+                priceElement: priceElement,
+                modal: modal
+            });
+
+            if (!nameElement) {
+                console.error('orderItemName element not found!');
+                return;
+            }
+
+            selectedItem = {
+                name: name,
+                price: price,
+                image: image,
+                description: description
+            };
+
+            // Update modal content
+            nameElement.textContent = name;
+            priceElement.textContent = price.toLocaleString() + ' FCFA';
+
+            // Update description
+            const descElement = document.getElementById('orderItemDescription');
+            if (descElement) {
+                descElement.textContent = description || 'Aucune description disponible';
+            }
+
+            // Update category
+            const categoryElement = document.getElementById('orderItemCategory');
+            if (categoryElement) {
+                categoryElement.textContent = category || 'Non catégorisé';
+            }
+
+            // Update image
+            const imageContainer = document.getElementById('orderItemImageContainer');
+            if (imageContainer) {
+                if (image && image.trim() !== '') {
+                    imageContainer.innerHTML = `<img src="uploads/${image}" alt="${name}" class="product-image">`;
+                } else {
+                    imageContainer.innerHTML = `<div class="product-image-placeholder"><i class="fas fa-utensils"></i></div>`;
+                }
+            }
+
+            // Reset and update totals
+            currentQuantity = 1;
+            const quantityDisplay = document.getElementById('quantityDisplay');
+            if (quantityDisplay) {
+                quantityDisplay.value = '1';
+            }
+
+            const specialInstructions = document.getElementById('specialInstructions');
+            if (specialInstructions) {
+                specialInstructions.value = '';
+            }
+
+            showOrderModal();
         }
-        
-        selectedItem = { 
-            name: name, 
-            price: price, 
-            image: image, 
-            description: description 
-        };
-        
-        // Update modal content
-        document.getElementById('orderItemName').textContent = name;
-        document.getElementById('orderItemPrice').textContent = price.toLocaleString() + ' FCFA';
-        document.getElementById('unitPrice').textContent = price.toLocaleString() + ' F';
-        
-        // Update image
-        const imageContainer = document.getElementById('orderItemImageContainer');
-        if (image && image.trim() !== '') {
-            imageContainer.innerHTML = `<img src="uploads/${image}" alt="${name}" class="order-item-image">`;
-        } else {
-            imageContainer.innerHTML = `<div class="order-item-placeholder"><i class="fas fa-utensils"></i></div>`;
-        }
-        
-        // Reset and update totals
-        currentQuantity = 1;
-        document.getElementById('quantityDisplay').textContent = '1';
-        document.getElementById('specialInstructions').value = '';
-        updateOrderSummary();
-        showOrderModal();
-    }); // ferme le .then(data => {...})
-} // ✅ ferme enfin la fonction openOrderModal
 
 
         // Fermer la modal de commande
@@ -2500,23 +2645,16 @@ function quickAddToCart(name, price, image, description) {
             const newQuantity = currentQuantity + change;
             if (newQuantity >= 1) {
                 currentQuantity = newQuantity;
-                document.getElementById('quantityDisplay').textContent = currentQuantity;
-                updateOrderSummary();
+                const quantityDisplay = document.getElementById('quantityDisplay');
+                if (quantityDisplay) {
+                    quantityDisplay.value = currentQuantity;
+                }
             }
-        }
-
-        // Mettre à jour le résumé de commande
-        function updateOrderSummary() {
-            const total = selectedItem.price * currentQuantity;
-            document.getElementById('summaryQuantity').textContent = currentQuantity;
-            document.getElementById('totalPrice').textContent = total.toLocaleString() + ' F';
-            document.getElementById('addToCartText').textContent = 
-                `${total.toLocaleString()} F • Ajouter`;
         }
        // Fonction addToCart modifiée
 function addToCart() {
     const specialInstructions = document.getElementById('specialInstructions').value;
-    
+
     const orderData = {
         item: selectedItem.name,
         price: selectedItem.price,
@@ -2531,18 +2669,20 @@ function addToCart() {
     saveCartToStorage(); // Sauvegarder après modification
     updateCartDisplay();
 
-    const btn = document.querySelector('.add-to-cart-btn');
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-check"></i> Ajouté !';
-    btn.style.background = 'linear-gradient(135deg, var(--success), #16a34a)';
-    
+    const btn = document.querySelector('.add-to-cart-modal-btn');
+    if (btn) {
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i> Ajouté !';
+        btn.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
+
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+            btn.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
+            closeOrderModal();
+        }, 1500);
+    }
+
     showToast(`${selectedItem.name} ajouté au panier !`);
-    
-    setTimeout(() => {
-        btn.innerHTML = originalText;
-        btn.style.background = 'linear-gradient(135deg, var(--accent), #c19654)';
-        closeOrderModal();
-    }, 1500);
 
     console.log('Panier mis à jour:', cartItems);
 }

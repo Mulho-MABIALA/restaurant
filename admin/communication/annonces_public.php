@@ -189,7 +189,7 @@ desactiverAnnoncesExpirees();
 
     <div class="flex h-screen overflow-hidden">
         <!-- Sidebar -->
-        <?php include '../sidebar.php'; ?>
+        <?php include '../includes/sidebar.php'; ?>
 
         <!-- Main Content -->
         <div class="flex-1 flex flex-col overflow-hidden">

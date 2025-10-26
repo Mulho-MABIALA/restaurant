@@ -1,7 +1,7 @@
 <?php
 session_start();
 require_once '../config.php';
-require_once './permissions.php';
+require_once 'includes/permissions.php';
 
 // Vérification admin
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
@@ -179,7 +179,7 @@ if ($result) {
 <body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 min-h-screen transition-all duration-500 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950">
 
 <div class="flex h-screen overflow-hidden">
-    <?php include 'sidebar.php'; ?>
+    <?php include 'includes/sidebar.php'; ?>
 
     <div class="flex-1 p-4 lg:p-8 overflow-y-auto custom-scrollbar">
         <!-- Header moderne avec navigation breadcrumb -->
@@ -1123,6 +1123,6 @@ if ($result) {
 </script>
 
 <!-- Footer -->
-<?php include 'footer.php'; ?>
+<?php include 'includes/footer.php'; ?>
 </body>
 </html>

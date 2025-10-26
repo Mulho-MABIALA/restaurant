@@ -73,10 +73,12 @@ try {
 <head>
     <meta charset="utf-8">
     <meta content="width=device-width, initial-scale=1.0" name="viewport">
-    <title>Restaurant Mulho</title>
-    <meta name="description" content="Restaurant Mulho - Découvrez nos plats de qualité">
-    <meta name="keywords" content="restaurant, mulho, dakar, senegal">
+    <title><?php echo htmlspecialchars(getSetting('restaurant_name', 'Restaurant Mulho')); ?></title>
+    <meta name="description" content="<?php echo htmlspecialchars(getSetting('restaurant_name', 'Restaurant Mulho')); ?> - Découvrez nos plats de qualité">
+    <meta name="keywords" content="restaurant, <?php echo htmlspecialchars(getSetting('restaurant_name', 'mulho')); ?>, dakar, senegal">
     <link rel="icon" type="image/x-icon" href="assets/img/logo.jpg">
+
+    <?php include 'includes/pwa-meta.php'; ?>
     
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com" rel="preconnect">
@@ -1320,7 +1322,7 @@ try {
                                 </div>
                                 <div class="info-content">
                                     <h3><?= t('contact.address') ?></h3>
-                                    <p>Dakar, Medina rue 27x24</p>
+                                    <p><?php echo htmlspecialchars(getSetting('restaurant_address', 'Dakar, Medina rue 27x24')); ?></p>
                                 </div>
                             </div>
                         </div>
@@ -1332,7 +1334,7 @@ try {
                                 </div>
                                 <div class="info-content">
                                     <h3><?= t('contact.phone') ?></h3>
-                                    <p><a href="tel:787308706">78 730 87 06</a></p>
+                                    <p><a href="tel:<?php echo preg_replace('/[^0-9]/', '', getSetting('contact_phone', '787308706')); ?>"><?php echo htmlspecialchars(getSetting('contact_phone', '78 730 87 06')); ?></a></p>
                                 </div>
                             </div>
                         </div>
@@ -1344,7 +1346,7 @@ try {
                                 </div>
                                 <div class="info-content">
                                     <h3><?= t('contact.email') ?></h3>
-                                    <p><a href="mailto:mulhomabiala29@gmail.com">mulhomabiala29@gmail.com</a></p>
+                                    <p><a href="mailto:<?php echo htmlspecialchars(getSetting('contact_email', 'mulhomabiala29@gmail.com')); ?>"><?php echo htmlspecialchars(getSetting('contact_email', 'mulhomabiala29@gmail.com')); ?></a></p>
                                 </div>
                             </div>
                         </div>

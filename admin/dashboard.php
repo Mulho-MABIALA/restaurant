@@ -1,7 +1,7 @@
 <?php
 session_start();
 require_once '../config.php';
-require_once './permissions.php';
+require_once 'includes/permissions.php';
 
 // Vérifier si l'admin est connecté
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
@@ -188,7 +188,7 @@ if ($admin_id > 0) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>restaurant Mulho</title>
+    <title>Tableau de bord - <?php echo defined('RESTAURANT_NAME') ? RESTAURANT_NAME : 'Restaurant'; ?></title>
     <link rel="icon" type="image/x-icon" href="../assets/img/logo.jpg">
     
     <!-- CSS Frameworks -->
@@ -288,19 +288,6 @@ if ($admin_id > 0) {
             --shadow-color: rgba(0, 0, 0, 0.3);
         }
 
-        /* Light Mode Variables */
-        .light-mode {
-            --bg-primary: #f8fafc;
-            --bg-secondary: #ffffff;
-            --bg-tertiary: #f1f5f9;
-            --text-primary: #0f172a;
-            --text-secondary: #475569;
-            --border-color: rgba(0, 0, 0, 0.1);
-            --glass-bg: rgba(255, 255, 255, 0.95);
-            --glass-border: rgba(0, 0, 0, 0.08);
-            --card-bg: rgba(255, 255, 255, 0.98);
-            --shadow-color: rgba(0, 0, 0, 0.1);
-        }
 
         body {
             background: var(--bg-primary);
@@ -334,62 +321,7 @@ if ($admin_id > 0) {
             animation: gradientShift 20s ease infinite;
         }
 
-        .light-mode .gradient-corporate {
-            background: linear-gradient(135deg,
-                #f1f5f9 0%,
-                #e2e8f0 25%,
-                #cbd5e1 50%,
-                #94a3b8 75%,
-                #64748b 100%);
-        }
 
-        /* Light mode blob animations */
-        .light-mode .blob {
-            background: linear-gradient(45deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
-        }
-
-        /* Light mode text */
-        .light-mode .text-corporate {
-            background: linear-gradient(135deg, #0f172a, #334155);
-            background-clip: text;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        /* Theme Toggle Button */
-        .theme-toggle {
-            position: relative;
-            width: 56px;
-            height: 56px;
-            background: linear-gradient(135deg, #fbbf24, #f59e0b);
-            border-radius: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 12px rgba(251, 191, 36, 0.3);
-        }
-
-        .theme-toggle:hover {
-            transform: scale(1.05) rotate(5deg);
-            box-shadow: 0 6px 20px rgba(251, 191, 36, 0.4);
-        }
-
-        .light-mode .theme-toggle {
-            background: linear-gradient(135deg, #1e293b, #334155);
-            box-shadow: 0 4px 12px rgba(30, 41, 59, 0.3);
-        }
-
-        .theme-icon {
-            font-size: 1.5rem;
-            color: white;
-            transition: all 0.3s ease;
-        }
-
-        .theme-toggle:hover .theme-icon {
-            transform: rotate(15deg) scale(1.1);
-        }
         
         @keyframes gradientShift {
             0% { background-position: 0% 50%; }
@@ -506,7 +438,7 @@ if ($admin_id > 0) {
 
     <div class="flex h-screen overflow-hidden relative z-10">
         <!-- Sidebar (préservé tel quel) -->
-        <?php include 'sidebar.php'; ?>
+        <?php include 'includes/sidebar.php'; ?>
         
         <!-- Main Content -->
         <div class="flex-1 flex flex-col overflow-hidden">
@@ -542,11 +474,6 @@ if ($admin_id > 0) {
                         
                         <!-- Contrôles Professionnels -->
                         <div class="flex items-center space-x-4" x-data="{ profileOpen: false, notificationsOpen: false }">
-                            <!-- Theme Toggle Button -->
-                            <button onclick="toggleTheme()" class="theme-toggle" title="Changer le thème" type="button">
-                                <i class="theme-icon fas fa-sun" id="theme-icon"></i>
-                            </button>
-
                             <!-- Widget Stats Temps Réel -->
                             <div class="hidden sm:flex items-center space-x-6 glass-card rounded-2xl px-6 py-4 shadow-xl">
                                 <div class="flex items-center space-x-3 text-text-primary">
@@ -1452,7 +1379,7 @@ if ($admin_id > 0) {
             </main>
 
             <!-- Footer -->
-            <?php include 'footer.php'; ?>
+            <?php include 'includes/footer.php'; ?>
         </div>
     </div>
 
@@ -1862,47 +1789,7 @@ function uploadProfilePhoto(input) {
         }
     </style>
 
-    <!-- Theme Toggle Script -->
     <script>
-        // Fonction pour basculer entre les thèmes
-        function toggleTheme() {
-            const body = document.body;
-            const themeIcon = document.getElementById('theme-icon');
-            const isDark = body.classList.contains('light-mode');
-
-            if (isDark) {
-                // Passer en mode sombre
-                body.classList.remove('light-mode');
-                themeIcon.classList.remove('fa-moon');
-                themeIcon.classList.add('fa-sun');
-                localStorage.setItem('theme', 'dark');
-            } else {
-                // Passer en mode clair
-                body.classList.add('light-mode');
-                themeIcon.classList.remove('fa-sun');
-                themeIcon.classList.add('fa-moon');
-                localStorage.setItem('theme', 'light');
-            }
-
-            // Animation du toggle
-            themeIcon.style.transform = 'rotate(360deg) scale(0)';
-            setTimeout(() => {
-                themeIcon.style.transform = 'rotate(0deg) scale(1)';
-            }, 150);
-        }
-
-        // Charger le thème sauvegardé au chargement de la page
-        document.addEventListener('DOMContentLoaded', function() {
-            const savedTheme = localStorage.getItem('theme');
-            const themeIcon = document.getElementById('theme-icon');
-
-            if (savedTheme === 'light') {
-                document.body.classList.add('light-mode');
-                themeIcon.classList.remove('fa-sun');
-                themeIcon.classList.add('fa-moon');
-            }
-        });
-
         // Horloge en temps réel
         function updateClock() {
             const clockElement = document.getElementById('live-clock');

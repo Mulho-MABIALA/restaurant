@@ -246,7 +246,7 @@ $pages_structure = [
 <body class="bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200 min-h-screen">
 
 <!-- Include du sidebar -->
-<?php include '../sidebar.php'; ?>
+<?php include '../includes/sidebar.php'; ?>
 
 <!-- Contenu principal -->
 <div id="main-content">

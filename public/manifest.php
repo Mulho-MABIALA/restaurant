@@ -1,0 +1,176 @@
+<?php
+/**
+ * Manifest PWA Dynamique
+ * Génère le manifest.json avec les paramètres depuis la base de données
+ */
+
+require_once '../config.php';
+
+// Récupérer le nom du restaurant
+$restaurantName = getSetting('restaurant_name', 'Restaurant Mulho');
+$restaurantShort = getSetting('restaurant_short_name', substr($restaurantName, 0, 12));
+
+// Créer le manifest
+$manifest = [
+    "name" => "$restaurantName - Commande en Ligne",
+    "short_name" => $restaurantShort,
+    "description" => "Commandez vos plats préférés du $restaurantName directement depuis votre téléphone. Livraison rapide, paiement sécurisé.",
+    "start_url" => "/restaurant/public/index.php",
+    "scope" => "/restaurant/public/",
+    "display" => "standalone",
+    "orientation" => "portrait-primary",
+    "theme_color" => "#10b981",
+    "background_color" => "#ffffff",
+    "lang" => "fr-FR",
+    "dir" => "ltr",
+
+    "icons" => [
+        [
+            "src" => "/restaurant/public/assets/img/icons/icon-72x72.png",
+            "sizes" => "72x72",
+            "type" => "image/png",
+            "purpose" => "any"
+        ],
+        [
+            "src" => "/restaurant/public/assets/img/icons/icon-96x96.png",
+            "sizes" => "96x96",
+            "type" => "image/png",
+            "purpose" => "any"
+        ],
+        [
+            "src" => "/restaurant/public/assets/img/icons/icon-128x128.png",
+            "sizes" => "128x128",
+            "type" => "image/png",
+            "purpose" => "any"
+        ],
+        [
+            "src" => "/restaurant/public/assets/img/icons/icon-144x144.png",
+            "sizes" => "144x144",
+            "type" => "image/png",
+            "purpose" => "any"
+        ],
+        [
+            "src" => "/restaurant/public/assets/img/icons/icon-152x152.png",
+            "sizes" => "152x152",
+            "type" => "image/png",
+            "purpose" => "any"
+        ],
+        [
+            "src" => "/restaurant/public/assets/img/icons/icon-192x192.png",
+            "sizes" => "192x192",
+            "type" => "image/png",
+            "purpose" => "any maskable"
+        ],
+        [
+            "src" => "/restaurant/public/assets/img/icons/icon-384x384.png",
+            "sizes" => "384x384",
+            "type" => "image/png",
+            "purpose" => "any"
+        ],
+        [
+            "src" => "/restaurant/public/assets/img/icons/icon-512x512.png",
+            "sizes" => "512x512",
+            "type" => "image/png",
+            "purpose" => "any maskable"
+        ]
+    ],
+
+    "screenshots" => [
+        [
+            "src" => "/restaurant/public/assets/img/screenshots/menu.png",
+            "sizes" => "540x720",
+            "type" => "image/png",
+            "form_factor" => "narrow",
+            "label" => "Menu des plats"
+        ],
+        [
+            "src" => "/restaurant/public/assets/img/screenshots/commande.png",
+            "sizes" => "540x720",
+            "type" => "image/png",
+            "form_factor" => "narrow",
+            "label" => "Panier et commande"
+        ],
+        [
+            "src" => "/restaurant/public/assets/img/screenshots/suivi.png",
+            "sizes" => "540x720",
+            "type" => "image/png",
+            "form_factor" => "narrow",
+            "label" => "Suivi de commande"
+        ]
+    ],
+
+    "categories" => ["food", "lifestyle"],
+
+    "shortcuts" => [
+        [
+            "name" => "Commander",
+            "short_name" => "Commander",
+            "description" => "Passer une nouvelle commande",
+            "url" => "/restaurant/public/menu.php",
+            "icons" => [
+                [
+                    "src" => "/restaurant/public/assets/img/icons/shortcut-order.png",
+                    "sizes" => "96x96",
+                    "type" => "image/png"
+                ]
+            ]
+        ],
+        [
+            "name" => "Mes Commandes",
+            "short_name" => "Commandes",
+            "description" => "Voir mes commandes en cours",
+            "url" => "/restaurant/public/mes_commandes.php",
+            "icons" => [
+                [
+                    "src" => "/restaurant/public/assets/img/icons/shortcut-orders.png",
+                    "sizes" => "96x96",
+                    "type" => "image/png"
+                ]
+            ]
+        ],
+        [
+            "name" => "Réserver",
+            "short_name" => "Réserver",
+            "description" => "Réserver une table",
+            "url" => "/restaurant/public/reservation.php",
+            "icons" => [
+                [
+                    "src" => "/restaurant/public/assets/img/icons/shortcut-reservation.png",
+                    "sizes" => "96x96",
+                    "type" => "image/png"
+                ]
+            ]
+        ]
+    ],
+
+    "related_applications" => [],
+    "prefer_related_applications" => false,
+
+    "share_target" => [
+        "action" => "/restaurant/public/partage.php",
+        "method" => "GET",
+        "enctype" => "application/x-www-form-urlencoded",
+        "params" => [
+            "title" => "title",
+            "text" => "text",
+            "url" => "url"
+        ]
+    ],
+
+    "display_override" => ["window-controls-overlay", "standalone", "minimal-ui"],
+
+    "iarc_rating_id" => "",
+
+    "edge_side_panel" => [
+        "preferred_width" => 400
+    ]
+];
+
+// Envoyer les headers JSON
+header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-cache, must-revalidate');
+header('Expires: Mon, 26 Jul 1997 05:00:00 GMT');
+
+// Afficher le JSON
+echo json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+?>

@@ -345,7 +345,7 @@ try {
 </head>
 <body class="bg-gray-100">
     <div class="flex h-screen overflow-hidden">
-        <?php include '../sidebar.php'; ?>
+        <?php include '../includes/sidebar.php'; ?>
         
         <main class="flex-1 overflow-y-auto p-6">
             <div class="max-w-7xl mx-auto">

@@ -37,7 +37,7 @@ if (!$page) {
 </head>
 <body class="flex min-h-screen bg-gray-100 font-sans text-gray-800">
 
-      <?php include 'sidebar.php'; ?>
+      <?php include 'includes/sidebar.php'; ?>
 
   <!-- Main Content Wrapper -->
   <div class="flex-1 flex flex-col md:ml-64">

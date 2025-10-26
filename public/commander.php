@@ -1,8 +1,17 @@
 <?php
+// Afficher les erreurs pour debug (À RETIRER EN PRODUCTION!)
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 session_start();
 require_once '../config.php';
 require_once 'includes/language.php';
 require '../vendor/autoload.php';
+
+// Charger les classes de paiement
+if (file_exists('../admin/classes/PaymentFactory.php')) {
+    require_once '../admin/classes/PaymentFactory.php';
+}
 
 // Ajouter ce code après session_start() dans commander.php
 
@@ -250,9 +259,63 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !isset($_POST['newsletter_choice']) 
                 $conn->commit();
                 $transactionActive = false;
 
-                // CORRECTION 6: Nettoyer le panier après succès
-                $_SESSION['panier'] = [];
-                unset($_SESSION['panier']);
+                // ============================================
+                // NOUVEAU: Gestion du paiement en ligne
+                // ============================================
+                $needsOnlinePayment = in_array($mode_paiement, ['wave', 'orange_money', 'paydunya']);
+
+                if ($needsOnlinePayment) {
+                    try {
+                        // Vérifier que PaymentFactory est disponible
+                        if (!class_exists('PaymentFactory')) {
+                            throw new Exception('Le système de paiement en ligne n\'est pas encore configuré. Veuillez choisir le paiement sur place.');
+                        }
+                        // Créer le provider de paiement
+                        $paymentGateway = PaymentFactory::create($mode_paiement, $conn);
+
+                        // Préparer les données de commande
+                        $orderData = [
+                            'id' => $commande_id,
+                            'client_nom' => $nom,
+                            'client_email' => $email,
+                            'client_telephone' => $telephone
+                        ];
+
+                        // Créer le paiement
+                        $paymentResult = $paymentGateway->createPayment($orderData, $total);
+
+                        if ($paymentResult['success']) {
+                            // Rediriger vers la page de paiement
+                            $_SESSION['panier'] = []; // Nettoyer le panier
+                            unset($_SESSION['panier']);
+
+                            // Redirection vers la gateway de paiement
+                            header('Location: ' . $paymentResult['payment_url']);
+                            exit;
+                        } else {
+                            // Erreur lors de la création du paiement
+                            throw new Exception('Erreur lors de l\'initialisation du paiement: ' . $paymentResult['error']);
+                        }
+
+                    } catch (Exception $e) {
+                        // Logger l'erreur
+                        error_log("Payment error for order #$commande_id: " . $e->getMessage());
+
+                        // Afficher une erreur à l'utilisateur
+                        $erreur = "Une erreur est survenue lors de l'initialisation du paiement. Veuillez réessayer ou choisir un autre mode de paiement.";
+
+                        // Marquer la commande comme ayant un problème de paiement
+                        $stmt = $conn->prepare("UPDATE commandes SET statut = 'En attente', statut_paiement = 'failed' WHERE id = ?");
+                        $stmt->execute([$commande_id]);
+                    }
+                } else {
+                    // Paiement sur place (cash) - continuer normalement
+                    $_SESSION['panier'] = [];
+                    unset($_SESSION['panier']);
+                }
+                // ============================================
+                // FIN: Gestion du paiement en ligne
+                // ============================================
 
                 // Template HTML pour l'email (même code qu'avant)
                 $emailTemplate = "<!DOCTYPE html>
@@ -815,57 +878,96 @@ $emailTemplate .= "
                             <label for="mode_paiement" class="block text-sm font-semibold text-gray-700 mb-2">
                                 Mode de paiement <span class="text-red-500">*</span>
                             </label>
-                            <div class="grid grid-cols-3 gap-3">
-                                <!-- Option Espèces -->
-                                <label class="relative cursor-pointer">
-                                    <input type="radio"
-                                           name="mode_paiement"
-                                           value="Espèces"
-                                           required
-                                           class="peer sr-only"
-                                           <?= (isset($_POST['mode_paiement']) && $_POST['mode_paiement'] == 'Espèces') ? 'checked' : '' ?>>
-                                    <div class="w-full px-4 py-4 border-2 border-gray-300 rounded-lg text-center transition-all
-                                                peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:shadow-md
-                                                hover:border-primary/50 hover:shadow-sm">
-                                        <div class="text-3xl mb-2">💵</div>
-                                        <div class="font-semibold text-sm text-gray-700">Espèces</div>
-                                    </div>
-                                </label>
 
-                                <!-- Option Wave -->
-                                <label class="relative cursor-pointer">
-                                    <input type="radio"
-                                           name="mode_paiement"
-                                           value="Wave"
-                                           required
-                                           class="peer sr-only"
-                                           <?= (isset($_POST['mode_paiement']) && $_POST['mode_paiement'] == 'Wave') ? 'checked' : '' ?>>
-                                    <div class="w-full px-4 py-4 border-2 border-gray-300 rounded-lg text-center transition-all
-                                                peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:shadow-md
-                                                hover:border-blue-400 hover:shadow-sm">
-                                        <div class="text-3xl mb-2">📱</div>
-                                        <div class="font-semibold text-sm text-gray-700">Wave</div>
-                                    </div>
-                                </label>
+                            <?php
+                            // Charger les méthodes de paiement actives depuis la BDD
+                            $paymentMethods = [];
+                            if (class_exists('PaymentFactory')) {
+                                try {
+                                    $paymentMethods = PaymentFactory::getActiveProviders($conn);
+                                } catch (Exception $e) {
+                                    error_log("Error loading payment methods: " . $e->getMessage());
+                                    // Fallback vers les méthodes par défaut
+                                    $paymentMethods = [
+                                        ['provider' => 'cash', 'name' => 'Paiement sur place', 'is_active' => 1]
+                                    ];
+                                }
+                            } else {
+                                // Fallback si PaymentFactory n'est pas disponible
+                                $paymentMethods = [
+                                    ['provider' => 'cash', 'name' => 'Espèces', 'is_active' => 1],
+                                    ['provider' => 'wave', 'name' => 'Wave', 'is_active' => 1],
+                                    ['provider' => 'orange_money', 'name' => 'Orange Money', 'is_active' => 1]
+                                ];
+                            }
+                            ?>
 
-                                <!-- Option Orange Money -->
-                                <label class="relative cursor-pointer">
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <?php foreach ($paymentMethods as $method): ?>
+                                <label class="relative cursor-pointer payment-method-option" data-provider="<?= htmlspecialchars($method['provider']) ?>">
                                     <input type="radio"
                                            name="mode_paiement"
-                                           value="Orange Money"
+                                           value="<?= htmlspecialchars($method['provider']) ?>"
                                            required
                                            class="peer sr-only"
-                                           <?= (isset($_POST['mode_paiement']) && $_POST['mode_paiement'] == 'Orange Money') ? 'checked' : '' ?>>
+                                           <?= (isset($_POST['mode_paiement']) && $_POST['mode_paiement'] == $method['provider']) ? 'checked' : '' ?>>
                                     <div class="w-full px-4 py-4 border-2 border-gray-300 rounded-lg text-center transition-all
-                                                peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:shadow-md
-                                                hover:border-orange-400 hover:shadow-sm">
-                                        <div class="text-3xl mb-2">🍊</div>
-                                        <div class="font-semibold text-sm text-gray-700">Orange Money</div>
+                                                peer-checked:border-yellow-600 peer-checked:bg-yellow-50 peer-checked:shadow-md
+                                                hover:border-yellow-400 hover:shadow-sm">
+                                        <?php
+                                        // Icônes par provider
+                                        $icons = [
+                                            'cash' => '💵',
+                                            'wave' => '📱',
+                                            'orange_money' => '🍊',
+                                            'paydunya' => '💳'
+                                        ];
+                                        $icon = $icons[$method['provider']] ?? '💰';
+                                        ?>
+                                        <div class="text-3xl mb-2"><?= $icon ?></div>
+                                        <div class="font-semibold text-sm text-gray-700"><?= htmlspecialchars($method['name']) ?></div>
+                                        <?php if ($method['provider'] !== 'cash'): ?>
+                                        <div class="text-xs text-green-600 mt-1">Paiement sécurisé</div>
+                                        <?php else: ?>
+                                        <div class="text-xs text-gray-500 mt-1">Sur place</div>
+                                        <?php endif; ?>
                                     </div>
                                 </label>
+                                <?php endforeach; ?>
                             </div>
+
+                            <!-- Info paiement en ligne -->
+                            <div class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg hidden" id="online-payment-info">
+                                <div class="flex items-start">
+                                    <svg class="w-5 h-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    <div class="text-sm text-blue-800">
+                                        <p class="font-semibold">Paiement sécurisé en ligne</p>
+                                        <p class="mt-1">Vous serez redirigé vers une page de paiement sécurisée pour finaliser votre commande.</p>
+                                    </div>
+                                </div>
+                            </div>
+
                             <p class="text-xs text-gray-500 mt-2">💳 Sélectionnez votre mode de paiement préféré</p>
                         </div>
+
+                        <script>
+                        // Afficher l'info pour paiement en ligne
+                        document.querySelectorAll('input[name="mode_paiement"]').forEach(radio => {
+                            radio.addEventListener('change', function() {
+                                const provider = this.value;
+                                const onlineProviders = ['wave', 'orange_money', 'paydunya'];
+                                const infoBox = document.getElementById('online-payment-info');
+
+                                if (onlineProviders.includes(provider)) {
+                                    infoBox.classList.remove('hidden');
+                                } else {
+                                    infoBox.classList.add('hidden');
+                                }
+                            });
+                        });
+                        </script>
                         <button type="submit" 
                                 class="w-full bg-gradient-to-r from-primary to-primary-dark text-white font-bold py-4 px-6 rounded-lg hover:from-primary-dark hover:to-primary transform hover:scale-[1.02] transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center space-x-2">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

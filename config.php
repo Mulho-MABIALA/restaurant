@@ -16,6 +16,11 @@ $pass = $_ENV['DB_PASS'] ?? '';
 try {
     $conn = new PDO("mysql:host={$host};dbname={$db};charset=utf8mb4", $user, $pass);
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+    // Charger les paramètres système
+    if (file_exists(__DIR__ . '/admin/includes/settings_loader.php')) {
+        require_once __DIR__ . '/admin/includes/settings_loader.php';
+    }
 } catch(PDOException $e) {
     die("Erreur connexion BDD : " . $e->getMessage());
 }

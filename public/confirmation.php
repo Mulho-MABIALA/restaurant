@@ -79,7 +79,7 @@ if ($totalCommande == 0 && isset($_SESSION['panier']) && !empty($_SESSION['panie
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>restaurant Mulho</title>
+    <title>Confirmation - <?php echo htmlspecialchars(getSetting('restaurant_name', 'Restaurant Mulho')); ?></title>
     <link rel="icon" type="image/x-icon" href="assets/img/logo.jpg">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -564,7 +564,7 @@ if ($totalCommande == 0 && isset($_SESSION['panier']) && !empty($_SESSION['panie
                 <!-- Footer final -->
                 <div class="receipt-footer">
                     <p><i class="fas fa-heart"></i> Merci de votre visite !</p>
-                    <p>Restaurant Mulho - Dakar, Sénégal</p>
+                    <p><?php echo htmlspecialchars(getSetting('restaurant_name', 'Restaurant Mulho')); ?> - <?php echo htmlspecialchars(getSetting('restaurant_address', 'Dakar, Sénégal')); ?></p>
                     <p style="margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 8px;">
                         Date d'impression : <?= date('d/m/Y à H:i') ?>
                     </p>

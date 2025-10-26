@@ -1,7 +1,7 @@
 <?php
 session_start();
 require_once '../config.php';
-require_once 'permissions.php';
+require_once 'includes/permissions.php';
 
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Location: login.php');

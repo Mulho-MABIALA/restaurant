@@ -33,7 +33,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sidebar Moderne - Restaurant Jungle</title>
+    <title>Sidebar - <?php echo defined('RESTAURANT_NAME') ? RESTAURANT_NAME : 'Restaurant'; ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <script>
@@ -457,7 +457,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
             </div>
             <div>
                 <h1 class="text-2xl font-bold bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-500 bg-clip-text text-transparent">
-                    Jungle
+                    <?php echo defined('RESTAURANT_NAME') ? RESTAURANT_NAME : 'Restaurant'; ?>
                 </h1>
                 <p class="text-sm text-gray-400 font-medium opacity-90">Restaurant Admin</p>
             </div>
@@ -526,6 +526,17 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                     <div class="flex-1">
                         <span class="font-medium text-base">Commandes</span>
                         <p class="nav-description text-sm text-gray-400 opacity-80">Gestion des commandes</p>
+                    </div>
+                    <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
+                </a>
+
+                <a href="commande_manuelle.php" class="nav-item <?php echo ($currentPage === 'commande_manuelle.php') ? 'active-nav' : ''; ?> flex items-center px-4 py-4 <?php echo ($currentPage === 'commande_manuelle.php') ? 'text-white' : 'text-gray-300 hover:bg-surface-lighter/50 hover:text-white'; ?> rounded-2xl transition-all duration-300 group hover:shadow-xl">
+                    <div class="flex items-center justify-center w-12 h-12 bg-white/5 rounded-xl mr-4 group-hover:bg-white/10 transition-all duration-300">
+                        <i class="fas fa-plus-circle nav-icon text-lg"></i>
+                    </div>
+                    <div class="flex-1">
+                        <span class="font-medium text-base">Commande Manuelle</span>
+                        <p class="nav-description text-sm text-gray-400 opacity-80">Créer une commande</p>
                     </div>
                     <i class="fas fa-chevron-right text-xs opacity-0 group-hover:opacity-60 transition-all duration-300 transform group-hover:translate-x-1"></i>
                 </a>
@@ -760,7 +771,13 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                     <span class="font-medium">Dashboard</span>
                 </a>
                 <?php endif; ?>
-                
+
+                <!-- Paiements en ligne -->
+                <a href="./paiements.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300 <?php echo ($currentPage === 'paiements.php') ? 'bg-primary/20 text-white' : ''; ?>">
+                    <i class="fas fa-credit-card mr-3 w-5 text-sm"></i>
+                    <span class="font-medium">Paiements en ligne</span>
+                </a>
+
                 <?php if (canAccess($conn, $adminId, 'facturation')): ?>
                 <a href="./facturation.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                     <i class="fas fa-file-invoice-dollar mr-3 w-5 text-sm"></i>
@@ -1025,7 +1042,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                     </div>
                     <div class="space-y-1">
                         <p class="font-medium text-gray-300">Version 2.0</p>
-                        <p class="opacity-70">© 2024 Jungle Restaurant</p>
+                        <p class="opacity-70">© <?php echo date('Y'); ?> <?php echo defined('RESTAURANT_NAME') ? RESTAURANT_NAME : 'Restaurant'; ?></p>
                     </div>
                     <div class="mt-3 flex justify-center space-x-2">
                         <div class="w-1 h-1 bg-indigo-500 rounded-full animate-pulse-soft"></div>

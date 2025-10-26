@@ -471,7 +471,7 @@ if (!empty($statistiques['jours'])) {
 <body class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
     <div class="flex h-screen overflow-hidden">
         <!-- Sidebar -->
-        <?php include 'sidebar.php'; ?>
+        <?php include 'includes/sidebar.php'; ?>
 
         <!-- Main Content -->
         <div class="flex-1 flex flex-col overflow-hidden">
@@ -926,7 +926,7 @@ if (!empty($statistiques['jours'])) {
     </main>
 
     <!-- Footer -->
-    <?php include 'footer.php'; ?>
+    <?php include 'includes/footer.php'; ?>
 </div>
 </div>
 

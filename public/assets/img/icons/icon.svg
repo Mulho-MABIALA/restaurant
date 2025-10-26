@@ -1,0 +1,13 @@
+<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#10b981"/>
+
+  <!-- White Circle -->
+  <circle cx="256" cy="256" r="180" fill="none" stroke="white" stroke-width="8"/>
+
+  <!-- Letter M -->
+  <text x="256" y="320" font-family="Arial, sans-serif" font-size="200" font-weight="bold" fill="white" text-anchor="middle">M</text>
+
+  <!-- Subtitle -->
+  <text x="256" y="400" font-family="Arial, sans-serif" font-size="40" fill="white" text-anchor="middle" opacity="0.9">Mulho</text>
+</svg>

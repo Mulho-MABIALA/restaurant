@@ -1,7 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/../config.php';
-require_once './permissions.php';
+require_once 'includes/permissions.php';
 
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Location: login.php');
@@ -404,7 +404,7 @@ foreach ($allImages as $img) {
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Restaurant Mulho - Galerie</title>
+    <title><?php echo defined('RESTAURANT_NAME') ? RESTAURANT_NAME : 'Restaurant'; ?> - Galerie</title>
     <link rel="icon" type="image/x-icon" href="../assets/img/logo.jpg">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -764,7 +764,7 @@ foreach ($allImages as $img) {
 </head>
 <body class="bg-gradient-to-br from-gray-50 to-gray-100 font-sans antialiased min-h-screen">
     <div class="flex h-screen overflow-hidden relative z-10">
-        <?php include 'sidebar.php'; ?>   
+        <?php include 'includes/sidebar.php'; ?>   
         
         <div class="flex-1 p-6 overflow-y-auto">
             <!-- Header avec gradient -->
@@ -1664,6 +1664,6 @@ foreach ($allImages as $img) {
     </script>
 
     <!-- Footer -->
-    <?php include 'footer.php'; ?>
+    <?php include 'includes/footer.php'; ?>
 </body>
 </html>

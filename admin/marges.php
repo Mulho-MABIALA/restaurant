@@ -1,7 +1,7 @@
 <?php
 session_start();
 require_once '../config.php';
-require_once 'permissions.php';
+require_once 'includes/permissions.php';
 
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Location: login.php');
@@ -74,7 +74,7 @@ $marge_moyenne = count($marges) > 0 ? $total_marges / count($marges) : 0;
 <body class="bg-gray-50">
 
     <div class="flex h-screen overflow-hidden">
-        <?php include 'sidebar.php'; ?>
+        <?php include 'includes/sidebar.php'; ?>
 
         <div class="flex-1 overflow-y-auto">
             <nav class="bg-white shadow-sm border-b sticky top-0 z-10">

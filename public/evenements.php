@@ -55,7 +55,7 @@ function formatDateFr($date) {
 <head>
     <meta charset="utf-8">
     <meta content="width=device-width, initial-scale=1.0" name="viewport">
-    <title>Événements - Restaurant Mulho</title>
+    <title>Événements - <?php echo htmlspecialchars(getSetting('restaurant_name', 'Restaurant Mulho')); ?></title>
     <meta name="description" content="Découvrez nos événements et soirées spéciales">
     <link rel="icon" type="image/x-icon" href="assets/img/logo.jpg">
 

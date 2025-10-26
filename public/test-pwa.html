@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test PWA - Diagnostic</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-box {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            font-size: 24px;
+            margin-right: 10px;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .pending { color: orange; }
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        button {
+            background: #10b981;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #059669;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Diagnostic PWA</h1>
+
+    <div class="test-box">
+        <h2><span id="sw-support-status" class="status pending">⏳</span>Support Service Worker</h2>
+        <p id="sw-support-message">Vérification...</p>
+    </div>
+
+    <div class="test-box">
+        <h2><span id="manifest-status" class="status pending">⏳</span>Manifest</h2>
+        <p id="manifest-message">Vérification...</p>
+        <pre id="manifest-content"></pre>
+    </div>
+
+    <div class="test-box">
+        <h2><span id="sw-status" class="status pending">⏳</span>Service Worker</h2>
+        <p id="sw-message">Vérification...</p>
+        <pre id="sw-details"></pre>
+    </div>
+
+    <div class="test-box">
+        <h2><span id="icons-status" class="status pending">⏳</span>Icônes</h2>
+        <p id="icons-message">Vérification...</p>
+        <div id="icons-preview"></div>
+    </div>
+
+    <div class="test-box">
+        <h2><span id="scripts-status" class="status pending">⏳</span>Scripts PWA</h2>
+        <p id="scripts-message">Vérification...</p>
+        <ul id="scripts-list"></ul>
+    </div>
+
+    <div class="test-box">
+        <h2>🎯 Actions</h2>
+        <button onclick="testInstall()">Test Installation</button>
+        <button onclick="location.reload()">🔄 Rafraîchir</button>
+        <button onclick="clearCache()">🗑️ Vider Cache</button>
+    </div>
+
+    <div class="test-box" id="console-output">
+        <h2>📋 Console</h2>
+        <pre id="console-log"></pre>
+    </div>
+
+    <script>
+        const log = [];
+
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            log.push(`[${timestamp}] ${type.toUpperCase()}: ${message}`);
+            document.getElementById('console-log').textContent = log.join('\n');
+        }
+
+        // Override console pour capturer les logs
+        const originalConsoleLog = console.log;
+        const originalConsoleError = console.error;
+        const originalConsoleWarn = console.warn;
+
+        console.log = function(...args) {
+            addLog(args.join(' '), 'info');
+            originalConsoleLog.apply(console, args);
+        };
+
+        console.error = function(...args) {
+            addLog(args.join(' '), 'error');
+            originalConsoleError.apply(console, args);
+        };
+
+        console.warn = function(...args) {
+            addLog(args.join(' '), 'warn');
+            originalConsoleWarn.apply(console, args);
+        };
+
+        // Test 1: Support Service Worker
+        function testServiceWorkerSupport() {
+            if ('serviceWorker' in navigator) {
+                document.getElementById('sw-support-status').textContent = '✅';
+                document.getElementById('sw-support-status').className = 'status success';
+                document.getElementById('sw-support-message').textContent = 'Service Worker supporté ✅';
+                console.log('Service Worker supporté');
+                return true;
+            } else {
+                document.getElementById('sw-support-status').textContent = '❌';
+                document.getElementById('sw-support-status').className = 'status error';
+                document.getElementById('sw-support-message').textContent = 'Service Worker NON supporté ❌';
+                console.error('Service Worker non supporté');
+                return false;
+            }
+        }
+
+        // Test 2: Manifest
+        async function testManifest() {
+            try {
+                const response = await fetch('/restaurant/public/manifest.json');
+                if (response.ok) {
+                    const manifest = await response.json();
+                    document.getElementById('manifest-status').textContent = '✅';
+                    document.getElementById('manifest-status').className = 'status success';
+                    document.getElementById('manifest-message').textContent = 'Manifest chargé avec succès ✅';
+                    document.getElementById('manifest-content').textContent = JSON.stringify(manifest, null, 2);
+                    console.log('Manifest chargé:', manifest);
+                    return true;
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (error) {
+                document.getElementById('manifest-status').textContent = '❌';
+                document.getElementById('manifest-status').className = 'status error';
+                document.getElementById('manifest-message').textContent = `Erreur manifest: ${error.message} ❌`;
+                console.error('Erreur manifest:', error);
+                return false;
+            }
+        }
+
+        // Test 3: Service Worker Registration
+        async function testServiceWorker() {
+            if (!('serviceWorker' in navigator)) return false;
+
+            try {
+                const registration = await navigator.serviceWorker.register('/restaurant/public/sw.js', {
+                    scope: '/restaurant/public/'
+                });
+
+                console.log('Service Worker enregistré:', registration);
+
+                if (registration.active) {
+                    document.getElementById('sw-status').textContent = '✅';
+                    document.getElementById('sw-status').className = 'status success';
+                    document.getElementById('sw-message').textContent = 'Service Worker actif ✅';
+                    document.getElementById('sw-details').textContent =
+                        `State: ${registration.active.state}\n` +
+                        `Scope: ${registration.scope}\n` +
+                        `Script URL: ${registration.active.scriptURL}`;
+                } else if (registration.installing) {
+                    document.getElementById('sw-status').textContent = '⏳';
+                    document.getElementById('sw-status').className = 'status pending';
+                    document.getElementById('sw-message').textContent = 'Service Worker en cours d\'installation... ⏳';
+                } else {
+                    document.getElementById('sw-status').textContent = '⚠️';
+                    document.getElementById('sw-status').className = 'status pending';
+                    document.getElementById('sw-message').textContent = 'Service Worker enregistré mais pas encore actif';
+                }
+
+                return true;
+            } catch (error) {
+                document.getElementById('sw-status').textContent = '❌';
+                document.getElementById('sw-status').className = 'status error';
+                document.getElementById('sw-message').textContent = `Erreur Service Worker: ${error.message} ❌`;
+                document.getElementById('sw-details').textContent = error.stack;
+                console.error('Erreur Service Worker:', error);
+                return false;
+            }
+        }
+
+        // Test 4: Icons
+        async function testIcons() {
+            const iconSizes = [72, 96, 128, 144, 152, 192, 384, 512];
+            const iconTests = [];
+            let successCount = 0;
+
+            for (const size of iconSizes) {
+                const url = `/restaurant/public/assets/img/icons/icon-${size}x${size}.png`;
+                try {
+                    const response = await fetch(url, { method: 'HEAD' });
+                    if (response.ok) {
+                        iconTests.push(`✅ icon-${size}x${size}.png`);
+                        successCount++;
+                    } else {
+                        iconTests.push(`❌ icon-${size}x${size}.png (${response.status})`);
+                    }
+                } catch (error) {
+                    iconTests.push(`❌ icon-${size}x${size}.png (erreur)`);
+                }
+            }
+
+            if (successCount === iconSizes.length) {
+                document.getElementById('icons-status').textContent = '✅';
+                document.getElementById('icons-status').className = 'status success';
+                document.getElementById('icons-message').textContent = `Toutes les icônes présentes (${successCount}/${iconSizes.length}) ✅`;
+            } else if (successCount >= 2) {
+                document.getElementById('icons-status').textContent = '⚠️';
+                document.getElementById('icons-status').className = 'status pending';
+                document.getElementById('icons-message').textContent = `Icônes partielles (${successCount}/${iconSizes.length}) ⚠️`;
+            } else {
+                document.getElementById('icons-status').textContent = '❌';
+                document.getElementById('icons-status').className = 'status error';
+                document.getElementById('icons-message').textContent = `Icônes manquantes (${successCount}/${iconSizes.length}) ❌`;
+            }
+
+            document.getElementById('icons-preview').innerHTML = '<ul>' + iconTests.map(t => `<li>${t}</li>`).join('') + '</ul>';
+
+            // Afficher preview des icônes principales
+            document.getElementById('icons-preview').innerHTML += `
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <img src="/restaurant/public/assets/img/icons/icon-192x192.png" style="width: 96px; border: 1px solid #ccc;" onerror="this.style.display='none'">
+                    <img src="/restaurant/public/assets/img/icons/icon-512x512.png" style="width: 96px; border: 1px solid #ccc;" onerror="this.style.display='none'">
+                </div>
+            `;
+
+            console.log('Icônes:', iconTests);
+        }
+
+        // Test 5: Scripts PWA
+        async function testScripts() {
+            const scripts = [
+                '/restaurant/public/assets/js/pwa-init.js',
+                '/restaurant/public/assets/js/pwa-install.js',
+                '/restaurant/public/assets/js/offline-storage.js'
+            ];
+
+            const scriptTests = [];
+            let successCount = 0;
+
+            for (const script of scripts) {
+                try {
+                    const response = await fetch(script, { method: 'HEAD' });
+                    if (response.ok) {
+                        scriptTests.push(`✅ ${script.split('/').pop()}`);
+                        successCount++;
+                    } else {
+                        scriptTests.push(`❌ ${script.split('/').pop()} (${response.status})`);
+                    }
+                } catch (error) {
+                    scriptTests.push(`❌ ${script.split('/').pop()} (erreur)`);
+                }
+            }
+
+            if (successCount === scripts.length) {
+                document.getElementById('scripts-status').textContent = '✅';
+                document.getElementById('scripts-status').className = 'status success';
+                document.getElementById('scripts-message').textContent = 'Tous les scripts présents ✅';
+            } else {
+                document.getElementById('scripts-status').textContent = '❌';
+                document.getElementById('scripts-status').className = 'status error';
+                document.getElementById('scripts-message').textContent = `Scripts manquants (${successCount}/${scripts.length}) ❌`;
+            }
+
+            document.getElementById('scripts-list').innerHTML = scriptTests.map(t => `<li>${t}</li>`).join('');
+            console.log('Scripts:', scriptTests);
+        }
+
+        // Test installation
+        function testInstall() {
+            console.log('Test d\'installation...');
+            alert('Le test d\'installation va s\'exécuter. Vérifiez la console pour les détails.');
+
+            if (window.deferredPrompt) {
+                console.log('deferredPrompt disponible, affichage...');
+                window.deferredPrompt.prompt();
+                window.deferredPrompt.userChoice.then(result => {
+                    console.log('Choix utilisateur:', result.outcome);
+                });
+            } else {
+                console.warn('deferredPrompt non disponible. Vérifiez que beforeinstallprompt a été déclenché.');
+                alert('La bannière d\'installation n\'est pas disponible. Vérifiez:\n\n1. Manifest valide\n2. Service Worker actif\n3. HTTPS (ou localhost)\n4. Pas déjà installé');
+            }
+        }
+
+        // Vider cache
+        async function clearCache() {
+            if ('serviceWorker' in navigator) {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                for (const registration of registrations) {
+                    await registration.unregister();
+                }
+            }
+
+            if ('caches' in window) {
+                const cacheNames = await caches.keys();
+                for (const cacheName of cacheNames) {
+                    await caches.delete(cacheName);
+                }
+            }
+
+            console.log('Cache vidé');
+            alert('Cache et Service Worker supprimés. Rafraîchissez la page.');
+        }
+
+        // Lancer tous les tests
+        async function runAllTests() {
+            console.log('=== DÉBUT DES TESTS ===');
+            testServiceWorkerSupport();
+            await testManifest();
+            await testServiceWorker();
+            await testIcons();
+            await testScripts();
+            console.log('=== FIN DES TESTS ===');
+        }
+
+        // Lancer au chargement
+        window.addEventListener('load', runAllTests);
+    </script>
+</body>
+</html>

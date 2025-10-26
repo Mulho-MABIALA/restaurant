@@ -47,7 +47,7 @@ if (isset($_GET['action']) || isset($_POST['ajaxAction'])) {
 
 session_start();
 require_once '../config.php';
-require_once './permissions.php';
+require_once 'includes/permissions.php';
 require_once 'phpqrcode/qrlib.php';
 require_once 'classes/PayrollCalculator.php';
 require_once 'classes/BulletinPDFGenerateur.php';
@@ -1969,7 +1969,7 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>restaurant Mulho</title>
+    <title>Gestion des Employés - <?php echo defined('RESTAURANT_NAME') ? RESTAURANT_NAME : 'Restaurant'; ?></title>
     <link rel="icon" type="image/x-icon" href="../assets/img/logo.jpg">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -2002,7 +2002,7 @@ if (isset($_GET['action']) || isset($_POST['ajax_action'])) {
 <body class="min-h-screen bg-gray-50">
     <div class="flex h-screen overflow-hidden">
         <!-- Sidebar -->
-        <?php include 'sidebar.php'; ?>
+        <?php include 'includes/sidebar.php'; ?>
 
         <!-- Contenu Principal -->
         <div class="flex-1 overflow-y-auto">
@@ -4302,6 +4302,6 @@ function exportReportToExcel() {
     </div> <!-- Fin flex h-screen -->
 
     <!-- Footer -->
-    <?php include 'footer.php'; ?>
+    <?php include 'includes/footer.php'; ?>
 </body>
 </html>

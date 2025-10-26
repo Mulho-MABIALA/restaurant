@@ -381,7 +381,7 @@ foreach ($details as $detail) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>restaurant Mulho #<?= str_pad($commande_id, 6, '0', STR_PAD_LEFT) ?></title>
+    <title><?php echo defined('RESTAURANT_NAME') ? RESTAURANT_NAME : 'Restaurant'; ?> - Reçu #<?= str_pad($commande_id, 6, '0', STR_PAD_LEFT) ?></title>
     <link rel="icon" type="image/x-icon" href="../assets/img/logo.jpg">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">

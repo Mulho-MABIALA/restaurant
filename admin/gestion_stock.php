@@ -175,7 +175,7 @@ $categories = $conn->query("SELECT DISTINCT categorie FROM stocks ORDER BY categ
 </head>
 <body class="bg-gradient-to-br from-gray-50 to-gray-100">
     <div class="flex h-screen overflow-hidden">
-        <?php include 'sidebar.php'; ?>
+        <?php include 'includes/sidebar.php'; ?>
         
         <!-- Main Content -->
         <div class="flex-1 flex flex-col overflow-hidden">
@@ -1286,6 +1286,6 @@ $categories = $conn->query("SELECT DISTINCT categorie FROM stocks ORDER BY categ
     </div>
 
     <!-- Footer -->
-    <?php include 'footer.php'; ?>
+    <?php include 'includes/footer.php'; ?>
 </body>
 </html>

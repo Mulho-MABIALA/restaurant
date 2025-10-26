@@ -1,7 +1,7 @@
 <?php
 session_start();
 require_once '../config.php';
-require_once './permissions.php';
+require_once 'includes/permissions.php';
 
 // Rediriger si l'admin n'est pas connecté
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
@@ -64,7 +64,7 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestion des Avis - Restaurant Mulho</title>
+    <title>Gestion des Avis - <?php echo defined('RESTAURANT_NAME') ? RESTAURANT_NAME : 'Restaurant'; ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
@@ -112,7 +112,7 @@ try {
 
     <div class="flex h-screen overflow-hidden">
         <!-- Sidebar -->
-        <?php include 'sidebar.php'; ?>
+        <?php include 'includes/sidebar.php'; ?>
 
         <!-- Main Content -->
         <div class="flex-1 flex flex-col overflow-hidden">
@@ -338,7 +338,7 @@ try {
 
                 <!-- Footer -->
                 <footer class="mt-8 text-center text-gray-600 text-sm">
-                    <p>&copy; <?= date('Y') ?> Restaurant Mulho. Tous droits réservés.</p>
+                    <p>&copy; <?= date('Y') ?> <?php echo defined('RESTAURANT_NAME') ? RESTAURANT_NAME : 'Restaurant'; ?>. Tous droits réservés.</p>
                 </footer>
             </main>
         </div>

@@ -25,6 +25,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $description = trim($_POST['description'] ?? '');
     $prix = floatval($_POST['prix'] ?? 0);
     $categorie_id = isset($_POST['categorie']) ? (int)$_POST['categorie'] : 0;
+    $disponibilite_active = isset($_POST['disponibilite_active']) ? 1 : 0;
+    $heure_debut = !empty($_POST['heure_debut']) ? $_POST['heure_debut'] : null;
+    $heure_fin = !empty($_POST['heure_fin']) ? $_POST['heure_fin'] : null;
     $image = null;
 
     // Debug: Affichage des données reçues (à supprimer en production)
@@ -63,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errors[] = "Format de fichier non autorisé. Seuls jpg, jpeg, png et gif sont acceptés.";
             } else {
                 // Créer le dossier uploads s'il n'existe pas
-                $uploadDir = '../uploads/';
+                $uploadDir = '../public/uploads/';
                 if (!is_dir($uploadDir)) {
                     mkdir($uploadDir, 0755, true);
                 }
@@ -92,8 +95,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             error_log("Colonnes de la table plats: " . implode(', ', $columns));
 
             // Insertion avec gestion d'erreur améliorée
-            $stmt = $conn->prepare("INSERT INTO plats (nom, description, prix, categorie_id, image) VALUES (?, ?, ?, ?, ?)");
-            $result = $stmt->execute([$nom, $description, $prix, $categorie_id, $image]);
+            $stmt = $conn->prepare("INSERT INTO plats (nom, description, prix, categorie_id, image, disponibilite_active, heure_debut, heure_fin) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $result = $stmt->execute([$nom, $description, $prix, $categorie_id, $image, $disponibilite_active, $heure_debut, $heure_fin]);
             
             if ($result) {
                 $newId = $conn->lastInsertId();
@@ -446,7 +449,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 </div>
                             </div>
                         </div>
-                        
+
+                        <!-- Horaires de disponibilité -->
+                        <div class="space-y-4 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200">
+                            <div class="flex items-center mb-3">
+                                <input type="checkbox" id="disponibilite_active" name="disponibilite_active"
+                                    class="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                                    onchange="toggleHorairesPlat(this)">
+                                <label for="disponibilite_active" class="ml-3 flex items-center space-x-2 text-lg font-bold text-gray-800">
+                                    <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                                        <i class="fas fa-clock text-white text-sm"></i>
+                                    </div>
+                                    <span>Limiter la disponibilité par horaires</span>
+                                </label>
+                            </div>
+
+                            <div id="horaires_plat_fields" class="space-y-4 hidden">
+                                <div class="bg-blue-100 border-l-4 border-blue-500 p-4 rounded-r-lg">
+                                    <p class="text-sm text-blue-800">
+                                        <i class="fas fa-info-circle mr-2"></i>
+                                        Ce plat sera disponible uniquement pendant ces horaires. Exemple: Poulet disponible de 10h00 à 15h00
+                                    </p>
+                                </div>
+
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div class="space-y-2">
+                                        <label for="heure_debut" class="flex items-center space-x-2 font-medium text-gray-700">
+                                            <i class="fas fa-play-circle text-green-500 text-lg"></i>
+                                            <span>Heure de début</span>
+                                        </label>
+                                        <input type="time" id="heure_debut" name="heure_debut"
+                                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg">
+                                    </div>
+
+                                    <div class="space-y-2">
+                                        <label for="heure_fin" class="flex items-center space-x-2 font-medium text-gray-700">
+                                            <i class="fas fa-stop-circle text-red-500 text-lg"></i>
+                                            <span>Heure de fin</span>
+                                        </label>
+                                        <input type="time" id="heure_fin" name="heure_fin"
+                                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg">
+                                    </div>
+                                </div>
+
+                                <div class="bg-amber-100 border-l-4 border-amber-500 p-3 rounded-r-lg">
+                                    <p class="text-sm text-amber-800">
+                                        <i class="fas fa-lightbulb mr-2"></i>
+                                        <strong>Exemple:</strong> Poulet rôti disponible de 10:00 à 15:00
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Action Buttons avec effets premium -->
                         <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-6 pt-8 border-t-2 border-gray-100">
                             <button type="submit" 
@@ -817,6 +871,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         `;
         document.head.appendChild(style);
+
+        // Fonction pour afficher/masquer les champs d'horaires
+        function toggleHorairesPlat(checkbox) {
+            const horairesFields = document.getElementById('horaires_plat_fields');
+            if (checkbox.checked) {
+                horairesFields.classList.remove('hidden');
+            } else {
+                horairesFields.classList.add('hidden');
+                // Réinitialiser les champs
+                document.getElementById('heure_debut').value = '';
+                document.getElementById('heure_fin').value = '';
+            }
+        }
     </script>
 </body>
 </html>

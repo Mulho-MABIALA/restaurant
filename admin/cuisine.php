@@ -1,7 +1,7 @@
 <?php
 session_start();
 require_once '../config.php';
-require_once './permissions.php';
+require_once 'includes/permissions.php';
 
 // Vérifie l'accès admin
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
@@ -191,7 +191,7 @@ try {
 
 <!-- Container Flex Parent -->
 <div class="flex min-h-screen">
-    <?php require_once 'sidebar.php'; ?>
+    <?php require_once './includes/sidebar.php'; ?>
     <!-- Main Content -->
     <div class="flex-1 flex flex-col min-h-screen overflow-hidden lg:ml-64">
 

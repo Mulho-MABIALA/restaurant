@@ -1,7 +1,7 @@
 <?php
 session_start();
 require_once '../config.php';
-require_once './permissions.php';
+require_once 'includes/permissions.php';
 
 if (!isset($_SESSION['admin_logged_in'])) {
     header('Location: login.php');
@@ -651,7 +651,7 @@ if (isset($_GET['get_event']) && isset($_GET['id'])) {
 
 <body>
     <div class="main-container">
-        <?php include 'sidebar.php'; ?>
+        <?php include 'includes/sidebar.php'; ?>
 
         <div class="content-wrapper">
             <!-- Page Header -->
@@ -1039,6 +1039,6 @@ if (isset($_GET['get_event']) && isset($_GET['id'])) {
     </script>
 
     <!-- Footer -->
-    <?php include 'footer.php'; ?>
+    <?php include 'includes/footer.php'; ?>
 </body>
 </html>

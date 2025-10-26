@@ -525,7 +525,7 @@ if ($selectedAdminId) {
 </head>
 <body>
     <div class="flex h-screen overflow-hidden">
-        <?php include 'sidebar.php'; ?>
+        <?php include 'includes/sidebar.php'; ?>
         
         <div class="flex-1 overflow-y-auto">
             <div class="content-wrapper">
@@ -718,6 +718,6 @@ if ($selectedAdminId) {
     </script>
 
     <!-- Footer -->
-    <?php include 'footer.php'; ?>
+    <?php include 'includes/footer.php'; ?>
 </body>
 </html>

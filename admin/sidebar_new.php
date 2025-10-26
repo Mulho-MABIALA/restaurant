@@ -6,7 +6,7 @@ if (!isset($conn)) {
 
 // Vérifier si permissions.php a déjà été chargé
 if (!function_exists('canAccess')) {
-    require_once './permissions.php';
+    require_once 'includes/permissions.php';
 }
 
 $adminId = $_SESSION['admin_id'] ?? null;

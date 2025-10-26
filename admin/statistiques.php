@@ -1,7 +1,7 @@
 <?php
 session_start();
 require_once '../config.php';
-require_once './permissions.php';
+require_once 'includes/permissions.php';
 
 // Vérifier authentification
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
@@ -291,7 +291,7 @@ function timeAgo($datetime) {
 <body class="bg-gray-50">
     <!-- Conteneur principal -->
     <div class="flex h-screen overflow-hidden">
-        <?php include 'sidebar.php'; ?>
+        <?php include 'includes/sidebar.php'; ?>
 
         <!-- Contenu principal -->
         <div class="flex-1 overflow-y-auto bg-gray-50">
@@ -615,6 +615,6 @@ function timeAgo($datetime) {
     </script>
 
     <!-- Footer -->
-    <?php include 'footer.php'; ?>
+    <?php include 'includes/footer.php'; ?>
 </body>
 </html>

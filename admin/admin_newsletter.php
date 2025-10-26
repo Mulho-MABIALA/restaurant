@@ -2,7 +2,7 @@
 session_start();
 // admin_newsletter.php - Version complète et organisée
 require_once '../config.php';
-require_once './permissions.php';
+require_once 'includes/permissions.php';
 
 // Rediriger si l'admin n'est pas connecté
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
@@ -446,7 +446,7 @@ function addToSegment($conn, $subscriber_id, $segment_id) {
 
     <div class="flex h-screen overflow-hidden">
 
-        <?php include 'sidebar.php'; ?>
+        <?php include 'includes/sidebar.php'; ?>
 
         <div class="flex-1 overflow-y-auto">
 

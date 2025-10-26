@@ -249,7 +249,7 @@ $has_duplicates = !empty($doublons);
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>restaurant Mulho</title>
+    <title>Badge Employé - <?php echo defined('RESTAURANT_NAME') ? RESTAURANT_NAME : 'Restaurant'; ?></title>
     <link rel="icon" type="image/x-icon" href="../assets/img/logo.jpg">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -303,7 +303,7 @@ $has_duplicates = !empty($doublons);
 <body class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
     <div class="flex h-screen overflow-hidden">
         <!-- Sidebar -->
-        <?php include 'sidebar.php'; ?>
+        <?php include 'includes/sidebar.php'; ?>
 
         <!-- Main Content -->
         <div class="flex-1 flex flex-col overflow-hidden">
@@ -677,7 +677,7 @@ $has_duplicates = !empty($doublons);
             </main>
 
             <!-- Footer -->
-            <?php include 'footer.php'; ?>
+            <?php include 'includes/footer.php'; ?>
         </div>
     </div>
 </body>
