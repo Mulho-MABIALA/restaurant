@@ -1047,9 +1047,9 @@ try {
                 <div class="menus-container flex gap-6 overflow-x-auto pb-6 scroll-smooth" id="menusCarousel" style="scroll-behavior: smooth; -webkit-overflow-scrolling: touch; scrollbar-width: thin;">
                     <!-- Première boucle -->
                     <?php foreach ($platsCarrousel as $plat): ?>
-                        <div class="menu-card flex-shrink-0 w-full sm:w-72 md:w-80 cursor-pointer transition-all duration-300 hover:scale-105 group">
+                        <div class="menu-card flex-shrink-0 w-full sm:w-56 md:w-64 cursor-pointer transition-all duration-300 hover:scale-105 group">
                             <div class="relative mb-4 overflow-hidden rounded-3xl shadow-lg">
-                                <div class="menu-circle-wrapper w-full h-72 md:h-80 rounded-3xl overflow-hidden border-4" style="border-color: #CE8505;">
+                                <div class="menu-circle-wrapper w-full h-56 md:h-64 rounded-3xl overflow-hidden border-4" style="border-color: #CE8505;">
                                     <?php if (!empty($plat['image'])): ?>
                                         <img src="uploads/<?= htmlspecialchars($plat['image']) ?>"
                                              alt="<?= htmlspecialchars($plat['nom']) ?>"
@@ -1071,11 +1071,11 @@ try {
                                 </div>
                             </div>
                             <div class="text-center">
-                                <h3 class="text-xl font-bold text-gray-900 group-hover:text-gray-700 transition-colors duration-300 line-clamp-2">
+                                <h3 class="text-lg font-bold text-gray-900 group-hover:text-gray-700 transition-colors duration-300 line-clamp-2">
                                     <?= htmlspecialchars($plat['nom']) ?>
                                 </h3>
                                 <?php if (!empty($plat['categorie_nom'])): ?>
-                                    <p class="text-sm text-gray-600 mt-1" style="color: #CE8505; font-weight: 600;">
+                                    <p class="text-xs text-gray-600 mt-1" style="color: #CE8505; font-weight: 600;">
                                         <?= htmlspecialchars($plat['categorie_nom']) ?>
                                     </p>
                                 <?php endif; ?>
@@ -1085,23 +1085,23 @@ try {
 
                     <!-- Dupliquer pour défilement infini -->
                     <?php foreach ($platsCarrousel as $plat): ?>
-                        <div class="menu-card flex-shrink-0 w-full sm:w-72 md:w-80 cursor-pointer transition-all duration-300 hover:scale-105 group">
+                        <div class="menu-card flex-shrink-0 w-full sm:w-56 md:w-64 cursor-pointer transition-all duration-300 hover:scale-105 group">
                             <div class="relative mb-4 overflow-hidden rounded-3xl shadow-lg">
-                                <div class="menu-circle-wrapper w-full h-72 md:h-80 rounded-3xl overflow-hidden border-4" style="border-color: #CE8505;">
+                                <div class="menu-circle-wrapper w-full h-56 md:h-64 rounded-3xl overflow-hidden border-4" style="border-color: #CE8505;">
                                     <?php if (!empty($plat['image'])): ?>
                                         <img src="uploads/<?= htmlspecialchars($plat['image']) ?>"
                                              alt="<?= htmlspecialchars($plat['nom']) ?>"
                                              class="menu-card-image w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
                                     <?php else: ?>
                                         <div class="menu-card-image w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
-                                            <i class="fas fa-utensils text-5xl text-gray-400"></i>
+                                            <i class="fas fa-utensils text-4xl text-gray-400"></i>
                                         </div>
                                     <?php endif; ?>
                                 </div>
                                 <!-- Overlay au hover -->
                                 <div class="absolute inset-0 rounded-3xl bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-6">
                                     <button
-                                        class="px-6 py-2 bg-white text-gray-900 font-bold rounded-full hover:bg-yellow-400 transition-colors duration-300"
+                                        class="px-6 py-2 bg-white text-gray-900 font-bold rounded-full hover:bg-yellow-400 transition-colors duration-300 text-sm"
                                         onclick="openModalMenus()"
                                     >
                                         Voir tous les plats
@@ -1109,11 +1109,11 @@ try {
                                 </div>
                             </div>
                             <div class="text-center">
-                                <h3 class="text-xl font-bold text-gray-900 group-hover:text-gray-700 transition-colors duration-300 line-clamp-2">
+                                <h3 class="text-lg font-bold text-gray-900 group-hover:text-gray-700 transition-colors duration-300 line-clamp-2">
                                     <?= htmlspecialchars($plat['nom']) ?>
                                 </h3>
                                 <?php if (!empty($plat['categorie_nom'])): ?>
-                                    <p class="text-sm text-gray-600 mt-1" style="color: #CE8505; font-weight: 600;">
+                                    <p class="text-xs text-gray-600 mt-1" style="color: #CE8505; font-weight: 600;">
                                         <?= htmlspecialchars($plat['categorie_nom']) ?>
                                     </p>
                                 <?php endif; ?>
