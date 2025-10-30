@@ -224,7 +224,7 @@ if (!function_exists('t')) {
                     </div>
 
                     <!-- Bouton Réserver -->
-                    <a href="#book-a-table" class="hidden sm:inline-flex items-center bg-gradient-to-r from-pink-500 via-pink-600 to-orange-500 text-white px-6 py-3 rounded-2xl font-bold hover:from-pink-600 hover:via-pink-700 hover:to-orange-600 active:scale-95 transition-all duration-300 text-base whitespace-nowrap shadow-lg hover:shadow-xl hover:-translate-y-1">
+                    <a href="#book-a-table" class="hidden sm:inline-flex items-center text-white px-6 py-3 rounded-2xl font-bold active:scale-95 transition-all duration-300 text-base whitespace-nowrap shadow-lg hover:shadow-xl hover:-translate-y-1" style="background: linear-gradient(135deg, #CE8505, #CE8505); background-color: #CE8505;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
                         <?= t('nav.reserve') ?>
                     </a>
 
@@ -249,7 +249,7 @@ if (!function_exists('t')) {
                 <a href="gallery_public.php" class="mobile-nav-link text-slate-800 hover:text-amber-600 hover:bg-amber-50 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-300"><?= t('nav.gallery') ?></a>
                 <a href="#contact" class="mobile-nav-link text-slate-800 hover:text-amber-600 hover:bg-amber-50 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-300"><?= t('nav.contact') ?></a>
                 <div class="border-t border-gray-200 mt-3 pt-3">
-                    <a href="#book-a-table" class="block w-full bg-gradient-to-r from-pink-500 via-pink-600 to-orange-500 text-white px-4 py-2.5 rounded-lg font-semibold text-center text-sm transition-all duration-300">
+                    <a href="#book-a-table" class="block w-full text-white px-4 py-2.5 rounded-lg font-semibold text-center text-sm transition-all duration-300" style="background-color: #CE8505;">
                         <?= t('nav.reserve') ?>
                     </a>
                 </div>

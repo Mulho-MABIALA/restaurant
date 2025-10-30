@@ -64,7 +64,7 @@
         font-weight: 500;
         letter-spacing: 3px;
         text-transform: uppercase;
-        color: #d4af37;
+        color: #CE8505;
         margin-bottom: 1rem;
         opacity: 0.9;
         animation: fadeInDown 1s ease-out 0.3s both;
@@ -99,15 +99,15 @@
     }
 
     .slide-cta-secondary {
-        background: rgba(255, 255, 255, 0.1);
+        background: rgba(206, 133, 5, 0.15);
         color: white;
         backdrop-filter: blur(20px);
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        border: 2px solid #CE8505;
     }
 
     .slide-cta-secondary:hover {
-        background: rgba(255, 255, 255, 0.2);
-        box-shadow: 0 15px 40px rgba(255, 255, 255, 0.1);
+        background: rgba(206, 133, 5, 0.3);
+        box-shadow: 0 15px 40px rgba(206, 133, 5, 0.3);
     }
 
     /* Navigation améliorée */
@@ -137,9 +137,9 @@
     }
 
     .nav-dot.active {
-        background: #d4af37;
+        background: #CE8505;
         transform: scale(1.4);
-        box-shadow: 0 0 20px rgba(212, 175, 55, 0.6);
+        box-shadow: 0 0 20px rgba(206, 133, 5, 0.8);
     }
 
     .nav-dot:hover:not(.active) {
@@ -170,10 +170,10 @@
     }
 
     .carousel-arrow:hover {
-        background: rgba(212, 175, 55, 0.9);
-        border-color: #d4af37;
+        background: rgba(206, 133, 5, 0.9);
+        border-color: #CE8505;
         transform: translateY(-50%) scale(1.1);
-        box-shadow: 0 10px 30px rgba(212, 175, 55, 0.3);
+        box-shadow: 0 10px 30px rgba(206, 133, 5, 0.5);
     }
 
     .carousel-arrow.prev {
@@ -190,7 +190,7 @@
         bottom: 0;
         left: 0;
         height: 4px;
-        background: #d4af37;
+        background: #CE8505;
         transition: width 5s linear;
         z-index: 4;
     }
@@ -211,7 +211,7 @@
         position: absolute;
         width: 6px;
         height: 6px;
-        background: rgba(212, 175, 55, 0.6);
+        background: rgba(206, 133, 5, 0.6);
         border-radius: 50%;
         animation: float-carousel 8s infinite ease-in-out;
     }
@@ -225,7 +225,7 @@
         width: 8px;
         height: 8px;
         background: transparent;
-        border: 1px solid rgba(212, 175, 55, 0.5);
+        border: 1px solid rgba(206, 133, 5, 0.5);
         border-radius: 0;
         transform: rotate(45deg);
     }
