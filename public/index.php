@@ -1134,7 +1134,101 @@ try {
     </section>
 
     <style>
-        /* Modal animations */
+        /* ========== ANIMATIONS GÉNÉRALES ========== */
+
+        /* Keyframes - Fade In */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        /* Keyframes - Slide Up */
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Keyframes - Slide In Left */
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-40px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* Keyframes - Bounce In */
+        @keyframes bounceIn {
+            0% {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.05);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        /* Keyframes - Glow Pulse */
+        @keyframes glowPulse {
+            0%, 100% {
+                box-shadow: 0 0 10px rgba(206, 133, 5, 0.3);
+            }
+            50% {
+                box-shadow: 0 0 25px rgba(206, 133, 5, 0.6);
+            }
+        }
+
+        /* Keyframes - Float */
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0px);
+            }
+            50% {
+                transform: translateY(-8px);
+            }
+        }
+
+        /* Keyframes - Shimmer */
+        @keyframes shimmer {
+            0% {
+                background-position: -1000px 0;
+            }
+            100% {
+                background-position: 1000px 0;
+            }
+        }
+
+        /* Keyframes - Text Rise */
+        @keyframes textRise {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* ========== MODAL ANIMATIONS ========== */
         #modalMenus {
             animation: fadeIn 0.3s ease-out;
         }
@@ -1145,26 +1239,6 @@ try {
 
         #modalMenus .modal-content-menus {
             animation: slideUp 0.4s cubic-bezier(0.23, 1, 0.32, 1);
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-            }
-            to {
-                opacity: 1;
-            }
-        }
-
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(40px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
         }
 
         /* Smooth scrollbar */
@@ -1183,6 +1257,176 @@ try {
 
         #modalMenus::-webkit-scrollbar-thumb:hover {
             background: #a86c04;
+        }
+
+        /* ========== MENU CARD ANIMATIONS ========== */
+        .menu-card {
+            animation: bounceIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .menu-card:hover {
+            animation: glowPulse 1s infinite;
+        }
+
+        /* Staggered animation for cards */
+        .menu-card:nth-child(1) { animation-delay: 0s; }
+        .menu-card:nth-child(2) { animation-delay: 0.1s; }
+        .menu-card:nth-child(3) { animation-delay: 0.2s; }
+        .menu-card:nth-child(4) { animation-delay: 0.3s; }
+        .menu-card:nth-child(5) { animation-delay: 0.4s; }
+        .menu-card:nth-child(n+6) { animation-delay: 0.5s; }
+
+        /* Card image hover effect */
+        .menu-card .menu-circle-wrapper {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .menu-card .menu-circle-wrapper::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            animation: shimmer 3s infinite;
+        }
+
+        .menu-card:hover .menu-circle-wrapper {
+            transform: scale(1.05) rotate(2deg);
+        }
+
+        /* ========== BUTTON ANIMATIONS ========== */
+        button, .voir-tout-btn, .cta-glow {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        button:hover, .voir-tout-btn:hover, .cta-glow:hover {
+            transform: translateY(-3px);
+            animation: glowPulse 0.6s ease-out;
+        }
+
+        button:active, .voir-tout-btn:active, .cta-glow:active {
+            transform: translateY(-1px);
+        }
+
+        /* Button ripple effect */
+        button::before, .voir-tout-btn::before, .cta-glow::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        button:active::before, .voir-tout-btn:active::before, .cta-glow:active::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        /* ========== TEXT ANIMATIONS ========== */
+        h1, h2, h3, h4, h5, h6 {
+            animation: textRise 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        h1 { animation-delay: 0.1s; }
+        h2 { animation-delay: 0.15s; }
+        h3 { animation-delay: 0.2s; }
+        h4 { animation-delay: 0.25s; }
+        h5, h6 { animation-delay: 0.3s; }
+
+        p {
+            animation: textRise 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        /* Menu title animation */
+        .menus-title {
+            animation: slideInLeft 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        /* Category badge animation */
+        .product-category, [style*="color: #CE8505"] {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        /* ========== PRODUCT CARD ANIMATIONS (MODAL) ========== */
+        .product-card {
+            animation: bounceIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .product-card:nth-child(1) { animation-delay: 0.05s; }
+        .product-card:nth-child(2) { animation-delay: 0.1s; }
+        .product-card:nth-child(3) { animation-delay: 0.15s; }
+        .product-card:nth-child(4) { animation-delay: 0.2s; }
+        .product-card:nth-child(n+5) { animation-delay: 0.25s; }
+
+        .product-card:hover {
+            transform: translateY(-8px) scale(1.03);
+            animation: glowPulse 1s infinite;
+        }
+
+        .product-card img {
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .product-card:hover img {
+            transform: scale(1.15) rotate(1deg);
+        }
+
+        /* ========== SECTION HEADER ANIMATIONS ========== */
+        .section-title h2 {
+            position: relative;
+            animation: slideUp 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .section-title h2::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 4px;
+            background: linear-gradient(90deg, transparent, #CE8505, transparent);
+            border-radius: 2px;
+            animation: shimmer 3s infinite;
+        }
+
+        /* ========== INPUT & FORM ANIMATIONS ========== */
+        input[type="text"], input[type="email"], textarea, .form-control {
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            animation: slideUp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        input[type="text"]:focus, input[type="email"]:focus, textarea:focus, .form-control:focus {
+            transform: translateY(-2px);
+            animation: glowPulse 0.6s ease-out;
+        }
+
+        /* ========== STAR RATING ANIMATIONS ========== */
+        .rating-stars label {
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            cursor: pointer;
+        }
+
+        .rating-stars label:hover {
+            animation: float 0.6s ease-out;
+            transform: scale(1.3);
+        }
+
+        .rating-stars input:checked + label {
+            animation: bounceIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
     </style>
 
