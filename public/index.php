@@ -1213,67 +1213,171 @@ try {
         </div>
     </section>
 <!-- ======= Avis Clients Section ======= -->
-<section id="avis" class="avis section">
-    <div class="container section-title" data-aos="fade-up">
-        <h2><?= t('misc.reviews') ?></h2>
-        <p><span><?= t('misc.what_clients_say') ?></span> <span class="description-title"><?= t('misc.our_clients') ?></span></p>
-    </div>
-    
-    <div class="container" data-aos="fade-up" data-aos-delay="100">
-        <div class="row justify-content-center">
-            <div class="col-lg-8">
-                <div class="glass-card p-4 mb-5">
-                    <h3 class="text-center mb-4" style="font-family: 'Playfair Display', serif; background: linear-gradient(135deg, var(--primary), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
-                        <?= t('misc.leave_review') ?>
-                    </h3>
-                    
-                    <form id="avis-form" method="post" action="traitement_avis.php">
-                        <div class="row gy-4">
+<section id="avis" class="py-20 px-4 md:px-6 bg-white">
+    <div class="max-w-6xl mx-auto">
+        <!-- Section Header -->
+        <div class="text-center mb-16">
+            <h2 class="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+                ⭐ <?= t('misc.reviews') ?>
+            </h2>
+            <p class="text-gray-600 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
+                <span><?= t('misc.what_clients_say') ?></span>
+                <span class="font-semibold" style="color: #CE8505;"><?= t('misc.our_clients') ?></span>
+            </p>
+        </div>
 
-                            <div class="col-md-12">
-                                <div class="alert alert-info" style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 10px; padding: 12px;">
-                                    <i class="fas fa-info-circle"></i> <?= t('misc.anonymous_review') ?>
-                                </div>
-                            </div>
-                            <div class="col-md-12">
-                                <div class="form-group">
-                                    <textarea class="form-control" name="message" rows="5" placeholder="<?= t('misc.share_experience') ?>" required style="border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px; word-break: break-word; overflow-wrap: break-word;"></textarea>
-                                </div>
-                            </div>
-                            <div class="col-md-12">
-                                <div class="form-group text-center">
-                                    <label class="mb-2"><?= t('misc.rate_experience') ?></label>
-                                    <div class="rating-stars mb-3">
-                                        <input type="radio" id="star5" name="note" value="5" />
-                                        <label for="star5"><i class="fas fa-star"></i></label>
-                                        <input type="radio" id="star4" name="note" value="4" />
-                                        <label for="star4"><i class="fas fa-star"></i></label>
-                                        <input type="radio" id="star3" name="note" value="3" />
-                                        <label for="star3"><i class="fas fa-star"></i></label>
-                                        <input type="radio" id="star2" name="note" value="2" />
-                                        <label for="star2"><i class="fas fa-star"></i></label>
-                                        <input type="radio" id="star1" name="note" value="1" required />
-                                        <label for="star1"><i class="fas fa-star"></i></label>
-                                    </div>
-                                </div>
+        <!-- Form Section -->
+        <div class="mb-20">
+            <div class="max-w-2xl mx-auto bg-gradient-to-br from-white to-gray-50 rounded-3xl shadow-lg border-2" style="border-color: #CE8505;">
+                <div class="p-8 md:p-12">
+                    <!-- Form Title -->
+                    <h3 class="text-3xl font-bold text-center mb-2" style="color: #CE8505;">
+                        ✍️ <?= t('misc.leave_review') ?>
+                    </h3>
+                    <p class="text-center text-gray-600 mb-8">Partagez votre expérience chez Mulho</p>
+
+                    <!-- Form -->
+                    <form id="avis-form" method="post" action="traitement_avis.php" class="space-y-6">
+                        <!-- Info Alert -->
+                        <div class="flex items-start gap-3 p-4 rounded-2xl" style="background-color: #CE8505; background-color: rgba(206, 133, 5, 0.08); border: 2px solid rgba(206, 133, 5, 0.2);">
+                            <i class="fas fa-info-circle text-2xl mt-1" style="color: #CE8505;"></i>
+                            <p class="text-gray-700 font-medium"><?= t('misc.anonymous_review') ?></p>
+                        </div>
+
+                        <!-- Rating Section -->
+                        <div class="text-center">
+                            <label class="block text-gray-800 font-bold text-lg mb-4"><?= t('misc.rate_experience') ?></label>
+                            <div class="flex justify-center gap-3 text-4xl">
+                                <input type="radio" id="star5" name="note" value="5" class="hidden" />
+                                <label for="star5" class="cursor-pointer transition-transform hover:scale-125 text-gray-300 hover:text-yellow-400">
+                                    <i class="fas fa-star"></i>
+                                </label>
+                                <input type="radio" id="star4" name="note" value="4" class="hidden" />
+                                <label for="star4" class="cursor-pointer transition-transform hover:scale-125 text-gray-300 hover:text-yellow-400">
+                                    <i class="fas fa-star"></i>
+                                </label>
+                                <input type="radio" id="star3" name="note" value="3" class="hidden" />
+                                <label for="star3" class="cursor-pointer transition-transform hover:scale-125 text-gray-300 hover:text-yellow-400">
+                                    <i class="fas fa-star"></i>
+                                </label>
+                                <input type="radio" id="star2" name="note" value="2" class="hidden" />
+                                <label for="star2" class="cursor-pointer transition-transform hover:scale-125 text-gray-300 hover:text-yellow-400">
+                                    <i class="fas fa-star"></i>
+                                </label>
+                                <input type="radio" id="star1" name="note" value="1" required class="hidden" />
+                                <label for="star1" class="cursor-pointer transition-transform hover:scale-125 text-gray-300 hover:text-yellow-400">
+                                    <i class="fas fa-star"></i>
+                                </label>
                             </div>
                         </div>
-                        <div class="text-center mt-3">
-                            <div class="loading" style="display: none;"><?= t('actions.loading') ?></div>
-                            <div class="error-message" style="display: none;"></div>
-                            <div class="sent-message" style="display: none;"><?= t('misc.review_success') ?></div>
-                            <button type="submit" class="cta-glow"><?= t('misc.submit_review') ?></button>
+
+                        <!-- Textarea -->
+                        <div>
+                            <label class="block text-gray-800 font-bold mb-3">Votre avis</label>
+                            <textarea
+                                class="w-full px-6 py-4 rounded-2xl border-2 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all duration-300"
+                                style="border-color: #CE8505; focus-ring: rgba(206, 133, 5, 0.2);"
+                                name="message"
+                                rows="5"
+                                placeholder="<?= t('misc.share_experience') ?>"
+                                required
+                            ></textarea>
+                        </div>
+
+                        <!-- Submit Button & Messages -->
+                        <div class="pt-4">
+                            <button
+                                type="submit"
+                                class="w-full py-4 px-6 rounded-2xl font-bold text-lg text-white transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg"
+                                style="background-color: #CE8505;"
+                            >
+                                <?= t('misc.submit_review') ?>
+                            </button>
+                            <div class="loading text-center mt-4 text-gray-700 font-semibold" style="display: none; color: #CE8505;">
+                                ⏳ <?= t('actions.loading') ?>
+                            </div>
+                            <div class="error-message text-center mt-4 font-semibold text-red-600" style="display: none;"></div>
+                            <div class="sent-message text-center mt-4 font-semibold text-green-600" style="display: none;">
+                                ✅ <?= t('misc.review_success') ?>
+                            </div>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
-        
-        <div class="row" id="avis-container">
+
+        <!-- Reviews Display Section -->
+        <div id="avis-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <!-- Les avis validés seront chargés ici via JavaScript -->
         </div>
     </div>
 </section>
+
+<style>
+    /* Styling pour les stars au survol */
+    #avis-form .rating-stars input:checked ~ label,
+    #avis-form .rating-stars label:hover,
+    #avis-form .rating-stars label:hover ~ label {
+        color: #fbbf24 !important;
+    }
+
+    #avis-form .rating-stars input:checked + label {
+        color: #fbbf24 !important;
+    }
+
+    /* Animation pour les cartes d'avis */
+    .avis-card {
+        animation: slideInUp 0.5s ease-out;
+        background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+        border-left: 5px solid #CE8505;
+        border-radius: 1.5rem;
+        padding: 2rem;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
+    }
+
+    .avis-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(206, 133, 5, 0.15);
+    }
+
+    .avis-card .client-note {
+        color: #fbbf24;
+        font-size: 1.25rem;
+        letter-spacing: 2px;
+    }
+
+    .avis-card .client-message {
+        color: #475569;
+        line-height: 1.8;
+        font-size: 0.95rem;
+        margin: 1rem 0;
+    }
+
+    .avis-card .client-name {
+        color: #1f2937;
+        font-weight: 700;
+        font-size: 1rem;
+        margin-top: 1.5rem;
+    }
+
+    .avis-card .client-date {
+        color: #9ca3af;
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+    }
+
+    @keyframes slideInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
     <!-- Section Contact -->
     <section id="contact" class="contact section">
         <div class="container section-title" data-aos="fade-up">
