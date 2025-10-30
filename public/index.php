@@ -134,7 +134,7 @@ try {
         }
 
         .btn-get-started {
-            background: linear-gradient(135deg, #ec4899, #f97316);
+            background: linear-gradient(135deg, #CE8505, #CE8505);
             color: white;
             padding: 12px 30px;
             border-radius: 50px;
@@ -146,7 +146,7 @@ try {
 
         .btn-get-started:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(236, 72, 153, 0.3);
+            box-shadow: 0 10px 25px rgba(206, 133, 5, 0.3);
             color: white;
         }
 
@@ -227,9 +227,9 @@ try {
         }
 
         :root {
-            --primary: #ff6b35;
-            --secondary: #f7931e;
-            --accent: #ffd23f;
+            --primary: #CE8505;
+            --secondary: #CE8505;
+            --accent: #CE8505;
 
             /* Theme Colors - Light Mode (par défaut) */
             --bg-primary: #ffffff;
@@ -275,11 +275,12 @@ try {
             font-family: 'Playfair Display', serif;
             font-size: 3.5rem;
             font-weight: 800;
-            background: linear-gradient(135deg, #ff6b35, #f7931e);
+            background: linear-gradient(135deg, #CE8505, #CE8505);
             -webkit-background-clip: text;
             background-clip: text;
             -webkit-text-fill-color: transparent;
             margin-bottom: 1rem;
+            color: #CE8505;
         }
 
         .about-subtitle {
@@ -346,19 +347,19 @@ try {
             padding: 20px;
             background: var(--card-bg);
             border-radius: 16px;
-            border-left: 4px solid #ff6b35;
+            border-left: 4px solid #CE8505;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
             transition: all 0.3s ease;
         }
 
         .about-feature:hover {
             transform: translateX(10px);
-            box-shadow: 0 8px 25px rgba(255, 107, 53, 0.15);
+            box-shadow: 0 8px 25px rgba(206, 133, 5, 0.15);
         }
 
         .about-feature-icon {
             font-size: 2rem;
-            color: #ff6b35;
+            color: #CE8505;
             flex-shrink: 0;
         }
 
@@ -375,8 +376,8 @@ try {
         }
 
         .about-quote {
-            background: linear-gradient(135deg, #fff5f0, #ffffff);
-            border-left: 4px solid #ff6b35;
+            background: linear-gradient(135deg, #FFF5E1, #ffffff);
+            border-left: 4px solid #CE8505;
             border-radius: 16px;
             padding: 30px;
             font-style: italic;
@@ -384,7 +385,7 @@ try {
             font-size: 1.1rem;
             line-height: 1.7;
             margin-top: 30px;
-            box-shadow: 0 4px 20px rgba(255, 107, 53, 0.1);
+            box-shadow: 0 4px 20px rgba(206, 133, 5, 0.1);
         }
 
         .about-stats {
@@ -406,18 +407,19 @@ try {
 
         .about-stat-card:hover {
             transform: translateY(-5px);
-            border-color: #ff6b35;
-            box-shadow: 0 12px 35px rgba(255, 107, 53, 0.15);
+            border-color: #CE8505;
+            box-shadow: 0 12px 35px rgba(206, 133, 5, 0.15);
         }
 
         .about-stat-number {
             font-size: 3.5rem;
             font-weight: 800;
-            background: linear-gradient(135deg, #ff6b35, #f7931e);
+            background: linear-gradient(135deg, #CE8505, #CE8505);
             -webkit-background-clip: text;
             background-clip: text;
             -webkit-text-fill-color: transparent;
             margin-bottom: 10px;
+            color: #CE8505;
         }
 
         .about-stat-label {
@@ -434,7 +436,7 @@ try {
         }
 
         .about-cta-btn {
-            background: linear-gradient(135deg, #ff6b35, #f7931e);
+            background: linear-gradient(135deg, #CE8505, #CE8505);
             color: white;
             padding: 18px 40px;
             border-radius: 50px;
@@ -444,13 +446,13 @@ try {
             display: inline-flex;
             align-items: center;
             gap: 10px;
-            box-shadow: 0 10px 30px rgba(255, 107, 53, 0.3);
+            box-shadow: 0 10px 30px rgba(206, 133, 5, 0.3);
             transition: all 0.3s ease;
         }
 
         .about-cta-btn:hover {
             transform: translateY(-3px);
-            box-shadow: 0 15px 40px rgba(255, 107, 53, 0.4);
+            box-shadow: 0 15px 40px rgba(206, 133, 5, 0.4);
             color: white;
         }
 
@@ -515,12 +517,12 @@ try {
 
         .info-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(255, 107, 107, 0.15);
-            border-color: #ff6b6b;
+            box-shadow: 0 10px 30px rgba(206, 133, 5, 0.15);
+            border-color: #CE8505;
         }
 
         .info-icon {
-            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            background: linear-gradient(135deg, #CE8505, #CE8505);
             color: white;
             width: 60px;
             height: 60px;
@@ -547,7 +549,7 @@ try {
         }
 
         .info-content a:hover {
-            color: #ff6b6b;
+            color: #CE8505;
         }
 
         .opening-hours {
@@ -609,7 +611,7 @@ try {
         }
 
         .form-control:focus {
-            border-color: #ff6b6b;
+            border-color: #CE8505;
             background: var(--card-bg);
             outline: none;
         }
@@ -620,7 +622,7 @@ try {
         }
 
         .submit-btn {
-            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            background: linear-gradient(135deg, #CE8505, #CE8505);
             color: white;
             border: none;
             padding: 15px 40px;
@@ -636,7 +638,7 @@ try {
 
         .submit-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(255, 107, 107, 0.3);
+            box-shadow: 0 10px 25px rgba(206, 133, 5, 0.3);
         }
 
         .message-status {
@@ -648,8 +650,8 @@ try {
         }
 
         .loading {
-            color: #ff6b6b;
-            background: rgba(255, 107, 107, 0.1);
+            color: #CE8505;
+            background: rgba(206, 133, 5, 0.1);
         }
         .error-message {
             color: #e53e3e;
@@ -731,7 +733,7 @@ try {
     /* Section Nos Menus */
     .menus-section {
         padding: 60px 0;
-        background: #fff;
+        background: #FFFFFF;
     }
 
     .menus-header {
@@ -763,7 +765,7 @@ try {
     }
 
     .voir-tout-btn:hover {
-        color: #ff6b35;
+        color: #CE8505;
         transform: translateX(5px);
     }
 
@@ -803,7 +805,7 @@ try {
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
         transition: all 0.3s ease;
         position: relative;
-        border: 3px solid #fff;
+        border: 3px solid #CE8505;
     }
 
     .menu-card:hover .menu-circle-wrapper {
@@ -906,7 +908,7 @@ try {
     }
 
     .modal-close:hover {
-        background: #ff6b35;
+        background: #CE8505;
         color: white;
         transform: rotate(90deg);
     }
@@ -937,7 +939,7 @@ try {
     .product-card:hover {
         transform: translateY(-5px);
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-        border-color: #ff6b35;
+        border-color: #CE8505;
     }
 
     .product-image {
@@ -964,7 +966,7 @@ try {
     .product-price {
         font-size: 1.2rem;
         font-weight: 700;
-        color: #ff6b35;
+        color: #CE8505;
     }
 
     /* Responsive */
@@ -1132,32 +1134,7 @@ try {
                         <?= nl2br(htmlspecialchars($aboutData['description'] ?? 'Bienvenue au Restaurant Mulho, où chaque plat raconte l\'histoire passionnée de la gastronomie sénégalaise. Situé au cœur vibrant de Dakar, nous créons des expériences culinaires qui éveillent les sens et célèbrent l\'authenticité de notre terroir.')) ?>
                     </p>
 
-                    <!-- Features -->
-                    <div class="about-features">
-                        <div class="about-feature">
-                            <i class="bi bi-gem about-feature-icon"></i>
-                            <div class="about-feature-content">
-                                <h4><?= t('about.feature_quality') ?></h4>
-                                <p><?= t('about.feature_quality_desc') ?></p>
-                            </div>
-                        </div>
-
-                        <div class="about-feature">
-                            <i class="bi bi-fire about-feature-icon"></i>
-                            <div class="about-feature-content">
-                                <h4><?= t('about.feature_chef') ?></h4>
-                                <p><?= t('about.feature_chef_desc') ?></p>
-                            </div>
-                        </div>
-
-                        <div class="about-feature">
-                            <i class="bi bi-hearts about-feature-icon"></i>
-                            <div class="about-feature-content">
-                                <h4><?= t('about.feature_ambiance') ?></h4>
-                                <p><?= t('about.feature_ambiance_desc') ?></p>
-                            </div>
-                        </div>
-                    </div>
+                   
 
                     <!-- Quote -->
                     <div class="about-quote">
@@ -1228,7 +1205,7 @@ try {
                             <div class="loading" style="display: none;"><?= t('actions.loading') ?></div>
                             <div class="error-message" style="display: none; color: #e53e3e;"></div>
                             <div class="sent-message" style="display: none; color: #38a169;"><?= t('contact.success_message') ?></div>
-                            <button type="submit" style="background: linear-gradient(135deg, #ec4899, #f97316); color: white; border: none; padding: 15px 40px; border-radius: 50px; font-weight: 600; cursor: pointer; transition: all 0.3s ease;"><?= t('contact.form_title') ?></button>
+                            <button type="submit" style="background: linear-gradient(135deg, #CE8505, #CE8505); color: white; border: none; padding: 15px 40px; border-radius: 50px; font-weight: 600; cursor: pointer; transition: all 0.3s ease;"><?= t('contact.form_title') ?></button>
                         </div>
                     </form>
                 </div>
@@ -1425,7 +1402,7 @@ try {
     <?php include('includes/footer.php'); ?>
 
     <!-- Scroll Top -->
-    <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center" style="position: fixed; bottom: 30px; right: 30px; background: linear-gradient(135deg, #ec4899, #f97316); color: white; width: 50px; height: 50px; border-radius: 50%; text-decoration: none; box-shadow: 0 5px 15px rgba(236, 72, 153, 0.3); transition: all 0.3s ease; z-index: 999; display: none;">
+    <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center" style="position: fixed; bottom: 30px; right: 30px; background: linear-gradient(135deg, #CE8505, #CE8505); color: white; width: 50px; height: 50px; border-radius: 50%; text-decoration: none; box-shadow: 0 5px 15px rgba(206, 133, 5, 0.3); transition: all 0.3s ease; z-index: 999; display: none;">
         <i class="bi bi-arrow-up-short" style="font-size: 1.5rem;"></i>
     </a>
 

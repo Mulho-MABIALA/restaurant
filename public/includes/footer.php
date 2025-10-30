@@ -59,45 +59,46 @@ try {
     .schedule-closed { color: #ef4444; }
 </style>
 
-<footer id="footer" class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white pt-16 pb-8 border-t border-pink-500/20">
+<footer id="footer" class="bg-white text-gray-900 pt-16 pb-8 border-t-4" style="border-color: #CE8505;">
     <div class="container mx-auto px-4 md:px-6">
         <!-- Newsletter Section -->
-        <div class="bg-gradient-to-r from-slate-800/50 to-slate-700/50 backdrop-blur-sm rounded-2xl p-8 md:p-12 mb-16 border border-slate-700/50 shadow-xl hover:border-pink-500/30 transition-all duration-300">
+        <div class="rounded-2xl p-8 md:p-12 mb-16 border-2 shadow-lg transition-all duration-300 hover:shadow-xl" style="background-color: #CE8505; border-color: #CE8505;">
             <div class="text-center max-w-2xl mx-auto">
                 <h3 class="text-2xl md:text-3xl font-bold text-white mb-3 tracking-tight">📧 Restez connecté !</h3>
-                <p class="text-slate-300 text-base md:text-lg leading-relaxed mb-6">Recevez nos dernières offres et actualités directement dans votre boîte mail</p>
+                <p class="text-white/90 text-base md:text-lg leading-relaxed mb-6">Recevez nos dernières offres et actualités directement dans votre boîte mail</p>
 
                 <form id="newsletterForm" class="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
                     <input
                         type="email"
-                        class="flex-1 px-5 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 transition-all duration-300 backdrop-blur-sm"
+                        class="flex-1 px-5 py-3 rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-300 font-medium"
                         placeholder="votre.email@exemple.com"
                         required
                         id="emailInput"
                     >
                     <button
                         type="submit"
-                        class="px-8 py-3 rounded-lg bg-gradient-to-r from-pink-500 to-orange-500 hover:from-pink-600 hover:to-orange-600 text-white font-semibold shadow-lg hover:shadow-pink-500/50 transition-all duration-300 transform hover:scale-105 active:scale-95 whitespace-nowrap"
+                        class="px-8 py-3 rounded-lg bg-white text-white font-semibold shadow-lg transition-all duration-300 transform hover:scale-105 active:scale-95 whitespace-nowrap hover:shadow-xl"
+                        style="background-color: #CE8505; color: #FFFFFF;"
                         id="submitBtn"
                     >
                         <span class="btn-text">S'abonner</span>
                     </button>
                 </form>
-                <div id="newsletterMessages" class="newsletter-message mt-4 px-5 py-3 rounded-lg text-sm md:text-base"></div>
+                <div id="newsletterMessages" class="newsletter-message mt-4 px-5 py-3 rounded-lg text-sm md:text-base text-white"></div>
             </div>
         </div>
 
         <!-- Main Content Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-6 mb-12 pb-12 border-b border-slate-700/50">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-6 mb-12 pb-12 border-b-2" style="border-color: #CE8505;">
             <!-- Brand Section -->
             <div class="flex flex-col space-y-4">
                 <div>
-                    <h3 class="text-3xl md:text-4xl font-bold bg-gradient-to-r from-pink-500 via-orange-500 to-yellow-500 bg-clip-text text-transparent tracking-tight mb-2">🍽️ Mulho</h3>
-                    <p class="text-slate-300 text-sm leading-relaxed">Expériences culinaires exceptionnelles au cœur de Dakar</p>
+                    <h3 class="text-3xl md:text-4xl font-bold tracking-tight mb-2" style="color: #CE8505;">🍽️ Mulho</h3>
+                    <p class="text-gray-600 text-sm leading-relaxed">Expériences culinaires exceptionnelles au cœur de Dakar</p>
                 </div>
                 <div>
-                    <h4 class="text-sm font-bold text-white uppercase tracking-wider mb-3 opacity-90">📍 Adresse</h4>
-                    <p class="text-slate-400 text-sm leading-relaxed space-y-1">
+                    <h4 class="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3" style="color: #CE8505;">📍 Adresse</h4>
+                    <p class="text-gray-600 text-sm leading-relaxed space-y-1">
                         <span>Dakar, Medina</span><br>
                         <span>Rue 27x24</span><br>
                         <span>Sénégal</span>
@@ -107,23 +108,25 @@ try {
 
             <!-- Contact Section -->
             <div class="flex flex-col space-y-4">
-                <h4 class="text-sm font-bold text-white uppercase tracking-wider opacity-90">📞 Contact</h4>
+                <h4 class="text-sm font-bold text-gray-900 uppercase tracking-wider" style="color: #CE8505;">📞 Contact</h4>
                 <div class="space-y-5">
                     <div>
-                        <p class="text-slate-400 text-xs uppercase tracking-wider font-semibold mb-2">Téléphone</p>
+                        <p class="text-gray-600 text-xs uppercase tracking-wider font-semibold mb-2">Téléphone</p>
                         <a
                             href="tel:787308706"
-                            class="text-pink-400 hover:text-pink-300 text-base font-medium transition-colors duration-300 inline-flex items-center group"
+                            class="text-base font-medium transition-colors duration-300 inline-flex items-center group"
+                            style="color: #CE8505;"
                         >
                             78 730 87 06
                             <span class="ml-1 opacity-0 group-hover:opacity-100 transform group-hover:translate-x-1 transition-all">→</span>
                         </a>
                     </div>
                     <div>
-                        <p class="text-slate-400 text-xs uppercase tracking-wider font-semibold mb-2">Email</p>
+                        <p class="text-gray-600 text-xs uppercase tracking-wider font-semibold mb-2">Email</p>
                         <a
                             href="mailto:mulhomabiala29@gmail.com"
-                            class="text-pink-400 hover:text-pink-300 text-sm break-all font-medium transition-colors duration-300 inline-flex items-center group"
+                            class="text-sm break-all font-medium transition-colors duration-300 inline-flex items-center group"
+                            style="color: #CE8505;"
                         >
                             mulhomabiala29@gmail.com
                             <span class="ml-1 opacity-0 group-hover:opacity-100 transform group-hover:translate-x-1 transition-all text-xs">↗</span>
@@ -134,13 +137,13 @@ try {
 
             <!-- Schedule Section -->
             <div>
-                <h4 class="text-sm font-bold text-white uppercase tracking-wider mb-4 opacity-90">🕐 Horaires</h4>
+                <h4 class="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4" style="color: #CE8505;">🕐 Horaires</h4>
                 <div class="space-y-2">
                     <?php if (!empty($results)): ?>
                         <?php foreach ($results as $row): ?>
-                            <div class="flex justify-between items-center py-2.5 px-3 rounded-lg bg-slate-800/30 hover:bg-slate-700/50 transition-colors duration-300 border border-slate-700/20">
-                                <span class="text-slate-300 text-sm font-medium"><?= htmlspecialchars($row['jour']) ?></span>
-                                <span class="text-xs font-semibold <?= $row['ferme'] == 1 ? 'schedule-closed font-bold' : 'schedule-open font-bold' ?>">
+                            <div class="flex justify-between items-center py-2.5 px-3 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors duration-300 border-2" style="border-color: #CE8505;">
+                                <span class="text-gray-700 text-sm font-medium"><?= htmlspecialchars($row['jour']) ?></span>
+                                <span class="text-xs font-semibold <?= $row['ferme'] == 1 ? 'schedule-closed' : 'schedule-open' ?>">
                                     <?php if ($row['ferme'] == 1): ?>
                                         Fermé
                                     <?php else: ?>
@@ -150,46 +153,48 @@ try {
                             </div>
                         <?php endforeach; ?>
                     <?php else: ?>
-                        <p class="text-slate-400 text-sm italic">Horaires non disponibles</p>
+                        <p class="text-gray-600 text-sm italic">Horaires non disponibles</p>
                     <?php endif; ?>
                 </div>
             </div>
 
             <!-- Social Networks Section -->
             <div>
-                <h4 class="text-sm font-bold text-white uppercase tracking-wider mb-4 opacity-90">🌐 Suivez-nous</h4>
+                <h4 class="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4" style="color: #CE8505;">🌐 Suivez-nous</h4>
                 <div class="flex flex-wrap gap-3">
                     <a
                         href="https://www.snapchat.com/add/yourusername"
-                        class="w-10 h-10 md:w-11 md:h-11 rounded-lg bg-yellow-300 hover:bg-yellow-400 text-slate-900 flex items-center justify-center transition-all duration-300 transform hover:scale-110 hover:shadow-lg shadow-lg hover:shadow-yellow-300/50 font-bold"
+                        class="w-10 h-10 md:w-11 md:h-11 rounded-lg text-white flex items-center justify-center transition-all duration-300 transform hover:scale-110 hover:shadow-lg shadow-md font-bold"
+                        style="background-color: #CE8505;"
                         title="Snapchat"
                     >
                         <i class="fab fa-snapchat-ghost text-lg"></i>
                     </a>
                     <a
                         href="https://www.tiktok.com/@Ombrelumineuse"
-                        class="w-10 h-10 md:w-11 md:h-11 rounded-lg bg-black hover:bg-gray-900 text-white flex items-center justify-center transition-all duration-300 transform hover:scale-110 hover:shadow-lg shadow-lg hover:shadow-gray-600/50 font-bold"
+                        class="w-10 h-10 md:w-11 md:h-11 rounded-lg bg-black hover:bg-gray-900 text-white flex items-center justify-center transition-all duration-300 transform hover:scale-110 hover:shadow-lg shadow-md font-bold"
                         title="TikTok"
                     >
                         <i class="fab fa-tiktok text-lg"></i>
                     </a>
                     <a
                         href="https://wa.me/+24205530852"
-                        class="w-10 h-10 md:w-11 md:h-11 rounded-lg bg-green-500 hover:bg-green-600 text-white flex items-center justify-center transition-all duration-300 transform hover:scale-110 hover:shadow-lg shadow-lg hover:shadow-green-500/50 font-bold"
+                        class="w-10 h-10 md:w-11 md:h-11 rounded-lg bg-green-500 hover:bg-green-600 text-white flex items-center justify-center transition-all duration-300 transform hover:scale-110 hover:shadow-lg shadow-md font-bold"
                         title="WhatsApp"
                     >
                         <i class="fab fa-whatsapp text-lg"></i>
                     </a>
                     <a
                         href="https://www.facebook.com/votreprofil"
-                        class="w-10 h-10 md:w-11 md:h-11 rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center transition-all duration-300 transform hover:scale-110 hover:shadow-lg shadow-lg hover:shadow-blue-600/50 font-bold"
+                        class="w-10 h-10 md:w-11 md:h-11 rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center transition-all duration-300 transform hover:scale-110 hover:shadow-lg shadow-md font-bold"
                         title="Facebook"
                     >
                         <i class="fab fa-facebook-f text-lg"></i>
                     </a>
                     <a
                         href="https://www.instagram.com/votreprofil"
-                        class="w-10 h-10 md:w-11 md:h-11 rounded-lg bg-gradient-to-br from-pink-500 via-red-500 to-orange-400 hover:from-pink-600 hover:via-red-600 hover:to-orange-500 text-white flex items-center justify-center transition-all duration-300 transform hover:scale-110 hover:shadow-lg shadow-lg hover:shadow-pink-500/50 font-bold"
+                        class="w-10 h-10 md:w-11 md:h-11 rounded-lg hover:opacity-90 text-white flex items-center justify-center transition-all duration-300 transform hover:scale-110 hover:shadow-lg shadow-md font-bold"
+                        style="background-color: #CE8505;"
                         title="Instagram"
                     >
                         <i class="fab fa-instagram text-lg"></i>
@@ -199,11 +204,11 @@ try {
         </div>
 
         <!-- Footer Bottom / Copyright -->
-        <div class="text-center py-8 border-t border-slate-700/50">
-            <p class="text-slate-400 text-sm leading-relaxed">
-                © <span class="font-semibold text-white"><?= date('Y') ?> Mulho</span> - Tous droits réservés
-                <span class="text-slate-500 mx-2">|</span>
-                Conçu par <a href="#" class="text-pink-400 hover:text-pink-300 font-semibold transition-colors duration-300">Mulho - MABIALA</a>
+        <div class="text-center py-8 border-t-2" style="border-color: #CE8505;">
+            <p class="text-gray-700 text-sm leading-relaxed">
+                © <span class="font-semibold text-gray-900"><?= date('Y') ?> Mulho</span> - Tous droits réservés
+                <span class="text-gray-500 mx-2">|</span>
+                Conçu par <a href="#" class="font-semibold transition-colors duration-300 hover:opacity-75" style="color: #CE8505;">Mulho - MABIALA</a>
             </p>
         </div>
     </div>
