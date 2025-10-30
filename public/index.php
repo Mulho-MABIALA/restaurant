@@ -1022,86 +1022,242 @@ try {
     <?php include('includes/carrousel.php'); ?>
 
     <!-- Section Nos Menus -->
-    <section class="menus-section">
-        <div class="container">
-            <div class="menus-header">
-                <h2 class="menus-title"><?= t('menu.title') ?></h2>
-                <button class="voir-tout-btn" onclick="openModalMenus()">
+    <section class="py-20 px-4 md:px-6 bg-gradient-to-br from-white to-gray-50">
+        <div class="max-w-7xl mx-auto">
+            <!-- Header -->
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-16">
+                <div>
+                    <h2 class="text-4xl md:text-5xl font-bold text-gray-900 mb-3">
+                        🍽️ <?= t('menu.title') ?>
+                    </h2>
+                    <p class="text-gray-600 text-lg">Découvrez nos délicieuses spécialités</p>
+                </div>
+                <button
+                    class="mt-6 md:mt-0 px-8 py-3 rounded-2xl font-bold text-white transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg inline-flex items-center gap-2"
+                    style="background-color: #CE8505;"
+                    onclick="openModalMenus()"
+                >
                     <?= t('menu.all_menus') ?>
                     <i class="fas fa-arrow-right"></i>
                 </button>
             </div>
 
-            <div class="menus-container" id="menusCarousel">
-                <?php foreach ($platsCarrousel as $plat): ?>
-                    <div class="menu-card">
-                        <div class="menu-circle-wrapper">
-                            <?php if (!empty($plat['image'])): ?>
-                                <img src="uploads/<?= htmlspecialchars($plat['image']) ?>"
-                                     alt="<?= htmlspecialchars($plat['nom']) ?>"
-                                     class="menu-card-image">
-                            <?php else: ?>
-                                <div class="menu-card-image" style="background: #e2e8f0; display: flex; align-items: center; justify-content: center;">
-                                    <i class="fas fa-utensils" style="font-size: 3rem; color: #94a3b8;"></i>
+            <!-- Carousel -->
+            <div class="relative">
+                <div class="menus-container flex gap-6 overflow-x-auto pb-6 scroll-smooth" id="menusCarousel" style="scroll-behavior: smooth; -webkit-overflow-scrolling: touch; scrollbar-width: thin;">
+                    <!-- Première boucle -->
+                    <?php foreach ($platsCarrousel as $plat): ?>
+                        <div class="menu-card flex-shrink-0 w-full sm:w-72 md:w-80 cursor-pointer transition-all duration-300 hover:scale-105 group">
+                            <div class="relative mb-4 overflow-hidden rounded-3xl shadow-lg">
+                                <div class="menu-circle-wrapper w-full h-72 md:h-80 rounded-3xl overflow-hidden border-4" style="border-color: #CE8505;">
+                                    <?php if (!empty($plat['image'])): ?>
+                                        <img src="uploads/<?= htmlspecialchars($plat['image']) ?>"
+                                             alt="<?= htmlspecialchars($plat['nom']) ?>"
+                                             class="menu-card-image w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
+                                    <?php else: ?>
+                                        <div class="menu-card-image w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
+                                            <i class="fas fa-utensils text-5xl text-gray-400"></i>
+                                        </div>
+                                    <?php endif; ?>
                                 </div>
-                            <?php endif; ?>
+                                <!-- Overlay au hover -->
+                                <div class="absolute inset-0 rounded-3xl bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-6">
+                                    <button
+                                        class="px-6 py-2 bg-white text-gray-900 font-bold rounded-full hover:bg-yellow-400 transition-colors duration-300"
+                                        onclick="openModalMenus()"
+                                    >
+                                        Voir tous les plats
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="text-center">
+                                <h3 class="text-xl font-bold text-gray-900 group-hover:text-gray-700 transition-colors duration-300 line-clamp-2">
+                                    <?= htmlspecialchars($plat['nom']) ?>
+                                </h3>
+                                <?php if (!empty($plat['categorie_nom'])): ?>
+                                    <p class="text-sm text-gray-600 mt-1" style="color: #CE8505; font-weight: 600;">
+                                        <?= htmlspecialchars($plat['categorie_nom']) ?>
+                                    </p>
+                                <?php endif; ?>
+                            </div>
                         </div>
-                        <div class="menu-name"><?= htmlspecialchars($plat['nom']) ?></div>
-                    </div>
-                <?php endforeach; ?>
+                    <?php endforeach; ?>
 
-                <!-- Dupliquer les cartes pour un défilement infini -->
-                <?php foreach ($platsCarrousel as $plat): ?>
-                    <div class="menu-card">
-                        <div class="menu-circle-wrapper">
-                            <?php if (!empty($plat['image'])): ?>
-                                <img src="uploads/<?= htmlspecialchars($plat['image']) ?>"
-                                     alt="<?= htmlspecialchars($plat['nom']) ?>"
-                                     class="menu-card-image">
-                            <?php else: ?>
-                                <div class="menu-card-image" style="background: #e2e8f0; display: flex; align-items: center; justify-content: center;">
-                                    <i class="fas fa-utensils" style="font-size: 3rem; color: #94a3b8;"></i>
+                    <!-- Dupliquer pour défilement infini -->
+                    <?php foreach ($platsCarrousel as $plat): ?>
+                        <div class="menu-card flex-shrink-0 w-full sm:w-72 md:w-80 cursor-pointer transition-all duration-300 hover:scale-105 group">
+                            <div class="relative mb-4 overflow-hidden rounded-3xl shadow-lg">
+                                <div class="menu-circle-wrapper w-full h-72 md:h-80 rounded-3xl overflow-hidden border-4" style="border-color: #CE8505;">
+                                    <?php if (!empty($plat['image'])): ?>
+                                        <img src="uploads/<?= htmlspecialchars($plat['image']) ?>"
+                                             alt="<?= htmlspecialchars($plat['nom']) ?>"
+                                             class="menu-card-image w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
+                                    <?php else: ?>
+                                        <div class="menu-card-image w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
+                                            <i class="fas fa-utensils text-5xl text-gray-400"></i>
+                                        </div>
+                                    <?php endif; ?>
                                 </div>
-                            <?php endif; ?>
+                                <!-- Overlay au hover -->
+                                <div class="absolute inset-0 rounded-3xl bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-6">
+                                    <button
+                                        class="px-6 py-2 bg-white text-gray-900 font-bold rounded-full hover:bg-yellow-400 transition-colors duration-300"
+                                        onclick="openModalMenus()"
+                                    >
+                                        Voir tous les plats
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="text-center">
+                                <h3 class="text-xl font-bold text-gray-900 group-hover:text-gray-700 transition-colors duration-300 line-clamp-2">
+                                    <?= htmlspecialchars($plat['nom']) ?>
+                                </h3>
+                                <?php if (!empty($plat['categorie_nom'])): ?>
+                                    <p class="text-sm text-gray-600 mt-1" style="color: #CE8505; font-weight: 600;">
+                                        <?= htmlspecialchars($plat['categorie_nom']) ?>
+                                    </p>
+                                <?php endif; ?>
+                            </div>
                         </div>
-                        <div class="menu-name"><?= htmlspecialchars($plat['nom']) ?></div>
+                    <?php endforeach; ?>
+                </div>
+
+                <!-- Scroll Indicator -->
+                <div class="flex justify-center mt-8">
+                    <div class="text-gray-500 text-sm flex items-center gap-2">
+                        <i class="fas fa-chevron-right animate-pulse"></i>
+                        Faites défiler pour voir plus
                     </div>
-                <?php endforeach; ?>
+                </div>
             </div>
         </div>
     </section>
 
+    <style>
+        /* Modal animations */
+        #modalMenus {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        #modalMenus.active {
+            display: flex !important;
+        }
+
+        #modalMenus .modal-content-menus {
+            animation: slideUp 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Smooth scrollbar */
+        #modalMenus::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #modalMenus::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+
+        #modalMenus::-webkit-scrollbar-thumb {
+            background: #CE8505;
+            border-radius: 4px;
+        }
+
+        #modalMenus::-webkit-scrollbar-thumb:hover {
+            background: #a86c04;
+        }
+    </style>
+
     <!-- Modal Tous les Produits -->
-    <div id="modalMenus" class="modal-menus" onclick="closeModalIfOutside(event)">
-        <div class="modal-content-menus" onclick="event.stopPropagation()">
-            <button class="modal-close" onclick="closeModalMenus()">
-                <i class="fas fa-times"></i>
-            </button>
+    <div id="modalMenus" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden" onclick="closeModalIfOutside(event)" style="display: none;">
+        <div class="bg-white rounded-3xl w-full max-w-6xl max-h-[90vh] overflow-y-auto shadow-2xl" onclick="event.stopPropagation()">
+            <!-- Header avec Close Button -->
+            <div class="sticky top-0 bg-white border-b-2 flex items-center justify-between p-6 md:p-8" style="border-color: #CE8505;">
+                <h2 class="text-3xl md:text-4xl font-bold text-gray-900">
+                    🍽️ <?= t('menu.all_menus') ?>
+                </h2>
+                <button
+                    class="w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110"
+                    style="background-color: #CE8505; color: white;"
+                    onclick="closeModalMenus()"
+                    title="Fermer"
+                >
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
 
-            <h2 class="modal-title"><?= t('menu.all_menus') ?></h2>
+            <!-- Content -->
+            <div class="p-6 md:p-8">
+                <!-- Grid de produits -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <?php foreach ($allPlats as $plat): ?>
+                        <div class="group bg-white rounded-2xl overflow-hidden border-2 transition-all duration-300 hover:shadow-lg hover:-translate-y-2 cursor-pointer" style="border-color: #CE8505;">
+                            <!-- Image Container -->
+                            <div class="relative h-56 overflow-hidden bg-gray-100">
+                                <?php if (!empty($plat['image'])): ?>
+                                    <img src="uploads/<?= htmlspecialchars($plat['image']) ?>"
+                                         alt="<?= htmlspecialchars($plat['nom']) ?>"
+                                         class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
+                                <?php else: ?>
+                                    <div class="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
+                                        <i class="fas fa-utensils text-5xl text-gray-400"></i>
+                                    </div>
+                                <?php endif; ?>
 
-            <div class="products-grid">
-                <?php foreach ($allPlats as $plat): ?>
-                    <div class="product-card">
-                        <?php if (!empty($plat['image'])): ?>
-                            <img src="uploads/<?= htmlspecialchars($plat['image']) ?>"
-                                 alt="<?= htmlspecialchars($plat['nom']) ?>"
-                                 class="product-image">
-                        <?php else: ?>
-                            <div class="product-image" style="background: #e2e8f0; display: flex; align-items: center; justify-content: center;">
-                                <i class="fas fa-utensils" style="font-size: 3rem; color: #94a3b8;"></i>
+                                <!-- Badge Catégorie -->
+                                <?php if (!empty($plat['categorie_nom'])): ?>
+                                    <div class="absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-bold text-white" style="background-color: #CE8505;">
+                                        <?= htmlspecialchars($plat['categorie_nom']) ?>
+                                    </div>
+                                <?php endif; ?>
                             </div>
-                        <?php endif; ?>
 
-                        <div class="product-name"><?= htmlspecialchars($plat['nom']) ?></div>
+                            <!-- Content -->
+                            <div class="p-5">
+                                <!-- Nom du produit -->
+                                <h3 class="text-lg font-bold text-gray-900 group-hover:text-gray-700 transition-colors duration-300 mb-3 line-clamp-2">
+                                    <?= htmlspecialchars($plat['nom']) ?>
+                                </h3>
 
-                        <?php if (!empty($plat['categorie_nom'])): ?>
-                            <div class="product-category"><?= htmlspecialchars($plat['categorie_nom']) ?></div>
-                        <?php endif; ?>
+                                <!-- Prix -->
+                                <div class="flex items-center justify-between">
+                                    <span class="text-2xl font-bold" style="color: #CE8505;">
+                                        <?= number_format($plat['prix'], 0, ',', ' ') ?>
+                                    </span>
+                                    <span class="text-xs font-semibold text-gray-600 uppercase">FCFA</span>
+                                </div>
 
-                        <div class="product-price"><?= number_format($plat['prix'], 0, ',', ' ') ?> FCFA</div>
-                    </div>
-                <?php endforeach; ?>
+                                <!-- Button -->
+                                <button
+                                    class="w-full mt-4 py-2 px-4 rounded-lg font-bold text-white transition-all duration-300 transform hover:scale-105 active:scale-95"
+                                    style="background-color: #CE8505;"
+                                    onclick="closeModalMenus(); ajouterAuPanier(<?= htmlspecialchars($plat['id']) ?>);"
+                                >
+                                    <i class="fas fa-shopping-cart mr-2"></i>
+                                    Ajouter au panier
+                                </button>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
             </div>
         </div>
     </div>
