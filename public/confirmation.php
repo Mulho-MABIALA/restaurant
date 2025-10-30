@@ -5,6 +5,43 @@ session_start();
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
+// Gestion de la newsletter après soumission du modal
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['newsletter_choice'])) {
+    header('Content-Type: application/json');
+
+    try {
+        $email = filter_var($_POST['email'] ?? '', FILTER_VALIDATE_EMAIL);
+        $choice = $_POST['newsletter_choice'] ?? '';
+        $first_name = $_POST['first_name'] ?? '';
+
+        if (!$email) {
+            throw new Exception('Email invalide');
+        }
+
+        if ($choice == 'oui') {
+            // Vérifier si l'email existe déjà
+            $stmt = $conn->prepare("SELECT id FROM newsletter WHERE email = ?");
+            $stmt->execute([$email]);
+
+            if ($stmt->rowCount() == 0) {
+                // Insérer dans la newsletter avec les infos du client
+                $stmt = $conn->prepare("INSERT INTO newsletter (email, first_name, source, ip_address, date_inscription) VALUES (?, ?, 'paiement_callback', ?, NOW())");
+                $stmt->execute([$email, $first_name, $_SERVER['REMOTE_ADDR'] ?? null]);
+            }
+        }
+
+        // Nettoyer la session
+        unset($_SESSION['show_newsletter_modal']);
+        unset($_SESSION['commande_email']);
+        unset($_SESSION['commande_nom']);
+
+        echo json_encode(['success' => true, 'message' => 'Merci pour votre choix']);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+    exit;
+}
+
 // Message par défaut
 $message = $_GET['message'] ?? 'Merci pour votre commande !';
 
@@ -605,5 +642,121 @@ if ($totalCommande == 0 && isset($_SESSION['panier']) && !empty($_SESSION['panie
             </a>
         </div>
     </div>
+
+    <!-- Modal Newsletter -->
+    <?php if (isset($_SESSION['show_newsletter_modal']) && $_SESSION['show_newsletter_modal'] && !empty($_SESSION['commande_email'])): ?>
+    <div id="newsletterModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all">
+            <!-- Icône -->
+            <div class="flex justify-center mb-4">
+                <div class="bg-primary/10 rounded-full p-4">
+                    <i class="fas fa-envelope text-primary text-4xl"></i>
+                </div>
+            </div>
+
+            <!-- Titre -->
+            <h3 class="text-2xl font-bold text-gray-900 text-center mb-3">
+                Restez informé !
+            </h3>
+
+            <!-- Description -->
+            <p class="text-gray-600 text-center mb-6">
+                Recevez nos dernières offres, nouveautés et événements spéciaux directement par email.
+            </p>
+
+            <!-- Loading (caché par défaut) -->
+            <div id="newsletterLoading" class="hidden text-center mb-4">
+                <i class="fas fa-spinner fa-spin text-primary text-2xl"></i>
+                <p class="text-gray-600 mt-2">Traitement en cours...</p>
+            </div>
+
+            <!-- Boutons -->
+            <div class="flex flex-col sm:flex-row gap-3">
+                <button type="button" id="newsletterNon"
+                        class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 px-6 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-times mr-2"></i>Non merci
+                </button>
+                <button type="button" id="newsletterOui"
+                        class="flex-1 bg-primary hover:bg-primary-dark text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-check mr-2"></i>Oui, je m'inscris
+                </button>
+            </div>
+
+            <!-- Note -->
+            <p class="text-xs text-gray-500 text-center mt-4">
+                <i class="fas fa-lock mr-1"></i>Vos données sont protégées. Vous pouvez vous désabonner à tout moment.
+            </p>
+        </div>
+    </div>
+
+    <script>
+    // Gestion du modal newsletter
+    function setupNewsletterModal() {
+        const modal = document.getElementById('newsletterModal');
+        if (!modal) return;
+
+        const btnOui = document.getElementById('newsletterOui');
+        const btnNon = document.getElementById('newsletterNon');
+        const loadingDiv = document.getElementById('newsletterLoading');
+
+        const email = '<?php echo addslashes($_SESSION['commande_email'] ?? ''); ?>';
+        const first_name = '<?php echo addslashes($_SESSION['commande_nom'] ?? ''); ?>';
+
+        if (!email) {
+            console.error('Newsletter: email manquant');
+            return;
+        }
+
+        function handleNewsletterChoice(choice) {
+            // Désactiver les boutons
+            btnOui.disabled = true;
+            btnNon.disabled = true;
+
+            // Afficher le loading
+            if (loadingDiv) loadingDiv.classList.remove('hidden');
+
+            const formData = new URLSearchParams();
+            formData.append('newsletter_choice', choice);
+            formData.append('email', email);
+            formData.append('first_name', first_name);
+
+            fetch('confirmation.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: formData.toString()
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Fermer le modal avec animation
+                    modal.style.opacity = '0';
+                    setTimeout(() => {
+                        modal.style.display = 'none';
+                    }, 300);
+                } else {
+                    throw new Error(data.message || 'Erreur inconnue');
+                }
+            })
+            .catch(error => {
+                console.error('Erreur newsletter:', error);
+                alert('Erreur: ' + error.message);
+
+                // Réactiver les boutons en cas d'erreur
+                btnOui.disabled = false;
+                btnNon.disabled = false;
+                if (loadingDiv) loadingDiv.classList.add('hidden');
+            });
+        }
+
+        if (btnOui) btnOui.addEventListener('click', () => handleNewsletterChoice('oui'));
+        if (btnNon) btnNon.addEventListener('click', () => handleNewsletterChoice('non'));
+    }
+
+    // Initialiser au chargement de la page
+    document.addEventListener('DOMContentLoaded', setupNewsletterModal);
+    </script>
+    <?php endif; ?>
 </body>
 </html>

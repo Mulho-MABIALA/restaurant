@@ -18,251 +18,193 @@ try {
 ?>
 
 <style>
-    .footer {
-        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-        color: white;
-        padding: 60px 0 0;
-        border-top: 1px solid rgba(236, 72, 153, 0.3);
+    /* Animation pour les éléments */
+    @keyframes slideUpFade {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
 
-    .newsletter-section {
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 12px;
-        padding: 30px;
-        margin-bottom: 40px;
-        text-align: center;
+    @keyframes shimmer {
+        0%, 100% {
+            background-position: -1000px 0;
+        }
+        50% {
+            background-position: 1000px 0;
+        }
     }
 
-    .newsletter-section h3 {
-        font-size: 1.3rem;
-        margin-bottom: 10px;
+    /* Classes Tailwind avancées */
+    .newsletter-message.show {
+        display: block;
+        animation: slideUpFade 0.3s ease-out;
     }
-
-    .newsletter-form {
-        display: flex;
-        gap: 10px;
-        max-width: 500px;
-        margin: 20px auto 0;
+    .newsletter-success {
+        background: rgba(16, 185, 129, 0.15);
+        color: #10b981;
+        border-left: 4px solid #10b981;
     }
-
-    .newsletter-input {
-        flex: 1;
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 8px;
-        padding: 12px 16px;
-        color: white;
-    }
-
-    .newsletter-input:focus {
-        outline: none;
-        border-color: #ec4899;
-    }
-
-    .newsletter-btn {
-        background: linear-gradient(135deg, #ec4899, #f97316);
-        color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 12px 24px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: transform 0.3s;
-    }
-
-    .newsletter-btn:hover:not(:disabled) {
-        transform: translateY(-2px);
-    }
-
-    .newsletter-message {
-        margin-top: 15px;
-        padding: 12px;
-        border-radius: 8px;
-        font-size: 0.9rem;
-        display: none;
-    }
-
-    .newsletter-message.show { display: block; }
-    .newsletter-success { background: rgba(16, 185, 129, 0.2); color: #10b981; }
-    .newsletter-error { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
-
-    .footer-content {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 40px;
-        margin-bottom: 30px;
-    }
-
-    .footer-section h4 {
-        font-size: 1.1rem;
-        margin-bottom: 15px;
-        color: white;
-    }
-
-    .footer-section p, .footer-section li {
-        color: #94a3b8;
-        line-height: 1.8;
-        margin-bottom: 8px;
-        font-size: 0.9rem;
-    }
-
-    .footer-section a {
-        color: #ec4899;
-        text-decoration: none;
-    }
-
-    .footer-section a:hover {
-        color: #f97316;
-    }
-
-    .brand-section h3 {
-        font-size: 1.8rem;
-        font-weight: 700;
-        background: linear-gradient(135deg, #ec4899, #f97316);
-        background-clip: text;
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 10px;
-    }
-
-    .schedule-item {
-        display: flex;
-        justify-content: space-between;
-        padding: 6px 0;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    .newsletter-error {
+        background: rgba(239, 68, 68, 0.15);
+        color: #ef4444;
+        border-left: 4px solid #ef4444;
     }
 
     .schedule-open { color: #10b981; }
     .schedule-closed { color: #ef4444; }
-
-    .social-links {
-        display: flex;
-        gap: 10px;
-        margin: 15px 0;
-    }
-
-    .social-links a {
-        width: 40px;
-        height: 40px;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: transform 0.3s;
-    }
-
-    .social-links a:hover {
-        transform: translateY(-3px);
-    }
-
-    .social-snapchat { background: #FFFC00; color: #333; }
-    .social-tiktok { background: #000; }
-    .social-whatsapp { background: #25D366; }
-    .social-facebook { background: #4267B2; }
-    .social-instagram { background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); }
-
-    .footer-bottom {
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 20px 0;
-        text-align: center;
-        color: #64748b;
-        font-size: 0.85rem;
-    }
-
-    @media (max-width: 768px) {
-        .footer-content {
-            grid-template-columns: 1fr;
-            gap: 30px;
-        }
-        .newsletter-form {
-            flex-direction: column;
-        }
-    }
 </style>
 
-<footer id="footer" class="footer">
-    <div class="container">
-        <!-- Newsletter -->
-        <div class="newsletter-section">
-            <h3>📧 Restez connecté !</h3>
-            <p style="color: #94a3b8;">Recevez nos dernières offres et actualités</p>
-            <form id="newsletterForm" class="newsletter-form">
-                <input type="email" class="newsletter-input" placeholder="Votre email..." required id="emailInput">
-                <button type="submit" class="newsletter-btn" id="submitBtn">
-                    <span class="btn-text">S'abonner</span>
-                </button>
-            </form>
-            <div id="newsletterMessages" class="newsletter-message"></div>
-        </div>
+<footer id="footer" class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white pt-16 pb-8 border-t border-pink-500/20">
+    <div class="container mx-auto px-4 md:px-6">
+        <!-- Newsletter Section -->
+        <div class="bg-gradient-to-r from-slate-800/50 to-slate-700/50 backdrop-blur-sm rounded-2xl p-8 md:p-12 mb-16 border border-slate-700/50 shadow-xl hover:border-pink-500/30 transition-all duration-300">
+            <div class="text-center max-w-2xl mx-auto">
+                <h3 class="text-2xl md:text-3xl font-bold text-white mb-3 tracking-tight">📧 Restez connecté !</h3>
+                <p class="text-slate-300 text-base md:text-lg leading-relaxed mb-6">Recevez nos dernières offres et actualités directement dans votre boîte mail</p>
 
-        <!-- Contenu principal -->
-        <div class="footer-content">
-            <!-- Brand -->
-            <div class="footer-section">
-                <div class="brand-section">
-                    <h3>🍽️ Mulho</h3>
-                    <p>Expériences culinaires exceptionnelles</p>
-                </div>
-                <h4>📍 Adresse</h4>
-                <p>Dakar, Medina<br>Rue 27x24<br>Sénégal</p>
-            </div>
-
-            <!-- Contact -->
-            <div class="footer-section">
-                <h4>📞 Contact</h4>
-                <p><strong>Téléphone:</strong><br>
-                <a href="tel:787308706">78 730 87 06</a></p>
-                <p style="margin-top: 15px;"><strong>Email:</strong><br>
-                <a href="mailto:mulhomabiala29@gmail.com">mulhomabiala29@gmail.com</a></p>
-            </div>
-
-            <!-- Horaires -->
-            <div class="footer-section">
-                <h4>🕐 Horaires</h4>
-                <?php if (!empty($results)): ?>
-                    <?php foreach ($results as $row): ?>
-                        <div class="schedule-item">
-                            <span><?= htmlspecialchars($row['jour']) ?></span>
-                            <span class="<?= $row['ferme'] == 1 ? 'schedule-closed' : 'schedule-open' ?>">
-                                <?php if ($row['ferme'] == 1): ?>
-                                    Fermé
-                                <?php else: ?>
-                                    <?= substr($row['heure_ouverture'], 0, 5) ?>-<?= substr($row['heure_fermeture'], 0, 5) ?>
-                                <?php endif; ?>
-                            </span>
-                        </div>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <p>Horaires non disponibles</p>
-                <?php endif; ?>
-            </div>
-
-            <!-- Réseaux sociaux -->
-            <div class="footer-section">
-                <h4>🌐 Suivez-nous</h4>
-                <div class="social-links">
-                    <a href="https://www.snapchat.com/add/yourusername" class="social-snapchat" title="Snapchat">
-                        <i class="fab fa-snapchat-ghost"></i>
-                    </a>
-                    <a href="https://www.tiktok.com/@Ombrelumineuse" class="social-tiktok" title="TikTok">
-                        <i class="fab fa-tiktok"></i>
-                    </a>
-                    <a href="https://wa.me/+24205530852" class="social-whatsapp" title="WhatsApp">
-                        <i class="fab fa-whatsapp"></i>
-                    </a>
-                    <a href="https://www.facebook.com/votreprofil" class="social-facebook" title="Facebook">
-                        <i class="fab fa-facebook-f"></i>
-                    </a>
-                    <a href="https://www.instagram.com/votreprofil" class="social-instagram" title="Instagram">
-                        <i class="fab fa-instagram"></i>
-                    </a>
-                </div>
+                <form id="newsletterForm" class="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+                    <input
+                        type="email"
+                        class="flex-1 px-5 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 transition-all duration-300 backdrop-blur-sm"
+                        placeholder="votre.email@exemple.com"
+                        required
+                        id="emailInput"
+                    >
+                    <button
+                        type="submit"
+                        class="px-8 py-3 rounded-lg bg-gradient-to-r from-pink-500 to-orange-500 hover:from-pink-600 hover:to-orange-600 text-white font-semibold shadow-lg hover:shadow-pink-500/50 transition-all duration-300 transform hover:scale-105 active:scale-95 whitespace-nowrap"
+                        id="submitBtn"
+                    >
+                        <span class="btn-text">S'abonner</span>
+                    </button>
+                </form>
+                <div id="newsletterMessages" class="newsletter-message mt-4 px-5 py-3 rounded-lg text-sm md:text-base"></div>
             </div>
         </div>
 
-        <!-- Copyright -->
-        <div class="footer-bottom">
-            <p>© <?= date('Y') ?> <strong style="color: #ec4899;">Mulho</strong> - Tous droits réservés | Conçu par <a href="#">Mulho - MABIALA</a></p>
+        <!-- Main Content Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-6 mb-12 pb-12 border-b border-slate-700/50">
+            <!-- Brand Section -->
+            <div class="flex flex-col space-y-4">
+                <div>
+                    <h3 class="text-3xl md:text-4xl font-bold bg-gradient-to-r from-pink-500 via-orange-500 to-yellow-500 bg-clip-text text-transparent tracking-tight mb-2">🍽️ Mulho</h3>
+                    <p class="text-slate-300 text-sm leading-relaxed">Expériences culinaires exceptionnelles au cœur de Dakar</p>
+                </div>
+                <div>
+                    <h4 class="text-sm font-bold text-white uppercase tracking-wider mb-3 opacity-90">📍 Adresse</h4>
+                    <p class="text-slate-400 text-sm leading-relaxed space-y-1">
+                        <span>Dakar, Medina</span><br>
+                        <span>Rue 27x24</span><br>
+                        <span>Sénégal</span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Contact Section -->
+            <div class="flex flex-col space-y-4">
+                <h4 class="text-sm font-bold text-white uppercase tracking-wider opacity-90">📞 Contact</h4>
+                <div class="space-y-5">
+                    <div>
+                        <p class="text-slate-400 text-xs uppercase tracking-wider font-semibold mb-2">Téléphone</p>
+                        <a
+                            href="tel:787308706"
+                            class="text-pink-400 hover:text-pink-300 text-base font-medium transition-colors duration-300 inline-flex items-center group"
+                        >
+                            78 730 87 06
+                            <span class="ml-1 opacity-0 group-hover:opacity-100 transform group-hover:translate-x-1 transition-all">→</span>
+                        </a>
+                    </div>
+                    <div>
+                        <p class="text-slate-400 text-xs uppercase tracking-wider font-semibold mb-2">Email</p>
+                        <a
+                            href="mailto:mulhomabiala29@gmail.com"
+                            class="text-pink-400 hover:text-pink-300 text-sm break-all font-medium transition-colors duration-300 inline-flex items-center group"
+                        >
+                            mulhomabiala29@gmail.com
+                            <span class="ml-1 opacity-0 group-hover:opacity-100 transform group-hover:translate-x-1 transition-all text-xs">↗</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Schedule Section -->
+            <div>
+                <h4 class="text-sm font-bold text-white uppercase tracking-wider mb-4 opacity-90">🕐 Horaires</h4>
+                <div class="space-y-2">
+                    <?php if (!empty($results)): ?>
+                        <?php foreach ($results as $row): ?>
+                            <div class="flex justify-between items-center py-2.5 px-3 rounded-lg bg-slate-800/30 hover:bg-slate-700/50 transition-colors duration-300 border border-slate-700/20">
+                                <span class="text-slate-300 text-sm font-medium"><?= htmlspecialchars($row['jour']) ?></span>
+                                <span class="text-xs font-semibold <?= $row['ferme'] == 1 ? 'schedule-closed font-bold' : 'schedule-open font-bold' ?>">
+                                    <?php if ($row['ferme'] == 1): ?>
+                                        Fermé
+                                    <?php else: ?>
+                                        <?= substr($row['heure_ouverture'], 0, 5) ?> - <?= substr($row['heure_fermeture'], 0, 5) ?>
+                                    <?php endif; ?>
+                                </span>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <p class="text-slate-400 text-sm italic">Horaires non disponibles</p>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <!-- Social Networks Section -->
+            <div>
+                <h4 class="text-sm font-bold text-white uppercase tracking-wider mb-4 opacity-90">🌐 Suivez-nous</h4>
+                <div class="flex flex-wrap gap-3">
+                    <a
+                        href="https://www.snapchat.com/add/yourusername"
+                        class="w-10 h-10 md:w-11 md:h-11 rounded-lg bg-yellow-300 hover:bg-yellow-400 text-slate-900 flex items-center justify-center transition-all duration-300 transform hover:scale-110 hover:shadow-lg shadow-lg hover:shadow-yellow-300/50 font-bold"
+                        title="Snapchat"
+                    >
+                        <i class="fab fa-snapchat-ghost text-lg"></i>
+                    </a>
+                    <a
+                        href="https://www.tiktok.com/@Ombrelumineuse"
+                        class="w-10 h-10 md:w-11 md:h-11 rounded-lg bg-black hover:bg-gray-900 text-white flex items-center justify-center transition-all duration-300 transform hover:scale-110 hover:shadow-lg shadow-lg hover:shadow-gray-600/50 font-bold"
+                        title="TikTok"
+                    >
+                        <i class="fab fa-tiktok text-lg"></i>
+                    </a>
+                    <a
+                        href="https://wa.me/+24205530852"
+                        class="w-10 h-10 md:w-11 md:h-11 rounded-lg bg-green-500 hover:bg-green-600 text-white flex items-center justify-center transition-all duration-300 transform hover:scale-110 hover:shadow-lg shadow-lg hover:shadow-green-500/50 font-bold"
+                        title="WhatsApp"
+                    >
+                        <i class="fab fa-whatsapp text-lg"></i>
+                    </a>
+                    <a
+                        href="https://www.facebook.com/votreprofil"
+                        class="w-10 h-10 md:w-11 md:h-11 rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center transition-all duration-300 transform hover:scale-110 hover:shadow-lg shadow-lg hover:shadow-blue-600/50 font-bold"
+                        title="Facebook"
+                    >
+                        <i class="fab fa-facebook-f text-lg"></i>
+                    </a>
+                    <a
+                        href="https://www.instagram.com/votreprofil"
+                        class="w-10 h-10 md:w-11 md:h-11 rounded-lg bg-gradient-to-br from-pink-500 via-red-500 to-orange-400 hover:from-pink-600 hover:via-red-600 hover:to-orange-500 text-white flex items-center justify-center transition-all duration-300 transform hover:scale-110 hover:shadow-lg shadow-lg hover:shadow-pink-500/50 font-bold"
+                        title="Instagram"
+                    >
+                        <i class="fab fa-instagram text-lg"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer Bottom / Copyright -->
+        <div class="text-center py-8 border-t border-slate-700/50">
+            <p class="text-slate-400 text-sm leading-relaxed">
+                © <span class="font-semibold text-white"><?= date('Y') ?> Mulho</span> - Tous droits réservés
+                <span class="text-slate-500 mx-2">|</span>
+                Conçu par <a href="#" class="text-pink-400 hover:text-pink-300 font-semibold transition-colors duration-300">Mulho - MABIALA</a>
+            </p>
         </div>
     </div>
 </footer>

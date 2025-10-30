@@ -14,7 +14,7 @@ define('DEBUG_MODE', false);
 // Informations du restaurant
 define('RESTAURANT_NAME', 'Restaurant Mulho');
 define('RESTAURANT_EMAIL', 'contact@restaurantmulho.com');
-define('RESTAURANT_PHONE', '+221 XX XXX XX XX');
+define('RESTAURANT_PHONE', '+221 787308706');
 define('RESTAURANT_ADDRESS', 'Dakar, Sénégal');
 
 // ============================================

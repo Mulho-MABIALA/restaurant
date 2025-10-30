@@ -18,9 +18,14 @@ if ($adminId && isset($conn)) {
         $stmt->execute([$adminId]);
         $admin = $stmt->fetch(PDO::FETCH_ASSOC);
         $userRole = $admin['role'] ?? '';
+
+        // Si pas de rôle spécifié, définir par défaut à superadmin pour afficher tous les menus
+        if (!$userRole) {
+            $userRole = 'superadmin'; // Fallback pour l'affichage des menus
+        }
     } catch (PDOException $e) {
         error_log("Erreur sidebar.php: " . $e->getMessage());
-        $userRole = '';
+        $userRole = 'superadmin'; // Fallback à superadmin en cas d'erreur
     }
 }
 
@@ -100,19 +105,27 @@ $currentPage = basename($_SERVER['PHP_SELF']);
         }
     </script>
     <style>
+        /* Glass Morphism */
         .glass-morphism {
-            background: rgba(17, 24, 39, 0.9);
+            background: rgba(15, 23, 42, 0.85);
             backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(148, 163, 184, 0.2);
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
         }
-        
+
+        .glass-morphism:hover {
+            border-color: rgba(148, 163, 184, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Navigation Items */
         .nav-item {
             position: relative;
             overflow: hidden;
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        
+
         .nav-item::before {
             content: '';
             position: absolute;
@@ -122,8 +135,8 @@ $currentPage = basename($_SERVER['PHP_SELF']);
             height: 100%;
             background: linear-gradient(90deg,
                 transparent,
-                rgba(99, 102, 241, 0.12),
-                rgba(129, 140, 248, 0.15),
+                rgba(99, 102, 241, 0.1),
+                rgba(129, 140, 248, 0.12),
                 transparent
             );
             transition: left 0.8s cubic-bezier(0.4, 0, 0.2, 1);
@@ -140,74 +153,79 @@ $currentPage = basename($_SERVER['PHP_SELF']);
             left: 0;
             width: 3px;
             height: 0;
-            background: linear-gradient(to bottom, #818cf8, #6366f1);
+            background: linear-gradient(to bottom, #6366f1, #4f46e5);
             transition: all 0.3s ease;
             transform: translateY(-50%);
-            border-radius: 0 3px 3px 0;
-            box-shadow: 0 0 8px rgba(99, 102, 241, 0.4);
+            border-radius: 0 2px 2px 0;
+            box-shadow: 0 0 8px rgba(99, 102, 241, 0.3);
         }
 
         .nav-item:hover::after {
             height: 70%;
+            box-shadow: 0 0 12px rgba(99, 102, 241, 0.5);
         }
-        
+
+        /* Active Navigation State */
         .active-nav {
             background: linear-gradient(135deg,
-                rgba(79, 70, 229, 0.15) 0%,
-                rgba(99, 102, 241, 0.25) 50%,
-                rgba(79, 70, 229, 0.15) 100%
+                rgba(99, 102, 241, 0.15) 0%,
+                rgba(129, 140, 248, 0.2) 50%,
+                rgba(99, 102, 241, 0.15) 100%
             );
-            border: 1px solid rgba(99, 102, 241, 0.4);
+            border: 1px solid rgba(99, 102, 241, 0.3);
             box-shadow:
-                0 0 20px rgba(79, 70, 229, 0.2),
-                0 4px 16px rgba(99, 102, 241, 0.15),
-                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+                0 0 20px rgba(99, 102, 241, 0.15),
+                0 4px 16px rgba(99, 102, 241, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.08);
         }
 
         .active-nav::after {
             height: 70%;
             background: linear-gradient(to bottom, #6366f1, #4f46e5);
-            box-shadow: 0 0 12px rgba(99, 102, 241, 0.6);
+            box-shadow: 0 0 12px rgba(99, 102, 241, 0.5);
         }
-        
+
+        /* Icons */
         .nav-icon {
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        
+
         .nav-item:hover .nav-icon {
-            transform: scale(1.15) rotate(8deg);
+            transform: scale(1.15) rotate(5deg);
             color: #818cf8;
-            filter: drop-shadow(0 0 10px rgba(129, 140, 248, 0.5));
+            filter: drop-shadow(0 0 8px rgba(129, 140, 248, 0.4));
         }
 
         .active-nav .nav-icon {
             color: #a5b4fc;
             transform: scale(1.1);
-            filter: drop-shadow(0 0 12px rgba(165, 180, 252, 0.6));
+            filter: drop-shadow(0 0 10px rgba(165, 180, 252, 0.5));
         }
-        
+
+        /* Danger Hover State */
         .danger-hover:hover {
-            background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.3) 100%);
-            border: 1px solid rgba(239, 68, 68, 0.4);
-            box-shadow: 0 8px 32px rgba(239, 68, 68, 0.2);
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.2) 100%);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            box-shadow: 0 8px 24px rgba(239, 68, 68, 0.15);
         }
-        
+
         .danger-hover:hover .nav-icon {
             color: #ef4444;
             filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.4));
         }
-        
+
+        /* Sidebar Gradient Background */
         .sidebar-gradient {
             background: linear-gradient(180deg,
-                #0a0e1a 0%,
-                #0f1419 15%,
-                #111827 30%,
-                #1a1f2e 60%,
-                #111827 85%,
+                #0f172a 0%,
+                #1e293b 15%,
+                #1a1f35 30%,
+                #0f172a 60%,
+                #1a1f35 85%,
                 #0f1419 100%
             );
             position: relative;
-            box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.4);
         }
 
         .sidebar-gradient::before {
@@ -218,44 +236,51 @@ $currentPage = basename($_SERVER['PHP_SELF']);
             right: 0;
             bottom: 0;
             background:
-                radial-gradient(circle at 20% 30%, rgba(79, 70, 229, 0.08) 0%, transparent 50%),
-                radial-gradient(circle at 80% 70%, rgba(16, 185, 129, 0.06) 0%, transparent 50%),
-                linear-gradient(135deg, rgba(99, 102, 241, 0.03) 0%, transparent 60%);
+                radial-gradient(circle at 20% 30%, rgba(99, 102, 241, 0.06) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(16, 185, 129, 0.04) 0%, transparent 50%),
+                linear-gradient(135deg, rgba(99, 102, 241, 0.02) 0%, transparent 60%);
             pointer-events: none;
         }
-        
+
+        /* Logo Animation */
         .logo-glow {
             animation: glow 4s ease-in-out infinite alternate;
         }
-        
+
+        /* Custom Scrollbar */
         .scrollbar-thin::-webkit-scrollbar {
             width: 6px;
         }
-        
+
         .scrollbar-thin::-webkit-scrollbar-track {
             background: rgba(255, 255, 255, 0.05);
             border-radius: 6px;
         }
-        
+
         .scrollbar-thin::-webkit-scrollbar-thumb {
-            background: linear-gradient(to bottom, rgba(99, 102, 241, 0.6), rgba(79, 70, 229, 0.4));
+            background: linear-gradient(to bottom, rgba(99, 102, 241, 0.5), rgba(79, 70, 229, 0.3));
             border-radius: 6px;
+            transition: all 0.3s ease;
         }
 
         .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-            background: linear-gradient(to bottom, rgba(129, 140, 248, 0.8), rgba(99, 102, 241, 0.6));
+            background: linear-gradient(to bottom, rgba(129, 140, 248, 0.7), rgba(99, 102, 241, 0.5));
         }
-        
+
+        /* Mobile Overlay */
         .mobile-overlay {
             backdrop-filter: blur(12px);
-            background: rgba(0, 0, 0, 0.6);
+            background: rgba(0, 0, 0, 0.5);
+            transition: opacity 0.3s ease;
         }
-        
+
+        /* Section Titles */
         .section-title {
             position: relative;
             overflow: hidden;
+            transition: all 0.3s ease;
         }
-        
+
         .section-title::before {
             content: '';
             position: absolute;
@@ -265,43 +290,52 @@ $currentPage = basename($_SERVER['PHP_SELF']);
             height: 2px;
             background: linear-gradient(to right, #6366f1, #818cf8, #a5b4fc);
             border-radius: 1px;
-            box-shadow: 0 0 6px rgba(99, 102, 241, 0.5);
+            box-shadow: 0 0 6px rgba(99, 102, 241, 0.4);
+            transition: width 0.3s ease;
         }
-        
+
+        .section-title:hover::before {
+            width: 40px;
+        }
+
+        /* Navigation Description */
         .nav-description {
             transition: all 0.3s ease;
         }
-        
+
         .nav-item:hover .nav-description {
-            color: #d1d5db;
+            color: #cbd5e1;
+            opacity: 1;
         }
-        
+
+        /* Floating Elements */
         .floating-elements {
             position: absolute;
             top: 20%;
             right: 10px;
-            opacity: 0.1;
+            opacity: 0.08;
             pointer-events: none;
         }
-        
+
         .floating-elements i {
             display: block;
             margin: 20px 0;
             animation: float 4s ease-in-out infinite;
         }
-        
+
         .floating-elements i:nth-child(2) {
             animation-delay: 1s;
         }
-        
+
         .floating-elements i:nth-child(3) {
             animation-delay: 2s;
         }
-        
+
+        /* Status Indicator */
         .status-indicator {
             position: relative;
         }
-        
+
         .status-indicator::before {
             content: '';
             position: absolute;
@@ -312,31 +346,41 @@ $currentPage = basename($_SERVER['PHP_SELF']);
             background: #10b981;
             border-radius: 50%;
             animation: pulse-soft 2s ease-in-out infinite;
+            box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
         }
-        
+
+        /* Mobile Sidebar */
         @media (max-width: 1023px) {
             .sidebar-mobile {
                 transform: translateX(-100%);
                 transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             }
-            
+
             .sidebar-mobile.open {
                 transform: translateX(0);
             }
         }
-        
+
+        /* Dropdown Menu */
         .dropdown-menu {
-            background: rgba(31, 41, 55, 0.95);
+            background: rgba(30, 41, 59, 0.9);
             backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(148, 163, 184, 0.15);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
         }
-        
+
+        .dropdown-menu:hover {
+            border-color: rgba(148, 163, 184, 0.25);
+        }
+
+        /* Dropdown Items */
         .dropdown-item {
             position: relative;
             overflow: hidden;
+            transition: all 0.3s ease;
         }
-        
+
         .dropdown-item::before {
             content: '';
             position: absolute;
@@ -347,17 +391,19 @@ $currentPage = basename($_SERVER['PHP_SELF']);
             background: linear-gradient(to bottom, #818cf8, #6366f1);
             transition: height 0.3s ease;
             transform: translateY(-50%);
-            box-shadow: 0 0 6px rgba(99, 102, 241, 0.5);
+            box-shadow: 0 0 6px rgba(99, 102, 241, 0.3);
         }
 
         .dropdown-item:hover::before {
             height: 60%;
+            box-shadow: 0 0 8px rgba(99, 102, 241, 0.5);
         }
-        
+
+        /* Fade In Up Animation */
         .animate-fade-in-up {
             animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        
+
         @keyframes fadeInUp {
             from {
                 opacity: 0;
@@ -368,9 +414,10 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                 transform: translateY(0);
             }
         }
-        
+
+        /* Shimmer Effect */
         .shimmer {
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.04), transparent);
             background-size: 200% 100%;
             animation: shimmer 3s linear infinite;
         }
@@ -408,15 +455,16 @@ $currentPage = basename($_SERVER['PHP_SELF']);
             display: none;
         }
 
+        /* Toggle Icon */
         .toggle-icon {
-            transition: transform 0.3s ease;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         #sidebar.sidebar-collapsed .toggle-icon {
             transform: rotate(180deg);
         }
 
-        /* Fix pour le scroll avec sidebar sticky */
+        /* Content Wrapper */
         @media (min-width: 1024px) {
             .content-wrapper {
                 height: 100vh;
@@ -795,11 +843,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                 <?php if (canAccess($conn, $adminId, 'tresorerie')): ?>
                 <a href="./tresorerie_globale.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                     <i class="fas fa-chart-line mr-3 w-5 text-sm"></i>
-                    <span class="font-medium">Trésorerie Globale</span>
-                </a>
-                <a href="./tresorerie.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
-                    <i class="fas fa-piggy-bank mr-3 w-5 text-sm"></i>
-                    <span class="font-medium">Trésorerie Détaillée</span>
+                    <span class="font-medium">Trésorerie</span>
                 </a>
                 <?php endif; ?>
 
@@ -811,7 +855,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                 <?php endif; ?>
 
                 <?php if (canAccess($conn, $adminId, 'factures_fournisseur')): ?>
-                <a href="./factures_fournisseur.php" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
+                <a href="./fournisseurs.php?mode=factures" class="dropdown-item flex items-center px-4 py-3 text-gray-300 hover:bg-primary/20 hover:text-white rounded-lg transition-all duration-300">
                     <i class="fas fa-file-invoice mr-3 w-5 text-sm"></i>
                     <span class="font-medium">Factures Fournisseurs</span>
                 </a>

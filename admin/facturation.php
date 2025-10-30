@@ -150,7 +150,7 @@ $stats_factures = $stmt_stats->fetch(PDO::FETCH_ASSOC);
                                 <a href="rapports.php" class="text-gray-600 hover:bg-gray-100 px-4 py-2 rounded-lg text-sm font-medium">
                                     <i class="fas fa-chart-bar mr-1"></i>Rapports
                                 </a>
-                                <a href="tresorerie.php" class="text-gray-600 hover:bg-gray-100 px-4 py-2 rounded-lg text-sm font-medium">
+                                <a href="tresorerie_globale.php" class="text-gray-600 hover:bg-gray-100 px-4 py-2 rounded-lg text-sm font-medium">
                                     <i class="fas fa-wallet mr-1"></i>Trésorerie
                                 </a>
                             </div>

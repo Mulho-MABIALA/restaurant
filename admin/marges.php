@@ -88,7 +88,7 @@ $marge_moyenne = count($marges) > 0 ? $total_marges / count($marges) : 0;
                             <a href="dashboard.php" class="text-gray-600 hover:text-blue-600"><i class="fas fa-chart-line mr-1"></i>Dashboard</a>
                             <a href="fournisseurs.php" class="text-gray-600 hover:text-blue-600"><i class="fas fa-truck mr-1"></i>Fournisseurs</a>
                             <a href="rapports.php" class="text-gray-600 hover:text-blue-600"><i class="fas fa-file-alt mr-1"></i>Rapports</a>
-                            <a href="tresorerie.php" class="text-gray-600 hover:text-blue-600"><i class="fas fa-cash-register mr-1"></i>Trésorerie</a>
+                            <a href="tresorerie_globale.php" class="text-gray-600 hover:text-blue-600"><i class="fas fa-cash-register mr-1"></i>Trésorerie</a>
                             <a href="alertes.php" class="text-gray-600 hover:text-blue-600"><i class="fas fa-bell mr-1"></i>Alertes</a>
                         </div>
                     </div>

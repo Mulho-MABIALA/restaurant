@@ -159,7 +159,7 @@ $ca_quotidien_moyen = $stats['ca_total'] / $nb_jours;
                                 <a href="rapports.php" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
                                     <i class="fas fa-chart-bar mr-1"></i>Rapports
                                 </a>
-                                <a href="tresorerie.php" class="text-gray-600 hover:bg-gray-100 px-4 py-2 rounded-lg text-sm font-medium">
+                                <a href="tresorerie_globale.php" class="text-gray-600 hover:bg-gray-100 px-4 py-2 rounded-lg text-sm font-medium">
                                     <i class="fas fa-wallet mr-1"></i>Trésorerie
                                 </a>
                             </div>
@@ -405,7 +405,7 @@ $ca_quotidien_moyen = $stats['ca_total'] / $nb_jours;
         function exporterPDF() {
             const dateDebut = document.getElementById('dateDebut').value;
             const dateFin = document.getElementById('dateFin').value;
-            window.open(`../../api/export_rapport.php?date_debut=${dateDebut}&date_fin=${dateFin}`, '_blank');
+            window.open(`../api/export_rapport.php?date_debut=${dateDebut}&date_fin=${dateFin}&format=csv`, '_blank');
         }
     </script>
 

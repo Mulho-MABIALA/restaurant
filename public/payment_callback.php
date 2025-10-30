@@ -105,8 +105,16 @@ try {
                     error_log("Failed to send confirmation email: " . $e->getMessage());
                 }
 
+                // Stocker les infos pour le modal newsletter
+                if (!empty($commande['email'])) {
+                    $_SESSION['commande_id'] = $commande['id'];
+                    $_SESSION['commande_email'] = $commande['email'];
+                    $_SESSION['commande_nom'] = $commande['nom_client'];
+                    $_SESSION['show_newsletter_modal'] = true;
+                }
+
                 // Rediriger vers page de succès
-                header('Location: confirmation.php?id=' . $commande['id'] . '&payment_success=1');
+                header('Location: confirmation.php?commande=' . $commande['id'] . '&payment_success=1');
                 exit;
             } else {
                 // Paiement échoué ou en attente
